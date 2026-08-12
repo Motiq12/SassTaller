@@ -1,0 +1,54 @@
+<ion-content class="motiq-fondo">
+  <div class="caja">
+    <div class="cabecera">
+      <img [src]="producto.logo" [alt]="producto.nombre" class="iso" />
+      <h1>{{ producto.nombre }}</h1>
+      <p class="sub">Panel de la plataforma</p>
+    </div>
+
+    <form (ngSubmit)="entrar()">
+      <ion-list lines="none" class="campos">
+        <ion-item>
+          <ion-input
+            label="Correo"
+            labelPlacement="stacked"
+            type="email"
+            inputmode="email"
+            autocomplete="username"
+            name="email"
+            [(ngModel)]="email"
+            placeholder="vos@motiq.cr"
+            required>
+          </ion-input>
+        </ion-item>
+
+        <ion-item>
+          <!-- El ojo es el de Ionic y no uno propio: maneja él el aria-label según el
+               estado. Hacerlo a mano con [attr.aria-label] sobre un ion-button rompe
+               (el watcher de aria del componente corre antes de que exista). -->
+          <ion-input
+            label="Contraseña"
+            labelPlacement="stacked"
+            type="password"
+            autocomplete="current-password"
+            name="password"
+            [(ngModel)]="password"
+            required>
+            <ion-input-password-toggle slot="end"></ion-input-password-toggle>
+          </ion-input>
+        </ion-item>
+      </ion-list>
+
+      <ion-text color="danger" *ngIf="error">
+        <p class="error" role="alert">{{ error }}</p>
+      </ion-text>
+
+      <ion-button expand="block" type="submit" [disabled]="cargando || !email.trim() || !password">
+        <ion-spinner *ngIf="cargando" name="crescent"></ion-spinner>
+        <span *ngIf="!cargando">Entrar</span>
+      </ion-button>
+    </form>
+
+    <p class="pie">Acceso restringido al equipo de {{ producto.nombre }}.</p>
+  </div>
+</ion-content>

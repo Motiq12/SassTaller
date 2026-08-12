@@ -1,0 +1,178 @@
+// Azul marino fijo, no la variable de marca: acá se ven todos los talleres a la vez
+// y el panel no es de ninguno.
+.barra-motiq {
+  --background: #1e3a5f;
+  --color: #fff;
+
+  ion-title {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-weight: 600;
+    padding-inline: 0.75rem;
+  }
+
+  .iso {
+    width: 26px;
+    height: 26px;
+    object-fit: contain;
+    border-radius: 7px;
+    background: #fff;
+    padding: 2px;
+  }
+
+  .quien {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.75);
+    margin-right: 0.35rem;
+  }
+
+  ion-button { --color: #fff; }
+}
+
+.fondo-motiq { --background: var(--ion-color-light, #f4f5f8); }
+
+// Las tarjetas NO llevan blanco fijo. Con el sistema en modo oscuro, el texto del
+// tema es blanco: sobre un fondo blanco a la fuerza, el nombre del taller quedaba
+// invisible. Van con los tokens del tema, que ya cambian solos.
+%tarjeta {
+  background: var(--ion-card-background, var(--ion-item-background, #fff));
+  color: var(--ion-text-color, #000);
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.contenido {
+  max-width: 940px;
+  margin: 0 auto;
+  padding: 1rem 1rem 2.5rem;
+}
+
+.tarjetas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+
+  .tarjeta {
+    @extend %tarjeta;
+    padding: 1rem;
+    text-align: center;
+  }
+
+  .cifra {
+    display: block;
+    font-size: 1.9rem;
+    font-weight: 700;
+    line-height: 1.1;
+
+    &.activo { color: var(--ion-color-success, #2dd36f); }
+    &.suspendido { color: var(--ion-color-danger, #eb445a); }
+  }
+
+  .rotulo {
+    font-size: 0.8rem;
+    color: var(--ion-color-medium, #92949c);
+  }
+}
+
+.uso {
+  margin: 0.9rem 0 0.4rem;
+  font-size: 0.88rem;
+  color: var(--ion-color-medium-shade, #808289);
+  text-align: center;
+}
+
+.filtros {
+  margin: 0.75rem 0 1rem;
+
+  ion-searchbar {
+    --box-shadow: none;
+    --background: var(--ion-item-background, #fff);
+    padding-inline: 0;
+  }
+  ion-segment { margin-top: 0.4rem; }
+}
+
+.taller {
+  @extend %tarjeta;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+
+  .cabecera {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  h2 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+
+  .slug {
+    font-size: 0.8rem;
+    color: var(--ion-color-medium, #92949c);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  .motivo {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0.6rem 0 0;
+    padding: 0.5rem 0.65rem;
+    border-radius: 8px;
+    background: rgba(235, 68, 90, 0.08);
+    color: var(--ion-color-danger-shade, #cf3c4f);
+    font-size: 0.85rem;
+  }
+
+  .numeros {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1rem;
+    margin-top: 0.7rem;
+    font-size: 0.85rem;
+    color: var(--ion-color-medium-shade, #808289);
+  }
+
+  .pie {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    // currentColor con alpha en vez de negro: se ve tanto sobre tarjeta clara como oscura.
+    border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  }
+
+  .desde {
+    font-size: 0.78rem;
+    color: var(--ion-color-medium, #92949c);
+  }
+
+  .acciones {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+}
+
+.vacio {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--ion-color-medium, #92949c);
+
+  ion-icon { font-size: 2.5rem; opacity: 0.5; }
+  p { margin: 0.5rem 0 0; }
+}
+
+.cargando {
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem;
+}

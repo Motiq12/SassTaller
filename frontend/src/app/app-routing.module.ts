@@ -15,6 +15,12 @@ const routes: Routes = [
     path: 'registro-taller',
     loadChildren: () => import('./pages/registro-taller/registro-taller.module').then(m => m.RegistroTallerPageModule),
   },
+  // Panel de la plataforma. Va suelto, sin AuthGuard: no es un rol más dentro de un
+  // taller sino una sesión aparte, con su propio token y su propio guard.
+  {
+    path: 'motiq',
+    loadChildren: () => import('./pages/motiq/motiq.module').then(m => m.MotiqPageModule),
+  },
   {
     path: 'portal',
     loadChildren: () => import('./pages/portal/portal.module').then(m => m.PortalPageModule),

@@ -5,15 +5,26 @@ import { catchError } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { PortalService } from '../services/portal.service';
+import { MotiqService } from '../services/motiq.service';
 
 @Injectable()
 export class AuthInterceptor implements HttpInterceptor {
-  constructor(private auth: AuthService, private portal: PortalService, private router: Router) {}
+  constructor(
+    private auth: AuthService,
+    private portal: PortalService,
+    private motiq: MotiqService,
+    private router: Router,
+  ) {}
 
   intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    // Las llamadas al portal del cliente usan su propio token; el resto, el del personal.
+    // Hay tres sesiones que pueden convivir en el mismo navegador y cada una tiene su
+    // token: el personal del taller, el cliente del portal y el admin de la plataforma.
+    // Se elige por la ruta a la que va la llamada — mandar el que no es sería un 403.
     const esPortal = req.url.includes('/api/portal');
-    const token = esPortal ? this.portal.getToken() : this.auth.getToken();
+    const esMotiq = req.url.includes('/api/motiq');
+    const token = esPortal ? this.portal.getToken()
+      : esMotiq ? this.motiq.getToken()
+      : this.auth.getToken();
 
     const authReq = token
       ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
@@ -27,6 +38,9 @@ export class AuthInterceptor implements HttpInterceptor {
           if (esPortal) {
             this.portal.logout();
             this.router.navigate(['/portal/login']);
+          } else if (esMotiq) {
+            this.motiq.logout();
+            this.router.navigate(['/motiq/login']);
           } else {
             this.auth.logout();
             this.router.navigate(['/login']);

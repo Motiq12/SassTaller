@@ -1,0 +1,78 @@
+// El panel de la plataforma se ve distinto al de un taller a propósito: quien entra
+// acá está mirando TODOS los talleres, y confundirse de pantalla sería caro.
+.motiq-fondo {
+  --background: linear-gradient(160deg, #16283f 0%, #1e3a5f 55%, #24486f 100%);
+}
+
+.caja {
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 3rem 1.25rem 2rem;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.cabecera {
+  text-align: center;
+  margin-bottom: 1.75rem;
+
+  .iso {
+    width: 76px;
+    height: 76px;
+    object-fit: contain;
+    border-radius: 18px;
+    background: #fff;
+    padding: 8px;
+  }
+
+  h1 {
+    margin: 0.85rem 0 0;
+    color: #fff;
+    font-size: 1.7rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .sub {
+    margin: 0.25rem 0 0;
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 0.95rem;
+  }
+}
+
+.campos {
+  background: transparent;
+  margin-bottom: 0.5rem;
+
+  ion-item {
+    --background: rgba(255, 255, 255, 0.08);
+    --color: #fff;
+    --placeholder-color: rgba(255, 255, 255, 0.5);
+    --highlight-color-focused: #fff;
+    border-radius: 12px;
+    margin-bottom: 0.7rem;
+  }
+}
+
+.error {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+ion-button[type='submit'] {
+  --background: #fff;
+  --color: #1e3a5f;
+  --border-radius: 12px;
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+.pie {
+  margin-top: 2rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.8rem;
+}

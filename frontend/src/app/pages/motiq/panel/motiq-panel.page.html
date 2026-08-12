@@ -1,0 +1,113 @@
+<ion-header class="ion-no-border">
+  <ion-toolbar class="barra-motiq">
+    <ion-title>
+      <img [src]="producto.logo" [alt]="producto.nombre" class="iso" />
+      <span>{{ producto.nombre }}</span>
+    </ion-title>
+    <ion-buttons slot="end">
+      <span class="quien" *ngIf="admin">{{ admin.nombre }}</span>
+      <ion-button (click)="salir()" aria-label="Cerrar sesión">
+        <ion-icon slot="icon-only" name="log-out-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="fondo-motiq">
+  <ion-refresher slot="fixed" (ionRefresh)="cargar($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <div class="contenido">
+    <!-- Resumen -->
+    <div class="tarjetas" *ngIf="resumen">
+      <div class="tarjeta">
+        <span class="cifra">{{ resumen.talleres.total }}</span>
+        <span class="rotulo">Talleres</span>
+      </div>
+      <div class="tarjeta">
+        <span class="cifra activo">{{ resumen.talleres.activos }}</span>
+        <span class="rotulo">Activos</span>
+      </div>
+      <div class="tarjeta">
+        <span class="cifra suspendido">{{ resumen.talleres.suspendidos }}</span>
+        <span class="rotulo">Suspendidos</span>
+      </div>
+      <div class="tarjeta">
+        <span class="cifra">{{ resumen.talleres.nuevos_30d }}</span>
+        <span class="rotulo">Nuevos (30 días)</span>
+      </div>
+    </div>
+
+    <div class="uso" *ngIf="resumen">
+      En total: <strong>{{ resumen.uso.usuarios }}</strong> usuarios ·
+      <strong>{{ resumen.uso.clientes }}</strong> clientes ·
+      <strong>{{ resumen.uso.vehiculos }}</strong> vehículos ·
+      <strong>{{ resumen.uso.ordenes }}</strong> órdenes
+    </div>
+
+    <!-- Filtros -->
+    <div class="filtros">
+      <ion-searchbar
+        placeholder="Buscar por nombre o identificador"
+        [value]="busqueda"
+        (ionInput)="alEscribir($any($event.target).value)"
+        debounce="0">
+      </ion-searchbar>
+      <ion-segment [(ngModel)]="filtroEstado" (ionChange)="cargarTalleres()" scrollable>
+        <ion-segment-button value=""><ion-label>Todos</ion-label></ion-segment-button>
+        <ion-segment-button value="activo"><ion-label>Activos</ion-label></ion-segment-button>
+        <ion-segment-button value="suspendido"><ion-label>Suspendidos</ion-label></ion-segment-button>
+        <ion-segment-button value="cancelado"><ion-label>Cancelados</ion-label></ion-segment-button>
+      </ion-segment>
+    </div>
+
+    <!-- Listado -->
+    <div class="vacio" *ngIf="!cargando && !talleres.length">
+      <ion-icon name="business-outline"></ion-icon>
+      <p *ngIf="busqueda || filtroEstado">Ningún taller coincide con eso.</p>
+      <p *ngIf="!busqueda && !filtroEstado">Todavía no hay talleres registrados.</p>
+    </div>
+
+    <div class="taller" *ngFor="let t of talleres">
+      <div class="cabecera">
+        <div class="quien-es">
+          <h2>{{ t.nombre }}</h2>
+          <span class="slug">{{ t.slug }}</span>
+        </div>
+        <ion-badge [color]="colorEstado(t.estado)">{{ t.estado }}</ion-badge>
+      </div>
+
+      <p class="motivo" *ngIf="t.estado !== 'activo' && t.motivo_estado">
+        <ion-icon name="alert-circle-outline"></ion-icon> {{ t.motivo_estado }}
+      </p>
+
+      <div class="numeros">
+        <span><strong>{{ t.usuarios }}</strong> usuarios</span>
+        <span><strong>{{ t.clientes }}</strong> clientes</span>
+        <span><strong>{{ t.vehiculos }}</strong> vehículos</span>
+        <span><strong>{{ t.ordenes }}</strong> órdenes</span>
+      </div>
+
+      <div class="pie">
+        <span class="desde">Desde {{ t.created_at | date: 'mediumDate' }}</span>
+        <div class="acciones">
+          <ion-button size="small" fill="clear" (click)="cambiarPlan(t)">
+            {{ rotuloPlan(t.plan) }}
+            <ion-icon slot="end" name="chevron-down-outline"></ion-icon>
+          </ion-button>
+          <ion-button size="small" fill="outline" color="success" *ngIf="t.estado !== 'activo'" (click)="reactivar(t)">
+            Reactivar
+          </ion-button>
+          <ion-button size="small" fill="outline" color="danger" *ngIf="t.estado === 'activo'" (click)="suspender(t)">
+            Suspender
+          </ion-button>
+        </div>
+      </div>
+    </div>
+
+    <div class="cargando" *ngIf="cargando">
+      <ion-spinner name="crescent"></ion-spinner>
+    </div>
+  </div>
+</ion-content>
