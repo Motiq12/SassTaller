@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { AlertController } from '@ionic/angular';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
-import { MotiqService, ResumenPlataforma, TallerDelPanel } from '../../../services/motiq.service';
+import { ContactoDemo, MotiqService, ResumenPlataforma, TallerDelPanel } from '../../../services/motiq.service';
 import { MarcaService } from '../../../services/marca.service';
 import { ToastService } from '../../../services/toast.service';
 import { PRODUCTO } from '../../../shared/producto';
@@ -27,11 +27,19 @@ export class MotiqPanelPage implements OnInit {
   talleres: TallerDelPanel[] = [];
   cargando = true;
 
+  // Dos bandejas: los que ya son clientes y los que preguntaron desde la landing.
+  vista: 'talleres' | 'contactos' = 'talleres';
+  contactos: ContactoDemo[] = [];
+  readonly ESTADOS_CONTACTO = ['nuevo', 'contactado', 'cerrado', 'descartado'];
+
   filtroEstado = '';
   busqueda = '';
   private escribiendo$ = new Subject<string>();
 
-  readonly PLANES = ['trial', 'basico', 'pro', 'enterprise'];
+  // Los mismos que acepta el backend (PLANES en motiq.routes.js). Tenía cuatro y dos
+  // no existían allá: elegirlos daba error 400. Mientras el plan no limite nada de
+  // verdad, inventar escalones acá es prometer algo que el sistema no cumple.
+  readonly PLANES = ['trial', 'pro'];
 
   constructor(
     private motiq: MotiqService,
@@ -56,7 +64,52 @@ export class MotiqPanelPage implements OnInit {
       next: (r) => (this.resumen = r.data),
       error: () => this.toast.error('No se pudo cargar el resumen'),
     });
+    this.cargarContactos();
     this.cargarTalleres(ev);
+  }
+
+  cargarContactos() {
+    this.motiq.contactos().subscribe({
+      next: (r) => (this.contactos = r.data),
+      error: () => this.toast.error('No se pudieron cargar los contactos'),
+    });
+  }
+
+  // Mover a alguien en el embudo, con la nota de qué pasó en la llamada. La nota es
+  // lo que evita que dentro de tres semanas nadie recuerde por qué se descartó.
+  async atender(c: ContactoDemo) {
+    const a = await this.alerta.create({
+      header: c.nombre,
+      subHeader: c.empresa || c.email,
+      inputs: [
+        ...this.ESTADOS_CONTACTO.map((e) => ({
+          type: 'radio' as const, label: this.rotuloContacto(e), value: e, checked: c.estado === e,
+        })),
+      ],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Guardar',
+          handler: (estado: string) => {
+            if (!estado || estado === c.estado) return true;
+            this.motiq.actualizarContacto(c.id, estado, c.nota_interna || '').subscribe({
+              next: () => { this.toast.success('Contacto actualizado'); this.cargar(); },
+              error: (e) => this.toast.error(e?.error?.error || 'No se pudo actualizar'),
+            });
+            return true;
+          },
+        },
+      ],
+    });
+    await a.present();
+  }
+
+  rotuloContacto(e: string): string {
+    return { nuevo: 'Sin atender', contactado: 'Ya lo contacté', cerrado: 'Cerrado', descartado: 'Descartado' }[e] || e;
+  }
+
+  colorContacto(e: string): string {
+    return { nuevo: 'warning', contactado: 'primary', cerrado: 'success', descartado: 'medium' }[e] || 'medium';
   }
 
   cargarTalleres(ev?: any) {

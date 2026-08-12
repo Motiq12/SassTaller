@@ -1,0 +1,306 @@
+// La landing se ve igual en modo claro y oscuro a propósito: es una página de venta,
+// y su identidad —el azul de Motiq— no debería cambiar según la configuración del
+// visitante. Por eso acá los colores van fijos y no con los tokens del tema, al revés
+// que en el panel.
+$marino: #1e3a5f;
+$marino-hondo: #16283f;
+$papel: #ffffff;
+$tinta: #16202c;
+$suave: #5b6876;
+
+.landing {
+  --background: #{$papel};
+  --color: #{$tinta};
+}
+
+.barra {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 1.25rem;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+
+  nav {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .enlace {
+    background: none;
+    border: 0;
+    padding: 0.45rem 0.7rem;
+    border-radius: 8px;
+    font: inherit;
+    font-size: 0.9rem;
+    color: $suave;
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover { color: $marino; background: rgba(30, 58, 95, 0.06); }
+  }
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  color: $marino;
+  font-size: 1.05rem;
+
+  .iso {
+    width: 30px;
+    height: 30px;
+    object-fit: contain;
+    border-radius: 8px;
+  }
+}
+
+.portada {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 4rem 1.25rem 3rem;
+  text-align: center;
+
+  h1 {
+    margin: 0;
+    font-size: clamp(1.9rem, 5.2vw, 3rem);
+    line-height: 1.12;
+    letter-spacing: -0.03em;
+    font-weight: 800;
+    color: $marino;
+  }
+
+  .bajada {
+    margin: 1.1rem auto 0;
+    max-width: 560px;
+    font-size: clamp(1rem, 2.3vw, 1.15rem);
+    line-height: 1.6;
+    color: $suave;
+  }
+
+  .acciones {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.6rem;
+    margin-top: 2rem;
+  }
+}
+
+// El botón de probar pesa más que el de hablar: la mayoría de los que llegan son
+// talleres chicos que se registran solos, y ese es el camino que queremos primero.
+.principal {
+  --background: #{$marino};
+  --background-hover: #{$marino-hondo};
+  --color: #fff;
+  --border-radius: 12px;
+  font-weight: 600;
+}
+
+.secundaria {
+  --border-radius: 12px;
+  --color: #{$marino};
+  --border-color: rgba(30, 58, 95, 0.35);
+  font-weight: 600;
+}
+
+.letra-chica {
+  margin-top: 0.9rem;
+  font-size: 0.83rem;
+  color: $suave;
+}
+
+.centrado { text-align: center; }
+
+.bloque {
+  padding: 3.25rem 1.25rem;
+  // La barra de arriba es fija: sin esto, saltar desde el menú deja el título de la
+  // sección escondido detrás de ella.
+  scroll-margin-top: 4rem;
+
+  > h2 {
+    max-width: 900px;
+    margin: 0 auto 1.75rem;
+    text-align: center;
+    font-size: clamp(1.4rem, 3.4vw, 1.9rem);
+    letter-spacing: -0.02em;
+    color: $marino;
+  }
+
+  > .centrado {
+    max-width: 620px;
+    margin: 0 auto;
+    color: $suave;
+    line-height: 1.65;
+  }
+
+  &.oscuro {
+    background: $marino;
+    color: rgba(255, 255, 255, 0.85);
+
+    > h2 { color: #fff; }
+    > .centrado { color: rgba(255, 255, 255, 0.78); }
+  }
+}
+
+.rejilla {
+  max-width: 900px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem 2rem;
+
+  ion-icon {
+    font-size: 1.7rem;
+    color: $marino;
+  }
+
+  h3 {
+    margin: 0.6rem 0 0.35rem;
+    font-size: 1.05rem;
+    color: $tinta;
+  }
+
+  p {
+    margin: 0;
+    color: $suave;
+    line-height: 1.6;
+    font-size: 0.95rem;
+  }
+}
+
+.dos {
+  max-width: 860px;
+  margin: 2rem auto 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+
+  > article {
+    padding: 1.5rem;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+
+    h3 { margin: 0 0 0.5rem; color: #fff; font-size: 1.1rem; }
+    p { margin: 0; line-height: 1.6; font-size: 0.95rem; }
+  }
+}
+
+.cta-chica {
+  --color: #fff;
+  --padding-start: 0;
+  margin-top: 0.75rem;
+  font-weight: 600;
+  text-transform: none;
+}
+
+.planes {
+  > .plan {
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    color: $tinta;
+
+    h3 { color: $marino; }
+    p, li { color: $suave; }
+
+    &.destacado {
+      border-color: $marino;
+      box-shadow: 0 6px 24px rgba(30, 58, 95, 0.13);
+    }
+
+    .precio {
+      margin: 0 0 1rem;
+      font-size: 1.7rem;
+      font-weight: 700;
+      color: $tinta;
+    }
+
+    ul {
+      margin: 0 0 1.25rem;
+      padding-left: 1.1rem;
+      line-height: 1.9;
+      font-size: 0.93rem;
+    }
+
+    ion-button { --border-radius: 10px; --background: #{$marino}; --color: #fff; }
+    ion-button[fill='outline'] { --background: transparent; --color: #{$marino}; --border-color: #{$marino}; }
+  }
+}
+
+.formulario {
+  max-width: 480px;
+  margin: 1.5rem auto 0;
+
+  .ayuda { margin: 0 0 1.25rem; font-size: 0.95rem; }
+
+  ion-list { background: transparent; }
+
+  ion-item {
+    --background: rgba(255, 255, 255, 0.08);
+    --color: #fff;
+    --placeholder-color: rgba(255, 255, 255, 0.5);
+    --highlight-color-focused: #fff;
+    border-radius: 12px;
+    margin-bottom: 0.6rem;
+  }
+
+  ion-button[type='submit'] {
+    --background: #fff;
+    --color: #{$marino};
+    --border-radius: 12px;
+    font-weight: 600;
+    margin-top: 0.75rem;
+  }
+
+  .error { text-align: center; font-size: 0.9rem; margin: 0.5rem 0 0; }
+  .letra-chica { color: rgba(255, 255, 255, 0.5); }
+}
+
+.gracias {
+  max-width: 440px;
+  margin: 1.5rem auto 0;
+  text-align: center;
+
+  ion-icon { font-size: 3rem; color: #6ee7a8; }
+  h3 { margin: 0.6rem 0 0.4rem; color: #fff; font-size: 1.2rem; }
+  p { margin: 0; color: rgba(255, 255, 255, 0.78); line-height: 1.6; }
+}
+
+.pie {
+  padding: 2.5rem 1.25rem 3rem;
+  text-align: center;
+  border-top: 1px solid rgba(0, 0, 0, 0.07);
+
+  .marca { justify-content: center; }
+
+  p {
+    margin: 0.5rem 0 1rem;
+    color: $suave;
+    font-size: 0.9rem;
+  }
+
+  nav {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+  }
+
+  a {
+    color: $marino;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+
+    &:hover { text-decoration: underline; }
+  }
+}

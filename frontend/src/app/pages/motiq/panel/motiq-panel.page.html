@@ -46,6 +46,56 @@
       <strong>{{ resumen.uso.ordenes }}</strong> órdenes
     </div>
 
+    <!-- Qué bandeja se está mirando -->
+    <ion-segment class="vistas" [(ngModel)]="vista">
+      <ion-segment-button value="talleres">
+        <ion-label>Talleres</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="contactos">
+        <ion-label>
+          Contactos
+          <ion-badge color="warning" *ngIf="resumen?.contactos?.sin_atender">
+            {{ resumen?.contactos?.sin_atender }}
+          </ion-badge>
+        </ion-label>
+      </ion-segment-button>
+    </ion-segment>
+
+    <!-- ===== Contactos de la landing ===== -->
+    <ng-container *ngIf="vista === 'contactos'">
+      <div class="vacio" *ngIf="!contactos.length">
+        <ion-icon name="mail-outline"></ion-icon>
+        <p>Nadie pidió una demo todavía.</p>
+      </div>
+
+      <div class="taller" *ngFor="let c of contactos">
+        <div class="cabecera">
+          <div class="quien-es">
+            <h2>{{ c.nombre }}</h2>
+            <span class="slug">{{ c.empresa || 'sin empresa' }}</span>
+          </div>
+          <ion-badge [color]="colorContacto(c.estado)">{{ rotuloContacto(c.estado) }}</ion-badge>
+        </div>
+
+        <div class="numeros">
+          <span><a [href]="'mailto:' + c.email">{{ c.email }}</a></span>
+          <span *ngIf="c.telefono"><a [href]="'tel:' + c.telefono">{{ c.telefono }}</a></span>
+          <span *ngIf="c.volumen">{{ c.volumen }} vehículos/mes</span>
+        </div>
+
+        <p class="motivo neutro" *ngIf="c.mensaje">{{ c.mensaje }}</p>
+
+        <div class="pie">
+          <span class="desde">{{ c.created_at | date: 'medium' }}</span>
+          <div class="acciones">
+            <ion-button size="small" fill="outline" (click)="atender(c)">Atender</ion-button>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- ===== Talleres ===== -->
+    <ng-container *ngIf="vista === 'talleres'">
     <!-- Filtros -->
     <div class="filtros">
       <ion-searchbar
@@ -109,5 +159,6 @@
     <div class="cargando" *ngIf="cargando">
       <ion-spinner name="crescent"></ion-spinner>
     </div>
+    </ng-container>
   </div>
 </ion-content>

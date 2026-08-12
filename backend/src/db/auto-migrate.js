@@ -583,6 +583,51 @@ async function ensureSchema() {
     await tryStep('fk citas.sucursal_id', () => addFkIfMissing('citas', 'fk_citas_sucursal', 'sucursal_id', 'sucursales', 'id'));
     await tryStep('fk ordenes.sucursal_id', () => addFkIfMissing('ordenes_trabajo', 'fk_ordenes_sucursal', 'sucursal_id', 'sucursales', 'id'));
     await tryStep('fk usuarios.sucursal_id', () => addFkIfMissing('usuarios', 'fk_usuarios_sucursal', 'sucursal_id', 'sucursales', 'id'));
+
+    // ---- Plataforma (migraciones 004 y 005) ----
+    // Van acá y no solo en migrations/*.sql para que una base que ya existía se ponga
+    // al día sola al arrancar. Sin esto, quien no reimporte el volcado arranca sin
+    // estas tablas y el panel de Motiq revienta al primer request.
+    //
+    // plataforma_admins NO es una tabla de taller: no lleva tenant_id, y su correo es
+    // único global. Es la diferencia de fondo con `usuarios`, donde el mismo correo
+    // puede repetirse en talleres distintos.
+    await tryStep('tabla plataforma_admins', () => pool.query(
+      `CREATE TABLE IF NOT EXISTS plataforma_admins (
+         id            INT AUTO_INCREMENT PRIMARY KEY,
+         nombre        VARCHAR(120) NOT NULL,
+         email         VARCHAR(150) NOT NULL,
+         password_hash VARCHAR(255) NOT NULL,
+         activo        TINYINT(1) NOT NULL DEFAULT 1,
+         ultimo_acceso DATETIME NULL,
+         created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+         updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+         UNIQUE KEY uq_plataforma_email (email)
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+    ));
+    await addColumnIfMissing('tenants', 'motivo_estado', 'VARCHAR(200) NULL');
+    await addColumnIfMissing('tenants', 'trial_hasta', 'DATE NULL');
+    await crearIndiceSiFalta('tenants', 'idx_tenants_estado', '(estado)');
+
+    // Quien pide una demo desde la landing. Tampoco lleva tenant_id: todavía no es
+    // un taller del sistema, es alguien de afuera preguntando.
+    await tryStep('tabla contactos_demo', () => pool.query(
+      `CREATE TABLE IF NOT EXISTS contactos_demo (
+         id           INT AUTO_INCREMENT PRIMARY KEY,
+         nombre       VARCHAR(120) NOT NULL,
+         email        VARCHAR(150) NOT NULL,
+         telefono     VARCHAR(40)  NULL,
+         empresa      VARCHAR(150) NULL,
+         volumen      VARCHAR(40)  NULL,
+         mensaje      TEXT NULL,
+         estado       ENUM('nuevo','contactado','cerrado','descartado') NOT NULL DEFAULT 'nuevo',
+         nota_interna VARCHAR(500) NULL,
+         origen       VARCHAR(80) NULL,
+         created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+         updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+         INDEX idx_contactos_estado (estado, created_at)
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+    ));
   } catch (err) {
     console.error('⚠️  Auto-migración falló:', err.code || err.message);
   }

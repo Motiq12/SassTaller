@@ -48,7 +48,102 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// POST /api/motiq/contacto — "Hablá con nosotros" de la landing. PÚBLICO.
+//
+// Va antes del authPlataforma de abajo a propósito: quien escribe todavía no es
+// cliente ni tiene cuenta, es justamente alguien de afuera preguntando. Es el único
+// endpoint de este archivo que no exige sesión, y por eso lleva su propio límite.
+router.post('/contacto', async (req, res) => {
+  try {
+    const { nombre, email, telefono, empresa, volumen, mensaje, origen } = req.body;
+    const correo = String(email || '').trim().toLowerCase();
+
+    if (!String(nombre || '').trim()) return res.status(400).json({ error: 'Falta tu nombre' });
+    if (!emailValido(correo)) return res.status(400).json({ error: 'El correo no parece válido' });
+
+    // Un formulario público abierto se llena de basura automática en cuestión de días.
+    // El límite es por IP y generoso para una persona real: nadie pide tres demos.
+    const limite = consumir(`contacto:${req.ip}`, { porMinuto: 2, porHora: 6 });
+    if (!limite.ok) {
+      return res.status(429).json({ error: 'Ya recibimos tu mensaje. Te escribimos pronto.' });
+    }
+
+    // Si el mismo correo ya escribió y todavía no lo atendieron, se actualiza en vez
+    // de duplicar: quien insiste porque no le contestaron no debería aparecer tres
+    // veces en la bandeja y hacer parecer que hay tres clientes.
+    const [[previo]] = await pool.query(
+      `SELECT id FROM contactos_demo WHERE email = ? AND estado = 'nuevo' LIMIT 1`, [correo]
+    );
+
+    const datos = [
+      String(nombre).trim().slice(0, 120),
+      correo,
+      String(telefono || '').trim().slice(0, 40) || null,
+      String(empresa || '').trim().slice(0, 150) || null,
+      String(volumen || '').trim().slice(0, 40) || null,
+      String(mensaje || '').trim().slice(0, 2000) || null,
+      String(origen || '').trim().slice(0, 80) || null,
+    ];
+
+    if (previo) {
+      await pool.query(
+        `UPDATE contactos_demo
+            SET nombre = ?, email = ?, telefono = ?, empresa = ?, volumen = ?, mensaje = ?, origen = ?
+          WHERE id = ?`,
+        [...datos, previo.id]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO contactos_demo (nombre, email, telefono, empresa, volumen, mensaje, origen)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        datos
+      );
+    }
+
+    res.status(201).json({ message: 'Recibimos tu mensaje. Te contactamos en menos de un día hábil.' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
 router.use(authPlataforma);
+
+// GET /api/motiq/contactos?estado= — la bandeja de quienes pidieron una demo.
+router.get('/contactos', async (req, res) => {
+  try {
+    const ESTADOS_C = ['nuevo', 'contactado', 'cerrado', 'descartado'];
+    const where = ESTADOS_C.includes(req.query.estado) ? 'WHERE estado = ?' : '';
+    const [filas] = await pool.query(
+      `SELECT id, nombre, email, telefono, empresa, volumen, mensaje, estado, nota_interna, origen, created_at
+         FROM contactos_demo ${where}
+        ORDER BY estado = 'nuevo' DESC, created_at DESC
+        LIMIT 200`,
+      where ? [req.query.estado] : []
+    );
+    res.json({ data: filas });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// PATCH /api/motiq/contactos/:id — mover en el embudo y anotar qué pasó.
+router.patch('/contactos/:id', async (req, res) => {
+  try {
+    const ESTADOS_C = ['nuevo', 'contactado', 'cerrado', 'descartado'];
+    const { estado, nota_interna } = req.body;
+    if (!ESTADOS_C.includes(estado)) {
+      return res.status(400).json({ error: `Estado inválido (${ESTADOS_C.join(', ')})` });
+    }
+    const [r] = await pool.query(
+      'UPDATE contactos_demo SET estado = ?, nota_interna = ? WHERE id = ?',
+      [estado, String(nota_interna || '').trim().slice(0, 500) || null, req.params.id]
+    );
+    if (!r.affectedRows) return res.status(404).json({ error: 'Contacto no encontrado' });
+    res.json({ message: 'Contacto actualizado' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
 
 // GET /api/motiq/resumen — el estado del negocio de un vistazo.
 router.get('/resumen', async (req, res) => {
@@ -69,7 +164,12 @@ router.get('/resumen', async (req, res) => {
               (SELECT COUNT(*) FROM vehiculos)       AS vehiculos,
               (SELECT COUNT(*) FROM ordenes_trabajo) AS ordenes`
     );
-    res.json({ data: { talleres: t, uso } });
+    // Cuántos pidieron una demo y nadie atendió todavía. Es lo que hay que mirar
+    // primero al abrir el panel: un contacto sin responder se enfría rápido.
+    const [[c]] = await pool.query(
+      `SELECT COUNT(*) AS sin_atender FROM contactos_demo WHERE estado = 'nuevo'`
+    );
+    res.json({ data: { talleres: t, uso, contactos: c } });
   } catch (err) {
     fail(res, err);
   }

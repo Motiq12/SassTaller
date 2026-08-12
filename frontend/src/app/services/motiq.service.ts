@@ -40,6 +40,25 @@ export interface TallerDelPanel {
 export interface ResumenPlataforma {
   talleres: { total: number; activos: number; suspendidos: number; en_prueba: number; nuevos_30d: number };
   uso: { usuarios: number; clientes: number; vehiculos: number; ordenes: number };
+  contactos: { sin_atender: number };
+}
+
+// Lo que manda la landing cuando alguien pide una demo.
+export interface PedidoDemo {
+  nombre: string;
+  email: string;
+  telefono?: string;
+  empresa?: string;
+  volumen?: string;
+  mensaje?: string;
+  origen?: string;
+}
+
+export interface ContactoDemo extends PedidoDemo {
+  id: number;
+  estado: 'nuevo' | 'contactado' | 'cerrado' | 'descartado';
+  nota_interna: string | null;
+  created_at: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -85,6 +104,24 @@ export class MotiqService {
     } catch {
       return true;   // token ilegible: tratarlo como vencido
     }
+  }
+
+  // --- Público: lo usa la landing, sin sesión de por medio ---
+
+  pedirDemo(datos: PedidoDemo): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/motiq/contacto`, datos);
+  }
+
+  // --- Con sesión de plataforma ---
+
+  contactos(estado = ''): Observable<{ data: ContactoDemo[] }> {
+    return this.http.get<{ data: ContactoDemo[] }>(
+      `${this.apiUrl}/motiq/contactos${estado ? `?estado=${encodeURIComponent(estado)}` : ''}`
+    );
+  }
+
+  actualizarContacto(id: number, estado: string, nota_interna?: string): Observable<{ message: string }> {
+    return this.http.patch<{ message: string }>(`${this.apiUrl}/motiq/contactos/${id}`, { estado, nota_interna });
   }
 
   resumen(): Observable<{ data: ResumenPlataforma }> {
