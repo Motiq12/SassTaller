@@ -30,7 +30,7 @@ function logoDesdeDataUrl(logo) {
 // correo del destinatario, que no manda cabeceras de sesión.
 router.get('/logo', async (req, res) => {
   try {
-    const { logo } = await getConfig();
+    const { logo } = await getConfig(req.db);
     const img = logoDesdeDataUrl(logo);
     if (!img) {
       // Sin logo cargado (o con un valor que no sabemos interpretar): se cae al que
@@ -54,7 +54,7 @@ router.get('/logo', async (req, res) => {
 // personal: no expone nada sensible, pero tampoco hace falta que sea público.
 router.get('/', auth, async (req, res) => {
   try {
-    const c = await getConfig();
+    const c = await getConfig(req.db);
     res.json({
       data: {
         nombre_taller: c.nombre_taller,

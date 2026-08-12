@@ -67,8 +67,8 @@ router.post('/', soloRoles(...GESTIONA_AGENDA), async (req, res) => {
     if (!textoDentroDeLimite(motivo, MAX_MOTIVO)) {
       return res.status(400).json({ error: `motivo no puede exceder ${MAX_MOTIVO} caracteres` });
     }
-    const sucursal_id = (await sucursalValida(req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
-    if (!(await tecnicoEnSucursal(tecnico_id, sucursal_id))) {
+    const sucursal_id = (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
+    if (!(await tecnicoEnSucursal(req.db, tecnico_id, sucursal_id))) {
       return res.status(400).json({ error: 'El mecánico no atiende en esa sucursal' });
     }
     const [result] = await pool.query(
@@ -77,10 +77,10 @@ router.post('/', soloRoles(...GESTIONA_AGENDA), async (req, res) => {
     );
     const [[nueva]] = await pool.query('SELECT * FROM citas WHERE id = ?', [result.insertId]);
     if (tecnico_id) {
-      await notificarMecanico(tecnico_id, `Nueva cita asignada: ${tipo_servicio || motivo} el ${fecha} a las ${hora}`, req.usuario.id);
+      await notificarMecanico(req.db, tecnico_id, `Nueva cita asignada: ${tipo_servicio || motivo} el ${fecha} a las ${hora}`, req.usuario.id);
     }
     // El cliente también se entera: el taller le agendó una cita desde el mostrador.
-    await notificarCitaAgendada(result.insertId);
+    await notificarCitaAgendada(req.db, result.insertId);
     res.status(201).json({ data: nueva, message: 'Cita creada' });
   } catch (err) {
     fail(res, err);
@@ -113,7 +113,7 @@ router.put('/:id', soloRoles(...GESTIONA_AGENDA), async (req, res) => {
       return res.status(400).json({ error: `motivo no puede exceder ${MAX_MOTIVO} caracteres` });
     }
     // Solo cambia la sucursal si llega una válida (no la borra al editar otros campos).
-    const sucursalNueva = (await sucursalValida(req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
+    const sucursalNueva = (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
     // Fecha/hora previas: si el taller mueve la cita hay que avisarle al cliente
     // (antes se le cambiaba el día y no se enteraba por ningún lado).
     const [[previa]] = await pool.query(
@@ -128,7 +128,7 @@ router.put('/:id', soloRoles(...GESTIONA_AGENDA), async (req, res) => {
     const [[actualizada]] = await pool.query('SELECT * FROM citas WHERE id = ?', [req.params.id]);
     // Solo si de verdad cambió el momento de la cita (editar el motivo no molesta al cliente).
     const movida = previa && (previa.fecha !== String(fecha).slice(0, 10) || previa.hora !== String(hora).slice(0, 5));
-    if (movida) await notificarCitaAgendada(req.params.id, { reprogramada: true });
+    if (movida) await notificarCitaAgendada(req.db, req.params.id, { reprogramada: true });
     res.json({ data: actualizada, message: 'Cita actualizada' });
   } catch (err) {
     fail(res, err);
@@ -154,7 +154,7 @@ router.patch('/:id/estado', async (req, res) => {
     }
 
     await pool.query('UPDATE citas SET estado = ? WHERE id = ?', [estado, req.params.id]);
-    await notificarCambioEstado(req.params.id, estado);
+    await notificarCambioEstado(req.db, req.params.id, estado);
     res.json({ message: 'Estado de cita actualizado' });
   } catch (err) {
     fail(res, err);
@@ -168,7 +168,7 @@ router.patch('/:id/asignar', requireRol('admin'), async (req, res) => {
     await pool.query('UPDATE citas SET tecnico_id = ? WHERE id = ?', [tecnico_id || null, req.params.id]);
     if (tecnico_id) {
       const [[cita]] = await pool.query("SELECT DATE_FORMAT(fecha,'%Y-%m-%d') AS fecha, TIME_FORMAT(hora,'%H:%i') AS hora, tipo_servicio, motivo FROM citas WHERE id = ?", [req.params.id]);
-      if (cita) await notificarMecanico(tecnico_id, `Te asignaron una cita: ${cita.tipo_servicio || cita.motivo} el ${cita.fecha} a las ${cita.hora}`, req.usuario.id);
+      if (cita) await notificarMecanico(req.db, tecnico_id, `Te asignaron una cita: ${cita.tipo_servicio || cita.motivo} el ${cita.fecha} a las ${cita.hora}`, req.usuario.id);
     }
     res.json({ message: tecnico_id ? 'Técnico asignado' : 'Asignación quitada' });
   } catch (err) {

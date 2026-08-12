@@ -138,7 +138,7 @@ router.post('/citas/:id/crear-orden', async (req, res) => {
     }
     if (!cita.moto_id) return res.status(400).json({ error: 'La cita no tiene una moto asociada; no se puede crear la orden' });
 
-    const numero_orden = await generarNumeroOrden();
+    const numero_orden = await generarNumeroOrden(req.db);
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
@@ -151,7 +151,7 @@ router.post('/citas/:id/crear-orden', async (req, res) => {
       await conn.query('INSERT INTO orden_tiempos (orden_id, etapa) VALUES (?, ?)', [result.insertId, 'diagnostico']);
       await conn.query('UPDATE citas SET orden_id = ? WHERE id = ?', [result.insertId, req.params.id]);
       await conn.commit();
-      await sincronizarCitaDesdeOrden(result.insertId, 'diagnostico'); // cita → en_revision + notificación
+      await sincronizarCitaDesdeOrden(req.db, result.insertId, 'diagnostico'); // cita → en_revision + notificación
       res.status(201).json({ data: { orden_id: result.insertId, numero_orden }, message: 'Orden creada desde la cita' });
     } catch (e) {
       await conn.rollback();
@@ -378,7 +378,7 @@ router.post('/ordenes/:id/fotos', async (req, res) => {
 router.post('/ordenes/:id/entregar', async (req, res) => {
   try {
     const { metodo_pago, garantia_dias, observaciones_finales } = req.body;
-    const r = await cerrarOrden(
+    const r = await cerrarOrden(req.db, 
       req.params.id,
       { metodo_pago, garantia_dias, observaciones_finales },
       { soloDesdeListaEntrega: true }
@@ -539,7 +539,7 @@ router.post('/cotizaciones/:id/armar', async (req, res) => {
         [tecnico_id]
       );
       if (!tec) return res.status(400).json({ error: 'El técnico no existe o está inactivo' });
-      if (!(await tecnicoEnSucursal(tecnico_id, orden.sucursal_id))) {
+      if (!(await tecnicoEnSucursal(req.db, tecnico_id, orden.sucursal_id))) {
         return res.status(400).json({ error: 'El mecánico no atiende en la sucursal de la orden' });
       }
     }
@@ -600,7 +600,7 @@ router.post('/cotizaciones/:id/enviar', async (req, res) => {
       [req.params.id]
     );
     // Preferencia del taller: avisar al cliente cuando la cotización está lista.
-    const config = await getConfig();
+    const config = await getConfig(req.db);
     if (o && config.notif_cotizacion) {
       const moto = [o.marca, o.modelo].filter(Boolean).join(' ') || 'tu moto';
       await pool.query(
@@ -657,7 +657,7 @@ router.get('/tecnicos', async (req, res) => {
 // el taller ofrece hoy. Se administra desde el panel, en Servicios.
 router.get('/servicios', async (req, res) => {
   try {
-    res.json({ data: await getServicios() });
+    res.json({ data: await getServicios(req.db) });
   } catch (err) {
     fail(res, err);
   }
@@ -666,7 +666,7 @@ router.get('/servicios', async (req, res) => {
 // Sucursales activas (para elegir local al ingresar un cliente sin cita).
 router.get('/sucursales', async (req, res) => {
   try {
-    const data = await getSucursales({ soloActivas: true });
+    const data = await getSucursales(req.db, { soloActivas: true });
     res.json({ data });
   } catch (err) {
     fail(res, err);
@@ -745,7 +745,7 @@ router.get('/disponibilidad', async (req, res) => {
   try {
     const { fecha, sucursal_id } = req.query;
     if (!fecha) return res.status(400).json({ error: 'Fecha requerida' });
-    const config = await getConfig();
+    const config = await getConfig(req.db);
     const horas = horasDisponibles(fecha, config);
     let sql = `SELECT TIME_FORMAT(hora, '%H:%i') AS hora, COUNT(*) AS n
                FROM citas WHERE fecha = ? AND estado != 'cancelado'`;
@@ -770,7 +770,7 @@ router.patch('/ordenes/:id/tecnico', async (req, res) => {
     if (tecnico_id) {
       const [[tec]] = await pool.query("SELECT id FROM usuarios WHERE id = ? AND rol = 'tecnico' AND activo = 1", [tecnico_id]);
       if (!tec) return res.status(400).json({ error: 'El técnico no existe o está inactivo' });
-      if (!(await tecnicoEnSucursal(tecnico_id, orden.sucursal_id))) {
+      if (!(await tecnicoEnSucursal(req.db, tecnico_id, orden.sucursal_id))) {
         return res.status(400).json({ error: 'El mecánico no atiende en la sucursal de la orden' });
       }
     }
@@ -778,7 +778,7 @@ router.patch('/ordenes/:id/tecnico', async (req, res) => {
     await pool.query('UPDATE citas SET tecnico_id = ? WHERE orden_id = ?', [tecnico_id || null, req.params.id]);
     if (tecnico_id) {
       const [[o]] = await pool.query('SELECT numero_orden, problema_reportado FROM ordenes_trabajo WHERE id = ?', [req.params.id]);
-      if (o) await notificarMecanico(tecnico_id, `Te asignaron la orden ${o.numero_orden}: ${(o.problema_reportado || '').slice(0, 80)}`, req.usuario.id);
+      if (o) await notificarMecanico(req.db, tecnico_id, `Te asignaron la orden ${o.numero_orden}: ${(o.problema_reportado || '').slice(0, 80)}`, req.usuario.id);
     }
     res.json({ message: 'Técnico asignado' });
   } catch (err) {
@@ -803,7 +803,7 @@ router.post('/cotizaciones/:id/aprobar', soloRoles('recepcion', 'admin'), async 
       "UPDATE ordenes_trabajo SET aprobacion_cliente = 'aprobado', aprobado_por_cliente = 1, fecha_aprobacion = NOW() WHERE id = ?",
       [req.params.id]
     );
-    await avanzarEstadoOrden(req.params.id, await estadoTrasAprobacion(req.params.id));
+    await avanzarEstadoOrden(req.db, req.params.id, await estadoTrasAprobacion(req.db, req.params.id));
     res.json({ message: 'Cotización aprobada' });
   } catch (err) {
     fail(res, err);
@@ -939,7 +939,7 @@ router.get('/mensajes-internos', async (req, res) => {
       params.push(me.sucursal_id);
     }
     const [rows] = await pool.query(`${SELECT_MSG_INT} ${where} ORDER BY m.created_at DESC LIMIT 100`, params);
-    await marcarLeidos(yo, rows);
+    await marcarLeidos(req.db, yo, rows);
     res.json({ data: rows });
   } catch (err) {
     fail(res, err);

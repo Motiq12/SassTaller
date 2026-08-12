@@ -1,7 +1,9 @@
-// Configuración del taller (fila única en la tabla `configuracion`).
+// Configuración del taller (una fila por taller en la tabla `configuracion`).
 // Centraliza datos del negocio, horarios de atención, capacidad de la agenda y
 // preferencias de notificación. El portal lee de aquí los cupos/horas agendables.
-const { pool } = require('../db/pool');
+//
+// Multi-tenant: recibe el `db` scopeado (req.db) y NO cae a un pool global. Si la
+// llamada llega sin él, revienta en vez de leer la configuración de otro taller.
 
 // Valores por defecto: idénticos a los antes hardcodeados (utils/servicios.js),
 // así el comportamiento inicial no cambia aunque la fila aún no exista.
@@ -48,15 +50,20 @@ const DEFAULTS = {
 
 // Caché en memoria: /disponibilidad del portal pega seguido; evita leer la BD
 // en cada request. Se invalida al guardar (clearCache) y por TTL como respaldo.
-let cache = null;
-let cacheAt = 0;
+//
+// La caché es POR TALLER. Con una sola variable global, la config del primer taller
+// que consultara quedaría servida al siguiente durante el TTL: una fuga que no pasa
+// por SQL, así que ni el guard de tenant-db ni los índices la detectarían.
+const cache = new Map(); // tenantId -> { config, at }
 const TTL_MS = 30 * 1000;
 
-async function getConfig() {
-  if (cache && Date.now() - cacheAt < TTL_MS) return cache;
+async function getConfig(db) {
+  if (!db || !db.tenantId) throw new Error('getConfig: falta el db scopeado (req.db)');
+  const guardado = cache.get(db.tenantId);
+  if (guardado && Date.now() - guardado.at < TTL_MS) return guardado.config;
   let row = {};
   try {
-    const [[r]] = await pool.query('SELECT * FROM configuracion WHERE id = 1');
+    const [[r]] = await db.query('SELECT * FROM configuracion WHERE tenant_id = @tenant AND id = 1');
     if (r) row = r;
   } catch (_) {
     // Tabla aún no migrada / sin fila: se usan los DEFAULTS.
@@ -76,14 +83,15 @@ async function getConfig() {
     horarios: listaJson(row.horarios, DEFAULTS.horarios),
     metodos_pago: listaJson(row.metodos_pago, DEFAULTS.metodos_pago),
   };
-  cache = config;
-  cacheAt = Date.now();
+  cache.set(db.tenantId, { config, at: Date.now() });
   return config;
 }
 
-function clearCache() {
-  cache = null;
-  cacheAt = 0;
+// Invalida la caché de UN taller (al guardar su configuración). Sin argumento limpia
+// todo, que es lo que quieren los tests.
+function clearCache(tenantId) {
+  if (tenantId == null) cache.clear();
+  else cache.delete(tenantId);
 }
 
 // Día de semana (0=Dom … 6=Sáb) de una fecha 'YYYY-MM-DD', estable ante la zona

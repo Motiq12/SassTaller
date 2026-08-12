@@ -159,4 +159,28 @@ async function verificarListaContraEsquema() {
   return true;
 }
 
-module.exports = { paraTenant, verificarListaContraEsquema, TABLAS_CON_TENANT };
+// Recorre los talleres activos ejecutando `fn(db, tenant)` con el acceso ya scopeado.
+// Es la vía para las tareas de fondo (recordatorios, no-show): corren sin request, así
+// que no hay token del que sacar el taller. Antes de multi-tenant una sola pasada
+// alcanzaba; ahora cada taller tiene su configuración —franja horaria, si quiere
+// recordatorios— y hay que resolverlos uno por uno.
+//
+// El error de un taller no corta el barrido: se loguea y sigue con el siguiente, para
+// que un dato roto en uno no deje sin recordatorios a todos los demás.
+async function porCadaTenant(fn) {
+  const [tenants] = await pool.query(
+    "SELECT id, nombre, slug FROM tenants WHERE estado = 'activo' ORDER BY id"
+  );
+  const resultados = [];
+  for (const tenant of tenants) {
+    try {
+      resultados.push({ tenant: tenant.id, resultado: await fn(paraTenant(tenant.id), tenant) });
+    } catch (err) {
+      console.error(`⚠️  Tarea de fondo falló para el taller ${tenant.slug}:`, err.message);
+      resultados.push({ tenant: tenant.id, error: err.message });
+    }
+  }
+  return resultados;
+}
+
+module.exports = { paraTenant, porCadaTenant, verificarListaContraEsquema, TABLAS_CON_TENANT };

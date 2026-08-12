@@ -24,8 +24,8 @@ const { recompensas } = require('../utils/recompensas');
 
 // Fecha de hoy en zona del taller (offset configurable, por defecto UTC-6).
 // Evita rechazar/permitir un día de más cuando el server corre en UTC.
-async function hoyCR() {
-  const config = await getConfig();
+async function hoyCR(db) {
+  const config = await getConfig(db);
   const offset = Number(config.zona_horaria_offset) || -6;
   return new Date(Date.now() + offset * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
@@ -447,7 +447,7 @@ router.get('/resumen', async (req, res) => {
     //   1) en_curso  → la moto ya está en el taller (estado != 'agendado').
     //   2) proxima   → agendada para hoy o más adelante.
     //   3) vencida   → agendada pero la fecha ya pasó y nunca se inició.
-    const hoy = await hoyCR();
+    const hoy = await hoyCR(req.db);
     const [citasAbiertas] = await pool.query(
       `SELECT ci.id, DATE_FORMAT(ci.fecha,'%Y-%m-%d') AS fecha, TIME_FORMAT(ci.hora,'%H:%i') AS hora,
               ci.tipo_servicio, ci.estado,
@@ -821,7 +821,7 @@ router.delete('/perfil', async (req, res) => {
 // GET /api/portal/sucursales — locales activos para el selector del formulario de citas.
 router.get('/sucursales', async (req, res) => {
   try {
-    const activas = await getSucursales({ soloActivas: true });
+    const activas = await getSucursales(req.db, { soloActivas: true });
     res.json({ data: activas.map((s) => ({ id: s.id, nombre: s.nombre, direccion: s.direccion })) });
   } catch (err) {
     fail(res, err);
@@ -833,7 +833,7 @@ router.get('/sucursales', async (req, res) => {
 // estaba copiado en el frontend y podía quedar desfasado del que exige el servidor.
 router.get('/servicios', async (req, res) => {
   try {
-    res.json({ data: await getServicios() });
+    res.json({ data: await getServicios(req.db) });
   } catch (err) {
     fail(res, err);
   }
@@ -848,8 +848,8 @@ router.get('/disponibilidad', async (req, res) => {
     if (!fecha) return res.status(400).json({ error: 'Fecha requerida' });
     // Sucursal: la pedida (si es válida) o la primera activa por compatibilidad.
     let sucursalId = Number(req.query.sucursal_id);
-    if (!(await sucursalValida(sucursalId))) sucursalId = await sucursalPorDefecto();
-    const config = await getConfig();
+    if (!(await sucursalValida(req.db, sucursalId))) sucursalId = await sucursalPorDefecto(req.db);
+    const config = await getConfig(req.db);
     const horas = horasDisponibles(fecha, config);
     const [rows] = await pool.query(
       `SELECT TIME_FORMAT(hora, '%H:%i') AS hora, COUNT(*) AS n
@@ -870,11 +870,11 @@ router.get('/proximo-libre', async (req, res) => {
   try {
     // El cupo es por sucursal: la sugerencia se calcula para la sucursal pedida.
     let sucursalId = Number(req.query.sucursal_id);
-    if (!(await sucursalValida(sucursalId))) sucursalId = await sucursalPorDefecto();
-    const config = await getConfig();
+    if (!(await sucursalValida(req.db, sucursalId))) sucursalId = await sucursalPorDefecto(req.db);
+    const config = await getConfig(req.db);
     const max = Number(config.max_citas_hora) || 1;
     const dias = Number(config.dias_anticipacion) || 30;
-    const hoy = await hoyCR();
+    const hoy = await hoyCR(req.db);
     const fin = new Date(`${hoy}T00:00:00Z`);
     fin.setUTCDate(fin.getUTCDate() + dias);
     const finStr = fin.toISOString().slice(0, 10);
@@ -1267,11 +1267,11 @@ router.put('/citas/:id', async (req, res) => {
     if (!moto_id || !fecha || !hora || !tipo_servicio) {
       return res.status(400).json({ error: 'Moto, servicio, fecha y hora son requeridos' });
     }
-    if (!(await servicioValido(tipo_servicio))) {
+    if (!(await servicioValido(req.db, tipo_servicio))) {
       return res.status(400).json({ error: 'Servicio no válido' });
     }
     // Sucursal: la pedida (si es válida) o se conserva la actual de la cita más abajo.
-    const sucursalPedida = (await sucursalValida(req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
+    const sucursalPedida = (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
 
     const [[cita]] = await pool.query(
       "SELECT id, estado, orden_id, sucursal_id, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora FROM citas WHERE id = ? AND cliente_id = ?",
@@ -1282,7 +1282,7 @@ router.put('/citas/:id', async (req, res) => {
       return res.status(400).json({ error: 'Esta cita ya no se puede modificar. Comunicate con el taller.' });
     }
 
-    const config = await getConfig();
+    const config = await getConfig(req.db);
     const minH = Number(config.cancelacion_horas_min || 0);
     // Ventana mínima sobre la cita ACTUAL (no reprogramar a último momento).
     if (minH > 0 && horasHastaCita(cita.fecha, cita.hora) < minH) {
@@ -1294,7 +1294,7 @@ router.put('/citas/:id', async (req, res) => {
     if (!horas.includes(hora)) {
       return res.status(400).json({ error: 'Ese día/hora no está disponible para agendar' });
     }
-    const hoy = await hoyCR();
+    const hoy = await hoyCR(req.db);
     if (fecha < hoy) return res.status(400).json({ error: 'La fecha no puede ser en el pasado' });
     if (fecha === hoy && horasHastaCita(fecha, hora) <= 0) {
       return res.status(400).json({ error: 'Esa hora ya pasó. Elegí un horario más tarde.' });
@@ -1313,7 +1313,7 @@ router.put('/citas/:id', async (req, res) => {
       return res.status(400).json({ error: `descripcion no puede exceder ${MAX_MOTIVO} caracteres` });
     }
     // Sucursal efectiva: la nueva pedida, o la que ya tenía la cita (fallback al default).
-    const sucursalId = sucursalPedida || cita.sucursal_id || (await sucursalPorDefecto());
+    const sucursalId = sucursalPedida || cita.sucursal_id || (await sucursalPorDefecto(req.db));
 
     // Cupo atómico de la NUEVA franja (por sucursal), excluyendo esta misma cita.
     const conn = await pool.getConnection();
@@ -1356,18 +1356,18 @@ router.post('/citas', async (req, res) => {
     if (!moto_id || !fecha || !hora || !tipo_servicio) {
       return res.status(400).json({ error: 'Moto, servicio, fecha y hora son requeridos' });
     }
-    if (!(await servicioValido(tipo_servicio))) {
+    if (!(await servicioValido(req.db, tipo_servicio))) {
       return res.status(400).json({ error: 'Servicio no válido' });
     }
     // Sucursal obligatoria y válida (activa). El cupo se controla por sucursal.
-    const sucursalId = (await sucursalValida(req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
+    const sucursalId = (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
     if (!sucursalId) return res.status(400).json({ error: 'Elegí una sucursal válida' });
-    const config = await getConfig();
+    const config = await getConfig(req.db);
     const horas = horasDisponibles(fecha, config);
     if (!horas.includes(hora)) {
       return res.status(400).json({ error: 'Ese día/hora no está disponible para agendar' });
     }
-    const hoy = await hoyCR();
+    const hoy = await hoyCR(req.db);
     if (fecha < hoy) {
       return res.status(400).json({ error: 'La fecha no puede ser en el pasado' });
     }
@@ -1470,7 +1470,7 @@ router.patch('/citas/:id/cancelar', async (req, res) => {
     if (cita.estado !== 'agendado' || cita.orden_id) {
       return res.status(400).json({ error: 'Esta cita ya no se puede cancelar. Comunicate con el taller.' });
     }
-    const config = await getConfig();
+    const config = await getConfig(req.db);
     const minH = Number(config.cancelacion_horas_min || 0);
     if (minH > 0 && horasHastaCita(cita.fecha, cita.hora) < minH) {
       return res.status(400).json({ error: `No se puede cancelar con menos de ${minH} h de anticipación. Comunicate con el taller.` });
@@ -1520,9 +1520,9 @@ async function actualizarAprobacion(ordenId, clienteId, decision, motivo) {
   // La orden no debe quedar "esperando aprobación" después de la decisión:
   // aprobado → a trabajar (o esperar repuestos); rechazado → vuelve a diagnóstico.
   if (decision === 'aprobado') {
-    await avanzarEstadoOrden(ordenId, await estadoTrasAprobacion(ordenId));
+    await avanzarEstadoOrden(req.db, ordenId, await estadoTrasAprobacion(req.db, ordenId));
   } else if (decision === 'rechazado') {
-    await avanzarEstadoOrden(ordenId, 'diagnostico');
+    await avanzarEstadoOrden(req.db, ordenId, 'diagnostico');
   }
   return true;
 }

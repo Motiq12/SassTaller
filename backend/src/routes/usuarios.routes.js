@@ -10,8 +10,8 @@ const { sucursalValida } = require('../utils/sucursales');
 router.use(auth, requireRol('admin'));
 
 // Normaliza el sucursal_id del body: id válido (activo) o null = "atiende ambas".
-async function sucursalDelBody(valor) {
-  return (await sucursalValida(valor)) ? Number(valor) : null;
+async function sucursalDelBody(db, valor) {
+  return (await sucursalValida(db, valor)) ? Number(valor) : null;
 }
 
 // Roles válidos del personal (debe coincidir con el ENUM de la tabla usuarios).
@@ -43,7 +43,7 @@ router.post('/', async (req, res) => {
     if (String(password).length < 8) return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
     if (!ROLES.includes(rol)) return res.status(400).json({ error: 'Rol no válido' });
     const hash = await bcrypt.hash(password, 10);
-    const sucursal_id = await sucursalDelBody(req.body.sucursal_id);
+    const sucursal_id = await sucursalDelBody(req.db, req.body.sucursal_id);
     const [result] = await pool.query(
       'INSERT INTO usuarios (nombre, email, password_hash, rol, telefono, sucursal_id) VALUES (?, ?, ?, ?, ?, ?)',
       [nombre, email, hash, rol, telefono || null, sucursal_id]
@@ -71,7 +71,7 @@ router.put('/:id', async (req, res) => {
     if (Number(req.params.id) === req.usuario.id && rol !== 'admin') {
       return res.status(400).json({ error: 'No podés cambiar tu propio rol de administrador' });
     }
-    const sucursal_id = await sucursalDelBody(req.body.sucursal_id);
+    const sucursal_id = await sucursalDelBody(req.db, req.body.sucursal_id);
     await pool.query(
       'UPDATE usuarios SET nombre=?, email=?, rol=?, telefono=?, sucursal_id=? WHERE id=?',
       [nombre, email, rol, telefono ?? null, sucursal_id, req.params.id]
@@ -103,7 +103,7 @@ router.patch('/:id/activo', async (req, res) => {
 // PATCH /:id/sucursal — cambia el local de un empleado desde la lista (null = Ambas).
 router.patch('/:id/sucursal', async (req, res) => {
   try {
-    const sucursal_id = await sucursalDelBody(req.body.sucursal_id);
+    const sucursal_id = await sucursalDelBody(req.db, req.body.sucursal_id);
     const [result] = await pool.query('UPDATE usuarios SET sucursal_id = ? WHERE id = ?', [sucursal_id, req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ error: 'Usuario no encontrado' });
     res.json({ data: { sucursal_id }, message: 'Sucursal actualizada' });

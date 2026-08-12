@@ -81,9 +81,9 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Nivel de combustible no válido' });
     }
 
-    const sucursal_id = (await sucursalValida(req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
+    const sucursal_id = (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
 
-    const numero_orden = await generarNumeroOrden();
+    const numero_orden = await generarNumeroOrden(req.db);
 
     // Orden + su tiempo inicial en una sola transacción: si algo falla, no queda
     // una orden sin etapa de recepción registrada.
@@ -215,11 +215,11 @@ router.patch('/:id/estado', async (req, res) => {
     }
 
     // Refleja el avance en la cita vinculada (si la hay) → portal del cliente + mecánico.
-    await sincronizarCitaDesdeOrden(req.params.id, estado);
+    await sincronizarCitaDesdeOrden(req.db, req.params.id, estado);
 
     // Cotización lista: avisar al cliente cuando la orden entra a esperando aprobación,
     // por cualquier vía (no solo desde el flujo de "Enviar cotización" de recepción).
-    if (estado === 'esperando_aprobacion') await notificarPresupuestoListo(req.params.id);
+    if (estado === 'esperando_aprobacion') await notificarPresupuestoListo(req.db, req.params.id);
 
     res.json({ data: { estado }, message: 'Estado actualizado' });
   } catch (err) {
@@ -393,7 +393,7 @@ router.get('/:id/checklist', async (req, res) => {
 router.patch('/:id/cerrar', requireRol('admin'), async (req, res) => {
   try {
     const { metodo_pago, garantia_dias, observaciones_finales } = req.body;
-    const r = await cerrarOrden(req.params.id, { metodo_pago, garantia_dias, observaciones_finales });
+    const r = await cerrarOrden(req.db, req.params.id, { metodo_pago, garantia_dias, observaciones_finales });
     if (r.notFound) return res.status(404).json({ error: 'Orden no encontrada' });
     res.json({ message: 'Orden cerrada y entregada', cortesia_ganada: r.cortesiaGanada });
   } catch (err) {
@@ -466,7 +466,7 @@ router.get('/:id/mensajes', async (req, res) => {
       `${SELECT_MSG_ORDEN} WHERE m.orden_id = ? ORDER BY m.created_at ASC LIMIT 100`,
       [yo, req.params.id]
     );
-    await marcarLeidos(yo, rows);
+    await marcarLeidos(req.db, yo, rows);
     res.json({ data: rows });
   } catch (err) {
     fail(res, err);

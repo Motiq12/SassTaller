@@ -147,7 +147,7 @@ router.patch('/citas/:id/estado', async (req, res) => {
     params.push(req.params.id);
 
     await pool.query(`UPDATE citas SET ${sets.join(', ')} WHERE id = ?`, params);
-    await notificarCambioEstado(req.params.id, estado);
+    await notificarCambioEstado(req.db, req.params.id, estado);
     res.json({ message: 'Estado actualizado' });
   } catch (err) {
     fail(res, err);
@@ -275,7 +275,7 @@ router.get('/mensajes', async (req, res) => {
        ORDER BY m.created_at ASC LIMIT 100`,
       [yo, yo, yo]
     );
-    await marcarLeidos(yo, rows);
+    await marcarLeidos(req.db, yo, rows);
     res.json({ data: rows });
   } catch (err) {
     fail(res, err);

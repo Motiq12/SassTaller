@@ -1,4 +1,6 @@
-const { pool } = require('../db/pool');
+// Multi-tenant: todas reciben el `db` scopeado (req.db) como primer argumento. Sin
+// pool global: una notificación mal dirigida terminaría en el portal de un cliente
+// de otro taller, así que preferimos que falle antes de escribir.
 const { getConfig } = require('./configuracion');
 const { recompensas } = require('./recompensas');
 const { enviarAvisoEstado } = require('../services/mailer');
@@ -21,10 +23,10 @@ const ESTADO_LEGIBLE = {
 // Inserta una notificación para el cliente. `tipo` define el icono/color en el
 // portal (estado | listo | entregado | presupuesto | cortesia | mensaje | ...).
 // Nunca lanza: si falla, lo loguea y sigue (no debe romper la operación que la dispara).
-async function crearNotificacion({ cliente_id, cita_id = null, titulo, mensaje, tipo = 'estado' }) {
+async function crearNotificacion(db, { cliente_id, cita_id = null, titulo, mensaje, tipo = 'estado' }) {
   try {
-    await pool.query(
-      'INSERT INTO notificaciones (cliente_id, cita_id, titulo, mensaje, tipo) VALUES (?, ?, ?, ?, ?)',
+    await db.query(
+      'INSERT INTO notificaciones (tenant_id, cliente_id, cita_id, titulo, mensaje, tipo) VALUES (@tenant, ?, ?, ?, ?, ?)',
       [cliente_id, cita_id, titulo, mensaje, tipo]
     );
   } catch (err) {
@@ -34,18 +36,18 @@ async function crearNotificacion({ cliente_id, cita_id = null, titulo, mensaje, 
 
 // Avisa al cliente cuando cambia el estado de su cita. El `tipo` = estado, para
 // que el portal pueda resaltar (ej. "listo" en verde, "cancelado" en rojo).
-async function notificarCambioEstado(citaId, estado) {
+async function notificarCambioEstado(db, citaId, estado) {
   try {
     // Preferencia del taller: si está apagado, no se avisa al cliente por cambio de estado.
-    const config = await getConfig();
+    const config = await getConfig(db);
     if (!config.notif_estado) return;
-    const [[cita]] = await pool.query(
+    const [[cita]] = await db.query(
       `SELECT ci.cliente_id, cl.notif_avances, cl.nombre AS cliente_nombre, cl.email AS cliente_email,
               m.marca, m.modelo
        FROM citas ci
-       LEFT JOIN motos m ON m.id = ci.moto_id
-       LEFT JOIN clientes cl ON cl.id = ci.cliente_id
-       WHERE ci.id = ?`,
+       LEFT JOIN motos m ON m.id = ci.moto_id AND m.tenant_id = @tenant
+       LEFT JOIN clientes cl ON cl.id = ci.cliente_id AND cl.tenant_id = @tenant
+       WHERE ci.id = ? AND ci.tenant_id = @tenant`,
       [citaId]
     );
     if (!cita) return;
@@ -53,7 +55,7 @@ async function notificarCambioEstado(citaId, estado) {
     if (cita.notif_avances === 0) return;
     const moto = [cita.marca, cita.modelo].filter(Boolean).join(' ') || 'tu moto';
     const legible = ESTADO_LEGIBLE[estado] || estado;
-    await crearNotificacion({
+    await crearNotificacion(db, {
       cliente_id: cita.cliente_id,
       cita_id: citaId,
       titulo: `${moto}: ${legible}`,
@@ -73,7 +75,7 @@ async function notificarCambioEstado(citaId, estado) {
       });
     }
     // Al entregar, si el cliente acaba de desbloquear su cortesía, avisarle.
-    if (estado === 'entregado') await notificarCortesia(cita.cliente_id);
+    if (estado === 'entregado') await notificarCortesia(db, cita.cliente_id);
   } catch (err) {
     console.error('⚠️  No se pudo crear notificación:', err.message);
   }
@@ -81,19 +83,19 @@ async function notificarCambioEstado(citaId, estado) {
 
 // Si con la última visita entregada el cliente llegó al servicio de cortesía,
 // se lo notifica. Se dispara una sola vez por ciclo (justo al alcanzar la meta).
-async function notificarCortesia(clienteId) {
+async function notificarCortesia(db, clienteId) {
   try {
-    const [[{ completadas }]] = await pool.query(
+    const [[{ completadas }]] = await db.query(
       `SELECT
-         (SELECT COUNT(*) FROM citas WHERE cliente_id = ? AND estado = 'entregado')
+         (SELECT COUNT(*) FROM citas WHERE cliente_id = ? AND estado = 'entregado' AND tenant_id = @tenant)
        + (SELECT COUNT(*) FROM ordenes_trabajo
-            WHERE cliente_id = ? AND estado = 'entregada'
-              AND id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL)) AS completadas`,
+            WHERE cliente_id = ? AND estado = 'entregada' AND tenant_id = @tenant
+              AND id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL AND tenant_id = @tenant)) AS completadas`,
       [clienteId, clienteId]
     );
     const r = recompensas(completadas);
     if (!r.cortesia_disponible) return;
-    await crearNotificacion({
+    await crearNotificacion(db, {
       cliente_id: clienteId,
       titulo: '🎉 ¡Desbloqueaste tu servicio de cortesía!',
       mensaje: 'Tu próxima cita es de cortesía. Agendala desde el portal para aprovecharla.',
@@ -108,18 +110,18 @@ async function notificarCortesia(clienteId) {
 // al crear una cita solo se notificaba al mecánico asignado: el cliente no recibía
 // nada en su campana. (Cuando la agenda él mismo desde el portal no hace falta.)
 // `reprogramada`: el taller le movió la fecha/hora a una cita que ya existía.
-async function notificarCitaAgendada(citaId, { reprogramada = false } = {}) {
+async function notificarCitaAgendada(db, citaId, { reprogramada = false } = {}) {
   try {
-    const config = await getConfig();
+    const config = await getConfig(db);
     if (!config.notif_estado) return;
-    const [[cita]] = await pool.query(
+    const [[cita]] = await db.query(
       `SELECT ci.cliente_id, DATE_FORMAT(ci.fecha, '%d/%m') AS fecha,
               TIME_FORMAT(ci.hora, '%H:%i') AS hora, ci.tipo_servicio, ci.motivo,
               cl.notif_avances, m.marca, m.modelo
        FROM citas ci
-       LEFT JOIN clientes cl ON cl.id = ci.cliente_id
-       LEFT JOIN motos m ON m.id = ci.moto_id
-       WHERE ci.id = ?`,
+       LEFT JOIN clientes cl ON cl.id = ci.cliente_id AND cl.tenant_id = @tenant
+       LEFT JOIN motos m ON m.id = ci.moto_id AND m.tenant_id = @tenant
+       WHERE ci.id = ? AND ci.tenant_id = @tenant`,
       [citaId]
     );
     if (!cita || !cita.cliente_id) return;
@@ -127,7 +129,7 @@ async function notificarCitaAgendada(citaId, { reprogramada = false } = {}) {
     if (cita.notif_avances === 0) return;
     const moto = [cita.marca, cita.modelo].filter(Boolean).join(' ') || 'tu moto';
     const servicio = cita.tipo_servicio || cita.motivo || 'tu servicio';
-    await crearNotificacion({
+    await crearNotificacion(db, {
       cliente_id: cita.cliente_id,
       cita_id: citaId,
       titulo: reprogramada
@@ -143,11 +145,12 @@ async function notificarCitaAgendada(citaId, { reprogramada = false } = {}) {
   }
 }
 
-async function notificarMecanico(tecnicoId, mensaje, remitenteId) {
+async function notificarMecanico(db, tecnicoId, mensaje, remitenteId) {
   try {
     if (!tecnicoId) return;
-    await pool.query(
-      "INSERT INTO mensajes_internos (remitente_id, destino_id, mensaje, tipo) VALUES (?, ?, ?, 'sistema')",
+    await db.query(
+      `INSERT INTO mensajes_internos (tenant_id, remitente_id, destino_id, mensaje, tipo)
+       VALUES (@tenant, ?, ?, ?, 'sistema')`,
       [remitenteId || tecnicoId, tecnicoId, mensaje]
     );
   } catch (err) {
@@ -160,21 +163,21 @@ async function notificarMecanico(tecnicoId, mensaje, remitenteId) {
 // botón "Enviar cotización", o un cambio de estado desde el detalle de la orden).
 // Va contra el cliente de la ORDEN (no depende de que haya una cita ligada) y respeta
 // la preferencia del taller notif_cotizacion.
-async function notificarPresupuestoListo(ordenId) {
+async function notificarPresupuestoListo(db, ordenId) {
   try {
-    const config = await getConfig();
+    const config = await getConfig(db);
     if (!config.notif_cotizacion) return;
-    const [[orden]] = await pool.query(
+    const [[orden]] = await db.query(
       `SELECT ot.cliente_id, ot.numero_orden, m.marca, m.modelo,
-              (SELECT id FROM citas WHERE orden_id = ot.id LIMIT 1) AS cita_id
+              (SELECT id FROM citas WHERE orden_id = ot.id AND tenant_id = @tenant LIMIT 1) AS cita_id
        FROM ordenes_trabajo ot
-       LEFT JOIN motos m ON m.id = ot.moto_id
-       WHERE ot.id = ?`,
+       LEFT JOIN motos m ON m.id = ot.moto_id AND m.tenant_id = @tenant
+       WHERE ot.id = ? AND ot.tenant_id = @tenant`,
       [ordenId]
     );
     if (!orden || !orden.cliente_id) return;
     const moto = [orden.marca, orden.modelo].filter(Boolean).join(' ') || 'tu moto';
-    await crearNotificacion({
+    await crearNotificacion(db, {
       cliente_id: orden.cliente_id,
       cita_id: orden.cita_id || null,
       titulo: `Presupuesto listo: ${moto}`,

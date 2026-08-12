@@ -406,7 +406,7 @@ const MAX_SERVICIO = 120;
 // GET /api/admin/servicios — catálogo completo, incluidos los desactivados.
 router.get('/servicios', async (req, res) => {
   try {
-    res.json({ data: await getServiciosFilas() });
+    res.json({ data: await getServiciosFilas(req.db) });
   } catch (err) {
     fail(res, err);
   }
@@ -527,7 +527,7 @@ router.get('/calendario', async (req, res) => {
 // GET /api/admin/configuracion
 router.get('/configuracion', async (req, res) => {
   try {
-    res.json({ data: await getConfig() });
+    res.json({ data: await getConfig(req.db) });
   } catch (err) {
     fail(res, err);
   }
@@ -607,7 +607,7 @@ router.put('/configuracion', async (req, res) => {
       ]
     );
     clearCache();
-    res.json({ data: await getConfig(), message: 'Configuración guardada' });
+    res.json({ data: await getConfig(req.db), message: 'Configuración guardada' });
   } catch (err) {
     fail(res, err);
   }
@@ -666,7 +666,7 @@ router.put('/cuenta/foto', async (req, res) => {
 // GET /api/admin/sucursales — todas (incluidas las inactivas).
 router.get('/sucursales', async (req, res) => {
   try {
-    res.json({ data: await getSucursales() });
+    res.json({ data: await getSucursales(req.db) });
   } catch (err) {
     fail(res, err);
   }

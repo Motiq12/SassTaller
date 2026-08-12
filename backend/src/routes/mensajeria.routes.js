@@ -124,7 +124,7 @@ router.get('/conversacion/:usuarioId', async (req, res) => {
       [yo, yo, otro.id, otro.id, yo]
     );
     rows.reverse(); // cronológico ascendente para pintar el chat
-    await marcarLeidos(yo, rows);
+    await marcarLeidos(req.db, yo, rows);
     res.json({ data: rows, contacto: otro });
   } catch (err) {
     fail(res, err);
@@ -183,7 +183,7 @@ router.get('/avisos', async (req, res) => {
       [yo]
     );
     rows.reverse();
-    await marcarLeidos(yo, rows);
+    await marcarLeidos(req.db, yo, rows);
     res.json({ data: rows });
   } catch (err) {
     fail(res, err);
