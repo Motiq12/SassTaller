@@ -4,6 +4,7 @@ import { Subject, debounceTime, switchMap, catchError, of } from 'rxjs';
 import { TallerService, TipoVehiculo } from '../../services/taller.service';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
+import { PRODUCTO } from '../../shared/producto';
 
 /**
  * Alta de un taller nuevo en el SaaS. Es la puerta de entrada del producto: antes de
@@ -21,6 +22,10 @@ import { ToastService } from '../../services/toast.service';
   standalone: false,
 })
 export class RegistroTallerPage {
+  // Esta pantalla identifica al PRODUCTO, no a un taller: quien la abre todavía no
+  // pertenece a ninguno.
+  producto = PRODUCTO;
+
   // Datos del taller
   nombre = '';
   slug = '';

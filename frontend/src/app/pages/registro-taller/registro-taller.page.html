@@ -3,15 +3,16 @@
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/portal/login" text="Volver"></ion-back-button>
     </ion-buttons>
-    <ion-title>Crear taller</ion-title>
+    <ion-title>{{ producto.nombre }}</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content class="ion-padding">
   <div class="registro-wrap">
-    <h1 class="titulo">Registrá tu taller</h1>
+    <h1 class="titulo">Registrá tu taller en {{ producto.nombre }}</h1>
     <p class="subtitulo">
-      Creás la cuenta y entrás como administrador. Después podés invitar a tu equipo.
+      Creás la cuenta y entrás como administrador. Después podés invitar a tu equipo
+      y personalizar el sistema con tu logo y tus colores.
     </p>
 
     <form (ngSubmit)="crear()">

@@ -4,6 +4,7 @@ import { BehaviorSubject, Observable, of } from 'rxjs';
 import { catchError, map, shareReplay, tap } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { TallerService } from './taller.service';
+import { PRODUCTO } from '../shared/producto';
 
 export interface Marca {
   nombre_taller: string;
@@ -95,12 +96,24 @@ export class MarcaService {
   }
 
   /**
+   * Rótulo para pantallas públicas (login, recuperar). Si el taller se resolvió por
+   * subdominio se muestra SU nombre — el cliente entra al portal de su taller, no a
+   * un producto. Si no se resolvió, quien llegó lo hizo a la puerta de Motiq.
+   */
+  get rotuloPublico(): string {
+    return this.taller.actual() ? this.actual.nombre_taller : PRODUCTO.nombre;
+  }
+
+  /**
    * Iniciales del taller, para cuando no cargó logo. Se prefiere esto a un logo
    * genérico de relleno: una imagen ajena se lee como un error, y las iniciales se
-   * leen como una decisión. Antes acá iba el logo de MS Motos.
+   * leen como una decisión.
    */
   get iniciales(): string {
-    return (this.actual.nombre_taller || RESPALDO.nombre_taller)
+    // Se derivan del MISMO rótulo que se muestra al lado. Sacándolas de
+    // nombre_taller, la pantalla de Motiq mostraba 'MT' (de 'Mi taller') junto al
+    // título 'Motiq': dos identidades distintas a cinco píxeles una de otra.
+    return this.rotuloPublico
       .split(/\s+/).filter(Boolean).slice(0, 2)
       .map(p => p[0]?.toUpperCase() || '')
       .join('') || 'T';
