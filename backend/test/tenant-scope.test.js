@@ -18,6 +18,16 @@ const YA_MIGRADOS = [
   'motos.routes.js',
   'recepcion.routes.js',
   'portal.routes.js',
+  'ordenes.routes.js',
+  'mecanico.routes.js',
+  'admin.routes.js',
+  'usuarios.routes.js',
+  'dashboard.routes.js',
+  'mensajeria.routes.js',
+  'garantias.routes.js',
+  'citas.routes.js',
+  'promos.routes.js',
+  'metricas.routes.js',
 ];
 
 // Extrae el SQL de cada llamada a req.db.query / conn.query. Solo mira literales

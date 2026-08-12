@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { pool } = require('../db/pool');
+// Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
 const { fail } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
@@ -71,11 +71,11 @@ router.post('/', soloRoles(...GESTIONA_AGENDA), async (req, res) => {
     if (!(await tecnicoEnSucursal(req.db, tecnico_id, sucursal_id))) {
       return res.status(400).json({ error: 'El mecánico no atiende en esa sucursal' });
     }
-    const [result] = await pool.query(
-      'INSERT INTO citas (cliente_id, moto_id, usuario_id, tecnico_id, sucursal_id, fecha, hora, motivo, tipo_servicio) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    const [result] = await req.db.query(
+      'INSERT INTO citas (tenant_id,cliente_id, moto_id, usuario_id, tecnico_id, sucursal_id, fecha, hora, motivo, tipo_servicio) VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [cliente_id, moto_id || null, req.usuario.id, tecnico_id || null, sucursal_id, fecha, hora, motivo, tipo_servicio || null]
     );
-    const [[nueva]] = await pool.query('SELECT * FROM citas WHERE id = ?', [result.insertId]);
+    const [[nueva]] = await req.db.query('SELECT * FROM citas WHERE tenant_id = @tenant AND id = ?', [result.insertId]);
     if (tecnico_id) {
       await notificarMecanico(req.db, tecnico_id, `Nueva cita asignada: ${tipo_servicio || motivo} el ${fecha} a las ${hora}`, req.usuario.id);
     }
@@ -89,13 +89,13 @@ router.post('/', soloRoles(...GESTIONA_AGENDA), async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const [[cita]] = await pool.query(
+    const [[cita]] = await req.db.query(
       `SELECT ci.*, c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.telefono AS cliente_telefono,
               m.marca, m.modelo, m.placa
        FROM citas ci
-       JOIN clientes c ON ci.cliente_id = c.id
-       LEFT JOIN motos m ON ci.moto_id = m.id
-       WHERE ci.id = ?`,
+       JOIN clientes c ON ci.cliente_id = c.id AND c.tenant_id = @tenant
+       LEFT JOIN motos m ON ci.moto_id = m.id AND m.tenant_id = @tenant
+       WHERE ci.tenant_id = @tenant AND ci.id = ?`,
       [req.params.id]
     );
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
@@ -116,16 +116,16 @@ router.put('/:id', soloRoles(...GESTIONA_AGENDA), async (req, res) => {
     const sucursalNueva = (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
     // Fecha/hora previas: si el taller mueve la cita hay que avisarle al cliente
     // (antes se le cambiaba el día y no se enteraba por ningún lado).
-    const [[previa]] = await pool.query(
-      "SELECT DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora FROM citas WHERE id = ?",
+    const [[previa]] = await req.db.query(
+      "SELECT DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora FROM citas WHERE tenant_id = @tenant AND id = ?",
       [req.params.id]
     );
-    await pool.query(
+    await req.db.query(
       `UPDATE citas SET cliente_id=?, moto_id=?, tecnico_id=?, fecha=?, hora=?, motivo=?, tipo_servicio=?,
-         sucursal_id = COALESCE(?, sucursal_id) WHERE id=?`,
+         sucursal_id = COALESCE(?, sucursal_id) WHERE id=? AND tenant_id = @tenant`,
       [cliente_id, moto_id || null, tecnico_id || null, fecha, hora, motivo, tipo_servicio || null, sucursalNueva, req.params.id]
     );
-    const [[actualizada]] = await pool.query('SELECT * FROM citas WHERE id = ?', [req.params.id]);
+    const [[actualizada]] = await req.db.query('SELECT * FROM citas WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     // Solo si de verdad cambió el momento de la cita (editar el motivo no molesta al cliente).
     const movida = previa && (previa.fecha !== String(fecha).slice(0, 10) || previa.hora !== String(hora).slice(0, 5));
     if (movida) await notificarCitaAgendada(req.db, req.params.id, { reprogramada: true });
@@ -140,7 +140,7 @@ router.patch('/:id/estado', async (req, res) => {
     const { estado } = req.body;
     if (!ESTADOS.includes(estado)) return res.status(400).json({ error: 'Estado inválido' });
 
-    const [[cita]] = await pool.query('SELECT id, tecnico_id, estado FROM citas WHERE id = ?', [req.params.id]);
+    const [[cita]] = await req.db.query('SELECT id, tecnico_id, estado FROM citas WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
 
     // Un técnico solo puede mover SUS citas; admin (y recepción) pueden cualquiera.
@@ -153,7 +153,7 @@ router.patch('/:id/estado', async (req, res) => {
       return res.status(400).json({ error: `Transición no permitida: ${cita.estado} → ${estado}` });
     }
 
-    await pool.query('UPDATE citas SET estado = ? WHERE id = ?', [estado, req.params.id]);
+    await req.db.query('UPDATE citas SET estado = ? WHERE tenant_id = @tenant AND id = ?', [estado, req.params.id]);
     await notificarCambioEstado(req.db, req.params.id, estado);
     res.json({ message: 'Estado de cita actualizado' });
   } catch (err) {
@@ -165,9 +165,9 @@ router.patch('/:id/estado', async (req, res) => {
 router.patch('/:id/asignar', requireRol('admin'), async (req, res) => {
   try {
     const { tecnico_id } = req.body;
-    await pool.query('UPDATE citas SET tecnico_id = ? WHERE id = ?', [tecnico_id || null, req.params.id]);
+    await req.db.query('UPDATE citas SET tecnico_id = ? WHERE tenant_id = @tenant AND id = ?', [tecnico_id || null, req.params.id]);
     if (tecnico_id) {
-      const [[cita]] = await pool.query("SELECT DATE_FORMAT(fecha,'%Y-%m-%d') AS fecha, TIME_FORMAT(hora,'%H:%i') AS hora, tipo_servicio, motivo FROM citas WHERE id = ?", [req.params.id]);
+      const [[cita]] = await req.db.query("SELECT DATE_FORMAT(fecha,'%Y-%m-%d') AS fecha, TIME_FORMAT(hora,'%H:%i') AS hora, tipo_servicio, motivo FROM citas WHERE tenant_id = @tenant AND id = ?", [req.params.id]);
       if (cita) await notificarMecanico(req.db, tecnico_id, `Te asignaron una cita: ${cita.tipo_servicio || cita.motivo} el ${cita.fecha} a las ${cita.hora}`, req.usuario.id);
     }
     res.json({ message: tecnico_id ? 'Técnico asignado' : 'Asignación quitada' });

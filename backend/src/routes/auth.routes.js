@@ -1,7 +1,11 @@
 const router = require('express').Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+// `pool` (sin scope) se usa a propósito y SOLO en /login: ahí todavía no se sabe a
+// qué taller pertenece quien entra — justamente es lo que hay que averiguar. Las
+// rutas autenticadas de este archivo usan req.db como todas las demás.
 const { pool } = require('../db/pool');
+const { paraTenant } = require('../db/tenant-db');
 const { fail } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const { emailValido } = require('../utils/validar');
@@ -16,8 +20,11 @@ function firmar(payload) {
 // segundo factor. NO lleva `rol`, así que `middleware/auth` (que exige rol y rechaza
 // `pend2fa`) lo bloquea en todas las rutas del sistema: solo sirve para canjearlo en
 // /auth/2fa/verificar, y vive 5 minutos.
-function firmarParcial(usuarioId) {
-  return jwt.sign({ id: usuarioId, pend2fa: true }, process.env.JWT_SECRET, { expiresIn: '5m' });
+// Lleva el taller: la contraseña ya se validó, así que en este punto se sabe de qué
+// taller es el usuario. Sin esto, al canjear el código habría que volver a buscarlo
+// sin scope, que es justo lo que queremos evitar.
+function firmarParcial(usuarioId, tenantId) {
+  return jwt.sign({ id: usuarioId, tenant_id: tenantId, pend2fa: true }, process.env.JWT_SECRET, { expiresIn: '5m' });
 }
 
 // Hash señuelo (bcrypt válido) para igualar el tiempo de respuesta cuando el correo
@@ -85,7 +92,7 @@ router.post('/login', async (req, res) => {
       // Con verificación en dos pasos activa, la contraseña sola no abre sesión:
       // se devuelve un token parcial que solo sirve para canjear el código.
       if (usuario.totp_activado) {
-        return res.json({ data: { requiere_2fa: true, tipo: 'staff', token_parcial: firmarParcial(usuario.id) } });
+        return res.json({ data: { requiere_2fa: true, tipo: 'staff', token_parcial: firmarParcial(usuario.id, usuario.tenant_id) } });
       }
       const payload = {
         id: usuario.id, nombre: usuario.nombre, email: usuario.email,
@@ -125,8 +132,8 @@ router.post('/login', async (req, res) => {
 
 router.get('/me', auth, async (req, res) => {
   try {
-    const [[usuario]] = await pool.query(
-      'SELECT id, nombre, email, rol, activo, created_at FROM usuarios WHERE id = ?',
+    const [[usuario]] = await req.db.query(
+      'SELECT id, nombre, email, rol, activo, created_at FROM usuarios WHERE id = ? AND tenant_id = @tenant',
       [req.usuario.id]
     );
     if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -155,7 +162,12 @@ router.post('/2fa/verificar', async (req, res) => {
     } catch {
       return res.status(401).json({ error: 'La sesión de ingreso venció. Iniciá sesión de nuevo.' });
     }
-    if (!datos.pend2fa || !datos.id) return res.status(401).json({ error: 'Token no válido' });
+    if (!datos.pend2fa || !datos.id || !datos.tenant_id) {
+      return res.status(401).json({ error: 'Token no válido' });
+    }
+    // Esta ruta no pasa por middleware/auth (todavía no hay sesión abierta), así que
+    // el acceso scopeado se arma acá, con el taller que viaja en el token parcial.
+    req.db = paraTenant(Number(datos.tenant_id));
 
     // Fuerza bruta: 6 dígitos son un millón de combinaciones, pero sin tope se
     // agotan rápido. Se limita por cuenta, no por IP (que el atacante puede rotar).
@@ -164,8 +176,8 @@ router.post('/2fa/verificar', async (req, res) => {
       return res.status(429).json({ error: `Demasiados intentos. Esperá ${limite.retryAfter}s e intentá de nuevo.` });
     }
 
-    const [[usuario]] = await pool.query(
-      'SELECT id, nombre, email, rol, totp_secret, totp_activado, totp_backup, totp_ultimo_contador FROM usuarios WHERE id = ? AND activo = 1',
+    const [[usuario]] = await req.db.query(
+      'SELECT id, nombre, email, rol, totp_secret, totp_activado, totp_backup, totp_ultimo_contador FROM usuarios WHERE id = ? AND activo = 1 AND tenant_id = @tenant',
       [datos.id]
     );
     if (!usuario || !usuario.totp_activado) return res.status(401).json({ error: 'Token no válido' });
@@ -175,7 +187,7 @@ router.post('/2fa/verificar', async (req, res) => {
 
     if (contador) {
       // Guarda el período consumido: ese mismo código ya no se puede reusar.
-      await pool.query('UPDATE usuarios SET totp_ultimo_contador = ? WHERE id = ?', [contador, usuario.id]);
+      await req.db.query('UPDATE usuarios SET totp_ultimo_contador = ? WHERE id = ? AND tenant_id = @tenant', [contador, usuario.id]);
     } else {
       // ¿Será un código de respaldo? (un solo uso: si acierta, se elimina)
       const usado = await consumirCodigoRespaldo(usuario, codigo);
@@ -204,7 +216,7 @@ async function consumirCodigoRespaldo(usuario, codigo) {
   for (let i = 0; i < hashes.length; i++) {
     if (await bcrypt.compare(limpio, hashes[i])) {
       hashes.splice(i, 1);
-      await pool.query('UPDATE usuarios SET totp_backup = ? WHERE id = ?', [JSON.stringify(hashes), usuario.id]);
+      await req.db.query('UPDATE usuarios SET totp_backup = ? WHERE id = ? AND tenant_id = @tenant', [JSON.stringify(hashes), usuario.id]);
       return true;
     }
   }
@@ -214,7 +226,7 @@ async function consumirCodigoRespaldo(usuario, codigo) {
 // Estado del 2FA de mi cuenta (para pintar el panel del perfil).
 router.get('/2fa/estado', auth, async (req, res) => {
   try {
-    const [[u]] = await pool.query('SELECT totp_activado, totp_backup FROM usuarios WHERE id = ?', [req.usuario.id]);
+    const [[u]] = await req.db.query('SELECT totp_activado, totp_backup FROM usuarios WHERE id = ? AND tenant_id = @tenant', [req.usuario.id]);
     let restantes = 0;
     try { restantes = (JSON.parse(u?.totp_backup || '[]') || []).length; } catch { restantes = 0; }
     res.json({ data: { activado: !!u?.totp_activado, backup_restantes: restantes } });
@@ -227,12 +239,12 @@ router.get('/2fa/estado', auth, async (req, res) => {
 // Queda guardada pero INACTIVA hasta que se confirme con un código válido.
 router.post('/2fa/setup', auth, async (req, res) => {
   try {
-    const [[u]] = await pool.query('SELECT email, totp_activado FROM usuarios WHERE id = ?', [req.usuario.id]);
+    const [[u]] = await req.db.query('SELECT email, totp_activado FROM usuarios WHERE id = ? AND tenant_id = @tenant', [req.usuario.id]);
     if (u?.totp_activado) return res.status(400).json({ error: 'La verificación en dos pasos ya está activa' });
 
     const secreto = totp.generarSecreto();
-    await pool.query(
-      'UPDATE usuarios SET totp_secret = ?, totp_activado = 0, totp_ultimo_contador = NULL WHERE id = ?',
+    await req.db.query(
+      'UPDATE usuarios SET totp_secret = ?, totp_activado = 0, totp_ultimo_contador = NULL WHERE id = ? AND tenant_id = @tenant',
       [secreto, req.usuario.id]
     );
     res.json({
@@ -259,8 +271,8 @@ router.post('/2fa/activar', auth, async (req, res) => {
       return res.status(429).json({ error: `Demasiados intentos. Esperá ${limite.retryAfter}s e intentá de nuevo.` });
     }
 
-    const [[u]] = await pool.query(
-      'SELECT totp_secret, totp_activado FROM usuarios WHERE id = ?', [req.usuario.id]
+    const [[u]] = await req.db.query(
+      'SELECT totp_secret, totp_activado FROM usuarios WHERE id = ? AND tenant_id = @tenant', [req.usuario.id]
     );
     if (u?.totp_activado) return res.status(400).json({ error: 'La verificación en dos pasos ya está activa' });
     if (!u?.totp_secret) return res.status(400).json({ error: 'Primero generá la clave' });
@@ -270,8 +282,8 @@ router.post('/2fa/activar', auth, async (req, res) => {
 
     const codigos = totp.generarCodigosRespaldo();
     const hashes = await Promise.all(codigos.map(c => bcrypt.hash(totp.normalizarRespaldo(c), 10)));
-    await pool.query(
-      'UPDATE usuarios SET totp_activado = 1, totp_backup = ?, totp_ultimo_contador = ? WHERE id = ?',
+    await req.db.query(
+      'UPDATE usuarios SET totp_activado = 1, totp_backup = ?, totp_ultimo_contador = ? WHERE id = ? AND tenant_id = @tenant',
       [JSON.stringify(hashes), contador, req.usuario.id]
     );
 
@@ -293,14 +305,14 @@ router.post('/2fa/desactivar', auth, async (req, res) => {
       return res.status(429).json({ error: `Demasiados intentos. Esperá ${limite.retryAfter}s e intentá de nuevo.` });
     }
 
-    const [[u]] = await pool.query('SELECT password_hash FROM usuarios WHERE id = ?', [req.usuario.id]);
+    const [[u]] = await req.db.query('SELECT password_hash FROM usuarios WHERE id = ? AND tenant_id = @tenant', [req.usuario.id]);
     if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
     if (!(await bcrypt.compare(String(password), u.password_hash))) {
       return res.status(400).json({ error: 'La contraseña no es correcta' });
     }
 
-    await pool.query(
-      'UPDATE usuarios SET totp_activado = 0, totp_secret = NULL, totp_backup = NULL, totp_ultimo_contador = NULL WHERE id = ?',
+    await req.db.query(
+      'UPDATE usuarios SET totp_activado = 0, totp_secret = NULL, totp_backup = NULL, totp_ultimo_contador = NULL WHERE id = ? AND tenant_id = @tenant',
       [req.usuario.id]
     );
     res.json({ message: 'Verificación en dos pasos desactivada' });

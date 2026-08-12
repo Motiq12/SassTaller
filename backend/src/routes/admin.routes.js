@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const bcrypt = require('bcrypt');
-const { pool } = require('../db/pool');
+// Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
 const { fail } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
@@ -15,50 +15,50 @@ router.use(auth, requireRol('admin'));
 // GET /api/admin/resumen — KPIs del mes + distribución de citas + ingresos por servicio.
 router.get('/resumen', async (req, res) => {
   try {
-    const [[{ total_citas }]] = await pool.query(
-      'SELECT COUNT(*) AS total_citas FROM citas WHERE MONTH(fecha) = MONTH(CURDATE()) AND YEAR(fecha) = YEAR(CURDATE())'
+    const [[{ total_citas }]] = await req.db.query(
+      'SELECT COUNT(*) AS total_citas FROM citas WHERE tenant_id = @tenant AND MONTH(fecha) = MONTH(CURDATE()) AND YEAR(fecha) = YEAR(CURDATE())'
     );
-    const [[{ citas_pendientes }]] = await pool.query(
-      "SELECT COUNT(*) AS citas_pendientes FROM citas WHERE estado NOT IN ('entregado','cancelado')"
+    const [[{ citas_pendientes }]] = await req.db.query(
+      "SELECT COUNT(*) AS citas_pendientes FROM citas WHERE tenant_id = @tenant AND estado NOT IN ('entregado','cancelado')"
     );
     // Ingresos del mes unificados (mismo criterio del #3: sin doble conteo de la cita y su orden).
-    const [[{ ingresos_mes }]] = await pool.query(
+    const [[{ ingresos_mes }]] = await req.db.query(
       `SELECT
          (SELECT COALESCE(SUM(monto),0) FROM citas
-            WHERE estado='entregado' AND MONTH(fecha_fin)=MONTH(CURDATE()) AND YEAR(fecha_fin)=YEAR(CURDATE()))
+            WHERE tenant_id = @tenant AND estado='entregado' AND MONTH(fecha_fin)=MONTH(CURDATE()) AND YEAR(fecha_fin)=YEAR(CURDATE()))
        + (SELECT COALESCE(SUM(costo_mano_obra+costo_repuestos-descuento),0) FROM ordenes_trabajo
-            WHERE estado='entregada' AND MONTH(fecha_entrega_real)=MONTH(CURDATE()) AND YEAR(fecha_entrega_real)=YEAR(CURDATE())
-              AND id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL)) AS ingresos_mes`
+            WHERE tenant_id = @tenant AND estado='entregada' AND MONTH(fecha_entrega_real)=MONTH(CURDATE()) AND YEAR(fecha_entrega_real)=YEAR(CURDATE())
+              AND id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL AND tenant_id = @tenant)) AS ingresos_mes`
     );
     // Tasa de éxito del mes: entregadas / (entregadas + canceladas).
-    const [[exito]] = await pool.query(
+    const [[exito]] = await req.db.query(
       `SELECT COALESCE(SUM(estado='entregado'),0) AS entregadas, COALESCE(SUM(estado='cancelado'),0) AS canceladas
-       FROM citas WHERE MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE())`
+       FROM citas WHERE tenant_id = @tenant AND MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE())`
     );
     const cerradas = Number(exito.entregadas) + Number(exito.canceladas);
     const tasa_exito = cerradas ? Math.round((Number(exito.entregadas) / cerradas) * 100) : 0;
 
-    const [top_servicios] = await pool.query(
+    const [top_servicios] = await req.db.query(
       `SELECT COALESCE(tipo_servicio,'Sin especificar') AS servicio, COUNT(*) AS total
-       FROM citas WHERE MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE())
+       FROM citas WHERE tenant_id = @tenant AND MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE())
        GROUP BY servicio ORDER BY total DESC LIMIT 5`
     );
 
-    const [[estado_citas]] = await pool.query(
+    const [[estado_citas]] = await req.db.query(
       `SELECT
          COALESCE(SUM(estado='agendado'),0) AS agendadas,
          COALESCE(SUM(estado IN ('en_revision','en_mantenimiento','listo')),0) AS en_proceso,
          COALESCE(SUM(estado='entregado'),0) AS completadas,
          COALESCE(SUM(estado='cancelado'),0) AS canceladas,
          COUNT(*) AS total
-       FROM citas WHERE MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE())`
+       FROM citas WHERE tenant_id = @tenant AND MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE())`
     );
 
-    const [ingresos_por_servicio] = await pool.query(
+    const [ingresos_por_servicio] = await req.db.query(
       `SELECT COALESCE(tipo_servicio,'Sin especificar') AS servicio,
               COUNT(*) AS citas, COALESCE(SUM(monto),0) AS ingreso, COALESCE(AVG(monto),0) AS promedio
        FROM citas
-       WHERE estado='entregado' AND MONTH(fecha_fin)=MONTH(CURDATE()) AND YEAR(fecha_fin)=YEAR(CURDATE())
+       WHERE tenant_id = @tenant AND estado='entregado' AND MONTH(fecha_fin)=MONTH(CURDATE()) AND YEAR(fecha_fin)=YEAR(CURDATE())
        GROUP BY servicio ORDER BY ingreso DESC`
     );
 
@@ -92,11 +92,11 @@ router.get('/opiniones', async (req, res) => {
              m.marca, m.modelo, m.placa,
              c.tecnico_id, u.nombre AS tecnico_nombre
       FROM citas c
-        JOIN clientes cl ON cl.id = c.cliente_id
-        LEFT JOIN motos m ON m.id = c.moto_id
-        LEFT JOIN usuarios u ON u.id = c.tecnico_id
-        LEFT JOIN ordenes_trabajo o ON o.id = c.orden_id
-      WHERE c.calificacion IS NOT NULL AND c.calificacion > 0
+        JOIN clientes cl ON cl.id = c.cliente_id AND cl.tenant_id = @tenant
+        LEFT JOIN motos m ON m.id = c.moto_id AND m.tenant_id = @tenant
+        LEFT JOIN usuarios u ON u.id = c.tecnico_id AND u.tenant_id = @tenant
+        LEFT JOIN ordenes_trabajo o ON o.id = c.orden_id AND o.tenant_id = @tenant
+      WHERE c.tenant_id = @tenant AND c.calificacion IS NOT NULL AND c.calificacion > 0
       UNION ALL
       SELECT o.id AS ref_id, 'orden' AS origen, o.id AS orden_id, o.numero_orden,
              o.calificacion, o.comentario_satisfaccion AS comentario,
@@ -105,11 +105,11 @@ router.get('/opiniones', async (req, res) => {
              m.marca, m.modelo, m.placa,
              o.tecnico_id, u.nombre AS tecnico_nombre
       FROM ordenes_trabajo o
-        JOIN clientes cl ON cl.id = o.cliente_id
-        LEFT JOIN motos m ON m.id = o.moto_id
-        LEFT JOIN usuarios u ON u.id = o.tecnico_id
-      WHERE o.calificacion IS NOT NULL AND o.calificacion > 0
-        AND o.id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL)`;
+        JOIN clientes cl ON cl.id = o.cliente_id AND cl.tenant_id = @tenant
+        LEFT JOIN motos m ON m.id = o.moto_id AND m.tenant_id = @tenant
+        LEFT JOIN usuarios u ON u.id = o.tecnico_id AND u.tenant_id = @tenant
+      WHERE o.tenant_id = @tenant AND o.calificacion IS NOT NULL AND o.calificacion > 0
+        AND o.id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL AND tenant_id = @tenant)`;
 
     // Cláusula de filtro (aplica igual a la lista y al resumen).
     let filtro = '';
@@ -117,20 +117,20 @@ router.get('/opiniones', async (req, res) => {
     if (estrellas) { filtro += ' AND t.calificacion = ?'; params.push(estrellas); }
     if (empleado)  { filtro += ' AND t.tecnico_id = ?'; params.push(empleado); }
 
-    const [opiniones] = await pool.query(
+    const [opiniones] = await req.db.query(
       `SELECT * FROM (${UNION}) t WHERE 1=1${filtro} ORDER BY t.fecha DESC LIMIT ?`,
       [...params, limit]
     );
     // Resumen con los mismos filtros aplicados.
-    const [[agg]] = await pool.query(
+    const [[agg]] = await req.db.query(
       `SELECT COUNT(*) AS total, COALESCE(AVG(t.calificacion),0) AS promedio,
               COALESCE(SUM(t.calificacion <= 2),0) AS bajas
        FROM (${UNION}) t WHERE 1=1${filtro}`,
       params
     );
     // Mecánicos activos para el filtro (siempre completo, no depende de los filtros).
-    const [tecnicos] = await pool.query(
-      "SELECT id, nombre FROM usuarios WHERE rol = 'tecnico' AND activo = 1 ORDER BY nombre"
+    const [tecnicos] = await req.db.query(
+      "SELECT id, nombre FROM usuarios WHERE tenant_id = @tenant AND rol = 'tecnico' AND activo = 1 ORDER BY nombre"
     );
     res.json({
       data: {
@@ -171,40 +171,40 @@ router.get('/reportes', async (req, res) => {
     const pEmp = empleado ? [empleado] : [];
 
     // KPIs del período.
-    const [[k]] = await pool.query(
+    const [[k]] = await req.db.query(
       `SELECT COUNT(*) AS total_citas,
               COALESCE(SUM(estado='entregado'),0) AS entregadas,
               COALESCE(SUM(estado='cancelado'),0) AS canceladas,
               COALESCE(AVG(NULLIF(calificacion,0)),0) AS calificacion_promedio
-       FROM citas c WHERE ${rango('c.fecha')}${empCita}`, pEmp
+       FROM citas c WHERE c.tenant_id = @tenant AND ${rango('c.fecha')}${empCita}`, pEmp
     );
     const cerradas = Number(k.entregadas) + Number(k.canceladas);
     const tasa_exito = cerradas ? Math.round((Number(k.entregadas) / cerradas) * 100) : 0;
 
     // Ticket promedio y total cobrado en citas entregadas (por fecha de entrega).
-    const [[tk]] = await pool.query(
+    const [[tk]] = await req.db.query(
       `SELECT COALESCE(AVG(NULLIF(monto,0)),0) AS ticket_promedio
-       FROM citas c WHERE estado='entregado' AND ${rango('c.fecha_fin')}${empCita}`, pEmp
+       FROM citas c WHERE c.tenant_id = @tenant AND c.estado='entregado' AND ${rango('c.fecha_fin')}${empCita}`, pEmp
     );
 
     // Ingresos unificados del período (mismo criterio del #3, sin doble conteo).
-    const [[ing]] = await pool.query(
+    const [[ing]] = await req.db.query(
       `SELECT
          (SELECT COALESCE(SUM(monto),0) FROM citas c
-            WHERE estado='entregado' AND ${rango('c.fecha_fin')}${empCita})
+            WHERE c.tenant_id = @tenant AND c.estado='entregado' AND ${rango('c.fecha_fin')}${empCita})
        + (SELECT COALESCE(SUM(costo_mano_obra+costo_repuestos-descuento),0) FROM ordenes_trabajo o
-            WHERE estado='entregada' AND ${rango('o.fecha_entrega_real')}
+            WHERE o.tenant_id = @tenant AND o.estado='entregada' AND ${rango('o.fecha_entrega_real')}
               ${empleado ? 'AND o.tecnico_id = ?' : ''}
-              AND o.id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL)) AS ingresos`,
+              AND o.id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL AND tenant_id = @tenant)) AS ingresos`,
       empleado ? [empleado, empleado] : []
     );
 
     // Serie temporal: citas e ingreso por día (mes) o por mes (año), con huecos en cero.
     const bucket = periodo === 'anio' ? 'MONTH(c.fecha)' : 'DAY(c.fecha)';
-    const [serieRows] = await pool.query(
+    const [serieRows] = await req.db.query(
       `SELECT ${bucket} AS b, COUNT(*) AS citas,
               COALESCE(SUM(CASE WHEN estado='entregado' THEN monto ELSE 0 END),0) AS ingreso
-       FROM citas c WHERE ${rango('c.fecha')}${empCita}
+       FROM citas c WHERE c.tenant_id = @tenant AND ${rango('c.fecha')}${empCita}
        GROUP BY b ORDER BY b`, pEmp
     );
     const mapSerie = {};
@@ -217,7 +217,7 @@ router.get('/reportes', async (req, res) => {
         return { label: m, citas: r ? Number(r.citas) : 0, ingreso: r ? Number(r.ingreso) : 0 };
       });
     } else {
-      const [[{ dias }]] = await pool.query(
+      const [[{ dias }]] = await req.db.query(
         periodo === 'mes_pasado'
           ? 'SELECT DAYOFMONTH(LAST_DAY(CURDATE() - INTERVAL 1 MONTH)) AS dias'
           : 'SELECT DAYOFMONTH(LAST_DAY(CURDATE())) AS dias'
@@ -229,15 +229,15 @@ router.get('/reportes', async (req, res) => {
     }
 
     // Ingresos por servicio (citas entregadas en el período).
-    const [ingresos_por_servicio] = await pool.query(
+    const [ingresos_por_servicio] = await req.db.query(
       `SELECT COALESCE(tipo_servicio,'Sin especificar') AS servicio,
               COUNT(*) AS citas, COALESCE(SUM(monto),0) AS ingreso, COALESCE(AVG(monto),0) AS promedio
-       FROM citas c WHERE estado='entregado' AND ${rango('c.fecha_fin')}${empCita}
+       FROM citas c WHERE c.tenant_id = @tenant AND c.estado='entregado' AND ${rango('c.fecha_fin')}${empCita}
        GROUP BY servicio ORDER BY ingreso DESC`, pEmp
     );
 
     // Rendimiento por mecánico: citas, entregas, ingresos, tiempo y calificación.
-    const [rendimiento] = await pool.query(
+    const [rendimiento] = await req.db.query(
       `SELECT u.id AS tecnico_id, u.nombre,
               COUNT(*) AS citas,
               COALESCE(SUM(c.estado='entregado'),0) AS entregadas,
@@ -248,20 +248,20 @@ router.get('/reportes', async (req, res) => {
               AVG(CASE WHEN c.estado='entregado' AND c.fecha_listo IS NOT NULL AND c.fecha_fin IS NOT NULL
                        THEN TIMESTAMPDIFF(MINUTE, c.fecha_listo, c.fecha_fin) END) AS tiempo_entrega_min,
               AVG(NULLIF(c.calificacion,0)) AS calificacion
-       FROM citas c JOIN usuarios u ON u.id = c.tecnico_id
-       WHERE ${rango('c.fecha')}${empCita}
+       FROM citas c JOIN usuarios u ON u.id = c.tecnico_id AND u.tenant_id = @tenant
+       WHERE c.tenant_id = @tenant AND ${rango('c.fecha')}${empCita}
        GROUP BY u.id, u.nombre
        ORDER BY ingresos DESC, citas DESC`, pEmp
     );
 
     // Cotizaciones por recepción (órdenes creadas y su aprobación por el cliente).
-    const [recepcion] = await pool.query(
+    const [recepcion] = await req.db.query(
       `SELECT u.id, u.nombre,
               COUNT(*) AS ordenes,
               COALESCE(SUM(o.aprobacion_cliente='aprobado'),0) AS aprobadas,
               COALESCE(SUM(o.aprobacion_cliente='rechazado'),0) AS rechazadas
-       FROM ordenes_trabajo o JOIN usuarios u ON u.id = o.recepcionista_id
-       WHERE ${rango('o.fecha_ingreso')}
+       FROM ordenes_trabajo o JOIN usuarios u ON u.id = o.recepcionista_id AND u.tenant_id = @tenant
+       WHERE o.tenant_id = @tenant AND ${rango('o.fecha_ingreso')}
        GROUP BY u.id, u.nombre ORDER BY ordenes DESC`
     );
 
@@ -316,14 +316,14 @@ router.get('/tareas', async (req, res) => {
       `SELECT t.id, t.tecnico_id, t.titulo, t.detalle, t.prioridad, t.hecha, t.vence, t.created_at,
               u.nombre AS tecnico_nombre, a.nombre AS asignado_por_nombre
        FROM tareas_mecanico t
-       JOIN usuarios u ON u.id = t.tecnico_id
-       LEFT JOIN usuarios a ON a.id = t.asignado_por
+       JOIN usuarios u ON u.id = t.tecnico_id AND u.tenant_id = @tenant
+       LEFT JOIN usuarios a ON a.id = t.asignado_por AND a.tenant_id = @tenant
        WHERE t.asignado_por IS NOT NULL`;
     const params = [];
     if (empleado) { sql += ' AND t.tecnico_id = ?'; params.push(empleado); }
     sql += ` ORDER BY t.hecha ASC, FIELD(t.prioridad,'urgente','alta','normal','baja'),
              (t.vence IS NULL), t.vence ASC, t.created_at DESC`;
-    const [rows] = await pool.query(sql, params);
+    const [rows] = await req.db.query(sql, params);
     res.json({ data: rows });
   } catch (err) {
     fail(res, err);
@@ -336,16 +336,16 @@ router.post('/tareas', async (req, res) => {
     const { tecnico_id, titulo, detalle, prioridad, vence } = req.body;
     const error = validarTarea({ titulo, detalle, tecnico_id });
     if (error) return res.status(400).json({ error });
-    const [[tec]] = await pool.query(
-      "SELECT id FROM usuarios WHERE id = ? AND rol = 'tecnico' AND activo = 1", [tecnico_id]
+    const [[tec]] = await req.db.query(
+      "SELECT id FROM usuarios WHERE tenant_id = @tenant AND id = ? AND rol = 'tecnico' AND activo = 1", [tecnico_id]
     );
     if (!tec) return res.status(400).json({ error: 'Mecánico no válido' });
     const prio = PRIORIDADES.includes(prioridad) ? prioridad : 'normal';
-    const [r] = await pool.query(
-      'INSERT INTO tareas_mecanico (tecnico_id, titulo, detalle, prioridad, vence, asignado_por) VALUES (?, ?, ?, ?, ?, ?)',
+    const [r] = await req.db.query(
+      'INSERT INTO tareas_mecanico (tenant_id,tecnico_id, titulo, detalle, prioridad, vence, asignado_por) VALUES (@tenant, ?, ?, ?, ?, ?, ?)',
       [tecnico_id, titulo.trim(), (detalle || '').trim() || null, prio, vence || null, req.usuario.id]
     );
-    const [[nueva]] = await pool.query('SELECT * FROM tareas_mecanico WHERE id = ?', [r.insertId]);
+    const [[nueva]] = await req.db.query('SELECT * FROM tareas_mecanico WHERE tenant_id = @tenant AND id = ?', [r.insertId]);
     res.status(201).json({ data: nueva, message: 'Tarea asignada' });
   } catch (err) {
     fail(res, err);
@@ -363,22 +363,22 @@ router.put('/tareas/:id', async (req, res) => {
 
     // Igual que el DELETE: el admin solo administra lo que él asignó. Las tareas que
     // el técnico se crea a sí mismo (asignado_por NULL) son suyas y no se tocan.
-    const [[existente]] = await pool.query(
-      'SELECT id FROM tareas_mecanico WHERE id = ? AND asignado_por IS NOT NULL', [req.params.id]
+    const [[existente]] = await req.db.query(
+      'SELECT id FROM tareas_mecanico WHERE tenant_id = @tenant AND id = ? AND asignado_por IS NOT NULL', [req.params.id]
     );
     if (!existente) return res.status(404).json({ error: 'Tarea no encontrada' });
 
-    const [[tec]] = await pool.query(
-      "SELECT id FROM usuarios WHERE id = ? AND rol = 'tecnico' AND activo = 1", [tecnico_id]
+    const [[tec]] = await req.db.query(
+      "SELECT id FROM usuarios WHERE tenant_id = @tenant AND id = ? AND rol = 'tecnico' AND activo = 1", [tecnico_id]
     );
     if (!tec) return res.status(400).json({ error: 'Mecánico no válido' });
 
     const prio = PRIORIDADES.includes(prioridad) ? prioridad : 'normal';
-    await pool.query(
-      'UPDATE tareas_mecanico SET tecnico_id = ?, titulo = ?, detalle = ?, prioridad = ?, vence = ? WHERE id = ?',
+    await req.db.query(
+      'UPDATE tareas_mecanico SET tecnico_id = ?, titulo = ?, detalle = ?, prioridad = ?, vence = ? WHERE tenant_id = @tenant AND id = ?',
       [tecnico_id, titulo.trim(), (detalle || '').trim() || null, prio, vence || null, req.params.id]
     );
-    const [[actualizada]] = await pool.query('SELECT * FROM tareas_mecanico WHERE id = ?', [req.params.id]);
+    const [[actualizada]] = await req.db.query('SELECT * FROM tareas_mecanico WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     res.json({ data: actualizada, message: 'Tarea actualizada' });
   } catch (err) {
     fail(res, err);
@@ -388,7 +388,7 @@ router.put('/tareas/:id', async (req, res) => {
 // DELETE /api/admin/tareas/:id — cancelar una tarea asignada (solo asignadas, no las propias del técnico).
 router.delete('/tareas/:id', async (req, res) => {
   try {
-    await pool.query('DELETE FROM tareas_mecanico WHERE id = ? AND asignado_por IS NOT NULL', [req.params.id]);
+    await req.db.query('DELETE FROM tareas_mecanico WHERE tenant_id = @tenant AND id = ? AND asignado_por IS NOT NULL', [req.params.id]);
     res.json({ message: 'Tarea eliminada' });
   } catch (err) {
     fail(res, err);
@@ -419,13 +419,13 @@ router.post('/servicios', async (req, res) => {
     if (!textoDentroDeLimite(nombre, MAX_SERVICIO)) {
       return res.status(400).json({ error: `El nombre no puede pasar de ${MAX_SERVICIO} caracteres` });
     }
-    const [[dup]] = await pool.query('SELECT id FROM servicios WHERE nombre = ?', [nombre]);
+    const [[dup]] = await req.db.query('SELECT id FROM servicios WHERE nombre = ? AND tenant_id = @tenant', [nombre]);
     if (dup) return res.status(409).json({ error: 'Ya existe un servicio con ese nombre' });
 
-    const [[max]] = await pool.query('SELECT COALESCE(MAX(orden), 0) AS m FROM servicios');
-    const [r] = await pool.query('INSERT INTO servicios (nombre, orden) VALUES (?, ?)', [nombre, max.m + 1]);
+    const [[max]] = await req.db.query('SELECT COALESCE(MAX(orden), 0) AS m FROM servicios WHERE tenant_id = @tenant');
+    const [r] = await req.db.query('INSERT INTO servicios (tenant_id,nombre, orden) VALUES (@tenant, ?, ?)', [nombre, max.m + 1]);
     clearServicios();
-    const [[nuevo]] = await pool.query('SELECT id, nombre, activo, orden FROM servicios WHERE id = ?', [r.insertId]);
+    const [[nuevo]] = await req.db.query('SELECT id, nombre, activo, orden FROM servicios WHERE tenant_id = @tenant AND id = ?', [r.insertId]);
     res.status(201).json({ data: nuevo, message: 'Servicio creado' });
   } catch (err) {
     fail(res, err);
@@ -439,19 +439,19 @@ router.put('/servicios/:id', async (req, res) => {
     if (!textoDentroDeLimite(nombre, MAX_SERVICIO)) {
       return res.status(400).json({ error: `El nombre no puede pasar de ${MAX_SERVICIO} caracteres` });
     }
-    const [[existe]] = await pool.query('SELECT id FROM servicios WHERE id = ?', [req.params.id]);
+    const [[existe]] = await req.db.query('SELECT id FROM servicios WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     if (!existe) return res.status(404).json({ error: 'Servicio no encontrado' });
-    const [[dup]] = await pool.query('SELECT id FROM servicios WHERE nombre = ? AND id <> ?', [nombre, req.params.id]);
+    const [[dup]] = await req.db.query('SELECT id FROM servicios WHERE nombre = ? AND id <> ? AND tenant_id = @tenant', [nombre, req.params.id]);
     if (dup) return res.status(409).json({ error: 'Ya existe un servicio con ese nombre' });
 
     const activo = req.body.activo === undefined ? undefined : (req.body.activo ? 1 : 0);
     if (activo === undefined) {
-      await pool.query('UPDATE servicios SET nombre = ? WHERE id = ?', [nombre, req.params.id]);
+      await req.db.query('UPDATE servicios SET nombre = ? WHERE tenant_id = @tenant AND id = ?', [nombre, req.params.id]);
     } else {
-      await pool.query('UPDATE servicios SET nombre = ?, activo = ? WHERE id = ?', [nombre, activo, req.params.id]);
+      await req.db.query('UPDATE servicios SET nombre = ?, activo = ? WHERE tenant_id = @tenant AND id = ?', [nombre, activo, req.params.id]);
     }
     clearServicios();
-    const [[actualizado]] = await pool.query('SELECT id, nombre, activo, orden FROM servicios WHERE id = ?', [req.params.id]);
+    const [[actualizado]] = await req.db.query('SELECT id, nombre, activo, orden FROM servicios WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     res.json({ data: actualizado, message: 'Servicio actualizado' });
   } catch (err) {
     fail(res, err);
@@ -461,10 +461,10 @@ router.put('/servicios/:id', async (req, res) => {
 // PATCH /api/admin/servicios/:id/activo — alternar disponibilidad sin borrar nada.
 router.patch('/servicios/:id/activo', async (req, res) => {
   try {
-    const [[s]] = await pool.query('SELECT id, activo FROM servicios WHERE id = ?', [req.params.id]);
+    const [[s]] = await req.db.query('SELECT id, activo FROM servicios WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     if (!s) return res.status(404).json({ error: 'Servicio no encontrado' });
     const activo = req.body.activo === undefined ? (s.activo ? 0 : 1) : (req.body.activo ? 1 : 0);
-    await pool.query('UPDATE servicios SET activo = ? WHERE id = ?', [activo, req.params.id]);
+    await req.db.query('UPDATE servicios SET activo = ? WHERE tenant_id = @tenant AND id = ?', [activo, req.params.id]);
     clearServicios();
     res.json({ data: { id: Number(req.params.id), activo }, message: activo ? 'Servicio activado' : 'Servicio desactivado' });
   } catch (err) {
@@ -477,17 +477,17 @@ router.patch('/servicios/:id/activo', async (req, res) => {
 // servicio que ya no se puede volver a ofrecer ni explicar.
 router.delete('/servicios/:id', async (req, res) => {
   try {
-    const [[s]] = await pool.query('SELECT id, nombre FROM servicios WHERE id = ?', [req.params.id]);
+    const [[s]] = await req.db.query('SELECT id, nombre FROM servicios WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     if (!s) return res.status(404).json({ error: 'Servicio no encontrado' });
 
-    const [[uso]] = await pool.query('SELECT COUNT(*) AS n FROM citas WHERE tipo_servicio = ?', [s.nombre]);
+    const [[uso]] = await req.db.query('SELECT COUNT(*) AS n FROM citas WHERE tipo_servicio = ? AND tenant_id = @tenant', [s.nombre]);
     if (uso.n > 0) {
       return res.status(409).json({
         error: `No se puede borrar: ${uso.n} cita${uso.n > 1 ? 's' : ''} lo usaron. Desactivalo para dejar de ofrecerlo.`,
         en_uso: uso.n,
       });
     }
-    await pool.query('DELETE FROM servicios WHERE id = ?', [req.params.id]);
+    await req.db.query('DELETE FROM servicios WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     clearServicios();
     res.json({ message: 'Servicio eliminado' });
   } catch (err) {
@@ -503,17 +503,17 @@ router.get('/calendario', async (req, res) => {
   try {
     const anio = parseInt(req.query.anio, 10) || new Date().getFullYear();
     const mes = Math.min(12, Math.max(1, parseInt(req.query.mes, 10) || (new Date().getMonth() + 1)));
-    const [celdas] = await pool.query(
+    const [celdas] = await req.db.query(
       `SELECT DAY(ci.fecha) AS dia, ci.tecnico_id, t.nombre AS tecnico_nombre, COUNT(*) AS n
        FROM citas ci
-       LEFT JOIN usuarios t ON t.id = ci.tecnico_id
-       WHERE YEAR(ci.fecha) = ? AND MONTH(ci.fecha) = ? AND ci.estado != 'cancelado'
+       LEFT JOIN usuarios t ON t.id = ci.tecnico_id AND t.tenant_id = @tenant
+       WHERE ci.tenant_id = @tenant AND YEAR(ci.fecha) = ? AND MONTH(ci.fecha) = ? AND ci.estado != 'cancelado'
        GROUP BY dia, ci.tecnico_id, t.nombre
        ORDER BY dia`,
       [anio, mes]
     );
-    const [tecnicos] = await pool.query(
-      "SELECT id, nombre FROM usuarios WHERE rol = 'tecnico' AND activo = 1 ORDER BY nombre"
+    const [tecnicos] = await req.db.query(
+      "SELECT id, nombre FROM usuarios WHERE tenant_id = @tenant AND rol = 'tecnico' AND activo = 1 ORDER BY nombre"
     );
     res.json({ data: { anio, mes, celdas, tecnicos } });
   } catch (err) {
@@ -578,7 +578,7 @@ router.put('/configuracion', async (req, res) => {
     // formas de pago anteriores que dejar el cierre de orden sin ninguna opción.
     const metodosJson = metodos && metodos.length ? JSON.stringify(metodos) : null;
 
-    await pool.query(
+    await req.db.query(
       `UPDATE configuracion SET
          nombre_taller = ?, telefono = ?, email = ?, direccion = ?, logo = ?,
          max_citas_hora = ?, dias_anticipacion = ?, duracion_cita_min = ?, cancelacion_horas_min = ?,
@@ -623,8 +623,8 @@ router.put('/cuenta', async (req, res) => {
     if (!nombre || !nombre.trim() || !email || !email.trim()) {
       return res.status(400).json({ error: 'Nombre y correo son requeridos' });
     }
-    await pool.query('UPDATE usuarios SET nombre = ?, email = ? WHERE id = ?', [nombre.trim(), email.trim(), req.usuario.id]);
-    const [[u]] = await pool.query('SELECT id, nombre, email, rol FROM usuarios WHERE id = ?', [req.usuario.id]);
+    await req.db.query('UPDATE usuarios SET nombre = ?, email = ? WHERE tenant_id = @tenant AND id = ?', [nombre.trim(), email.trim(), req.usuario.id]);
+    const [[u]] = await req.db.query('SELECT id, nombre, email, rol FROM usuarios WHERE tenant_id = @tenant AND id = ?', [req.usuario.id]);
     res.json({ data: u, message: 'Cuenta actualizada' });
   } catch (err) {
     fail(res, err);
@@ -637,12 +637,12 @@ router.put('/cuenta/password', async (req, res) => {
     const { actual, nueva } = req.body;
     if (!actual || !nueva) return res.status(400).json({ error: 'Contraseña actual y nueva son requeridas' });
     if (String(nueva).length < 8) return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres' });
-    const [[u]] = await pool.query('SELECT password_hash FROM usuarios WHERE id = ?', [req.usuario.id]);
+    const [[u]] = await req.db.query('SELECT password_hash FROM usuarios WHERE tenant_id = @tenant AND id = ?', [req.usuario.id]);
     if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
     const ok = await bcrypt.compare(String(actual), u.password_hash);
     if (!ok) return res.status(400).json({ error: 'La contraseña actual no es correcta' });
     const hash = await bcrypt.hash(String(nueva), 10);
-    await pool.query('UPDATE usuarios SET password_hash = ? WHERE id = ?', [hash, req.usuario.id]);
+    await req.db.query('UPDATE usuarios SET password_hash = ? WHERE tenant_id = @tenant AND id = ?', [hash, req.usuario.id]);
     res.json({ message: 'Contraseña actualizada' });
   } catch (err) {
     fail(res, err);
@@ -653,7 +653,7 @@ router.put('/cuenta/foto', async (req, res) => {
   try {
     const { foto } = req.body;
     if (!fotoValida(foto)) return res.status(400).json({ error: 'Imagen inválida' });
-    await pool.query('UPDATE usuarios SET foto = ? WHERE id = ?', [foto || null, req.usuario.id]);
+    await req.db.query('UPDATE usuarios SET foto = ? WHERE tenant_id = @tenant AND id = ?', [foto || null, req.usuario.id]);
     res.json({ data: { foto: foto || null }, message: foto ? 'Foto actualizada' : 'Foto eliminada' });
   } catch (err) {
     fail(res, err);
@@ -677,13 +677,13 @@ router.post('/sucursales', async (req, res) => {
   try {
     const nombre = (req.body.nombre || '').trim();
     if (!nombre) return res.status(400).json({ error: 'El nombre de la sucursal es requerido' });
-    const [[{ orden }]] = await pool.query('SELECT COALESCE(MAX(orden), 0) + 1 AS orden FROM sucursales');
-    const [result] = await pool.query(
-      'INSERT INTO sucursales (nombre, direccion, telefono, orden) VALUES (?, ?, ?, ?)',
+    const [[{ orden }]] = await req.db.query('SELECT COALESCE(MAX(orden), 0) + 1 AS orden FROM sucursales WHERE tenant_id = @tenant');
+    const [result] = await req.db.query(
+      'INSERT INTO sucursales (tenant_id,nombre, direccion, telefono, orden) VALUES (@tenant, ?, ?, ?, ?)',
       [nombre, (req.body.direccion || '').trim() || null, (req.body.telefono || '').trim() || null, orden]
     );
     clearSucursalesCache();
-    const [[nueva]] = await pool.query('SELECT id, nombre, direccion, telefono, activa, orden FROM sucursales WHERE id = ?', [result.insertId]);
+    const [[nueva]] = await req.db.query('SELECT id, nombre, direccion, telefono, activa, orden FROM sucursales WHERE tenant_id = @tenant AND id = ?', [result.insertId]);
     res.status(201).json({ data: nueva, message: 'Sucursal creada' });
   } catch (err) {
     fail(res, err);
@@ -695,13 +695,13 @@ router.put('/sucursales/:id', async (req, res) => {
   try {
     const nombre = (req.body.nombre || '').trim();
     if (!nombre) return res.status(400).json({ error: 'El nombre de la sucursal es requerido' });
-    const [result] = await pool.query(
-      'UPDATE sucursales SET nombre = ?, direccion = ?, telefono = ? WHERE id = ?',
+    const [result] = await req.db.query(
+      'UPDATE sucursales SET nombre = ?, direccion = ?, telefono = ? WHERE tenant_id = @tenant AND id = ?',
       [nombre, (req.body.direccion || '').trim() || null, (req.body.telefono || '').trim() || null, req.params.id]
     );
     if (!result.affectedRows) return res.status(404).json({ error: 'Sucursal no encontrada' });
     clearSucursalesCache();
-    const [[actualizada]] = await pool.query('SELECT id, nombre, direccion, telefono, activa, orden FROM sucursales WHERE id = ?', [req.params.id]);
+    const [[actualizada]] = await req.db.query('SELECT id, nombre, direccion, telefono, activa, orden FROM sucursales WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     res.json({ data: actualizada, message: 'Sucursal actualizada' });
   } catch (err) {
     fail(res, err);
@@ -713,10 +713,10 @@ router.patch('/sucursales/:id/activa', async (req, res) => {
   try {
     const activa = req.body.activa ? 1 : 0;
     if (!activa) {
-      const [[{ activas }]] = await pool.query('SELECT COUNT(*) AS activas FROM sucursales WHERE activa = 1 AND id <> ?', [req.params.id]);
+      const [[{ activas }]] = await req.db.query('SELECT COUNT(*) AS activas FROM sucursales WHERE tenant_id = @tenant AND activa = 1 AND id <> ?', [req.params.id]);
       if (!activas) return res.status(400).json({ error: 'Debe quedar al menos una sucursal activa' });
     }
-    const [result] = await pool.query('UPDATE sucursales SET activa = ? WHERE id = ?', [activa, req.params.id]);
+    const [result] = await req.db.query('UPDATE sucursales SET activa = ? WHERE tenant_id = @tenant AND id = ?', [activa, req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ error: 'Sucursal no encontrada' });
     clearSucursalesCache();
     res.json({ message: activa ? 'Sucursal activada' : 'Sucursal desactivada' });

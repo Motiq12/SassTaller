@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { pool } = require('../db/pool');
+// Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
 const { fail } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
@@ -32,8 +32,8 @@ router.post('/web-vitals', async (req, res) => {
     // Solo la ruta, recortada: sin querystring (puede traer datos) y sin dominio.
     const rutaLimpia = String(ruta || '/').split('?')[0].slice(0, 200);
 
-    await pool.query(
-      'INSERT INTO web_vitals (metrica, valor, calificacion, ruta, movil) VALUES (?, ?, ?, ?, ?)',
+    await req.db.query(
+      'INSERT INTO web_vitals (tenant_id,metrica, valor, calificacion, ruta, movil) VALUES (@tenant, ?, ?, ?, ?, ?)',
       [metrica, n, String(calificacion || '').slice(0, 20) || null, rutaLimpia, movil ? 1 : 0]
     );
     // 204: el navegador manda esto con sendBeacon al cerrar la pestaña y no espera cuerpo.
@@ -50,9 +50,9 @@ router.post('/web-vitals', async (req, res) => {
 router.get('/web-vitals', auth, requireRol('admin'), async (req, res) => {
   try {
     const dias = Math.min(Math.max(Number(req.query.dias) || 30, 1), 365);
-    const [filas] = await pool.query(
+    const [filas] = await req.db.query(
       `SELECT metrica, valor FROM web_vitals
-       WHERE created_at >= NOW() - INTERVAL ? DAY
+       WHERE tenant_id = @tenant AND created_at >= NOW() - INTERVAL ? DAY
        ORDER BY metrica, valor`,
       [dias]
     );

@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const bcrypt = require('bcrypt');
-const { pool } = require('../db/pool');
+// Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
 const { fail } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
@@ -19,11 +19,12 @@ const ROLES = ['recepcion', 'tecnico', 'admin'];
 
 router.get('/', async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await req.db.query(
       `SELECT u.id, u.nombre, u.email, u.telefono, u.rol, u.activo, u.created_at,
               u.sucursal_id, s.nombre AS sucursal_nombre
        FROM usuarios u
-       LEFT JOIN sucursales s ON s.id = u.sucursal_id
+       LEFT JOIN sucursales s ON s.id = u.sucursal_id AND s.tenant_id = @tenant
+       WHERE u.tenant_id = @tenant
        ORDER BY u.nombre`
     );
     res.json({ data: rows });
@@ -44,12 +45,12 @@ router.post('/', async (req, res) => {
     if (!ROLES.includes(rol)) return res.status(400).json({ error: 'Rol no válido' });
     const hash = await bcrypt.hash(password, 10);
     const sucursal_id = await sucursalDelBody(req.db, req.body.sucursal_id);
-    const [result] = await pool.query(
-      'INSERT INTO usuarios (nombre, email, password_hash, rol, telefono, sucursal_id) VALUES (?, ?, ?, ?, ?, ?)',
+    const [result] = await req.db.query(
+      'INSERT INTO usuarios (tenant_id,nombre, email, password_hash, rol, telefono, sucursal_id) VALUES (@tenant, ?, ?, ?, ?, ?, ?)',
       [nombre, email, hash, rol, telefono || null, sucursal_id]
     );
-    const [[nuevo]] = await pool.query(
-      'SELECT id, nombre, email, telefono, rol, activo, created_at, sucursal_id FROM usuarios WHERE id = ?',
+    const [[nuevo]] = await req.db.query(
+      'SELECT id, nombre, email, telefono, rol, activo, created_at, sucursal_id FROM usuarios WHERE tenant_id = @tenant AND id = ?',
       [result.insertId]
     );
     res.status(201).json({ data: nuevo, message: 'Usuario creado' });
@@ -72,12 +73,12 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'No podés cambiar tu propio rol de administrador' });
     }
     const sucursal_id = await sucursalDelBody(req.db, req.body.sucursal_id);
-    await pool.query(
-      'UPDATE usuarios SET nombre=?, email=?, rol=?, telefono=?, sucursal_id=? WHERE id=?',
+    await req.db.query(
+      'UPDATE usuarios SET nombre=?, email=?, rol=?, telefono=?, sucursal_id=? WHERE tenant_id = @tenant AND id=? AND tenant_id = @tenant',
       [nombre, email, rol, telefono ?? null, sucursal_id, req.params.id]
     );
-    const [[actualizado]] = await pool.query(
-      'SELECT id, nombre, email, telefono, rol, activo, created_at, sucursal_id FROM usuarios WHERE id = ?',
+    const [[actualizado]] = await req.db.query(
+      'SELECT id, nombre, email, telefono, rol, activo, created_at, sucursal_id FROM usuarios WHERE tenant_id = @tenant AND id = ?',
       [req.params.id]
     );
     res.json({ data: actualizado, message: 'Usuario actualizado' });
@@ -93,7 +94,7 @@ router.patch('/:id/activo', async (req, res) => {
     if (Number(req.params.id) === req.usuario.id && !activo) {
       return res.status(400).json({ error: 'No podés desactivar tu propia cuenta' });
     }
-    await pool.query('UPDATE usuarios SET activo = ? WHERE id = ?', [activo ? 1 : 0, req.params.id]);
+    await req.db.query('UPDATE usuarios SET activo = ? WHERE tenant_id = @tenant AND id = ?', [activo ? 1 : 0, req.params.id]);
     res.json({ message: activo ? 'Usuario activado' : 'Usuario desactivado' });
   } catch (err) {
     fail(res, err);
@@ -104,7 +105,7 @@ router.patch('/:id/activo', async (req, res) => {
 router.patch('/:id/sucursal', async (req, res) => {
   try {
     const sucursal_id = await sucursalDelBody(req.db, req.body.sucursal_id);
-    const [result] = await pool.query('UPDATE usuarios SET sucursal_id = ? WHERE id = ?', [sucursal_id, req.params.id]);
+    const [result] = await req.db.query('UPDATE usuarios SET sucursal_id = ? WHERE tenant_id = @tenant AND id = ?', [sucursal_id, req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ error: 'Usuario no encontrado' });
     res.json({ data: { sucursal_id }, message: 'Sucursal actualizada' });
   } catch (err) {
@@ -124,7 +125,7 @@ router.patch('/:id/sucursal', async (req, res) => {
 //     responsable). No se borran: son el historial del negocio y la facturación
 //     del cliente; eliminarlos destruiría datos contables ajenos al empleado.
 router.delete('/:id', async (req, res) => {
-  const conn = await pool.getConnection();
+  const conn = await req.db.conexion();
   try {
     const id = Number(req.params.id);
     // Anti-lockout: nadie se borra a sí mismo (quedaría sin acceso al sistema).
@@ -132,7 +133,7 @@ router.delete('/:id', async (req, res) => {
       conn.release();
       return res.status(400).json({ error: 'No podés eliminar tu propia cuenta' });
     }
-    const [[usuario]] = await conn.query('SELECT id FROM usuarios WHERE id = ?', [id]);
+    const [[usuario]] = await conn.query('SELECT id FROM usuarios WHERE tenant_id = @tenant AND id = ?', [id]);
     if (!usuario) {
       conn.release();
       return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -141,21 +142,21 @@ router.delete('/:id', async (req, res) => {
     await conn.beginTransaction();
 
     // 1) Rastro personal (NOT NULL → hay que borrar la fila).
-    await conn.query('DELETE FROM orden_avances WHERE usuario_id = ?', [id]);
-    await conn.query('DELETE FROM tareas_mecanico WHERE tecnico_id = ?', [id]);
-    await conn.query('DELETE FROM mensaje_lecturas WHERE usuario_id = ?', [id]);
-    await conn.query('DELETE FROM mensajes_internos WHERE remitente_id = ? OR destino_id = ?', [id, id]);
+    await conn.query('DELETE FROM orden_avances WHERE usuario_id = ? AND tenant_id = @tenant', [id]);
+    await conn.query('DELETE FROM tareas_mecanico WHERE tecnico_id = ? AND tenant_id = @tenant', [id]);
+    await conn.query('DELETE FROM mensaje_lecturas WHERE usuario_id = ? AND tenant_id = @tenant', [id]);
+    await conn.query('DELETE FROM mensajes_internos WHERE tenant_id = @tenant AND (remitente_id = ? OR destino_id = ?)', [id, id]);
 
     // 2) Trabajo del taller: se conserva, sin responsable.
-    await conn.query('UPDATE citas SET usuario_id = NULL WHERE usuario_id = ?', [id]);
-    await conn.query('UPDATE citas SET tecnico_id = NULL WHERE tecnico_id = ?', [id]);
-    await conn.query('UPDATE ordenes_trabajo SET recepcionista_id = NULL WHERE recepcionista_id = ?', [id]);
-    await conn.query('UPDATE ordenes_trabajo SET tecnico_id = NULL WHERE tecnico_id = ?', [id]);
-    await conn.query('UPDATE garantias SET creado_por = NULL WHERE creado_por = ?', [id]);
-    await conn.query('UPDATE tareas_mecanico SET asignado_por = NULL WHERE asignado_por = ?', [id]);
-    await conn.query('UPDATE recompensas_canjeadas SET aplicado_por = NULL WHERE aplicado_por = ?', [id]);
+    await conn.query('UPDATE citas SET usuario_id = NULL WHERE usuario_id = ? AND tenant_id = @tenant', [id]);
+    await conn.query('UPDATE citas SET tecnico_id = NULL WHERE tecnico_id = ? AND tenant_id = @tenant', [id]);
+    await conn.query('UPDATE ordenes_trabajo SET recepcionista_id = NULL WHERE recepcionista_id = ? AND tenant_id = @tenant', [id]);
+    await conn.query('UPDATE ordenes_trabajo SET tecnico_id = NULL WHERE tecnico_id = ? AND tenant_id = @tenant', [id]);
+    await conn.query('UPDATE garantias SET creado_por = NULL WHERE creado_por = ? AND tenant_id = @tenant', [id]);
+    await conn.query('UPDATE tareas_mecanico SET asignado_por = NULL WHERE asignado_por = ? AND tenant_id = @tenant', [id]);
+    await conn.query('UPDATE recompensas_canjeadas SET aplicado_por = NULL WHERE aplicado_por = ? AND tenant_id = @tenant', [id]);
 
-    await conn.query('DELETE FROM usuarios WHERE id = ?', [id]);
+    await conn.query('DELETE FROM usuarios WHERE tenant_id = @tenant AND id = ?', [id]);
     await conn.commit();
     res.json({ message: 'Empleado eliminado' });
   } catch (err) {
