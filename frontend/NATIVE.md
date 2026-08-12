@@ -11,13 +11,27 @@ API se redirigen al backend absoluto. Falta solo correr la cadena nativa en tu m
   - `@aparajita/capacitor-biometric-auth` (huella / Face ID)
   - `@aparajita/capacitor-secure-storage` (Keystore / Keychain)
 
-## 1. URL del backend  ✅ ya configurada
-La app nativa NO puede usar la ruta relativa `/api`. Ya está puesta en
-[`src/app/native-config.ts`](src/app/native-config.ts):
+## 1. URL del backend  ⚠️ hay que configurarla antes de compilar
+La app nativa NO puede usar la ruta relativa `/api`: el WebView carga desde
+`capacitor://localhost`, así que necesita el dominio completo del backend.
+
+[`src/app/native-config.ts`](src/app/native-config.ts) lo toma del entorno:
 
 ```ts
-export const NATIVE_API_URL = 'https://proyecto-taller-production-0e4b.up.railway.app';
+export const NATIVE_API_URL = environment.nativeApiUrl;
 ```
+
+Y en [`src/environments/environment.prod.ts`](src/environments/environment.prod.ts)
+hoy hay un **placeholder que no resuelve a propósito**:
+
+```ts
+nativeApiUrl: 'https://configura-tu-dominio.invalid',
+```
+
+Reemplazalo por tu dominio antes del build nativo. Está así porque el proyecto
+base apuntaba al servidor de producción del taller original: compilar sin
+cambiarlo conectaba la app a la base real de ESE taller. Con `.invalid` la app
+falla de entrada, que es preferible a conectarse por error a un sistema ajeno.
 
 > El `ApiUrlInterceptor` reescribe `/api/...` → `${NATIVE_API_URL}/api/...` **solo en nativo**.
 > En web no cambia nada.

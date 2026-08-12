@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { Router } from '@angular/router';
-import { Subject, debounceTime, distinctUntilChanged, switchMap, catchError, of } from 'rxjs';
+import { Subject, debounceTime, switchMap, catchError, of } from 'rxjs';
 import { TallerService } from '../../services/taller.service';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
@@ -51,9 +51,15 @@ export class RegistroTallerPage {
     // Se espera a que deje de escribir antes de preguntar: sin esto, cada tecla
     // dispararía una consulta y las respuestas podrían llegar desordenadas.
     // switchMap además cancela la anterior, así que siempre gana la última.
+    //
+    // A propósito SIN distinctUntilChanged: `pedirVerificacion` deja `verificando`
+    // en true antes de emitir, así que un valor descartado por repetido nunca
+    // llegaría al suscriptor y el formulario quedaría colgado en "Verificando…"
+    // para siempre, con el botón deshabilitado. Se dispara con una secuencia
+    // normal: escribir un nombre, probar otro identificador y volver al anterior.
+    // Además, revalidar el mismo valor es correcto: pudo ocupárselo alguien más.
     this.slugCambiado.pipe(
       debounceTime(400),
-      distinctUntilChanged(),
       switchMap(valor => {
         if (!valor) { this.verificando = false; return of(null); }
         return this.taller.disponible(valor).pipe(catchError(() => of(null)));
