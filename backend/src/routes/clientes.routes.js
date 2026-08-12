@@ -1,6 +1,8 @@
 const router = require('express').Router();
 const bcrypt = require('bcrypt');
-const { pool } = require('../db/pool');
+// Sin `pool` importado: todo el acceso a datos de este archivo pasa por req.db, que
+// va scopeado al taller. Si hiciera falta una consulta sin scope, el import tendría
+// que volver a agregarse a propósito y eso se ve en el diff.
 const { fail } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
@@ -25,7 +27,7 @@ const MAX_LISTADO = 500;
 router.get('/', async (req, res) => {
   try {
     const { q } = req.query;
-    let sql = `SELECT ${COLS} FROM clientes WHERE activo = 1`;
+    let sql = `SELECT ${COLS} FROM clientes WHERE activo = 1 AND tenant_id = @tenant`;
     const params = [];
     if (q) {
       sql += ' AND (nombre LIKE ? OR apellido LIKE ? OR telefono LIKE ? OR cedula LIKE ?)';
@@ -33,7 +35,7 @@ router.get('/', async (req, res) => {
       params.push(like, like, like, like);
     }
     sql += ` ORDER BY nombre, apellido LIMIT ${MAX_LISTADO}`;
-    const [rows] = await pool.query(sql, params);
+    const [rows] = await req.db.query(sql, params);
     res.json({ data: rows });
   } catch (err) {
     fail(res, err);
@@ -48,11 +50,13 @@ router.post('/', async (req, res) => {
     }
     if (!telefonoValido(telefono)) return res.status(400).json({ error: 'El teléfono no tiene un formato válido' });
     if (!cedulaValida(cedula)) return res.status(400).json({ error: 'La cédula no tiene un formato válido' });
-    const [result] = await pool.query(
-      'INSERT INTO clientes (nombre, apellido, telefono, email, cedula, direccion) VALUES (?, ?, ?, ?, ?, ?)',
+    const [result] = await req.db.query(
+      'INSERT INTO clientes (tenant_id, nombre, apellido, telefono, email, cedula, direccion) VALUES (@tenant, ?, ?, ?, ?, ?, ?)',
       [nombre, apellido, telefono, email || null, cedula || null, direccion || null]
     );
-    const [[nuevo]] = await pool.query('SELECT * FROM clientes WHERE id = ?', [result.insertId]);
+    const [[nuevo]] = await req.db.query(
+      'SELECT * FROM clientes WHERE id = ? AND tenant_id = @tenant', [result.insertId]
+    );
     res.status(201).json({ data: nuevo, message: 'Cliente creado' });
   } catch (err) {
     fail(res, err);
@@ -61,10 +65,11 @@ router.post('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const [[cliente]] = await pool.query(
+    const [[cliente]] = await req.db.query(
       `SELECT ${COLS},
-              (SELECT COUNT(*) FROM recompensas_canjeadas WHERE cliente_id = clientes.id) AS cortesias_canjeadas
-       FROM clientes WHERE id = ? AND activo = 1`,
+              (SELECT COUNT(*) FROM recompensas_canjeadas
+                WHERE cliente_id = clientes.id AND tenant_id = @tenant) AS cortesias_canjeadas
+       FROM clientes WHERE id = ? AND activo = 1 AND tenant_id = @tenant`,
       [req.params.id]
     );
     if (!cliente) return res.status(404).json({ error: 'Cliente no encontrado' });
@@ -78,19 +83,22 @@ router.get('/:id', async (req, res) => {
 // Además del flag, deja un registro en recompensas_canjeadas (historial que ve el cliente).
 // Acepta orden_id y descripcion opcionales (la cortesía aplicada a un servicio puntual).
 router.patch('/:id/cortesia', async (req, res) => {
-  const conn = await pool.getConnection();
+  const conn = await req.db.conexion();
   try {
     await conn.beginTransaction();
     const [[cliente]] = await conn.query(
-      'SELECT cortesia_disponible FROM clientes WHERE id = ? AND activo = 1 FOR UPDATE',
+      'SELECT cortesia_disponible FROM clientes WHERE id = ? AND activo = 1 AND tenant_id = @tenant FOR UPDATE',
       [req.params.id]
     );
     if (!cliente) { await conn.rollback(); return res.status(404).json({ error: 'Cliente no encontrado' }); }
     if (!cliente.cortesia_disponible) { await conn.rollback(); return res.status(400).json({ error: 'El cliente no tiene cortesía disponible' }); }
 
-    await conn.query('UPDATE clientes SET cortesia_disponible = 0 WHERE id = ?', [req.params.id]);
     await conn.query(
-      'INSERT INTO recompensas_canjeadas (cliente_id, orden_id, aplicado_por, descripcion) VALUES (?, ?, ?, ?)',
+      'UPDATE clientes SET cortesia_disponible = 0 WHERE id = ? AND tenant_id = @tenant',
+      [req.params.id]
+    );
+    await conn.query(
+      'INSERT INTO recompensas_canjeadas (tenant_id, cliente_id, orden_id, aplicado_por, descripcion) VALUES (@tenant, ?, ?, ?, ?)',
       [req.params.id, req.body.orden_id || null, req.usuario.id, (req.body.descripcion || 'Servicio de cortesía').slice(0, 150)]
     );
     await conn.commit();
@@ -108,11 +116,17 @@ router.patch('/:id/cortesia', async (req, res) => {
 router.patch('/:id/portal', requireRol('admin'), async (req, res) => {
   try {
     const { password, activar } = req.body;
-    const [[cliente]] = await pool.query('SELECT id, email FROM clientes WHERE id = ? AND activo = 1', [req.params.id]);
+    const [[cliente]] = await req.db.query(
+      'SELECT id, email FROM clientes WHERE id = ? AND activo = 1 AND tenant_id = @tenant',
+      [req.params.id]
+    );
     if (!cliente) return res.status(404).json({ error: 'Cliente no encontrado' });
 
     if (activar === false) {
-      await pool.query('UPDATE clientes SET password_hash = NULL WHERE id = ?', [req.params.id]);
+      await req.db.query(
+        'UPDATE clientes SET password_hash = NULL WHERE id = ? AND tenant_id = @tenant',
+        [req.params.id]
+      );
       return res.json({ message: 'Acceso al portal desactivado' });
     }
     if (!cliente.email) return res.status(400).json({ error: 'El cliente necesita un email para acceder al portal' });
@@ -120,7 +134,10 @@ router.patch('/:id/portal', requireRol('admin'), async (req, res) => {
       return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
     }
     const hash = await bcrypt.hash(password, 10);
-    await pool.query('UPDATE clientes SET password_hash = ? WHERE id = ?', [hash, req.params.id]);
+    await req.db.query(
+      'UPDATE clientes SET password_hash = ? WHERE id = ? AND tenant_id = @tenant',
+      [hash, req.params.id]
+    );
     res.json({ message: 'Acceso al portal activado' });
   } catch (err) {
     fail(res, err);
@@ -136,11 +153,13 @@ router.put('/:id', async (req, res) => {
     if (!telefono || !String(telefono).trim()) return res.status(400).json({ error: 'El teléfono es requerido' });
     if (!telefonoValido(telefono)) return res.status(400).json({ error: 'El teléfono no tiene un formato válido' });
     if (!cedulaValida(cedula)) return res.status(400).json({ error: 'La cédula no tiene un formato válido' });
-    await pool.query(
-      'UPDATE clientes SET nombre=?, apellido=?, telefono=?, email=?, cedula=?, direccion=? WHERE id=?',
+    await req.db.query(
+      'UPDATE clientes SET nombre=?, apellido=?, telefono=?, email=?, cedula=?, direccion=? WHERE id=? AND tenant_id = @tenant',
       [nombre, apellido, telefono, email || null, cedula || null, direccion || null, req.params.id]
     );
-    const [[actualizado]] = await pool.query('SELECT * FROM clientes WHERE id = ?', [req.params.id]);
+    const [[actualizado]] = await req.db.query(
+      'SELECT * FROM clientes WHERE id = ? AND tenant_id = @tenant', [req.params.id]
+    );
     res.json({ data: actualizado, message: 'Cliente actualizado' });
   } catch (err) {
     fail(res, err);
@@ -149,8 +168,8 @@ router.put('/:id', async (req, res) => {
 
 router.get('/:id/motos', async (req, res) => {
   try {
-    const [rows] = await pool.query(
-      'SELECT * FROM motos WHERE cliente_id = ? AND activa = 1 ORDER BY created_at DESC',
+    const [rows] = await req.db.query(
+      'SELECT * FROM motos WHERE cliente_id = ? AND activa = 1 AND tenant_id = @tenant ORDER BY created_at DESC',
       [req.params.id]
     );
     res.json({ data: rows });
@@ -161,13 +180,13 @@ router.get('/:id/motos', async (req, res) => {
 
 router.get('/:id/ordenes', async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await req.db.query(
       `SELECT ot.*, m.marca, m.modelo, m.placa,
               u.nombre AS tecnico_nombre
        FROM ordenes_trabajo ot
-       JOIN motos m ON ot.moto_id = m.id
-       LEFT JOIN usuarios u ON ot.tecnico_id = u.id
-       WHERE ot.cliente_id = ?
+       JOIN motos m ON ot.moto_id = m.id AND m.tenant_id = @tenant
+       LEFT JOIN usuarios u ON ot.tecnico_id = u.id AND u.tenant_id = @tenant
+       WHERE ot.cliente_id = ? AND ot.tenant_id = @tenant
        ORDER BY ot.fecha_ingreso DESC`,
       [req.params.id]
     );
@@ -187,10 +206,12 @@ router.get('/:id/ordenes', async (req, res) => {
 //     el cliente desaparece de la app,
 //   • las órdenes ya cobradas quedan intactas para la contabilidad.
 router.delete('/:id', async (req, res) => {
-  const conn = await pool.getConnection();
+  const conn = await req.db.conexion();
   try {
     const id = Number(req.params.id);
-    const [[cliente]] = await conn.query('SELECT id FROM clientes WHERE id = ? AND activo = 1', [id]);
+    const [[cliente]] = await conn.query(
+      'SELECT id FROM clientes WHERE id = ? AND activo = 1 AND tenant_id = @tenant', [id]
+    );
     if (!cliente) {
       conn.release();
       return res.status(404).json({ error: 'Cliente no encontrado' });
@@ -199,13 +220,13 @@ router.delete('/:id', async (req, res) => {
     await conn.beginTransaction();
 
     // Rastro personal y accesos al portal: se borran de verdad.
-    await conn.query('DELETE FROM notificaciones WHERE cliente_id = ?', [id]);
-    await conn.query('DELETE FROM password_reset_codes WHERE cliente_id = ?', [id]);
-    await conn.query('DELETE FROM login_codes WHERE cliente_id = ?', [id]);
-    await conn.query('DELETE FROM email_verify_codes WHERE cliente_id = ?', [id]);
+    await conn.query('DELETE FROM notificaciones WHERE cliente_id = ? AND tenant_id = @tenant', [id]);
+    await conn.query('DELETE FROM password_reset_codes WHERE cliente_id = ? AND tenant_id = @tenant', [id]);
+    await conn.query('DELETE FROM login_codes WHERE cliente_id = ? AND tenant_id = @tenant', [id]);
+    await conn.query('DELETE FROM email_verify_codes WHERE cliente_id = ? AND tenant_id = @tenant', [id]);
 
     // Sus motos salen de los listados activos, pero siguen ligadas a las órdenes.
-    await conn.query('UPDATE motos SET activa = 0 WHERE cliente_id = ?', [id]);
+    await conn.query('UPDATE motos SET activa = 0 WHERE cliente_id = ? AND tenant_id = @tenant', [id]);
 
     // nombre/apellido/telefono son NOT NULL: se reemplazan por un marcador.
     await conn.query(
@@ -213,7 +234,7 @@ router.delete('/:id', async (req, res) => {
          nombre = 'Cliente', apellido = 'eliminado', telefono = '-',
          email = NULL, cedula = NULL, direccion = NULL, foto = NULL,
          password_hash = NULL, email_pendiente = NULL, activo = 0
-       WHERE id = ?`,
+       WHERE id = ? AND tenant_id = @tenant`,
       [id]
     );
 

@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { pool } = require('../db/pool');
+// Sin `pool`: todo pasa por req.db, scopeado al taller (ver clientes.routes.js).
 const { fail } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const { anioValido, placaValida } = require('../utils/validar');
@@ -21,7 +21,8 @@ router.get('/', async (req, res) => {
                       m.activa, m.created_at, m.updated_at,
                       (m.foto IS NOT NULL) AS tiene_foto,
                       c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.telefono AS cliente_telefono
-               FROM motos m JOIN clientes c ON m.cliente_id = c.id WHERE m.activa = 1`;
+               FROM motos m JOIN clientes c ON m.cliente_id = c.id AND c.tenant_id = @tenant
+               WHERE m.activa = 1 AND m.tenant_id = @tenant`;
     const params = [];
     if (cliente_id) { sql += ' AND m.cliente_id = ?'; params.push(cliente_id); }
     if (q) {
@@ -30,7 +31,7 @@ router.get('/', async (req, res) => {
       params.push(like, like, like);
     }
     sql += ` ORDER BY m.created_at DESC LIMIT ${MAX_LISTADO}`;
-    const [rows] = await pool.query(sql, params);
+    const [rows] = await req.db.query(sql, params);
     res.json({ data: rows });
   } catch (err) {
     fail(res, err);
@@ -45,21 +46,34 @@ router.post('/', async (req, res) => {
     }
     if (!placaValida(placa)) return res.status(400).json({ error: 'La placa no tiene un formato válido' });
     if (!anioValido(anio)) return res.status(400).json({ error: 'El año no es válido' });
+
+    // El cliente tiene que ser de ESTE taller. Sin esta comprobación se podía colgar
+    // una moto del cliente de otro taller mandando su id a mano: la FK apunta a
+    // clientes(id) sin mirar el tenant, así que la base sola no lo impide.
+    const [[duenio]] = await req.db.query(
+      'SELECT id FROM clientes WHERE id = ? AND tenant_id = @tenant', [cliente_id]
+    );
+    if (!duenio) return res.status(404).json({ error: 'Cliente no encontrado' });
+
     // Evita placas duplicadas (normaliza espacios y guiones), igual que en el portal.
+    // El chequeo va acotado al taller: que otro taller tenga esa placa no es asunto
+    // de este, y el índice único de la base también es (tenant_id, placa_norm).
     if (placa) {
-      const [[dup]] = await pool.query(
-        `SELECT id FROM motos WHERE activa = 1
+      const [[dup]] = await req.db.query(
+        `SELECT id FROM motos WHERE activa = 1 AND tenant_id = @tenant
            AND UPPER(REPLACE(REPLACE(placa, ' ', ''), '-', '')) = UPPER(REPLACE(REPLACE(?, ' ', ''), '-', ''))`,
         [placa]
       );
       if (dup) return res.status(409).json({ error: 'Esa placa ya está registrada' });
     }
-    const [result] = await pool.query(
-      `INSERT INTO motos (cliente_id, marca, modelo, anio, placa, color, numero_motor, numero_chasis, kilometraje_actual, foto_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    const [result] = await req.db.query(
+      `INSERT INTO motos (tenant_id, cliente_id, marca, modelo, anio, placa, color, numero_motor, numero_chasis, kilometraje_actual, foto_url)
+       VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [cliente_id, marca, modelo, anio || null, placa || null, color || null, numero_motor || null, numero_chasis || null, kilometraje_actual || 0, foto_url || null]
     );
-    const [[nueva]] = await pool.query('SELECT * FROM motos WHERE id = ?', [result.insertId]);
+    const [[nueva]] = await req.db.query(
+      'SELECT * FROM motos WHERE id = ? AND tenant_id = @tenant', [result.insertId]
+    );
     res.status(201).json({ data: nueva, message: 'Moto registrada' });
   } catch (err) {
     fail(res, err);
@@ -68,9 +82,10 @@ router.post('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const [[moto]] = await pool.query(
+    const [[moto]] = await req.db.query(
       `SELECT m.*, c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.telefono AS cliente_telefono
-       FROM motos m JOIN clientes c ON m.cliente_id = c.id WHERE m.id = ? AND m.activa = 1`,
+       FROM motos m JOIN clientes c ON m.cliente_id = c.id AND c.tenant_id = @tenant
+       WHERE m.id = ? AND m.activa = 1 AND m.tenant_id = @tenant`,
       [req.params.id]
     );
     if (!moto) return res.status(404).json({ error: 'Moto no encontrada' });
@@ -85,12 +100,14 @@ router.put('/:id', async (req, res) => {
     const { marca, modelo, anio, placa, color, numero_motor, numero_chasis, kilometraje_actual, foto_url } = req.body;
     if (!placaValida(placa)) return res.status(400).json({ error: 'La placa no tiene un formato válido' });
     if (!anioValido(anio)) return res.status(400).json({ error: 'El año no es válido' });
-    await pool.query(
+    await req.db.query(
       `UPDATE motos SET marca=?, modelo=?, anio=?, placa=?, color=?, numero_motor=?, numero_chasis=?, kilometraje_actual=?, foto_url=?
-       WHERE id=?`,
+       WHERE id=? AND tenant_id = @tenant`,
       [marca, modelo, anio || null, placa || null, color || null, numero_motor || null, numero_chasis || null, kilometraje_actual || 0, foto_url || null, req.params.id]
     );
-    const [[actualizada]] = await pool.query('SELECT * FROM motos WHERE id = ?', [req.params.id]);
+    const [[actualizada]] = await req.db.query(
+      'SELECT * FROM motos WHERE id = ? AND tenant_id = @tenant', [req.params.id]
+    );
     res.json({ data: actualizada, message: 'Moto actualizada' });
   } catch (err) {
     fail(res, err);
@@ -99,14 +116,14 @@ router.put('/:id', async (req, res) => {
 
 router.get('/:id/historial', async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await req.db.query(
       `SELECT ot.id, ot.numero_orden, ot.estado, ot.problema_reportado, ot.fecha_ingreso, ot.fecha_entrega_real,
               ot.costo_mano_obra, ot.costo_repuestos, ot.descuento,
               (ot.costo_mano_obra + ot.costo_repuestos - ot.descuento) AS total,
               u.nombre AS tecnico_nombre
        FROM ordenes_trabajo ot
-       LEFT JOIN usuarios u ON ot.tecnico_id = u.id
-       WHERE ot.moto_id = ?
+       LEFT JOIN usuarios u ON ot.tecnico_id = u.id AND u.tenant_id = @tenant
+       WHERE ot.moto_id = ? AND ot.tenant_id = @tenant
        ORDER BY ot.fecha_ingreso DESC`,
       [req.params.id]
     );

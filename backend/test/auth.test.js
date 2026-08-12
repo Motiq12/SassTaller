@@ -59,11 +59,31 @@ test('rechaza (403) un token parcial de 2FA aunque traiga rol', () => {
 });
 
 test('acepta un token de staff y expone req.usuario', () => {
-  const token = jwt.sign({ id: 5, rol: 'recepcion', nombre: 'Ana' }, process.env.JWT_SECRET);
+  const token = jwt.sign({ id: 5, rol: 'recepcion', nombre: 'Ana', tenant_id: 1 }, process.env.JWT_SECRET);
   const req = reqCon(token); const res = fakeRes(); let llamado = false;
   auth(req, res, () => { llamado = true; });
   assert.equal(llamado, true);
   assert.equal(res._status, null, 'no debe responder error');
   assert.equal(req.usuario.rol, 'recepcion');
   assert.equal(req.usuario.id, 5);
+});
+
+// Multi-tenant: `auth` encadena el scope por taller, así que autenticar y quedar
+// acotado a un taller son el mismo paso. Un token sin tenant_id es de antes de la
+// migración (o manipulado) y no puede abrir sesión: sin taller no hay forma de
+// filtrar, y dejarlo pasar significaría consultar sin scope.
+test('rechaza (401) un token de staff sin tenant_id', () => {
+  const token = jwt.sign({ id: 5, rol: 'recepcion', nombre: 'Ana' }, process.env.JWT_SECRET);
+  const res = fakeRes(); let llamado = false;
+  auth(reqCon(token), res, () => { llamado = true; });
+  assert.equal(res._status, 401);
+  assert.equal(llamado, false, 'sin taller no puede seguir a la ruta');
+});
+
+test('deja en req.db un acceso a datos ligado al taller del token', () => {
+  const token = jwt.sign({ id: 5, rol: 'admin', tenant_id: 42 }, process.env.JWT_SECRET);
+  const req = reqCon(token);
+  auth(req, fakeRes(), () => {});
+  assert.equal(req.tenantId, 42);
+  assert.equal(req.db.tenantId, 42, 'req.db debe estar acotado al taller del token');
 });

@@ -101,10 +101,35 @@ function paraTenant(tenantId) {
     const q = expandir(sql, params, tenantId);
     return pool.query(q.sql, q.params);
   };
+  // Conexión dedicada (transacciones, FOR UPDATE) con el mismo scope y el mismo
+  // guard que `query`. Se expone con control manual —begin/commit/rollback/release—
+  // en vez de un callback porque las rutas ya deciden ahí adentro qué HTTP devolver
+  // en cada rollback, y envolverlas cambiaría ese flujo.
+  const conexion = async () => {
+    const conn = await pool.getConnection();
+    const enConn = async (sql, params = []) => {
+      exigirScope(sql);
+      const q = expandir(sql, params, tenantId);
+      return conn.query(q.sql, q.params);
+    };
+    return {
+      tenantId,
+      query: enConn,
+      execute: enConn,
+      beginTransaction: () => conn.beginTransaction(),
+      commit: () => conn.commit(),
+      rollback: () => conn.rollback(),
+      release: () => conn.release(),
+      sinScope: (sql, params = []) => conn.query(sql, params),
+    };
+  };
+
   return {
     tenantId,
     query: ejecutar,
     execute: ejecutar,
+    conexion,
+    getConnection: conexion,
     // Escape hatch explícito y greppable: consultas que legítimamente cruzan
     // tenants (login, tareas de plataforma, métricas agregadas). Se salta la
     // verificación a propósito, por eso conviene que sean pocas y auditables.

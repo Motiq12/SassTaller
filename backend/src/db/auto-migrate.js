@@ -288,8 +288,16 @@ async function ensureSchema() {
         "VARCHAR(32) AS (UPPER(REPLACE(REPLACE(placa,' ',''),'-',''))) STORED"
       )
     );
-    await tryStep('uq_motos_placa_norm', () =>
-      crearIndiceSiFalta('motos', 'uq_motos_placa_norm', '(placa_norm)', { unico: true })
+    // La placa es única DENTRO de cada taller, no en todo el SaaS: que otro taller
+    // atienda esa moto no es asunto de este. El índice global anterior
+    // (uq_motos_placa_norm) se elimina si sobrevive de una versión previa —si no,
+    // este mismo arranque volvería a imponer unicidad entre talleres y el segundo
+    // que registre la placa recibiría un choque que no le corresponde.
+    await tryStep('uq_motos_tenant', () =>
+      crearIndiceSiFalta('motos', 'uq_motos_tenant', '(tenant_id, placa_norm)', { unico: true })
+    );
+    await tryStep('quitar uq_motos_placa_norm global', () =>
+      borrarIndiceSiExiste('motos', 'uq_motos_placa_norm')
     );
 
     // Panel del mecánico v2: perfil profesional (lo edita el propio técnico).
@@ -458,30 +466,40 @@ async function ensureSchema() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS servicios (
         id         INT AUTO_INCREMENT PRIMARY KEY,
+        tenant_id  INT NOT NULL,
         nombre     VARCHAR(120) NOT NULL,
         activo     TINYINT(1) NOT NULL DEFAULT 1,
         orden      INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        UNIQUE KEY uq_servicio_nombre (nombre)
+        -- El nombre es único por taller: dos talleres pueden ofrecer "Cambio de aceite".
+        UNIQUE KEY uq_servicios_tenant (tenant_id, nombre)
       )
     `);
     // Semilla con los dos catálogos que estaban dispersos, unificados. Sin esto, al
     // desplegar el portal se quedaría sin nada que ofrecer. INSERT IGNORE + UNIQUE
     // lo hace idempotente y respeta cualquier edición posterior del taller.
+    // El catálogo es POR TALLER, así que la semilla se cruza contra tenants en vez de
+    // insertar filas sueltas: cada taller existente arranca con la lista completa y
+    // puede editarla sin afectar a los demás. INSERT IGNORE contra el único
+    // (tenant_id, nombre) lo mantiene idempotente y respeta ediciones posteriores.
     await tryStep('seed servicios', () =>
       pool.query(
-        `INSERT IGNORE INTO servicios (nombre, orden) VALUES
-           ('Cambio de aceite y filtros', 1),
-           ('Revisión completa', 2),
-           ('Cambio de pastillas de freno', 3),
-           ('Kit de transmisión (cadena y piñones)', 4),
-           ('Diagnóstico electrónico', 5),
-           ('Cambio de neumáticos', 6),
-           ('Mantenimiento preventivo', 7),
-           ('Sistema eléctrico', 8),
-           ('Afinamiento', 9),
-           ('Otro', 99)`
+        `INSERT IGNORE INTO servicios (tenant_id, nombre, orden)
+         SELECT t.id, v.nombre, v.orden
+         FROM tenants t
+         JOIN (
+                     SELECT 'Cambio de aceite y filtros' AS nombre, 1 AS orden
+           UNION ALL SELECT 'Revisión completa', 2
+           UNION ALL SELECT 'Cambio de pastillas de freno', 3
+           UNION ALL SELECT 'Kit de transmisión (cadena y piñones)', 4
+           UNION ALL SELECT 'Diagnóstico electrónico', 5
+           UNION ALL SELECT 'Cambio de neumáticos', 6
+           UNION ALL SELECT 'Mantenimiento preventivo', 7
+           UNION ALL SELECT 'Sistema eléctrico', 8
+           UNION ALL SELECT 'Afinamiento', 9
+           UNION ALL SELECT 'Otro', 99
+         ) v`
       )
     );
     // Los servicios que ya se usaron en citas pero no están en la semilla (nombres
@@ -571,6 +589,21 @@ async function tryStep(label, fn) {
     await fn();
   } catch (err) {
     console.error(`⚠️  Migración (${label}) omitida:`, err.code || err.message);
+  }
+}
+
+// Borra un índice solo si existe (idempotente). Hace falta para retirar índices que
+// una versión anterior creó y que ya no corresponden — por ejemplo los únicos
+// globales que multi-tenancy convirtió en compuestos con tenant_id.
+async function borrarIndiceSiExiste(tabla, nombre) {
+  const [[existe]] = await pool.query(
+    `SELECT COUNT(*) AS n FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?`,
+    [tabla, nombre]
+  );
+  if (existe.n) {
+    await pool.query(`DROP INDEX ${nombre} ON ${tabla}`);
+    console.log(`🔧 Migración: índice ${nombre} en ${tabla} eliminado`);
   }
 }
 
