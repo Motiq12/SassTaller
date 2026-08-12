@@ -1,9 +1,10 @@
 const router = require('express').Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
-const { pool } = require('../db/pool');
+// Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
 const { fail } = require('../utils/responder');
 const authCliente = require('../middleware/auth-cliente');
+const tenantPublico = require('../middleware/tenant-publico');
 const {
   emailValido, fotoValida, textoDentroDeLimite, cedulaValida, telefonoValido, anioValido, placaValida,
 } = require('../utils/validar');
@@ -48,10 +49,14 @@ function horasHastaCita(fecha, hora) {
 
 // Firma el JWT del cliente y arma el payload estándar.
 function tokenCliente(cliente) {
-  const payload = { id: cliente.id, tipo: 'cliente', nombre: cliente.nombre, apellido: cliente.apellido };
+  const payload = { id: cliente.id, tipo: 'cliente', nombre: cliente.nombre, apellido: cliente.apellido, tenant_id: cliente.tenant_id };
   const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '8h' });
   return { payload, token };
 }
+
+// Tramo publico (login, registro, recuperar, OTP): el taller sale del subdominio
+// o de un campo `taller`, porque todavia no hay token del que leerlo.
+router.use(tenantPublico);
 
 // POST /api/portal/login — login del cliente con email + contraseña
 router.post('/login', async (req, res) => {
@@ -59,8 +64,8 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email y contraseña requeridos' });
     if (!emailValido(email)) return res.status(400).json({ error: 'El correo no tiene un formato válido' });
-    const [[cliente]] = await pool.query(
-      'SELECT * FROM clientes WHERE email = ? AND activo = 1',
+    const [[cliente]] = await req.db.query(
+      'SELECT * FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1',
       [email]
     );
     if (!cliente || !cliente.password_hash) {
@@ -87,36 +92,36 @@ router.post('/login', async (req, res) => {
 // Invalida los códigos previos del cliente para que solo el último sea válido.
 // El propósito separa dos códigos que conviven: el de estrenar la cuenta y el de mudar
 // el correo desde el perfil. Sin distinguirlos, pedir uno anularía el otro.
-async function nuevoCodigoVerificacion(clienteId, proposito) {
+async function nuevoCodigoVerificacion(db, clienteId, proposito) {
   const codigo = String(Math.floor(100000 + Math.random() * 900000)); // 6 dígitos
   const codeHash = await bcrypt.hash(codigo, 10);
-  await pool.query(
-    'UPDATE email_verify_codes SET used = 1 WHERE cliente_id = ? AND proposito = ? AND used = 0',
+  await db.query(
+    'UPDATE email_verify_codes SET used = 1 WHERE tenant_id = @tenant AND cliente_id = ? AND proposito = ? AND used = 0',
     [clienteId, proposito]
   );
-  await pool.query(
-    `INSERT INTO email_verify_codes (cliente_id, code_hash, proposito, expires_at)
-     VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))`,
+  await db.query(
+    `INSERT INTO email_verify_codes (tenant_id, cliente_id, code_hash, proposito, expires_at)
+     VALUES (@tenant, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))`,
     [clienteId, codeHash, proposito]
   );
   return codigo;
 }
 
-async function enviarVerificacion(clienteId, email, nombre) {
-  const codigo = await nuevoCodigoVerificacion(clienteId, 'registro');
+async function enviarVerificacion(db, clienteId, email, nombre) {
+  const codigo = await nuevoCodigoVerificacion(db, clienteId, 'registro');
   await enviarCodigoVerificacion(email, nombre, codigo);
 }
 
 // Código a la dirección NUEVA para confirmar un cambio de correo desde el perfil.
-async function enviarCodigoCambio(clienteId, emailNuevo, nombre) {
-  const codigo = await nuevoCodigoVerificacion(clienteId, 'cambio');
+async function enviarCodigoCambio(db, clienteId, emailNuevo, nombre) {
+  const codigo = await nuevoCodigoVerificacion(db, clienteId, 'cambio');
   await enviarCodigoCambioCorreo(emailNuevo, nombre, codigo);
 }
 
 // ¿Otra cuenta ya tiene ese correo, o lo tiene reservado como pendiente?
-async function correoOcupado(email, exceptoId) {
-  const [[dup]] = await pool.query(
-    'SELECT id FROM clientes WHERE (email = ? OR email_pendiente = ?) AND id <> ? AND activo = 1',
+async function correoOcupado(db, email, exceptoId) {
+  const [[dup]] = await db.query(
+    'SELECT id FROM clientes WHERE tenant_id = @tenant AND (email = ? OR email_pendiente = ?) AND id <> ? AND activo = 1',
     [email, email, exceptoId]
   );
   return !!dup;
@@ -143,7 +148,7 @@ router.post('/registro', antibot(), async (req, res) => {
       return res.status(429).json({ error: `Demasiados intentos. Esperá ${limite.retryAfter}s e intentá de nuevo.` });
     }
 
-    const [[existente]] = await pool.query('SELECT id, password_hash FROM clientes WHERE email = ? AND activo = 1', [email]);
+    const [[existente]] = await req.db.query('SELECT id, password_hash FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1', [email]);
     const hash = await bcrypt.hash(password, 10);
     let clienteId;
 
@@ -154,20 +159,20 @@ router.post('/registro', antibot(), async (req, res) => {
       // El taller ya tenía registrado al cliente: "reclama" la cuenta definiendo su
       // contraseña. Igual exige verificar el correo — sin esto, cualquiera que supiera
       // el email de un cliente ya cargado por el taller podía apropiarse de su cuenta.
-      await pool.query(
-        'UPDATE clientes SET password_hash = ?, cedula = COALESCE(cedula, ?), email_verificado = 0 WHERE id = ?',
+      await req.db.query(
+        'UPDATE clientes SET password_hash = ?, cedula = COALESCE(cedula, ?), email_verificado = 0 WHERE id = ? AND tenant_id = @tenant',
         [hash, cedula || null, existente.id]
       );
       clienteId = existente.id;
     } else {
-      const [result] = await pool.query(
-        'INSERT INTO clientes (nombre, apellido, telefono, email, cedula, password_hash, email_verificado) VALUES (?, ?, ?, ?, ?, ?, 0)',
+      const [result] = await req.db.query(
+        'INSERT INTO clientes (tenant_id, nombre, apellido, telefono, email, cedula, password_hash, email_verificado) VALUES (@tenant, ?, ?, ?, ?, ?, ?, 0)',
         [nombre, apellido, telefono, email, cedula || null, hash]
       );
       clienteId = result.insertId;
     }
 
-    await enviarVerificacion(clienteId, email, nombre);
+    await enviarVerificacion(req.db, clienteId, email, nombre);
     res.status(201).json({ data: { requiere_verificacion: true, email }, message: 'Te enviamos un código para confirmar tu correo.' });
   } catch (err) {
     fail(res, err);
@@ -181,8 +186,8 @@ router.post('/registro/verificar', async (req, res) => {
     if (!emailValido(email)) return res.status(400).json({ error: 'El correo no tiene un formato válido' });
     if (!codigo) return res.status(400).json({ error: 'El código es requerido' });
 
-    const [[cliente]] = await pool.query(
-      'SELECT id, nombre, apellido, email_verificado FROM clientes WHERE email = ? AND activo = 1', [email]
+    const [[cliente]] = await req.db.query(
+      'SELECT id, nombre, apellido, email_verificado FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1', [email]
     );
     const ERR_CODIGO = 'Código inválido o expirado';
     if (!cliente) return res.status(400).json({ error: ERR_CODIGO });
@@ -198,9 +203,9 @@ router.post('/registro/verificar', async (req, res) => {
       return res.status(429).json({ error: `Demasiados intentos. Esperá ${limite.retryAfter}s e intentá de nuevo.` });
     }
 
-    const [[reg]] = await pool.query(
+    const [[reg]] = await req.db.query(
       `SELECT id, code_hash, attempts FROM email_verify_codes
-       WHERE cliente_id = ? AND proposito = 'registro' AND used = 0 AND expires_at > NOW()
+       WHERE tenant_id = @tenant AND cliente_id = ? AND proposito = 'registro' AND used = 0 AND expires_at > NOW()
        ORDER BY created_at DESC LIMIT 1`,
       [cliente.id]
     );
@@ -208,12 +213,12 @@ router.post('/registro/verificar', async (req, res) => {
 
     const ok = await bcrypt.compare(String(codigo).trim(), reg.code_hash);
     if (!ok) {
-      await pool.query('UPDATE email_verify_codes SET attempts = attempts + 1 WHERE id = ?', [reg.id]);
+      await req.db.query('UPDATE email_verify_codes SET attempts = attempts + 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
       return res.status(400).json({ error: ERR_CODIGO });
     }
 
-    await pool.query('UPDATE email_verify_codes SET used = 1 WHERE id = ?', [reg.id]);
-    await pool.query('UPDATE clientes SET email_verificado = 1 WHERE id = ?', [cliente.id]);
+    await req.db.query('UPDATE email_verify_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
+    await req.db.query('UPDATE clientes SET email_verificado = 1 WHERE id = ? AND tenant_id = @tenant', [cliente.id]);
 
     const { payload, token } = tokenCliente(cliente);
     res.json({ data: { token, cliente: payload } });
@@ -235,10 +240,10 @@ router.post('/registro/reenviar', antibot(), async (req, res) => {
       return res.status(429).json({ error: `Esperá ${limite.retryAfter}s antes de pedir otro código.` });
     }
 
-    const [[cliente]] = await pool.query(
-      'SELECT id, nombre FROM clientes WHERE email = ? AND activo = 1 AND email_verificado = 0', [email]
+    const [[cliente]] = await req.db.query(
+      'SELECT id, nombre FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND email_verificado = 0', [email]
     );
-    if (cliente) await enviarVerificacion(cliente.id, email, cliente.nombre);
+    if (cliente) await enviarVerificacion(req.db, cliente.id, email, cliente.nombre);
 
     res.json({ message: 'Si tu cuenta está pendiente de verificar, te enviamos un nuevo código.' });
   } catch (err) {
@@ -260,8 +265,8 @@ router.post('/recuperar/solicitar', antibot(), async (req, res) => {
       return res.status(429).json({ error: `Esperá ${limite.retryAfter}s antes de pedir otro código.` });
     }
 
-    const [[cliente]] = await pool.query(
-      'SELECT id, nombre, apellido FROM clientes WHERE email = ? AND activo = 1 AND password_hash IS NOT NULL',
+    const [[cliente]] = await req.db.query(
+      'SELECT id, nombre, apellido FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND password_hash IS NOT NULL',
       [email]
     );
 
@@ -269,9 +274,9 @@ router.post('/recuperar/solicitar', antibot(), async (req, res) => {
       const codigo = String(Math.floor(100000 + Math.random() * 900000)); // 6 dígitos
       const codeHash = await bcrypt.hash(codigo, 10);
       // Invalida códigos previos y guarda el nuevo (vence en 10 min).
-      await pool.query('UPDATE password_reset_codes SET used = 1 WHERE cliente_id = ? AND used = 0', [cliente.id]);
-      await pool.query(
-        'INSERT INTO password_reset_codes (cliente_id, code_hash, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))',
+      await req.db.query('UPDATE password_reset_codes SET used = 1 WHERE tenant_id = @tenant AND cliente_id = ? AND used = 0', [cliente.id]);
+      await req.db.query(
+        'INSERT INTO password_reset_codes (tenant_id, cliente_id, code_hash, expires_at) VALUES (@tenant, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))',
         [cliente.id, codeHash]
       );
       await enviarCodigoReset(email, cliente.nombre, codigo);
@@ -291,16 +296,16 @@ router.post('/recuperar/confirmar', async (req, res) => {
     if (!codigo || !password) return res.status(400).json({ error: 'Código y nueva contraseña son requeridos' });
     if (password.length < 8) return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
 
-    const [[cliente]] = await pool.query(
-      'SELECT id, nombre, apellido FROM clientes WHERE email = ? AND activo = 1 AND password_hash IS NOT NULL',
+    const [[cliente]] = await req.db.query(
+      'SELECT id, nombre, apellido FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND password_hash IS NOT NULL',
       [email]
     );
     const ERR_CODIGO = 'Código inválido o expirado';
     if (!cliente) return res.status(400).json({ error: ERR_CODIGO });
 
-    const [[reg]] = await pool.query(
+    const [[reg]] = await req.db.query(
       `SELECT id, code_hash, attempts FROM password_reset_codes
-       WHERE cliente_id = ? AND used = 0 AND expires_at > NOW()
+       WHERE tenant_id = @tenant AND cliente_id = ? AND used = 0 AND expires_at > NOW()
        ORDER BY created_at DESC LIMIT 1`,
       [cliente.id]
     );
@@ -308,15 +313,15 @@ router.post('/recuperar/confirmar', async (req, res) => {
 
     const ok = await bcrypt.compare(String(codigo).trim(), reg.code_hash);
     if (!ok) {
-      await pool.query('UPDATE password_reset_codes SET attempts = attempts + 1 WHERE id = ?', [reg.id]);
+      await req.db.query('UPDATE password_reset_codes SET attempts = attempts + 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
       return res.status(400).json({ error: ERR_CODIGO });
     }
 
     // Completar el reset por correo prueba que se controla la bandeja: de paso
     // verifica la cuenta (cierra el reset como atajo para "reclamar" sin verificar).
     const hash = await bcrypt.hash(password, 10);
-    await pool.query('UPDATE clientes SET password_hash = ?, email_verificado = 1 WHERE id = ?', [hash, cliente.id]);
-    await pool.query('UPDATE password_reset_codes SET used = 1 WHERE id = ?', [reg.id]);
+    await req.db.query('UPDATE clientes SET password_hash = ?, email_verificado = 1 WHERE id = ? AND tenant_id = @tenant', [hash, cliente.id]);
+    await req.db.query('UPDATE password_reset_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
 
     const { payload, token } = tokenCliente(cliente);
     res.json({ data: { token, cliente: payload } });
@@ -342,17 +347,17 @@ router.post('/otp/solicitar', antibot(), async (req, res) => {
       return res.status(429).json({ error: `Esperá ${limite.retryAfter}s antes de pedir otro código.` });
     }
 
-    const [[cliente]] = await pool.query(
-      'SELECT id, nombre FROM clientes WHERE email = ? AND activo = 1',
+    const [[cliente]] = await req.db.query(
+      'SELECT id, nombre FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1',
       [email]
     );
     if (cliente) {
       const codigo = String(Math.floor(100000 + Math.random() * 900000)); // 6 dígitos
       const codeHash = await bcrypt.hash(codigo, 10);
       // Invalida códigos previos y guarda el nuevo (vence en 10 min).
-      await pool.query('UPDATE login_codes SET used = 1 WHERE cliente_id = ? AND used = 0', [cliente.id]);
-      await pool.query(
-        'INSERT INTO login_codes (cliente_id, code_hash, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))',
+      await req.db.query('UPDATE login_codes SET used = 1 WHERE tenant_id = @tenant AND cliente_id = ? AND used = 0', [cliente.id]);
+      await req.db.query(
+        'INSERT INTO login_codes (tenant_id, cliente_id, code_hash, expires_at) VALUES (@tenant, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))',
         [cliente.id, codeHash]
       );
       await enviarCodigoLogin(email, cliente.nombre, codigo);
@@ -371,16 +376,16 @@ router.post('/otp/verificar', async (req, res) => {
     if (!emailValido(email)) return res.status(400).json({ error: 'El correo no tiene un formato válido' });
     if (!codigo) return res.status(400).json({ error: 'El código es requerido' });
 
-    const [[cliente]] = await pool.query(
-      'SELECT id, nombre, apellido, foto FROM clientes WHERE email = ? AND activo = 1',
+    const [[cliente]] = await req.db.query(
+      'SELECT id, nombre, apellido, foto FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1',
       [email]
     );
     const ERR_CODIGO = 'Código inválido o expirado';
     if (!cliente) return res.status(400).json({ error: ERR_CODIGO });
 
-    const [[reg]] = await pool.query(
+    const [[reg]] = await req.db.query(
       `SELECT id, code_hash, attempts FROM login_codes
-       WHERE cliente_id = ? AND used = 0 AND expires_at > NOW()
+       WHERE tenant_id = @tenant AND cliente_id = ? AND used = 0 AND expires_at > NOW()
        ORDER BY created_at DESC LIMIT 1`,
       [cliente.id]
     );
@@ -388,14 +393,14 @@ router.post('/otp/verificar', async (req, res) => {
 
     const ok = await bcrypt.compare(String(codigo).trim(), reg.code_hash);
     if (!ok) {
-      await pool.query('UPDATE login_codes SET attempts = attempts + 1 WHERE id = ?', [reg.id]);
+      await req.db.query('UPDATE login_codes SET attempts = attempts + 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
       return res.status(400).json({ error: ERR_CODIGO });
     }
 
-    await pool.query('UPDATE login_codes SET used = 1 WHERE id = ?', [reg.id]);
+    await req.db.query('UPDATE login_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
     // Entrar con el código por correo prueba lo mismo que la verificación de registro:
     // se controla la bandeja. Se promueve sin fricción extra.
-    await pool.query('UPDATE clientes SET email_verificado = 1 WHERE id = ? AND email_verificado = 0', [cliente.id]);
+    await req.db.query('UPDATE clientes SET email_verificado = 1 WHERE tenant_id = @tenant AND id = ? AND email_verificado = 0', [cliente.id]);
     const { payload, token } = tokenCliente(cliente);
     res.json({ data: { token, cliente: { ...payload, foto: cliente.foto || null } } });
   } catch (err) {
@@ -412,32 +417,32 @@ router.get('/resumen', async (req, res) => {
     const id = req.cliente.id;
     // "Citas totales" del cliente = pendientes + completadas (NO cuenta las canceladas,
     // que para el cliente quedan eliminadas de su vista).
-    const [[{ citas_totales }]] = await pool.query(
-      "SELECT COUNT(*) AS citas_totales FROM citas WHERE cliente_id = ? AND estado <> 'cancelado'",
+    const [[{ citas_totales }]] = await req.db.query(
+      "SELECT COUNT(*) AS citas_totales FROM citas WHERE tenant_id = @tenant AND cliente_id = ? AND estado <> 'cancelado'",
       [id]
     );
-    const [[{ citas_pendientes }]] = await pool.query(
-      "SELECT COUNT(*) AS citas_pendientes FROM citas WHERE cliente_id = ? AND estado NOT IN ('entregado','cancelado')",
+    const [[{ citas_pendientes }]] = await req.db.query(
+      "SELECT COUNT(*) AS citas_pendientes FROM citas WHERE tenant_id = @tenant AND cliente_id = ? AND estado NOT IN ('entregado','cancelado')",
       [id]
     );
-    const [[{ motos_registradas }]] = await pool.query('SELECT COUNT(*) AS motos_registradas FROM motos WHERE cliente_id = ? AND activa = 1', [id]);
+    const [[{ motos_registradas }]] = await req.db.query('SELECT COUNT(*) AS motos_registradas FROM motos WHERE tenant_id = @tenant AND cliente_id = ? AND activa = 1', [id]);
     // Total pagado y visitas completadas: una sola fuente que cruza los dos mundos
     // sin doble conteo. Cuenta citas entregadas (su monto ya = total de la orden
     // vinculada al entregar) + órdenes entregadas SIN cita (visitas sin agenda previa).
-    const [[{ total_pagado }]] = await pool.query(
+    const [[{ total_pagado }]] = await req.db.query(
       `SELECT
-         (SELECT COALESCE(SUM(monto), 0) FROM citas WHERE cliente_id = ? AND estado = 'entregado')
+         (SELECT COALESCE(SUM(monto), 0) FROM citas WHERE tenant_id = @tenant AND cliente_id = ? AND estado = 'entregado')
        + (SELECT COALESCE(SUM(costo_mano_obra + costo_repuestos - descuento), 0)
             FROM ordenes_trabajo
-            WHERE cliente_id = ? AND estado = 'entregada'
+            WHERE tenant_id = @tenant AND cliente_id = ? AND estado = 'entregada'
               AND id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL)) AS total_pagado`,
       [id, id]
     );
-    const [[{ completadas }]] = await pool.query(
+    const [[{ completadas }]] = await req.db.query(
       `SELECT
-         (SELECT COUNT(*) FROM citas WHERE cliente_id = ? AND estado = 'entregado')
+         (SELECT COUNT(*) FROM citas WHERE tenant_id = @tenant AND cliente_id = ? AND estado = 'entregado')
        + (SELECT COUNT(*) FROM ordenes_trabajo
-            WHERE cliente_id = ? AND estado = 'entregada'
+            WHERE tenant_id = @tenant AND cliente_id = ? AND estado = 'entregada'
               AND id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL)) AS completadas`,
       [id, id]
     );
@@ -448,14 +453,14 @@ router.get('/resumen', async (req, res) => {
     //   2) proxima   → agendada para hoy o más adelante.
     //   3) vencida   → agendada pero la fecha ya pasó y nunca se inició.
     const hoy = await hoyCR(req.db);
-    const [citasAbiertas] = await pool.query(
+    const [citasAbiertas] = await req.db.query(
       `SELECT ci.id, DATE_FORMAT(ci.fecha,'%Y-%m-%d') AS fecha, TIME_FORMAT(ci.hora,'%H:%i') AS hora,
               ci.tipo_servicio, ci.estado,
               m.marca, m.modelo, m.placa, t.nombre AS tecnico_nombre
        FROM citas ci
-       LEFT JOIN motos m ON m.id = ci.moto_id
-       LEFT JOIN usuarios t ON t.id = ci.tecnico_id
-       WHERE ci.cliente_id = ? AND ci.estado NOT IN ('entregado','cancelado')
+       LEFT JOIN motos m ON m.id = ci.moto_id AND m.tenant_id = @tenant
+       LEFT JOIN usuarios t ON t.id = ci.tecnico_id AND t.tenant_id = @tenant
+       WHERE ci.tenant_id = @tenant AND ci.cliente_id = ? AND ci.estado NOT IN ('entregado','cancelado')
        ORDER BY ci.fecha ASC, ci.hora ASC`,
       [id]
     );
@@ -495,12 +500,12 @@ const NOTIF_RETENCION_DIAS = 7;
 // info real vive en el detalle de la cita; el feed no debe crecer sin límite).
 router.get('/notificaciones', async (req, res) => {
   try {
-    await pool.query(
-      'DELETE FROM notificaciones WHERE cliente_id = ? AND leida = 1 AND created_at < (NOW() - INTERVAL ? DAY)',
+    await req.db.query(
+      'DELETE FROM notificaciones WHERE tenant_id = @tenant AND cliente_id = ? AND leida = 1 AND created_at < (NOW() - INTERVAL ? DAY)',
       [req.cliente.id, NOTIF_RETENCION_DIAS]
     );
-    const [rows] = await pool.query(
-      'SELECT id, cita_id, titulo, mensaje, tipo, leida, created_at FROM notificaciones WHERE cliente_id = ? ORDER BY created_at DESC LIMIT 50',
+    const [rows] = await req.db.query(
+      'SELECT id, cita_id, titulo, mensaje, tipo, leida, created_at FROM notificaciones WHERE tenant_id = @tenant AND cliente_id = ? ORDER BY created_at DESC LIMIT 50',
       [req.cliente.id]
     );
     res.json({ data: rows });
@@ -512,8 +517,8 @@ router.get('/notificaciones', async (req, res) => {
 // GET /api/portal/notificaciones/contador — solo el # de no leídas (para el badge).
 router.get('/notificaciones/contador', async (req, res) => {
   try {
-    const [[{ no_leidas }]] = await pool.query(
-      'SELECT COUNT(*) AS no_leidas FROM notificaciones WHERE cliente_id = ? AND leida = 0',
+    const [[{ no_leidas }]] = await req.db.query(
+      'SELECT COUNT(*) AS no_leidas FROM notificaciones WHERE tenant_id = @tenant AND cliente_id = ? AND leida = 0',
       [req.cliente.id]
     );
     res.json({ data: { no_leidas } });
@@ -525,7 +530,7 @@ router.get('/notificaciones/contador', async (req, res) => {
 // POST /api/portal/notificaciones/leer — marca todas como leídas
 router.post('/notificaciones/leer', async (req, res) => {
   try {
-    await pool.query('UPDATE notificaciones SET leida = 1 WHERE cliente_id = ? AND leida = 0', [req.cliente.id]);
+    await req.db.query('UPDATE notificaciones SET leida = 1 WHERE tenant_id = @tenant AND cliente_id = ? AND leida = 0', [req.cliente.id]);
     res.json({ message: 'Notificaciones leídas' });
   } catch (err) {
     fail(res, err);
@@ -535,8 +540,8 @@ router.post('/notificaciones/leer', async (req, res) => {
 // PATCH /api/portal/notificaciones/:id/leer — marca UNA como leída.
 router.patch('/notificaciones/:id/leer', async (req, res) => {
   try {
-    await pool.query(
-      'UPDATE notificaciones SET leida = 1 WHERE id = ? AND cliente_id = ?',
+    await req.db.query(
+      'UPDATE notificaciones SET leida = 1 WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?',
       [req.params.id, req.cliente.id]
     );
     res.json({ message: 'Notificación leída' });
@@ -548,7 +553,7 @@ router.patch('/notificaciones/:id/leer', async (req, res) => {
 // DELETE /api/portal/notificaciones/leidas — borra todas las leídas (limpiar feed).
 router.delete('/notificaciones/leidas', async (req, res) => {
   try {
-    await pool.query('DELETE FROM notificaciones WHERE cliente_id = ? AND leida = 1', [req.cliente.id]);
+    await req.db.query('DELETE FROM notificaciones WHERE tenant_id = @tenant AND cliente_id = ? AND leida = 1', [req.cliente.id]);
     res.json({ message: 'Notificaciones leídas eliminadas' });
   } catch (err) {
     fail(res, err);
@@ -558,8 +563,8 @@ router.delete('/notificaciones/leidas', async (req, res) => {
 // DELETE /api/portal/notificaciones/:id — borra UNA (deslizar para eliminar).
 router.delete('/notificaciones/:id', async (req, res) => {
   try {
-    await pool.query(
-      'DELETE FROM notificaciones WHERE id = ? AND cliente_id = ?',
+    await req.db.query(
+      'DELETE FROM notificaciones WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?',
       [req.params.id, req.cliente.id]
     );
     res.json({ message: 'Notificación eliminada' });
@@ -573,10 +578,10 @@ router.delete('/notificaciones/:id', async (req, res) => {
 // GET /api/portal/perfil — datos de la cuenta del cliente autenticado
 router.get('/perfil', async (req, res) => {
   try {
-    const [[c]] = await pool.query(
+    const [[c]] = await req.db.query(
       `SELECT id, nombre, apellido, email, email_pendiente, telefono, cedula, foto,
               notif_avances, notif_recordatorios
-       FROM clientes WHERE id = ? AND activo = 1`,
+       FROM clientes WHERE tenant_id = @tenant AND id = ? AND activo = 1`,
       [req.cliente.id]
     );
     if (!c) return res.status(404).json({ error: 'Cuenta no encontrada' });
@@ -605,8 +610,8 @@ router.put('/perfil', async (req, res) => {
     if (!telefonoValido(telefono)) {
       return res.status(400).json({ error: 'El teléfono no tiene un formato válido' });
     }
-    const [[actual]] = await pool.query(
-      'SELECT nombre, email, password_hash FROM clientes WHERE id = ?', [req.cliente.id]
+    const [[actual]] = await req.db.query(
+      'SELECT nombre, email, password_hash FROM clientes WHERE id = ? AND tenant_id = @tenant', [req.cliente.id]
     );
     if (!actual) return res.status(404).json({ error: 'Cuenta no encontrada' });
 
@@ -637,12 +642,12 @@ router.put('/perfil', async (req, res) => {
 
       // No puede pisar la cuenta de otro, ni el correo ya en uso ni uno que otro tenga
       // reservado como pendiente (se vuelve a comprobar al confirmar, por si acaso).
-      if (await correoOcupado(emailNuevo, req.cliente.id)) {
+      if (await correoOcupado(req.db, emailNuevo, req.cliente.id)) {
         return res.status(409).json({ error: 'Ese correo ya está en uso por otra cuenta' });
       }
 
-      await pool.query('UPDATE clientes SET email_pendiente = ? WHERE id = ?', [emailNuevo, req.cliente.id]);
-      await enviarCodigoCambio(req.cliente.id, emailNuevo, actual.nombre);
+      await req.db.query('UPDATE clientes SET email_pendiente = ? WHERE id = ? AND tenant_id = @tenant', [emailNuevo, req.cliente.id]);
+      await enviarCodigoCambio(req.db, req.cliente.id, emailNuevo, actual.nombre);
       // Al correo viejo le avisamos aunque el cambio no esté hecho: si le robaron la
       // sesión, ese aviso es la única forma de que el dueño se entere a tiempo.
       await enviarAvisoCambioCorreo(actual.email, actual.nombre, emailNuevo);
@@ -650,13 +655,13 @@ router.put('/perfil', async (req, res) => {
 
     // Recién acá se tocan los demás datos: si el cambio de correo se rechazó por
     // contraseña incorrecta, no queremos haber guardado el nombre a medias.
-    await pool.query(
-      'UPDATE clientes SET nombre = ?, apellido = ?, telefono = ? WHERE id = ?',
+    await req.db.query(
+      'UPDATE clientes SET nombre = ?, apellido = ?, telefono = ? WHERE id = ? AND tenant_id = @tenant',
       [nombre.trim(), apellido.trim(), (telefono || '').trim() || null, req.cliente.id]
     );
 
-    const [[c]] = await pool.query(
-      'SELECT id, nombre, apellido, email, email_pendiente, telefono, cedula FROM clientes WHERE id = ?',
+    const [[c]] = await req.db.query(
+      'SELECT id, nombre, apellido, email, email_pendiente, telefono, cedula FROM clientes WHERE id = ? AND tenant_id = @tenant',
       [req.cliente.id]
     );
     res.json({
@@ -677,8 +682,8 @@ router.post('/perfil/email/confirmar', async (req, res) => {
     const { codigo } = req.body;
     if (!codigo) return res.status(400).json({ error: 'El código es requerido' });
 
-    const [[c]] = await pool.query(
-      'SELECT nombre, email, email_pendiente FROM clientes WHERE id = ? AND activo = 1', [req.cliente.id]
+    const [[c]] = await req.db.query(
+      'SELECT nombre, email, email_pendiente FROM clientes WHERE tenant_id = @tenant AND id = ? AND activo = 1', [req.cliente.id]
     );
     if (!c || !c.email_pendiente) return res.status(400).json({ error: 'No hay ningún cambio de correo pendiente' });
 
@@ -688,34 +693,34 @@ router.post('/perfil/email/confirmar', async (req, res) => {
     }
 
     const ERR_CODIGO = 'Código inválido o expirado';
-    const [[reg]] = await pool.query(
+    const [[reg]] = await req.db.query(
       `SELECT id, code_hash, attempts FROM email_verify_codes
-       WHERE cliente_id = ? AND proposito = 'cambio' AND used = 0 AND expires_at > NOW()
+       WHERE tenant_id = @tenant AND cliente_id = ? AND proposito = 'cambio' AND used = 0 AND expires_at > NOW()
        ORDER BY created_at DESC LIMIT 1`,
       [req.cliente.id]
     );
     if (!reg || reg.attempts >= 5) return res.status(400).json({ error: ERR_CODIGO });
 
     if (!(await bcrypt.compare(String(codigo).trim(), reg.code_hash))) {
-      await pool.query('UPDATE email_verify_codes SET attempts = attempts + 1 WHERE id = ?', [reg.id]);
+      await req.db.query('UPDATE email_verify_codes SET attempts = attempts + 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
       return res.status(400).json({ error: ERR_CODIGO });
     }
 
     // Se vuelve a comprobar acá: entre el pedido y la confirmación alguien más pudo
     // haberse quedado con ese correo.
-    if (await correoOcupado(c.email_pendiente, req.cliente.id)) {
-      await pool.query('UPDATE clientes SET email_pendiente = NULL WHERE id = ?', [req.cliente.id]);
+    if (await correoOcupado(req.db, c.email_pendiente, req.cliente.id)) {
+      await req.db.query('UPDATE clientes SET email_pendiente = NULL WHERE id = ? AND tenant_id = @tenant', [req.cliente.id]);
       return res.status(409).json({ error: 'Ese correo ya está en uso por otra cuenta' });
     }
 
-    await pool.query('UPDATE email_verify_codes SET used = 1 WHERE id = ?', [reg.id]);
-    await pool.query(
-      'UPDATE clientes SET email = email_pendiente, email_verificado = 1, email_pendiente = NULL WHERE id = ?',
+    await req.db.query('UPDATE email_verify_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
+    await req.db.query(
+      'UPDATE clientes SET email = email_pendiente, email_verificado = 1, email_pendiente = NULL WHERE id = ? AND tenant_id = @tenant',
       [req.cliente.id]
     );
 
-    const [[actualizado]] = await pool.query(
-      'SELECT id, nombre, apellido, email, email_pendiente, telefono, cedula FROM clientes WHERE id = ?',
+    const [[actualizado]] = await req.db.query(
+      'SELECT id, nombre, apellido, email, email_pendiente, telefono, cedula FROM clientes WHERE id = ? AND tenant_id = @tenant',
       [req.cliente.id]
     );
     res.json({ data: actualizado, message: 'Listo, ese ya es tu correo. Usalo la próxima vez que entres.' });
@@ -727,8 +732,8 @@ router.post('/perfil/email/confirmar', async (req, res) => {
 // POST /api/portal/perfil/email/reenviar — otro código a la dirección pendiente.
 router.post('/perfil/email/reenviar', async (req, res) => {
   try {
-    const [[c]] = await pool.query(
-      'SELECT nombre, email_pendiente FROM clientes WHERE id = ? AND activo = 1', [req.cliente.id]
+    const [[c]] = await req.db.query(
+      'SELECT nombre, email_pendiente FROM clientes WHERE tenant_id = @tenant AND id = ? AND activo = 1', [req.cliente.id]
     );
     if (!c || !c.email_pendiente) return res.status(400).json({ error: 'No hay ningún cambio de correo pendiente' });
 
@@ -737,7 +742,7 @@ router.post('/perfil/email/reenviar', async (req, res) => {
       return res.status(429).json({ error: `Esperá ${limite.retryAfter}s antes de pedir otro código.` });
     }
 
-    await enviarCodigoCambio(req.cliente.id, c.email_pendiente, c.nombre);
+    await enviarCodigoCambio(req.db, req.cliente.id, c.email_pendiente, c.nombre);
     res.json({ message: `Te enviamos otro código a ${c.email_pendiente}.` });
   } catch (err) {
     fail(res, err);
@@ -748,8 +753,8 @@ router.post('/perfil/email/reenviar', async (req, res) => {
 // o el dueño real recibió el aviso y quiere frenarlo).
 router.delete('/perfil/email', async (req, res) => {
   try {
-    await pool.query("UPDATE email_verify_codes SET used = 1 WHERE cliente_id = ? AND proposito = 'cambio' AND used = 0", [req.cliente.id]);
-    await pool.query('UPDATE clientes SET email_pendiente = NULL WHERE id = ?', [req.cliente.id]);
+    await req.db.query("UPDATE email_verify_codes SET used = 1 WHERE tenant_id = @tenant AND cliente_id = ? AND proposito = 'cambio' AND used = 0", [req.cliente.id]);
+    await req.db.query('UPDATE clientes SET email_pendiente = NULL WHERE id = ? AND tenant_id = @tenant', [req.cliente.id]);
     res.json({ message: 'Cambio de correo cancelado' });
   } catch (err) {
     fail(res, err);
@@ -761,8 +766,8 @@ router.put('/perfil/notificaciones', async (req, res) => {
   try {
     const avances = req.body.notif_avances ? 1 : 0;
     const recordatorios = req.body.notif_recordatorios ? 1 : 0;
-    await pool.query(
-      'UPDATE clientes SET notif_avances = ?, notif_recordatorios = ? WHERE id = ?',
+    await req.db.query(
+      'UPDATE clientes SET notif_avances = ?, notif_recordatorios = ? WHERE id = ? AND tenant_id = @tenant',
       [avances, recordatorios, req.cliente.id]
     );
     res.json({ data: { notif_avances: avances, notif_recordatorios: recordatorios }, message: 'Preferencias actualizadas' });
@@ -777,12 +782,12 @@ router.put('/perfil/password', async (req, res) => {
     const { actual, nueva } = req.body;
     if (!actual || !nueva) return res.status(400).json({ error: 'Contraseña actual y nueva son requeridas' });
     if (String(nueva).length < 8) return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres' });
-    const [[c]] = await pool.query('SELECT password_hash FROM clientes WHERE id = ? AND activo = 1', [req.cliente.id]);
+    const [[c]] = await req.db.query('SELECT password_hash FROM clientes WHERE tenant_id = @tenant AND id = ? AND activo = 1', [req.cliente.id]);
     if (!c || !c.password_hash) return res.status(404).json({ error: 'Cuenta no encontrada' });
     const ok = await bcrypt.compare(String(actual), c.password_hash);
     if (!ok) return res.status(400).json({ error: 'La contraseña actual no es correcta' });
     const hash = await bcrypt.hash(String(nueva), 10);
-    await pool.query('UPDATE clientes SET password_hash = ? WHERE id = ?', [hash, req.cliente.id]);
+    await req.db.query('UPDATE clientes SET password_hash = ? WHERE id = ? AND tenant_id = @tenant', [hash, req.cliente.id]);
     res.json({ message: 'Contraseña actualizada' });
   } catch (err) {
     fail(res, err);
@@ -799,7 +804,7 @@ router.put('/perfil/foto', async (req, res) => {
       return res.status(400).json({ error: 'La imagen no es válida o es demasiado grande.' });
     }
     const val = fotoParaGuardar(foto);
-    await pool.query('UPDATE clientes SET foto = ? WHERE id = ?', [val, req.cliente.id]);
+    await req.db.query('UPDATE clientes SET foto = ? WHERE id = ? AND tenant_id = @tenant', [val, req.cliente.id]);
     res.json({ data: { foto: val }, message: val ? 'Foto actualizada' : 'Foto eliminada' });
   } catch (err) {
     fail(res, err);
@@ -811,7 +816,7 @@ router.put('/perfil/foto', async (req, res) => {
 // del taller; se desactiva el acceso al portal (activo=0 + sin contraseña).
 router.delete('/perfil', async (req, res) => {
   try {
-    await pool.query('UPDATE clientes SET activo = 0, password_hash = NULL WHERE id = ?', [req.cliente.id]);
+    await req.db.query('UPDATE clientes SET activo = 0, password_hash = NULL WHERE id = ? AND tenant_id = @tenant', [req.cliente.id]);
     res.json({ message: 'Cuenta eliminada' });
   } catch (err) {
     fail(res, err);
@@ -851,9 +856,9 @@ router.get('/disponibilidad', async (req, res) => {
     if (!(await sucursalValida(req.db, sucursalId))) sucursalId = await sucursalPorDefecto(req.db);
     const config = await getConfig(req.db);
     const horas = horasDisponibles(fecha, config);
-    const [rows] = await pool.query(
+    const [rows] = await req.db.query(
       `SELECT TIME_FORMAT(hora, '%H:%i') AS hora, COUNT(*) AS n
-       FROM citas WHERE fecha = ? AND sucursal_id = ? AND estado != 'cancelado' GROUP BY 1`,
+       FROM citas WHERE tenant_id = @tenant AND fecha = ? AND sucursal_id = ? AND estado != 'cancelado' GROUP BY 1`,
       [fecha, sucursalId]
     );
     const ocupacion = {};
@@ -880,9 +885,9 @@ router.get('/proximo-libre', async (req, res) => {
     const finStr = fin.toISOString().slice(0, 10);
 
     // Ocupación de todo el rango en una sola consulta (fecha+hora → cantidad), por sucursal.
-    const [filas] = await pool.query(
+    const [filas] = await req.db.query(
       `SELECT DATE_FORMAT(fecha, '%Y-%m-%d') AS f, TIME_FORMAT(hora, '%H:%i') AS h, COUNT(*) AS n
-       FROM citas WHERE fecha BETWEEN ? AND ? AND sucursal_id = ? AND estado <> 'cancelado' GROUP BY f, h`,
+       FROM citas WHERE tenant_id = @tenant AND fecha BETWEEN ? AND ? AND sucursal_id = ? AND estado <> 'cancelado' GROUP BY f, h`,
       [hoy, finStr, sucursalId]
     );
     const ocup = {};
@@ -909,13 +914,13 @@ router.get('/proximo-libre', async (req, res) => {
 // GET /api/portal/ordenes — órdenes del cliente autenticado
 router.get('/ordenes', async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await req.db.query(
       `SELECT o.id, o.numero_orden, o.estado, o.problema_reportado, o.aprobacion_cliente,
               o.fecha_ingreso, o.fecha_estimada_entrega,
               m.marca, m.modelo, m.placa
        FROM ordenes_trabajo o
-       JOIN motos m ON m.id = o.moto_id
-       WHERE o.cliente_id = ?
+       JOIN motos m ON m.id = o.moto_id AND m.tenant_id = @tenant
+       WHERE o.tenant_id = @tenant AND o.cliente_id = ?
        ORDER BY o.fecha_ingreso DESC`,
       [req.cliente.id]
     );
@@ -928,7 +933,7 @@ router.get('/ordenes', async (req, res) => {
 // GET /api/portal/ordenes/:id — detalle de una orden propia
 router.get('/ordenes/:id', async (req, res) => {
   try {
-    const [[orden]] = await pool.query(
+    const [[orden]] = await req.db.query(
       `SELECT o.id, o.numero_orden, o.estado, o.problema_reportado, o.diagnostico,
               o.costo_mano_obra, o.costo_repuestos, o.descuento,
               (o.costo_mano_obra + o.costo_repuestos - o.descuento) AS total,
@@ -938,25 +943,25 @@ router.get('/ordenes/:id', async (req, res) => {
               m.marca, m.modelo, m.placa, m.anio,
               u.nombre AS tecnico_nombre
        FROM ordenes_trabajo o
-       JOIN motos m ON m.id = o.moto_id
-       LEFT JOIN usuarios u ON u.id = o.tecnico_id
-       WHERE o.id = ? AND o.cliente_id = ?`,
+       JOIN motos m ON m.id = o.moto_id AND m.tenant_id = @tenant
+       LEFT JOIN usuarios u ON u.id = o.tecnico_id AND u.tenant_id = @tenant
+       WHERE o.tenant_id = @tenant AND o.id = ? AND o.cliente_id = ?`,
       [req.params.id, req.cliente.id]
     );
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
 
-    const [avances] = await pool.query(
+    const [avances] = await req.db.query(
       `SELECT a.descripcion, a.created_at, u.nombre AS usuario_nombre
-       FROM orden_avances a LEFT JOIN usuarios u ON u.id = a.usuario_id
-       WHERE a.orden_id = ? ORDER BY a.created_at ASC`,
+       FROM orden_avances a LEFT JOIN usuarios u ON u.id = a.usuario_id AND u.tenant_id = @tenant
+       WHERE a.tenant_id = @tenant AND a.orden_id = ? ORDER BY a.created_at ASC`,
       [req.params.id]
     );
-    const [repuestos] = await pool.query(
-      'SELECT nombre, cantidad, costo_unitario, estado FROM orden_repuestos WHERE orden_id = ? ORDER BY created_at ASC',
+    const [repuestos] = await req.db.query(
+      'SELECT nombre, cantidad, costo_unitario, estado FROM orden_repuestos WHERE tenant_id = @tenant AND orden_id = ? ORDER BY created_at ASC',
       [req.params.id]
     );
-    const [fotos] = await pool.query(
-      'SELECT url, tipo, descripcion FROM orden_fotos WHERE orden_id = ? ORDER BY created_at ASC',
+    const [fotos] = await req.db.query(
+      'SELECT url, tipo, descripcion FROM orden_fotos WHERE tenant_id = @tenant AND orden_id = ? ORDER BY created_at ASC',
       [req.params.id]
     );
     res.json({ data: { ...orden, avances, repuestos, fotos } });
@@ -968,7 +973,7 @@ router.get('/ordenes/:id', async (req, res) => {
 // POST /api/portal/ordenes/:id/aprobar — el cliente aprueba el presupuesto
 router.post('/ordenes/:id/aprobar', async (req, res) => {
   try {
-    const ok = await actualizarAprobacion(req.params.id, req.cliente.id, 'aprobado', null);
+    const ok = await actualizarAprobacion(req.db, req.params.id, req.cliente.id, 'aprobado', null);
     if (!ok) return res.status(400).json({ error: 'La orden no está esperando aprobación' });
     res.json({ message: 'Presupuesto aprobado' });
   } catch (err) {
@@ -983,7 +988,7 @@ router.post('/ordenes/:id/rechazar', async (req, res) => {
     if (!textoDentroDeLimite(motivoRechazo, MAX_MOTIVO_RECHAZO)) {
       return res.status(400).json({ error: `motivo no puede exceder ${MAX_MOTIVO_RECHAZO} caracteres` });
     }
-    const ok = await actualizarAprobacion(req.params.id, req.cliente.id, 'rechazado', motivoRechazo);
+    const ok = await actualizarAprobacion(req.db, req.params.id, req.cliente.id, 'rechazado', motivoRechazo);
     if (!ok) return res.status(400).json({ error: 'La orden no está esperando aprobación' });
     res.json({ message: 'Presupuesto rechazado' });
   } catch (err) {
@@ -998,15 +1003,15 @@ router.post('/ordenes/:id/encuesta', async (req, res) => {
     if (!(calificacion >= 1 && calificacion <= 5)) {
       return res.status(400).json({ error: 'La calificación debe ser de 1 a 5' });
     }
-    const [[orden]] = await pool.query(
-      "SELECT id, calificacion FROM ordenes_trabajo WHERE id = ? AND cliente_id = ? AND estado = 'entregada'",
+    const [[orden]] = await req.db.query(
+      "SELECT id, calificacion FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ? AND cliente_id = ? AND estado = 'entregada'",
       [req.params.id, req.cliente.id]
     );
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada o no entregada' });
     if (orden.calificacion) return res.status(400).json({ error: 'Ya calificaste esta orden' });
 
-    await pool.query(
-      'UPDATE ordenes_trabajo SET calificacion = ?, comentario_satisfaccion = ? WHERE id = ?',
+    await req.db.query(
+      'UPDATE ordenes_trabajo SET calificacion = ?, comentario_satisfaccion = ? WHERE id = ? AND tenant_id = @tenant',
       [calificacion, req.body.comentario || null, req.params.id]
     );
     res.json({ message: '¡Gracias por tu opinión!' });
@@ -1020,11 +1025,11 @@ router.post('/ordenes/:id/encuesta', async (req, res) => {
 // por órdenes), para que ambas pantallas siempre coincidan.
 router.get('/fidelidad', async (req, res) => {
   try {
-    const [[{ completadas }]] = await pool.query(
+    const [[{ completadas }]] = await req.db.query(
       `SELECT
-         (SELECT COUNT(*) FROM citas WHERE cliente_id = ? AND estado = 'entregado')
+         (SELECT COUNT(*) FROM citas WHERE tenant_id = @tenant AND cliente_id = ? AND estado = 'entregado')
        + (SELECT COUNT(*) FROM ordenes_trabajo
-            WHERE cliente_id = ? AND estado = 'entregada'
+            WHERE tenant_id = @tenant AND cliente_id = ? AND estado = 'entregada'
               AND id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL)) AS completadas`,
       [req.cliente.id, req.cliente.id]
     );
@@ -1040,11 +1045,11 @@ router.get('/fidelidad', async (req, res) => {
 // GET /api/portal/recompensas — historial de cortesías canjeadas del cliente.
 router.get('/recompensas', async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await req.db.query(
       `SELECT rc.id, DATE_FORMAT(rc.created_at, '%Y-%m-%d') AS fecha, rc.descripcion, o.numero_orden
        FROM recompensas_canjeadas rc
-       LEFT JOIN ordenes_trabajo o ON o.id = rc.orden_id
-       WHERE rc.cliente_id = ?
+       LEFT JOIN ordenes_trabajo o ON o.id = rc.orden_id AND o.tenant_id = @tenant
+       WHERE rc.tenant_id = @tenant AND rc.cliente_id = ?
        ORDER BY rc.created_at DESC`,
       [req.cliente.id]
     );
@@ -1057,10 +1062,10 @@ router.get('/recompensas', async (req, res) => {
 // GET /api/portal/promos — promociones activas (sin imagen pesada para carga rápida)
 router.get('/promos', async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await req.db.query(
       `SELECT id, titulo, descripcion, descuento, precio_final,
               CASE WHEN imagen IS NOT NULL THEN 1 ELSE 0 END AS tiene_imagen
-       FROM promos WHERE activa = 1 ORDER BY created_at DESC`
+       FROM promos WHERE tenant_id = @tenant AND activa = 1 ORDER BY created_at DESC`
     );
     res.json({ data: rows });
   } catch (err) {
@@ -1071,7 +1076,7 @@ router.get('/promos', async (req, res) => {
 // GET /api/portal/promos/:id/imagen — imagen individual (lazy load)
 router.get('/promos/:id/imagen', async (req, res) => {
   try {
-    const [[row]] = await pool.query('SELECT imagen FROM promos WHERE id = ? AND activa = 1', [req.params.id]);
+    const [[row]] = await req.db.query('SELECT imagen FROM promos WHERE tenant_id = @tenant AND id = ? AND activa = 1', [req.params.id]);
     if (!row || !row.imagen) return res.status(404).json({ error: 'Sin imagen' });
     res.json({ data: row.imagen });
   } catch (err) {
@@ -1082,11 +1087,11 @@ router.get('/promos/:id/imagen', async (req, res) => {
 // GET /api/portal/motos — motos del cliente (para asociar a una cita)
 router.get('/motos', async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await req.db.query(
       `SELECT m.id, m.marca, m.modelo, m.placa, m.anio, m.color, m.kilometraje_actual, m.foto,
               (SELECT DATE_FORMAT(MAX(COALESCE(c.fecha_fin, c.fecha)), '%Y-%m-%d')
-               FROM citas c WHERE c.moto_id = m.id AND c.estado = 'entregado') AS ultimo_servicio
-       FROM motos m WHERE m.cliente_id = ? AND m.activa = 1 ORDER BY m.created_at DESC`,
+               FROM citas c WHERE c.tenant_id = @tenant AND c.moto_id = m.id AND c.estado = 'entregado') AS ultimo_servicio
+       FROM motos m WHERE m.tenant_id = @tenant AND m.cliente_id = ? AND m.activa = 1 ORDER BY m.created_at DESC`,
       [req.cliente.id]
     );
     res.json({ data: rows });
@@ -1107,19 +1112,19 @@ router.post('/motos', async (req, res) => {
     if (!anioValido(anio)) return res.status(400).json({ error: 'El año no es válido' });
     if (!fotoValida(foto)) return res.status(400).json({ error: 'La foto de la moto no es válida o es demasiado grande.' });
     // Bloquea placas ya registradas (normaliza espacios y guiones).
-    const [[existe]] = await pool.query(
-      `SELECT id FROM motos WHERE activa = 1
+    const [[existe]] = await req.db.query(
+      `SELECT id FROM motos WHERE tenant_id = @tenant AND activa = 1
          AND UPPER(REPLACE(REPLACE(placa, ' ', ''), '-', '')) = UPPER(REPLACE(REPLACE(?, ' ', ''), '-', ''))`,
       [placa]
     );
     if (existe) return res.status(409).json({ error: 'Esa placa ya está registrada en el taller' });
 
-    const [result] = await pool.query(
-      'INSERT INTO motos (cliente_id, marca, modelo, placa, anio, color, kilometraje_actual, foto) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    const [result] = await req.db.query(
+      'INSERT INTO motos (tenant_id, cliente_id, marca, modelo, placa, anio, color, kilometraje_actual, foto) VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, ?)',
       [req.cliente.id, marca, modelo, placa, anio || null, color || null, kilometraje_actual || 0, fotoParaGuardar(foto)]
     );
-    const [[nueva]] = await pool.query(
-      'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM motos WHERE id = ?',
+    const [[nueva]] = await req.db.query(
+      'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM motos WHERE id = ? AND tenant_id = @tenant',
       [result.insertId]
     );
     res.status(201).json({ data: nueva, message: 'Moto registrada' });
@@ -1139,22 +1144,22 @@ router.put('/motos/:id', async (req, res) => {
     if (!anioValido(anio)) return res.status(400).json({ error: 'El año no es válido' });
     if (!fotoValida(foto)) return res.status(400).json({ error: 'La foto de la moto no es válida o es demasiado grande.' });
     // La moto debe ser del cliente
-    const [[moto]] = await pool.query('SELECT id FROM motos WHERE id = ? AND cliente_id = ? AND activa = 1', [req.params.id, req.cliente.id]);
+    const [[moto]] = await req.db.query('SELECT id FROM motos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ? AND activa = 1', [req.params.id, req.cliente.id]);
     if (!moto) return res.status(404).json({ error: 'Moto no encontrada' });
     // Placa duplicada (excluyendo la propia)
-    const [[dup]] = await pool.query(
-      `SELECT id FROM motos WHERE activa = 1 AND id <> ?
+    const [[dup]] = await req.db.query(
+      `SELECT id FROM motos WHERE tenant_id = @tenant AND activa = 1 AND id <> ?
          AND UPPER(REPLACE(REPLACE(placa, ' ', ''), '-', '')) = UPPER(REPLACE(REPLACE(?, ' ', ''), '-', ''))`,
       [req.params.id, placa]
     );
     if (dup) return res.status(409).json({ error: 'Esa placa ya está registrada en el taller' });
 
-    await pool.query(
-      'UPDATE motos SET marca = ?, modelo = ?, placa = ?, anio = ?, color = ?, kilometraje_actual = ?, foto = ? WHERE id = ?',
+    await req.db.query(
+      'UPDATE motos SET marca = ?, modelo = ?, placa = ?, anio = ?, color = ?, kilometraje_actual = ?, foto = ? WHERE id = ? AND tenant_id = @tenant',
       [marca, modelo, placa, anio || null, color || null, kilometraje_actual || 0, fotoParaGuardar(foto), req.params.id]
     );
-    const [[actualizada]] = await pool.query(
-      'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM motos WHERE id = ?',
+    const [[actualizada]] = await req.db.query(
+      'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM motos WHERE id = ? AND tenant_id = @tenant',
       [req.params.id]
     );
     res.json({ data: actualizada, message: 'Moto actualizada' });
@@ -1167,9 +1172,9 @@ router.put('/motos/:id', async (req, res) => {
 // No se borra la fila (preserva el historial de citas/órdenes); deja de aparecer en su lista.
 router.delete('/motos/:id', async (req, res) => {
   try {
-    const [[moto]] = await pool.query('SELECT id FROM motos WHERE id = ? AND cliente_id = ? AND activa = 1', [req.params.id, req.cliente.id]);
+    const [[moto]] = await req.db.query('SELECT id FROM motos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ? AND activa = 1', [req.params.id, req.cliente.id]);
     if (!moto) return res.status(404).json({ error: 'Moto no encontrada' });
-    await pool.query('UPDATE motos SET activa = 0 WHERE id = ?', [req.params.id]);
+    await req.db.query('UPDATE motos SET activa = 0 WHERE id = ? AND tenant_id = @tenant', [req.params.id]);
     res.json({ message: 'Moto eliminada' });
   } catch (err) {
     fail(res, err);
@@ -1181,21 +1186,21 @@ router.delete('/motos/:id', async (req, res) => {
 // activa=1: el historial sobrevive aunque el cliente haya eliminado la moto de su lista.
 router.get('/motos/:id/historial', async (req, res) => {
   try {
-    const [[moto]] = await pool.query(
-      'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM motos WHERE id = ? AND cliente_id = ?',
+    const [[moto]] = await req.db.query(
+      'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM motos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?',
       [req.params.id, req.cliente.id]
     );
     if (!moto) return res.status(404).json({ error: 'Moto no encontrada' });
 
-    const [servicios] = await pool.query(
+    const [servicios] = await req.db.query(
       `SELECT ci.id, DATE_FORMAT(COALESCE(ci.fecha_fin, ci.fecha), '%Y-%m-%d') AS fecha,
               ci.tipo_servicio, ci.motivo, ci.monto, ci.calificacion,
               ci.orden_id, o.numero_orden, o.diagnostico,
               t.nombre AS tecnico_nombre
        FROM citas ci
-       LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id
-       LEFT JOIN usuarios t ON t.id = ci.tecnico_id
-       WHERE ci.moto_id = ? AND ci.cliente_id = ? AND ci.estado = 'entregado'
+       LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id AND o.tenant_id = @tenant
+       LEFT JOIN usuarios t ON t.id = ci.tecnico_id AND t.tenant_id = @tenant
+       WHERE ci.tenant_id = @tenant AND ci.moto_id = ? AND ci.cliente_id = ? AND ci.estado = 'entregado'
        ORDER BY COALESCE(ci.fecha_fin, ci.fecha) DESC, ci.hora DESC`,
       [req.params.id, req.cliente.id]
     );
@@ -1208,7 +1213,7 @@ router.get('/motos/:id/historial', async (req, res) => {
 // GET /api/portal/citas — citas del cliente
 router.get('/citas', async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await req.db.query(
       `SELECT ci.id, DATE_FORMAT(ci.fecha,'%Y-%m-%d') AS fecha, TIME_FORMAT(ci.hora,'%H:%i') AS hora,
               ci.motivo, ci.tipo_servicio, ci.estado,
               ci.monto, ci.calificacion, ci.confirmada_cliente,
@@ -1217,11 +1222,11 @@ router.get('/citas', async (req, res) => {
               t.nombre AS tecnico_nombre,
               ci.sucursal_id, s.nombre AS sucursal_nombre
        FROM citas ci
-       LEFT JOIN motos m ON m.id = ci.moto_id
-       LEFT JOIN usuarios t ON t.id = ci.tecnico_id
-       LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id
-       LEFT JOIN sucursales s ON s.id = ci.sucursal_id
-       WHERE ci.cliente_id = ? AND ci.estado <> 'cancelado'
+       LEFT JOIN motos m ON m.id = ci.moto_id AND m.tenant_id = @tenant
+       LEFT JOIN usuarios t ON t.id = ci.tecnico_id AND t.tenant_id = @tenant
+       LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id AND o.tenant_id = @tenant
+       LEFT JOIN sucursales s ON s.id = ci.sucursal_id AND s.tenant_id = @tenant
+       WHERE ci.tenant_id = @tenant AND ci.cliente_id = ? AND ci.estado <> 'cancelado'
        ORDER BY ci.fecha DESC, ci.hora DESC`,
       [req.cliente.id]
     );
@@ -1234,7 +1239,7 @@ router.get('/citas', async (req, res) => {
 // GET /api/portal/citas/:id — detalle de una cita propia (para la pantalla de detalle)
 router.get('/citas/:id', async (req, res) => {
   try {
-    const [[cita]] = await pool.query(
+    const [[cita]] = await req.db.query(
       `SELECT ci.id, DATE_FORMAT(ci.fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(ci.hora, '%H:%i') AS hora,
               ci.motivo, ci.tipo_servicio, ci.estado, ci.moto_id,
               ci.monto, ci.calificacion, ci.comentario_satisfaccion, ci.fecha_inicio, ci.fecha_fin,
@@ -1244,11 +1249,11 @@ router.get('/citas/:id', async (req, res) => {
               t.nombre AS tecnico_nombre,
               ci.sucursal_id, s.nombre AS sucursal_nombre, s.direccion AS sucursal_direccion
        FROM citas ci
-       LEFT JOIN motos m ON m.id = ci.moto_id
-       LEFT JOIN usuarios t ON t.id = ci.tecnico_id
-       LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id
-       LEFT JOIN sucursales s ON s.id = ci.sucursal_id
-       WHERE ci.id = ? AND ci.cliente_id = ?`,
+       LEFT JOIN motos m ON m.id = ci.moto_id AND m.tenant_id = @tenant
+       LEFT JOIN usuarios t ON t.id = ci.tecnico_id AND t.tenant_id = @tenant
+       LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id AND o.tenant_id = @tenant
+       LEFT JOIN sucursales s ON s.id = ci.sucursal_id AND s.tenant_id = @tenant
+       WHERE ci.tenant_id = @tenant AND ci.id = ? AND ci.cliente_id = ?`,
       [req.params.id, req.cliente.id]
     );
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
@@ -1273,8 +1278,8 @@ router.put('/citas/:id', async (req, res) => {
     // Sucursal: la pedida (si es válida) o se conserva la actual de la cita más abajo.
     const sucursalPedida = (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
 
-    const [[cita]] = await pool.query(
-      "SELECT id, estado, orden_id, sucursal_id, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora FROM citas WHERE id = ? AND cliente_id = ?",
+    const [[cita]] = await req.db.query(
+      "SELECT id, estado, orden_id, sucursal_id, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora FROM citas WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?",
       [req.params.id, req.cliente.id]
     );
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
@@ -1305,7 +1310,7 @@ router.put('/citas/:id', async (req, res) => {
       return res.status(400).json({ error: `Solo se puede agendar hasta ${config.dias_anticipacion} días por adelantado` });
     }
 
-    const [[moto]] = await pool.query('SELECT id FROM motos WHERE id = ? AND cliente_id = ?', [moto_id, req.cliente.id]);
+    const [[moto]] = await req.db.query('SELECT id FROM motos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?', [moto_id, req.cliente.id]);
     if (!moto) return res.status(400).json({ error: 'Moto no válida' });
 
     const motivo = (descripcion || '').trim() || tipo_servicio;
@@ -1316,11 +1321,11 @@ router.put('/citas/:id', async (req, res) => {
     const sucursalId = sucursalPedida || cita.sucursal_id || (await sucursalPorDefecto(req.db));
 
     // Cupo atómico de la NUEVA franja (por sucursal), excluyendo esta misma cita.
-    const conn = await pool.getConnection();
+    const conn = await req.db.conexion();
     try {
       await conn.beginTransaction();
       const [[{ ocupadas }]] = await conn.query(
-        "SELECT COUNT(*) AS ocupadas FROM citas WHERE fecha = ? AND hora = ? AND sucursal_id = ? AND estado != 'cancelado' AND id != ? FOR UPDATE",
+        "SELECT COUNT(*) AS ocupadas FROM citas WHERE tenant_id = @tenant AND fecha = ? AND hora = ? AND sucursal_id = ? AND estado != 'cancelado' AND id != ? FOR UPDATE",
         [fecha, hora, sucursalId, req.params.id]
       );
       if (ocupadas >= config.max_citas_hora) {
@@ -1328,12 +1333,12 @@ router.put('/citas/:id', async (req, res) => {
         return res.status(400).json({ error: 'Esa hora ya no está disponible, elegí otra.' });
       }
       await conn.query(
-        'UPDATE citas SET moto_id = ?, fecha = ?, hora = ?, tipo_servicio = ?, motivo = ?, sucursal_id = ? WHERE id = ?',
+        'UPDATE citas SET moto_id = ?, fecha = ?, hora = ?, tipo_servicio = ?, motivo = ?, sucursal_id = ? WHERE id = ? AND tenant_id = @tenant',
         [moto_id, fecha, hora, tipo_servicio, motivo, sucursalId, req.params.id]
       );
       const [[actualizada]] = await conn.query(
         `SELECT ci.id, ci.fecha, ci.hora, ci.motivo, ci.tipo_servicio, ci.estado, m.marca, m.modelo, m.placa
-         FROM citas ci LEFT JOIN motos m ON m.id = ci.moto_id WHERE ci.id = ?`,
+         FROM citas ci LEFT JOIN motos m ON m.id = ci.moto_id AND m.tenant_id = @tenant WHERE ci.tenant_id = @tenant AND ci.id = ?`,
         [req.params.id]
       );
       await conn.commit();
@@ -1389,7 +1394,7 @@ router.post('/citas', async (req, res) => {
     }
 
     // La moto debe ser del cliente
-    const [[moto]] = await pool.query('SELECT id FROM motos WHERE id = ? AND cliente_id = ?', [moto_id, req.cliente.id]);
+    const [[moto]] = await req.db.query('SELECT id FROM motos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?', [moto_id, req.cliente.id]);
     if (!moto) return res.status(400).json({ error: 'Moto no válida' });
 
     const motivo = (descripcion || '').trim() || tipo_servicio;
@@ -1400,11 +1405,11 @@ router.post('/citas', async (req, res) => {
     // Cupo atómico: una transacción bloquea el rango (fecha,hora) con FOR UPDATE,
     // cuenta y recién ahí inserta. Dos solicitudes simultáneas se serializan, así
     // nunca se superan las MAX_POR_HORA citas por franja (evita la carrera del COUNT+INSERT).
-    const conn = await pool.getConnection();
+    const conn = await req.db.conexion();
     try {
       await conn.beginTransaction();
       const [[{ ocupadas }]] = await conn.query(
-        "SELECT COUNT(*) AS ocupadas FROM citas WHERE fecha = ? AND hora = ? AND sucursal_id = ? AND estado != 'cancelado' FOR UPDATE",
+        "SELECT COUNT(*) AS ocupadas FROM citas WHERE tenant_id = @tenant AND fecha = ? AND hora = ? AND sucursal_id = ? AND estado != 'cancelado' FOR UPDATE",
         [fecha, hora, sucursalId]
       );
       if (ocupadas >= config.max_citas_hora) {
@@ -1412,12 +1417,12 @@ router.post('/citas', async (req, res) => {
         return res.status(400).json({ error: 'Esa hora ya no está disponible, elegí otra.' });
       }
       const [result] = await conn.query(
-        "INSERT INTO citas (cliente_id, moto_id, sucursal_id, fecha, hora, motivo, tipo_servicio, estado) VALUES (?, ?, ?, ?, ?, ?, ?, 'agendado')",
+        "INSERT INTO citas (tenant_id, cliente_id, moto_id, sucursal_id, fecha, hora, motivo, tipo_servicio, estado) VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, 'agendado')",
         [req.cliente.id, moto_id, sucursalId, fecha, hora, motivo, tipo_servicio]
       );
       const [[nueva]] = await conn.query(
         `SELECT ci.id, ci.fecha, ci.hora, ci.motivo, ci.tipo_servicio, ci.estado, m.marca, m.modelo, m.placa
-         FROM citas ci LEFT JOIN motos m ON m.id = ci.moto_id WHERE ci.id = ?`,
+         FROM citas ci LEFT JOIN motos m ON m.id = ci.moto_id AND m.tenant_id = @tenant WHERE ci.tenant_id = @tenant AND ci.id = ?`,
         [result.insertId]
       );
       await conn.commit();
@@ -1440,15 +1445,15 @@ router.post('/citas/:id/calificar', async (req, res) => {
     if (!(calificacion >= 1 && calificacion <= 5)) {
       return res.status(400).json({ error: 'La calificación debe ser de 1 a 5' });
     }
-    const [[cita]] = await pool.query(
-      "SELECT id, calificacion FROM citas WHERE id = ? AND cliente_id = ? AND estado = 'entregado'",
+    const [[cita]] = await req.db.query(
+      "SELECT id, calificacion FROM citas WHERE tenant_id = @tenant AND id = ? AND cliente_id = ? AND estado = 'entregado'",
       [req.params.id, req.cliente.id]
     );
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada o no entregada' });
     if (cita.calificacion) return res.status(400).json({ error: 'Ya calificaste esta cita' });
 
-    await pool.query(
-      'UPDATE citas SET calificacion = ?, comentario_satisfaccion = ? WHERE id = ?',
+    await req.db.query(
+      'UPDATE citas SET calificacion = ?, comentario_satisfaccion = ? WHERE id = ? AND tenant_id = @tenant',
       [calificacion, req.body.comentario || null, req.params.id]
     );
     res.json({ message: '¡Gracias por tu opinión!' });
@@ -1462,8 +1467,8 @@ router.post('/citas/:id/calificar', async (req, res) => {
 // (después la gestiona el taller). Libera el cupo de la franja.
 router.patch('/citas/:id/cancelar', async (req, res) => {
   try {
-    const [[cita]] = await pool.query(
-      "SELECT id, estado, orden_id, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora FROM citas WHERE id = ? AND cliente_id = ?",
+    const [[cita]] = await req.db.query(
+      "SELECT id, estado, orden_id, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora FROM citas WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?",
       [req.params.id, req.cliente.id]
     );
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
@@ -1477,7 +1482,7 @@ router.patch('/citas/:id/cancelar', async (req, res) => {
     }
     // fecha_cancelacion deja rastro del momento: es lo que hace visible la
     // cancelación en las alertas de recepción (antes la cita desaparecía en silencio).
-    await pool.query("UPDATE citas SET estado = 'cancelado', fecha_cancelacion = NOW() WHERE id = ?", [req.params.id]);
+    await req.db.query("UPDATE citas SET estado = 'cancelado', fecha_cancelacion = NOW() WHERE id = ? AND tenant_id = @tenant", [req.params.id]);
     res.json({ message: 'Cita cancelada' });
   } catch (err) {
     fail(res, err);
@@ -1488,15 +1493,15 @@ router.patch('/citas/:id/cancelar', async (req, res) => {
 // Marca confirmada_cliente=1 (el taller lo usa como señal de presencia / no-show).
 router.patch('/citas/:id/confirmar', async (req, res) => {
   try {
-    const [[cita]] = await pool.query(
-      'SELECT id, estado FROM citas WHERE id = ? AND cliente_id = ?',
+    const [[cita]] = await req.db.query(
+      'SELECT id, estado FROM citas WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?',
       [req.params.id, req.cliente.id]
     );
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
     if (cita.estado !== 'agendado') {
       return res.status(400).json({ error: 'Solo se puede confirmar una cita agendada.' });
     }
-    await pool.query('UPDATE citas SET confirmada_cliente = 1 WHERE id = ?', [req.params.id]);
+    await req.db.query('UPDATE citas SET confirmada_cliente = 1 WHERE id = ? AND tenant_id = @tenant', [req.params.id]);
     res.json({ message: 'Asistencia confirmada' });
   } catch (err) {
     fail(res, err);
@@ -1504,13 +1509,13 @@ router.patch('/citas/:id/confirmar', async (req, res) => {
 });
 
 // Solo permite aprobar/rechazar si la orden es del cliente y está esperando aprobación.
-async function actualizarAprobacion(ordenId, clienteId, decision, motivo) {
-  const [[orden]] = await pool.query(
-    "SELECT id FROM ordenes_trabajo WHERE id = ? AND cliente_id = ? AND estado = 'esperando_aprobacion'",
+async function actualizarAprobacion(db, ordenId, clienteId, decision, motivo) {
+  const [[orden]] = await db.query(
+    "SELECT id FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ? AND cliente_id = ? AND estado = 'esperando_aprobacion'",
     [ordenId, clienteId]
   );
   if (!orden) return false;
-  await pool.query(
+  await db.query(
     `UPDATE ordenes_trabajo
        SET aprobacion_cliente = ?, motivo_rechazo = ?,
            aprobado_por_cliente = ?, fecha_aprobacion = NOW()
@@ -1520,9 +1525,9 @@ async function actualizarAprobacion(ordenId, clienteId, decision, motivo) {
   // La orden no debe quedar "esperando aprobación" después de la decisión:
   // aprobado → a trabajar (o esperar repuestos); rechazado → vuelve a diagnóstico.
   if (decision === 'aprobado') {
-    await avanzarEstadoOrden(req.db, ordenId, await estadoTrasAprobacion(req.db, ordenId));
+    await avanzarEstadoOrden(db, ordenId, await estadoTrasAprobacion(db, ordenId));
   } else if (decision === 'rechazado') {
-    await avanzarEstadoOrden(req.db, ordenId, 'diagnostico');
+    await avanzarEstadoOrden(db, ordenId, 'diagnostico');
   }
   return true;
 }

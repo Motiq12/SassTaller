@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const tenant = require('./tenant');
 
 // Valida el token del portal del cliente. El payload debe tener tipo: 'cliente'
 // para que un token de personal no sirva en el portal y viceversa.
@@ -14,7 +15,10 @@ module.exports = function authCliente(req, res, next) {
       return res.status(401).json({ error: 'Token no válido para el portal' });
     }
     req.cliente = payload;
-    next();
+    // Mismo criterio que middleware/auth: el scope por taller se encadena acá, no
+    // ruta por ruta. El portal es la cara pública del SaaS, así que es donde menos
+    // se puede depender de que cada endpoint se acuerde de acotar.
+    return tenant(req, res, next);
   } catch {
     return res.status(401).json({ error: 'Token inválido o expirado' });
   }

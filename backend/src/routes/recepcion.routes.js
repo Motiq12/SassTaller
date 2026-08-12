@@ -456,9 +456,9 @@ router.get('/cotizaciones/:id/repuestos', async (req, res) => {
 });
 
 // Recalcula costo_repuestos de la orden a partir de sus piezas.
-async function recalcularRepuestos(ordenId) {
-  await req.db.query(
-    'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ?) WHERE id = ? AND tenant_id = @tenant',
+async function recalcularRepuestos(db, ordenId) {
+  await db.query(
+    'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ? AND tenant_id = @tenant) WHERE id = ? AND tenant_id = @tenant',
     [ordenId, ordenId]
   );
 }
@@ -472,7 +472,7 @@ router.post('/cotizaciones/:id/repuestos', async (req, res) => {
       'INSERT INTO orden_repuestos (tenant_id, orden_id, nombre, cantidad, costo_unitario, estado) VALUES (@tenant, ?, ?, ?, ?, ?)',
       [req.params.id, nombre, cantidad || 1, costo_unitario || 0, estado || 'pendiente']
     );
-    await recalcularRepuestos(req.params.id);
+    await recalcularRepuestos(req.db, req.params.id);
     const [[nuevo]] = await req.db.query('SELECT * FROM orden_repuestos WHERE id = ? AND tenant_id = @tenant', [result.insertId]);
     res.status(201).json({ data: nuevo, message: 'Repuesto agregado' });
   } catch (err) {
@@ -490,7 +490,7 @@ router.put('/cotizaciones/:id/repuestos/:rid', async (req, res) => {
       'UPDATE orden_repuestos SET nombre=?, cantidad=?, costo_unitario=?, estado=? WHERE id=? AND orden_id=? AND tenant_id = @tenant',
       [nombre, cantidad || 1, costo_unitario || 0, estado || 'pendiente', req.params.rid, req.params.id]
     );
-    await recalcularRepuestos(req.params.id);
+    await recalcularRepuestos(req.db, req.params.id);
     const [[actualizado]] = await req.db.query('SELECT * FROM orden_repuestos WHERE id = ? AND tenant_id = @tenant', [req.params.rid]);
     res.json({ data: actualizado, message: 'Repuesto actualizado' });
   } catch (err) {
@@ -503,7 +503,7 @@ router.delete('/cotizaciones/:id/repuestos/:rid', async (req, res) => {
   try {
     const [result] = await req.db.query('DELETE FROM orden_repuestos WHERE id=? AND orden_id=? AND tenant_id = @tenant', [req.params.rid, req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ error: 'Repuesto no encontrado' });
-    await recalcularRepuestos(req.params.id);
+    await recalcularRepuestos(req.db, req.params.id);
     res.json({ message: 'Repuesto eliminado' });
   } catch (err) {
     fail(res, err);
@@ -578,7 +578,7 @@ router.post('/cotizaciones/:id/armar', async (req, res) => {
         [Number(costo_mano_obra) || 0, Number(descuento) || 0, ordenId]
       );
       await conn.query(
-        'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ?) WHERE id = ? AND tenant_id = @tenant',
+        'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ? AND tenant_id = @tenant) WHERE id = ? AND tenant_id = @tenant',
         [ordenId, ordenId]
       );
       await conn.commit();
