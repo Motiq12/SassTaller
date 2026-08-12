@@ -504,6 +504,30 @@ ion-toast {
 // .login-header pasa a ser el panel de marca y todo lo demás cae en la columna
 // del formulario. Por eso las tres cambian juntas y ninguna queda desparejada.
 // ————————————————————————————————
+// Aparecer subiendo un poco. Se usa tanto para la entrada de la pantalla como para
+// los cambios de paso: Angular reemplaza el bloque con *ngIf, así que la animación
+// se vuelve a disparar sola al pasar de contraseña a código o al segundo factor.
+// Sin esto el bloque se cambiaba de golpe y parecía que la pantalla se había roto.
+@keyframes acceso-entrar {
+  from { opacity: 0; transform: translateY(9px); }
+  to   { opacity: 1; transform: none; }
+}
+
+// Acercamiento muy lento de la foto del panel. Va en 40s y de ida y vuelta: a esa
+// velocidad no se ve moverse, se nota que está vivo.
+@keyframes acceso-acercar {
+  from { transform: scale(1); }
+  to   { transform: scale(1.09); }
+}
+
+// El formulario se sacude cuando rechazan el ingreso.
+@keyframes acceso-rechazo {
+  10%, 90% { transform: translateX(-3px); }
+  20%, 80% { transform: translateX(5px); }
+  30%, 50%, 70% { transform: translateX(-8px); }
+  40%, 60% { transform: translateX(8px); }
+}
+
 .login-content {
   --background: var(--ion-background-color, #fff);
 
@@ -526,15 +550,43 @@ ion-toast {
     color: #fff;
     text-align: center;
     padding: 2.5rem 1.5rem 2.25rem;
-    // El color del taller manda y la foto queda de textura por debajo. Se hace con
-    // el color semitransparente encima, no con `multiply`: multiplicando, la foto
-    // oscura se comía el color y el panel salía casi negro para cualquier taller —
-    // justo lo contrario de lo que tiene que demostrar esta pantalla.
-    background:
-      linear-gradient(155deg,
+    // La foto y el color van en capas separadas en vez de en un solo `background`:
+    // así se puede acercar la foto sin arrastrar el color ni, sobre todo, el texto
+    // y el logo, que escalados se verían borrosos.
+    //
+    // El color va ENCIMA y semitransparente, no en `multiply`: multiplicando, la
+    // foto oscura se comía el color y el panel salía casi negro para cualquier
+    // taller — justo lo contrario de lo que esta pantalla tiene que demostrar.
+    background: var(--ion-color-primary);
+
+    // Capa 1: la foto, acercándose despacio.
+    &::before {
+      content: '';
+      position: absolute;
+      // Se pasa de los bordes para que al escalar no asome el fondo por los lados.
+      inset: -6%;
+      background: url('/assets/portal/taller-bg.jpg') center / cover no-repeat;
+      animation: acceso-acercar 40s ease-in-out infinite alternate;
+    }
+
+    // Capa 2: el color del taller por encima.
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(155deg,
         color-mix(in srgb, var(--ion-color-primary) 93%, transparent) 0%,
-        color-mix(in srgb, var(--ion-color-primary) 88%, transparent) 100%),
-      url('/assets/portal/taller-bg.jpg') center / cover no-repeat;
+        color-mix(in srgb, var(--ion-color-primary) 88%, transparent) 100%);
+    }
+
+    // Capa 3: el contenido, por encima de las dos anteriores.
+    > * {
+      position: relative;
+      z-index: 1;
+      animation: acceso-entrar .5s ease-out both;
+    }
+    > *:nth-child(2) { animation-delay: .07s; }
+    > *:nth-child(3) { animation-delay: .13s; }
 
     .logo-wrapper {
       width: 78px;
@@ -585,6 +637,22 @@ ion-toast {
     box-shadow: none !important;
 
     ion-card-content { padding-inline: 0; }
+
+    // Los campos y el botón entran escalonados. El primer campo entra sin retraso a
+    // propósito: es donde va el foco, y hacer esperar al que ya está escribiendo se
+    // pagaría en cada ingreso, todos los días.
+    ion-item, ion-button[expand="block"], .turnstile-box {
+      animation: acceso-entrar .42s ease-out both;
+    }
+    ion-item:nth-of-type(2) { animation-delay: .06s; }
+    ion-item:nth-of-type(3) { animation-delay: .1s; }
+    ion-button[expand="block"] { animation-delay: .14s; }
+
+    // Rechazado: sacude el formulario entero, no solo el campo de la contraseña —
+    // el correo también puede ser el equivocado y no hay forma de saber cuál falló.
+    &.rechazado {
+      animation: acceso-rechazo .45s cubic-bezier(.36, .07, .19, .97) both;
+    }
 
     ion-item {
       --background: var(--ion-item-background, #fff);

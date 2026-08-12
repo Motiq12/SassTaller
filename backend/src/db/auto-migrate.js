@@ -423,12 +423,14 @@ async function ensureSchema() {
     // Horarios: 0=Dom … 6=Sáb. L-V 08-17, Sáb 08-13, Dom cerrado.
     await tryStep('seed configuracion', () =>
       pool.query(
-        // Configuración del taller original (tenant 1), explícito. Los talleres
-        // nuevos reciben la suya en el alta, con los datos que declararon.
+        // Configuración del primer taller (tenant 1). El nombre va genérico: decía
+        // "MS Motos", y como es un INSERT IGNORE solo pega en instalaciones nuevas —
+        // o sea que cualquiera que montara Motiq desde cero arrancaba con el nombre
+        // del taller original. Lo cambia en su configuración al entrar.
         `INSERT IGNORE INTO configuracion
            (tenant_id, id, nombre_taller, telefono, email, direccion,
             max_citas_hora, dias_anticipacion, duracion_cita_min, horarios)
-         VALUES (1, 1, 'MS Motos', '', '', '', 2, 30, 90, ?)`,
+         VALUES (1, 1, 'Mi taller', '', '', '', 2, 30, 90, ?)`,
         [JSON.stringify([
           { dia: 0, abre: '08:00', cierra: '13:00', activo: 0 },
           { dia: 1, abre: '08:00', cierra: '17:00', activo: 1 },
@@ -458,10 +460,12 @@ async function ensureSchema() {
       )
     `);
     await tryStep('seed sucursales', () =>
-      // Sedes del taller original (tenant 1). Va explícito y solo para él: los
-      // talleres nuevos crean su primera sucursal en el alta (utils/onboarding),
-      // con SUS datos. Sembrar "Liberia" y "Cañas" a todos sería absurdo.
-      pool.query("INSERT IGNORE INTO sucursales (tenant_id, id, nombre, orden) VALUES (1, 1, 'Liberia', 1), (1, 2, 'Cañas', 2)")
+      // Primera sucursal del tenant 1, con nombre genérico. Antes sembraba "Liberia"
+      // y "Cañas", que son las sedes reales del taller de donde salió este sistema:
+      // en una instalación nueva aparecían dos locales inventados que el dueño tenía
+      // que borrar. Los talleres que se dan de alta crean la suya en el onboarding.
+      // El id 1 se mantiene fijo porque el backfill de datos viejos lo asume.
+      pool.query("INSERT IGNORE INTO sucursales (tenant_id, id, nombre, orden) VALUES (1, 1, 'Principal', 1)")
     );
 
     // Catálogo de servicios editable desde el panel. Antes vivía hardcodeado en

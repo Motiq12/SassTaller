@@ -9,7 +9,7 @@
     </div>
 
     <!-- PASO 2: verificación en dos pasos (personal con 2FA activo) -->
-    <ion-card *ngIf="paso2fa" class="dosfa-card">
+    <ion-card *ngIf="paso2fa" class="dosfa-card" [class.rechazado]="fallo">
       <ion-card-content>
         <div class="dosfa-head">
           <ion-icon name="shield-checkmark-outline"></ion-icon>
@@ -33,7 +33,7 @@
       </ion-card-content>
     </ion-card>
 
-    <ion-card *ngIf="!paso2fa">
+    <ion-card *ngIf="!paso2fa" [class.rechazado]="fallo">
       <ion-card-content>
         <ion-item lines="full">
           <ion-label position="stacked">Correo</ion-label>

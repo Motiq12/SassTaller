@@ -35,7 +35,10 @@ function logoUrl(slug) {
 // ─────────────────────────────────────────────────────────────
 async function enviarCorreo({ to, subject, html, devLog }) {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.MAIL_FROM || 'Taller MS <onboarding@resend.dev>';
+  // El remitente por defecto es el del PRODUCTO, no el de ningún taller: acá decía
+  // "Taller MS" y ese nombre le salía a los clientes de cualquier taller del SaaS
+  // que no definiera MAIL_FROM.
+  const from = process.env.MAIL_FROM || 'Motiq <onboarding@resend.dev>';
 
   if (!to) return false;
 

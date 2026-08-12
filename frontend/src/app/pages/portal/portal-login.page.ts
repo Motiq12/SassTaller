@@ -36,6 +36,11 @@ export class PortalLoginPage implements OnInit, OnDestroy {
   codigo2fa = '';
   verificando2fa = false;
 
+  // Se enciende cuando el ingreso es rechazado y se apaga solo. Sacude el formulario:
+  // el aviso sale en un toast abajo, lejos de donde está mirando quien acaba de
+  // escribir, y con el sacudón se entiende que falló antes de leer nada.
+  fallo = false;
+
   // Anti-bot para el pedido de código OTP: honeypot + captcha Turnstile.
   website = '';
   mostrarCaptcha = turnstileHabilitado();
@@ -132,6 +137,7 @@ export class PortalLoginPage implements OnInit, OnDestroy {
       },
       error: async (err) => {
         await l.dismiss();
+        this.sacudir();
         const t = await this.toast.create({
           message: err.error?.error || 'No se pudo iniciar sesión',
           duration: 2500,
@@ -161,6 +167,7 @@ export class PortalLoginPage implements OnInit, OnDestroy {
       error: async (err) => {
         this.verificando2fa = false;
         this.codigo2fa = '';
+        this.sacudir();
         // Si venció el token parcial (5 min), hay que empezar el login de nuevo.
         if (err.status === 401) this.cancelar2fa();
         const t = await this.toast.create({
@@ -169,6 +176,18 @@ export class PortalLoginPage implements OnInit, OnDestroy {
         });
         await t.present();
       },
+    });
+  }
+
+  // Marca el formulario como rechazado y lo desmarca cuando termina la animación,
+  // para que el siguiente intento fallido vuelva a dispararla. Sin apagarlo, la
+  // clase queda puesta y el segundo error no se nota.
+  private sacudir() {
+    this.fallo = false;
+    // En el mismo tick Angular no ve el cambio y la animación no se reinicia.
+    setTimeout(() => {
+      this.fallo = true;
+      setTimeout(() => (this.fallo = false), 500);
     });
   }
 
