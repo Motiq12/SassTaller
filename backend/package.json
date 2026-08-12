@@ -10,7 +10,9 @@
     "test": "node --test",
     "backup": "node scripts/backup-db.js",
     "crear-usuario-app": "node scripts/crear-usuario-app.js",
-    "start:single": "node src/server.js"
+    "start:single": "node src/server.js",
+    "db:importar": "node db/importar.js",
+    "db:exportar": "node db/exportar.js"
   },
   "keywords": [],
   "author": "",
