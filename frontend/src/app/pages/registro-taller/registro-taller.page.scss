@@ -68,7 +68,9 @@
 
 .titulo-grupo {
   font-weight: 600;
-  color: var(--ion-color-dark);
+  /* --ion-color-dark es un color de paleta y en tema oscuro queda casi negro
+     sobre fondo negro. --ion-text-color es el que sigue al tema. */
+  color: var(--ion-text-color);
   margin: 0 0 0.15rem;
 }
 
