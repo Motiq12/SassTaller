@@ -46,60 +46,105 @@
       inset: 0;
       z-index: 9999;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 22px;
       background: #1e3a5f;
+      /* Fondo con un poco de profundidad: un halo apenas más claro arriba evita que
+         el azul plano se vea como una pantalla trabada. */
+      background-image: radial-gradient(120% 80% at 50% 12%, #26496f 0%, #1e3a5f 55%);
       transition: opacity .35s ease;
     }
     #boot-splash.hide { opacity: 0; pointer-events: none; }
-    .boot-glow {
-      position: absolute;
-      width: 180px;
-      height: 180px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(255, 255, 255, .35), transparent 70%);
+
+    .boot-marca {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
       opacity: 0;
-      transform: scale(.7);
-      animation: boot-glow 1.6s ease-out forwards;
+      transform: translateY(6px) scale(.98);
+      animation: boot-entrar .7s cubic-bezier(.2, .7, .3, 1) .06s forwards;
     }
+
+    /* Placa clara detrás del isotipo: el logo es azul marino y sobre este fondo
+       desaparecería. Así alcanza UN solo archivo para el favicon, el ícono de la app
+       instalada y esta pantalla. */
     .boot-mark {
-      position: relative;
-      width: 84px;
-      height: 84px;
-      /* Placa clara detrás del isotipo: el logo de Motiq es azul marino y sobre el
-         fondo oscuro del arranque desaparecería. Con esto alcanza UN solo archivo
-         de logo para el favicon, el ícono de la app y esta pantalla. */
+      width: 76px;
+      height: 76px;
       background: #ffffff;
       border-radius: 20px;
-      padding: 10px;
+      padding: 12px;
       box-sizing: border-box;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .28);
+      /* Oculto hasta que la imagen cargue de verdad: si el archivo no existe, el
+         navegador pinta su ícono de imagen rota, que es justo lo que no queremos
+         en la primera pantalla del producto. El script de abajo lo revela. */
+      display: none;
+    }
+
+    .boot-nombre {
+      font-family: 'Outfit', 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: .01em;
+      color: #ffffff;
+      line-height: 1;
+    }
+
+    /* Barra indeterminada: no promete un porcentaje que no sabemos, solo comunica
+       que algo está pasando. Es más honesta que una rueda girando sin fin. */
+    .boot-barra {
+      position: relative;
+      width: 132px;
+      height: 3px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .16);
+      overflow: hidden;
       opacity: 0;
-      transform: scale(.94);
-      animation: boot-mark 1.6s cubic-bezier(.2, .7, .3, 1) forwards;
+      animation: boot-entrar .5s ease .28s forwards;
     }
-    @keyframes boot-glow {
-      0%, 8% { opacity: 0; transform: scale(.7); }
-      30% { opacity: .7; transform: scale(1.15); }
-      55%, 100% { opacity: .25; transform: scale(1); }
+    .boot-barra::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      width: 42%;
+      border-radius: inherit;
+      background: #ffffff;
+      animation: boot-correr 1.15s cubic-bezier(.65, .05, .36, 1) infinite;
     }
-    @keyframes boot-mark {
-      0%, 6% { opacity: 0; transform: scale(.94); }
-      22%, 100% { opacity: 1; transform: scale(1); }
+
+    @keyframes boot-entrar {
+      to { opacity: 1; transform: translateY(0) scale(1); }
     }
-    /* Recarga (misma sesión, ver script abajo): la animación corre más rápido —
-       ya viste el arranque completo hace un momento, no hace falta repetirlo entero. */
-    #boot-splash.recarga .boot-glow { animation-duration: .9s; }
-    #boot-splash.recarga .boot-mark { animation-duration: .9s; }
+    @keyframes boot-correr {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(238%); }
+    }
+
+    /* Recarga (misma sesión, ver script abajo): más corta — ya viste el arranque
+       completo hace un momento, no hace falta repetirlo entero. */
+    #boot-splash.recarga .boot-marca { animation-duration: .4s; }
+
     @media (prefers-reduced-motion: reduce) {
-      .boot-glow, .boot-mark { animation-duration: .01ms !important; }
+      .boot-marca, .boot-barra { animation-duration: .01ms !important; opacity: 1; transform: none; }
+      /* La barra deja de correr y queda como una línea de progreso quieta: el
+         movimiento continuo es justo lo que molesta a quien pide menos animación. */
+      .boot-barra::after { animation: none; width: 100%; opacity: .5; }
     }
   </style>
 </head>
 
 <body>
   <div id="boot-splash" aria-hidden="true">
-    <div class="boot-glow"></div>
-    <img class="boot-mark" src="assets/logo/motiq-iso.png" alt="" />
+    <div class="boot-marca">
+      <img class="boot-mark" src="assets/logo/motiq-iso.png" alt=""
+           onload="this.style.display='block'" onerror="this.remove()" />
+      <div class="boot-nombre">Motiq</div>
+    </div>
+    <div class="boot-barra"></div>
   </div>
   <script>
     (function () {
