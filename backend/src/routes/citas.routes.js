@@ -34,7 +34,7 @@ router.get('/', async (req, res) => {
                       s.nombre AS sucursal_nombre
                FROM citas ci
                JOIN clientes c ON ci.cliente_id = c.id AND c.tenant_id = @tenant
-               LEFT JOIN motos m ON ci.moto_id = m.id AND m.tenant_id = @tenant
+               LEFT JOIN vehiculos m ON ci.vehiculo_id = m.id AND m.tenant_id = @tenant
                LEFT JOIN usuarios u ON ci.usuario_id = u.id AND u.tenant_id = @tenant
                LEFT JOIN usuarios t ON ci.tecnico_id = t.id AND t.tenant_id = @tenant
                LEFT JOIN sucursales s ON s.id = ci.sucursal_id AND s.tenant_id = @tenant
@@ -59,7 +59,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', soloRoles(...GESTIONA_AGENDA), async (req, res) => {
   try {
-    const { cliente_id, moto_id, fecha, hora, tipo_servicio, tecnico_id } = req.body;
+    const { cliente_id, vehiculo_id, fecha, hora, tipo_servicio, tecnico_id } = req.body;
     const motivo = String(req.body.motivo || '').trim();
     if (!cliente_id || !fecha || !hora || !motivo) {
       return res.status(400).json({ error: 'cliente_id, fecha, hora y motivo son requeridos' });
@@ -72,8 +72,8 @@ router.post('/', soloRoles(...GESTIONA_AGENDA), async (req, res) => {
       return res.status(400).json({ error: 'El mecánico no atiende en esa sucursal' });
     }
     const [result] = await req.db.query(
-      'INSERT INTO citas (tenant_id,cliente_id, moto_id, usuario_id, tecnico_id, sucursal_id, fecha, hora, motivo, tipo_servicio) VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [cliente_id, moto_id || null, req.usuario.id, tecnico_id || null, sucursal_id, fecha, hora, motivo, tipo_servicio || null]
+      'INSERT INTO citas (tenant_id,cliente_id, vehiculo_id, usuario_id, tecnico_id, sucursal_id, fecha, hora, motivo, tipo_servicio) VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [cliente_id, vehiculo_id || null, req.usuario.id, tecnico_id || null, sucursal_id, fecha, hora, motivo, tipo_servicio || null]
     );
     const [[nueva]] = await req.db.query('SELECT * FROM citas WHERE tenant_id = @tenant AND id = ?', [result.insertId]);
     if (tecnico_id) {
@@ -94,7 +94,7 @@ router.get('/:id', async (req, res) => {
               m.marca, m.modelo, m.placa
        FROM citas ci
        JOIN clientes c ON ci.cliente_id = c.id AND c.tenant_id = @tenant
-       LEFT JOIN motos m ON ci.moto_id = m.id AND m.tenant_id = @tenant
+       LEFT JOIN vehiculos m ON ci.vehiculo_id = m.id AND m.tenant_id = @tenant
        WHERE ci.tenant_id = @tenant AND ci.id = ?`,
       [req.params.id]
     );
@@ -107,7 +107,7 @@ router.get('/:id', async (req, res) => {
 
 router.put('/:id', soloRoles(...GESTIONA_AGENDA), async (req, res) => {
   try {
-    const { cliente_id, moto_id, fecha, hora, tipo_servicio, tecnico_id } = req.body;
+    const { cliente_id, vehiculo_id, fecha, hora, tipo_servicio, tecnico_id } = req.body;
     const motivo = String(req.body.motivo || '').trim();
     if (!textoDentroDeLimite(motivo, MAX_MOTIVO)) {
       return res.status(400).json({ error: `motivo no puede exceder ${MAX_MOTIVO} caracteres` });
@@ -121,9 +121,9 @@ router.put('/:id', soloRoles(...GESTIONA_AGENDA), async (req, res) => {
       [req.params.id]
     );
     await req.db.query(
-      `UPDATE citas SET cliente_id=?, moto_id=?, tecnico_id=?, fecha=?, hora=?, motivo=?, tipo_servicio=?,
+      `UPDATE citas SET cliente_id=?, vehiculo_id=?, tecnico_id=?, fecha=?, hora=?, motivo=?, tipo_servicio=?,
          sucursal_id = COALESCE(?, sucursal_id) WHERE id=? AND tenant_id = @tenant`,
-      [cliente_id, moto_id || null, tecnico_id || null, fecha, hora, motivo, tipo_servicio || null, sucursalNueva, req.params.id]
+      [cliente_id, vehiculo_id || null, tecnico_id || null, fecha, hora, motivo, tipo_servicio || null, sucursalNueva, req.params.id]
     );
     const [[actualizada]] = await req.db.query('SELECT * FROM citas WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     // Solo si de verdad cambió el momento de la cita (editar el motivo no molesta al cliente).

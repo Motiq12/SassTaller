@@ -93,7 +93,7 @@ router.get('/opiniones', async (req, res) => {
              c.tecnico_id, u.nombre AS tecnico_nombre
       FROM citas c
         JOIN clientes cl ON cl.id = c.cliente_id AND cl.tenant_id = @tenant
-        LEFT JOIN motos m ON m.id = c.moto_id AND m.tenant_id = @tenant
+        LEFT JOIN vehiculos m ON m.id = c.vehiculo_id AND m.tenant_id = @tenant
         LEFT JOIN usuarios u ON u.id = c.tecnico_id AND u.tenant_id = @tenant
         LEFT JOIN ordenes_trabajo o ON o.id = c.orden_id AND o.tenant_id = @tenant
       WHERE c.tenant_id = @tenant AND c.calificacion IS NOT NULL AND c.calificacion > 0
@@ -106,7 +106,7 @@ router.get('/opiniones', async (req, res) => {
              o.tecnico_id, u.nombre AS tecnico_nombre
       FROM ordenes_trabajo o
         JOIN clientes cl ON cl.id = o.cliente_id AND cl.tenant_id = @tenant
-        LEFT JOIN motos m ON m.id = o.moto_id AND m.tenant_id = @tenant
+        LEFT JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
         LEFT JOIN usuarios u ON u.id = o.tecnico_id AND u.tenant_id = @tenant
       WHERE o.tenant_id = @tenant AND o.calificacion IS NOT NULL AND o.calificacion > 0
         AND o.id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL AND tenant_id = @tenant)`;

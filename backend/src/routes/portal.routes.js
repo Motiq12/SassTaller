@@ -19,6 +19,7 @@ const {
 const { antibot } = require('../utils/antibot');
 const { servicioValido, getServicios } = require('../utils/servicios');
 const { getConfig, horasDisponibles } = require('../utils/configuracion');
+const { normalizarTipos, limpiarAtributos } = require('../utils/tipos-vehiculo');
 const { getSucursales, sucursalValida, sucursalPorDefecto } = require('../utils/sucursales');
 const { avanzarEstadoOrden, estadoTrasAprobacion } = require('../utils/ordenes');
 const { recompensas } = require('../utils/recompensas');
@@ -425,7 +426,7 @@ router.get('/resumen', async (req, res) => {
       "SELECT COUNT(*) AS citas_pendientes FROM citas WHERE tenant_id = @tenant AND cliente_id = ? AND estado NOT IN ('entregado','cancelado')",
       [id]
     );
-    const [[{ motos_registradas }]] = await req.db.query('SELECT COUNT(*) AS motos_registradas FROM motos WHERE tenant_id = @tenant AND cliente_id = ? AND activa = 1', [id]);
+    const [[{ motos_registradas }]] = await req.db.query('SELECT COUNT(*) AS motos_registradas FROM vehiculos WHERE tenant_id = @tenant AND cliente_id = ? AND activa = 1', [id]);
     // Total pagado y visitas completadas: una sola fuente que cruza los dos mundos
     // sin doble conteo. Cuenta citas entregadas (su monto ya = total de la orden
     // vinculada al entregar) + órdenes entregadas SIN cita (visitas sin agenda previa).
@@ -458,7 +459,7 @@ router.get('/resumen', async (req, res) => {
               ci.tipo_servicio, ci.estado,
               m.marca, m.modelo, m.placa, t.nombre AS tecnico_nombre
        FROM citas ci
-       LEFT JOIN motos m ON m.id = ci.moto_id AND m.tenant_id = @tenant
+       LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant
        LEFT JOIN usuarios t ON t.id = ci.tecnico_id AND t.tenant_id = @tenant
        WHERE ci.tenant_id = @tenant AND ci.cliente_id = ? AND ci.estado NOT IN ('entregado','cancelado')
        ORDER BY ci.fecha ASC, ci.hora ASC`,
@@ -919,7 +920,7 @@ router.get('/ordenes', async (req, res) => {
               o.fecha_ingreso, o.fecha_estimada_entrega,
               m.marca, m.modelo, m.placa
        FROM ordenes_trabajo o
-       JOIN motos m ON m.id = o.moto_id AND m.tenant_id = @tenant
+       JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
        WHERE o.tenant_id = @tenant AND o.cliente_id = ?
        ORDER BY o.fecha_ingreso DESC`,
       [req.cliente.id]
@@ -943,7 +944,7 @@ router.get('/ordenes/:id', async (req, res) => {
               m.marca, m.modelo, m.placa, m.anio,
               u.nombre AS tecnico_nombre
        FROM ordenes_trabajo o
-       JOIN motos m ON m.id = o.moto_id AND m.tenant_id = @tenant
+       JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
        LEFT JOIN usuarios u ON u.id = o.tecnico_id AND u.tenant_id = @tenant
        WHERE o.tenant_id = @tenant AND o.id = ? AND o.cliente_id = ?`,
       [req.params.id, req.cliente.id]
@@ -1085,13 +1086,13 @@ router.get('/promos/:id/imagen', async (req, res) => {
 });
 
 // GET /api/portal/motos — motos del cliente (para asociar a una cita)
-router.get('/motos', async (req, res) => {
+router.get('/vehiculos', async (req, res) => {
   try {
     const [rows] = await req.db.query(
       `SELECT m.id, m.marca, m.modelo, m.placa, m.anio, m.color, m.kilometraje_actual, m.foto,
               (SELECT DATE_FORMAT(MAX(COALESCE(c.fecha_fin, c.fecha)), '%Y-%m-%d')
-               FROM citas c WHERE c.tenant_id = @tenant AND c.moto_id = m.id AND c.estado = 'entregado') AS ultimo_servicio
-       FROM motos m WHERE m.tenant_id = @tenant AND m.cliente_id = ? AND m.activa = 1 ORDER BY m.created_at DESC`,
+               FROM citas c WHERE c.tenant_id = @tenant AND c.vehiculo_id = m.id AND c.estado = 'entregado') AS ultimo_servicio
+       FROM vehiculos m WHERE m.tenant_id = @tenant AND m.cliente_id = ? AND m.activa = 1 ORDER BY m.created_at DESC`,
       [req.cliente.id]
     );
     res.json({ data: rows });
@@ -1102,7 +1103,7 @@ router.get('/motos', async (req, res) => {
 
 // POST /api/portal/motos — el cliente registra una moto propia
 // Obligatorios: marca, modelo, placa. Evita placas duplicadas.
-router.post('/motos', async (req, res) => {
+router.post('/vehiculos', async (req, res) => {
   try {
     const { marca, modelo, placa, anio, color, kilometraje_actual, foto } = req.body;
     if (!marca || !modelo || !placa) {
@@ -1113,18 +1114,29 @@ router.post('/motos', async (req, res) => {
     if (!fotoValida(foto)) return res.status(400).json({ error: 'La foto de la moto no es válida o es demasiado grande.' });
     // Bloquea placas ya registradas (normaliza espacios y guiones).
     const [[existe]] = await req.db.query(
-      `SELECT id FROM motos WHERE tenant_id = @tenant AND activa = 1
+      `SELECT id FROM vehiculos WHERE tenant_id = @tenant AND activa = 1
          AND UPPER(REPLACE(REPLACE(placa, ' ', ''), '-', '')) = UPPER(REPLACE(REPLACE(?, ' ', ''), '-', ''))`,
       [placa]
     );
     if (existe) return res.status(409).json({ error: 'Esa placa ya está registrada en el taller' });
 
+    // El cliente elige entre los tipos que atiende SU taller. Si el taller atiende
+    // uno solo (el caso común) no se le pregunta nada: se usa ese.
+    const cfgTaller = await getConfig(req.db);
+    const tiposDelTaller = normalizarTipos(cfgTaller.tipos_vehiculo);
+    const tipoPedido = String(req.body.tipo || tiposDelTaller[0]).toLowerCase();
+    if (!tiposDelTaller.includes(tipoPedido)) {
+      return res.status(400).json({ error: 'El taller no atiende ese tipo de vehículo' });
+    }
+    const atributos = limpiarAtributos(tipoPedido, req.body.atributos);
+
     const [result] = await req.db.query(
-      'INSERT INTO motos (tenant_id, cliente_id, marca, modelo, placa, anio, color, kilometraje_actual, foto) VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [req.cliente.id, marca, modelo, placa, anio || null, color || null, kilometraje_actual || 0, fotoParaGuardar(foto)]
+      `INSERT INTO vehiculos (tenant_id, cliente_id, tipo, marca, modelo, placa, anio, color, kilometraje_actual, foto, atributos)
+       VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.cliente.id, tipoPedido, marca, modelo, placa, anio || null, color || null, kilometraje_actual || 0, fotoParaGuardar(foto), atributos ? JSON.stringify(atributos) : null]
     );
     const [[nueva]] = await req.db.query(
-      'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM motos WHERE id = ? AND tenant_id = @tenant',
+      'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM vehiculos WHERE id = ? AND tenant_id = @tenant',
       [result.insertId]
     );
     res.status(201).json({ data: nueva, message: 'Moto registrada' });
@@ -1134,7 +1146,7 @@ router.post('/motos', async (req, res) => {
 });
 
 // PUT /api/portal/motos/:id — el cliente edita su propia moto
-router.put('/motos/:id', async (req, res) => {
+router.put('/vehiculos/:id', async (req, res) => {
   try {
     const { marca, modelo, placa, anio, color, kilometraje_actual, foto } = req.body;
     if (!marca || !modelo || !placa) {
@@ -1144,22 +1156,22 @@ router.put('/motos/:id', async (req, res) => {
     if (!anioValido(anio)) return res.status(400).json({ error: 'El año no es válido' });
     if (!fotoValida(foto)) return res.status(400).json({ error: 'La foto de la moto no es válida o es demasiado grande.' });
     // La moto debe ser del cliente
-    const [[moto]] = await req.db.query('SELECT id FROM motos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ? AND activa = 1', [req.params.id, req.cliente.id]);
+    const [[moto]] = await req.db.query('SELECT id FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ? AND activa = 1', [req.params.id, req.cliente.id]);
     if (!moto) return res.status(404).json({ error: 'Moto no encontrada' });
     // Placa duplicada (excluyendo la propia)
     const [[dup]] = await req.db.query(
-      `SELECT id FROM motos WHERE tenant_id = @tenant AND activa = 1 AND id <> ?
+      `SELECT id FROM vehiculos WHERE tenant_id = @tenant AND activa = 1 AND id <> ?
          AND UPPER(REPLACE(REPLACE(placa, ' ', ''), '-', '')) = UPPER(REPLACE(REPLACE(?, ' ', ''), '-', ''))`,
       [req.params.id, placa]
     );
     if (dup) return res.status(409).json({ error: 'Esa placa ya está registrada en el taller' });
 
     await req.db.query(
-      'UPDATE motos SET marca = ?, modelo = ?, placa = ?, anio = ?, color = ?, kilometraje_actual = ?, foto = ? WHERE id = ? AND tenant_id = @tenant',
+      'UPDATE vehiculos SET marca = ?, modelo = ?, placa = ?, anio = ?, color = ?, kilometraje_actual = ?, foto = ? WHERE id = ? AND tenant_id = @tenant',
       [marca, modelo, placa, anio || null, color || null, kilometraje_actual || 0, fotoParaGuardar(foto), req.params.id]
     );
     const [[actualizada]] = await req.db.query(
-      'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM motos WHERE id = ? AND tenant_id = @tenant',
+      'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM vehiculos WHERE id = ? AND tenant_id = @tenant',
       [req.params.id]
     );
     res.json({ data: actualizada, message: 'Moto actualizada' });
@@ -1170,11 +1182,11 @@ router.put('/motos/:id', async (req, res) => {
 
 // DELETE /api/portal/motos/:id — el cliente da de baja una moto propia (soft-delete).
 // No se borra la fila (preserva el historial de citas/órdenes); deja de aparecer en su lista.
-router.delete('/motos/:id', async (req, res) => {
+router.delete('/vehiculos/:id', async (req, res) => {
   try {
-    const [[moto]] = await req.db.query('SELECT id FROM motos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ? AND activa = 1', [req.params.id, req.cliente.id]);
+    const [[moto]] = await req.db.query('SELECT id FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ? AND activa = 1', [req.params.id, req.cliente.id]);
     if (!moto) return res.status(404).json({ error: 'Moto no encontrada' });
-    await req.db.query('UPDATE motos SET activa = 0 WHERE id = ? AND tenant_id = @tenant', [req.params.id]);
+    await req.db.query('UPDATE vehiculos SET activa = 0 WHERE id = ? AND tenant_id = @tenant', [req.params.id]);
     res.json({ message: 'Moto eliminada' });
   } catch (err) {
     fail(res, err);
@@ -1184,10 +1196,10 @@ router.delete('/motos/:id', async (req, res) => {
 // GET /api/portal/motos/:id/historial — línea de tiempo de servicios de una moto.
 // Devuelve la moto + sus citas entregadas (qué se le hizo y cuándo). No filtra por
 // activa=1: el historial sobrevive aunque el cliente haya eliminado la moto de su lista.
-router.get('/motos/:id/historial', async (req, res) => {
+router.get('/vehiculos/:id/historial', async (req, res) => {
   try {
     const [[moto]] = await req.db.query(
-      'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM motos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?',
+      'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?',
       [req.params.id, req.cliente.id]
     );
     if (!moto) return res.status(404).json({ error: 'Moto no encontrada' });
@@ -1200,7 +1212,7 @@ router.get('/motos/:id/historial', async (req, res) => {
        FROM citas ci
        LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id AND o.tenant_id = @tenant
        LEFT JOIN usuarios t ON t.id = ci.tecnico_id AND t.tenant_id = @tenant
-       WHERE ci.tenant_id = @tenant AND ci.moto_id = ? AND ci.cliente_id = ? AND ci.estado = 'entregado'
+       WHERE ci.tenant_id = @tenant AND ci.vehiculo_id = ? AND ci.cliente_id = ? AND ci.estado = 'entregado'
        ORDER BY COALESCE(ci.fecha_fin, ci.fecha) DESC, ci.hora DESC`,
       [req.params.id, req.cliente.id]
     );
@@ -1222,7 +1234,7 @@ router.get('/citas', async (req, res) => {
               t.nombre AS tecnico_nombre,
               ci.sucursal_id, s.nombre AS sucursal_nombre
        FROM citas ci
-       LEFT JOIN motos m ON m.id = ci.moto_id AND m.tenant_id = @tenant
+       LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant
        LEFT JOIN usuarios t ON t.id = ci.tecnico_id AND t.tenant_id = @tenant
        LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id AND o.tenant_id = @tenant
        LEFT JOIN sucursales s ON s.id = ci.sucursal_id AND s.tenant_id = @tenant
@@ -1241,7 +1253,7 @@ router.get('/citas/:id', async (req, res) => {
   try {
     const [[cita]] = await req.db.query(
       `SELECT ci.id, DATE_FORMAT(ci.fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(ci.hora, '%H:%i') AS hora,
-              ci.motivo, ci.tipo_servicio, ci.estado, ci.moto_id,
+              ci.motivo, ci.tipo_servicio, ci.estado, ci.vehiculo_id,
               ci.monto, ci.calificacion, ci.comentario_satisfaccion, ci.fecha_inicio, ci.fecha_fin,
               ci.confirmada_cliente,
               ci.orden_id, o.numero_orden, o.estado AS orden_estado, o.aprobacion_cliente,
@@ -1249,7 +1261,7 @@ router.get('/citas/:id', async (req, res) => {
               t.nombre AS tecnico_nombre,
               ci.sucursal_id, s.nombre AS sucursal_nombre, s.direccion AS sucursal_direccion
        FROM citas ci
-       LEFT JOIN motos m ON m.id = ci.moto_id AND m.tenant_id = @tenant
+       LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant
        LEFT JOIN usuarios t ON t.id = ci.tecnico_id AND t.tenant_id = @tenant
        LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id AND o.tenant_id = @tenant
        LEFT JOIN sucursales s ON s.id = ci.sucursal_id AND s.tenant_id = @tenant
@@ -1268,8 +1280,8 @@ router.get('/citas/:id', async (req, res) => {
 // Revalida la NUEVA fecha/hora con las mismas reglas que agendar (cupo atómico).
 router.put('/citas/:id', async (req, res) => {
   try {
-    const { moto_id, fecha, hora, tipo_servicio, descripcion } = req.body;
-    if (!moto_id || !fecha || !hora || !tipo_servicio) {
+    const { vehiculo_id, fecha, hora, tipo_servicio, descripcion } = req.body;
+    if (!vehiculo_id || !fecha || !hora || !tipo_servicio) {
       return res.status(400).json({ error: 'Moto, servicio, fecha y hora son requeridos' });
     }
     if (!(await servicioValido(req.db, tipo_servicio))) {
@@ -1310,7 +1322,7 @@ router.put('/citas/:id', async (req, res) => {
       return res.status(400).json({ error: `Solo se puede agendar hasta ${config.dias_anticipacion} días por adelantado` });
     }
 
-    const [[moto]] = await req.db.query('SELECT id FROM motos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?', [moto_id, req.cliente.id]);
+    const [[moto]] = await req.db.query('SELECT id FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?', [vehiculo_id, req.cliente.id]);
     if (!moto) return res.status(400).json({ error: 'Moto no válida' });
 
     const motivo = (descripcion || '').trim() || tipo_servicio;
@@ -1333,12 +1345,12 @@ router.put('/citas/:id', async (req, res) => {
         return res.status(400).json({ error: 'Esa hora ya no está disponible, elegí otra.' });
       }
       await conn.query(
-        'UPDATE citas SET moto_id = ?, fecha = ?, hora = ?, tipo_servicio = ?, motivo = ?, sucursal_id = ? WHERE id = ? AND tenant_id = @tenant',
-        [moto_id, fecha, hora, tipo_servicio, motivo, sucursalId, req.params.id]
+        'UPDATE citas SET vehiculo_id = ?, fecha = ?, hora = ?, tipo_servicio = ?, motivo = ?, sucursal_id = ? WHERE id = ? AND tenant_id = @tenant',
+        [vehiculo_id, fecha, hora, tipo_servicio, motivo, sucursalId, req.params.id]
       );
       const [[actualizada]] = await conn.query(
         `SELECT ci.id, ci.fecha, ci.hora, ci.motivo, ci.tipo_servicio, ci.estado, m.marca, m.modelo, m.placa
-         FROM citas ci LEFT JOIN motos m ON m.id = ci.moto_id AND m.tenant_id = @tenant WHERE ci.tenant_id = @tenant AND ci.id = ?`,
+         FROM citas ci LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant WHERE ci.tenant_id = @tenant AND ci.id = ?`,
         [req.params.id]
       );
       await conn.commit();
@@ -1357,8 +1369,8 @@ router.put('/citas/:id', async (req, res) => {
 // POST /api/portal/citas — el cliente solicita una cita (queda pendiente de confirmar)
 router.post('/citas', async (req, res) => {
   try {
-    const { moto_id, fecha, hora, tipo_servicio, descripcion } = req.body;
-    if (!moto_id || !fecha || !hora || !tipo_servicio) {
+    const { vehiculo_id, fecha, hora, tipo_servicio, descripcion } = req.body;
+    if (!vehiculo_id || !fecha || !hora || !tipo_servicio) {
       return res.status(400).json({ error: 'Moto, servicio, fecha y hora son requeridos' });
     }
     if (!(await servicioValido(req.db, tipo_servicio))) {
@@ -1394,7 +1406,7 @@ router.post('/citas', async (req, res) => {
     }
 
     // La moto debe ser del cliente
-    const [[moto]] = await req.db.query('SELECT id FROM motos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?', [moto_id, req.cliente.id]);
+    const [[moto]] = await req.db.query('SELECT id FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?', [vehiculo_id, req.cliente.id]);
     if (!moto) return res.status(400).json({ error: 'Moto no válida' });
 
     const motivo = (descripcion || '').trim() || tipo_servicio;
@@ -1417,12 +1429,12 @@ router.post('/citas', async (req, res) => {
         return res.status(400).json({ error: 'Esa hora ya no está disponible, elegí otra.' });
       }
       const [result] = await conn.query(
-        "INSERT INTO citas (tenant_id, cliente_id, moto_id, sucursal_id, fecha, hora, motivo, tipo_servicio, estado) VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, 'agendado')",
-        [req.cliente.id, moto_id, sucursalId, fecha, hora, motivo, tipo_servicio]
+        "INSERT INTO citas (tenant_id, cliente_id, vehiculo_id, sucursal_id, fecha, hora, motivo, tipo_servicio, estado) VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, 'agendado')",
+        [req.cliente.id, vehiculo_id, sucursalId, fecha, hora, motivo, tipo_servicio]
       );
       const [[nueva]] = await conn.query(
         `SELECT ci.id, ci.fecha, ci.hora, ci.motivo, ci.tipo_servicio, ci.estado, m.marca, m.modelo, m.placa
-         FROM citas ci LEFT JOIN motos m ON m.id = ci.moto_id AND m.tenant_id = @tenant WHERE ci.tenant_id = @tenant AND ci.id = ?`,
+         FROM citas ci LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant WHERE ci.tenant_id = @tenant AND ci.id = ?`,
         [result.insertId]
       );
       await conn.commit();

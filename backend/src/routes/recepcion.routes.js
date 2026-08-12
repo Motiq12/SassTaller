@@ -82,7 +82,7 @@ router.get('/citas-hoy', async (req, res) => {
               ci.sucursal_id, s.nombre AS sucursal_nombre
        FROM citas ci
        JOIN clientes c ON ci.cliente_id = c.id AND c.tenant_id = @tenant
-       LEFT JOIN motos m ON ci.moto_id = m.id AND m.tenant_id = @tenant
+       LEFT JOIN vehiculos m ON ci.vehiculo_id = m.id AND m.tenant_id = @tenant
        LEFT JOIN usuarios t ON ci.tecnico_id = t.id AND t.tenant_id = @tenant
        LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id AND o.tenant_id = @tenant
        LEFT JOIN sucursales s ON s.id = ci.sucursal_id AND s.tenant_id = @tenant
@@ -112,7 +112,7 @@ router.get('/agenda', async (req, res) => {
               ci.sucursal_id, s.nombre AS sucursal_nombre
        FROM citas ci
        JOIN clientes c ON ci.cliente_id = c.id AND c.tenant_id = @tenant
-       LEFT JOIN motos m ON ci.moto_id = m.id AND m.tenant_id = @tenant
+       LEFT JOIN vehiculos m ON ci.vehiculo_id = m.id AND m.tenant_id = @tenant
        LEFT JOIN usuarios t ON ci.tecnico_id = t.id AND t.tenant_id = @tenant
        LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id AND o.tenant_id = @tenant
        LEFT JOIN sucursales s ON s.id = ci.sucursal_id AND s.tenant_id = @tenant
@@ -130,7 +130,7 @@ router.get('/agenda', async (req, res) => {
 router.post('/citas/:id/crear-orden', async (req, res) => {
   try {
     const [[cita]] = await req.db.query(
-      `SELECT id, cliente_id, moto_id, motivo, tecnico_id, sucursal_id, orden_id
+      `SELECT id, cliente_id, vehiculo_id, motivo, tecnico_id, sucursal_id, orden_id
        FROM citas WHERE id = ? AND tenant_id = @tenant`,
       [req.params.id]
     );
@@ -143,7 +143,7 @@ router.post('/citas/:id/crear-orden', async (req, res) => {
       );
       if (o) return res.json({ data: { orden_id: o.id, numero_orden: o.numero_orden }, message: 'La cita ya tiene una orden' });
     }
-    if (!cita.moto_id) return res.status(400).json({ error: 'La cita no tiene una moto asociada; no se puede crear la orden' });
+    if (!cita.vehiculo_id) return res.status(400).json({ error: 'La cita no tiene una moto asociada; no se puede crear la orden' });
 
     const numero_orden = await generarNumeroOrden(req.db);
     const conn = await req.db.conexion();
@@ -151,9 +151,9 @@ router.post('/citas/:id/crear-orden', async (req, res) => {
       await conn.beginTransaction();
       const [result] = await conn.query(
         `INSERT INTO ordenes_trabajo
-          (tenant_id, numero_orden, moto_id, cliente_id, sucursal_id, recepcionista_id, tecnico_id, problema_reportado, estado)
+          (tenant_id, numero_orden, vehiculo_id, cliente_id, sucursal_id, recepcionista_id, tecnico_id, problema_reportado, estado)
          VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, 'diagnostico')`,
-        [numero_orden, cita.moto_id, cita.cliente_id, cita.sucursal_id || null, req.usuario.id, cita.tecnico_id || null, cita.motivo || 'Orden generada desde la cita']
+        [numero_orden, cita.vehiculo_id, cita.cliente_id, cita.sucursal_id || null, req.usuario.id, cita.tecnico_id || null, cita.motivo || 'Orden generada desde la cita']
       );
       await conn.query(
         'INSERT INTO orden_tiempos (tenant_id, orden_id, etapa) VALUES (@tenant, ?, ?)',
@@ -236,7 +236,7 @@ router.get('/alertas', async (req, res) => {
               u.nombre AS tecnico_nombre
        FROM orden_fotos f
        JOIN ordenes_trabajo o ON o.id = f.orden_id AND o.tenant_id = @tenant
-       JOIN motos m ON m.id = o.moto_id AND m.tenant_id = @tenant
+       JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
        LEFT JOIN usuarios u ON u.id = o.tecnico_id AND u.tenant_id = @tenant
        WHERE f.tenant_id = @tenant AND o.estado NOT IN ('entregada','cancelada')
          AND f.created_at >= NOW() - INTERVAL 24 HOUR
@@ -252,7 +252,7 @@ router.get('/alertas', async (req, res) => {
        FROM orden_tiempos t
        JOIN ordenes_trabajo o ON o.id = t.orden_id AND o.tenant_id = @tenant
        JOIN clientes c ON c.id = o.cliente_id AND c.tenant_id = @tenant
-       JOIN motos m ON m.id = o.moto_id AND m.tenant_id = @tenant
+       JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
        WHERE t.tenant_id = @tenant AND t.etapa = 'lista_entrega' AND t.fin IS NULL
          AND o.estado = 'lista_entrega'
          AND t.inicio >= NOW() - INTERVAL 24 HOUR
@@ -266,7 +266,7 @@ router.get('/alertas', async (req, res) => {
               m.marca, m.modelo
        FROM ordenes_trabajo o
        JOIN clientes c ON c.id = o.cliente_id AND c.tenant_id = @tenant
-       JOIN motos m ON m.id = o.moto_id AND m.tenant_id = @tenant
+       JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
        WHERE o.tenant_id = @tenant AND o.aprobacion_cliente IN ('aprobado','rechazado')
          AND o.fecha_aprobacion >= NOW() - INTERVAL 24 HOUR
        ORDER BY o.fecha_aprobacion DESC LIMIT 10`
@@ -280,7 +280,7 @@ router.get('/alertas', async (req, res) => {
               m.marca, m.modelo
        FROM citas ci
        JOIN clientes c ON c.id = ci.cliente_id AND c.tenant_id = @tenant
-       LEFT JOIN motos m ON m.id = ci.moto_id AND m.tenant_id = @tenant
+       LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant
        WHERE ci.tenant_id = @tenant AND ci.usuario_id IS NULL AND ci.estado <> 'cancelado'
          AND ci.created_at >= NOW() - INTERVAL 24 HOUR
        ORDER BY ci.created_at DESC LIMIT 10`
@@ -295,7 +295,7 @@ router.get('/alertas', async (req, res) => {
               m.marca, m.modelo
        FROM citas ci
        JOIN clientes c ON c.id = ci.cliente_id AND c.tenant_id = @tenant
-       LEFT JOIN motos m ON m.id = ci.moto_id AND m.tenant_id = @tenant
+       LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant
        WHERE ci.tenant_id = @tenant AND ci.estado = 'cancelado' AND ci.fecha_cancelacion IS NOT NULL
          AND ci.fecha_cancelacion >= NOW() - INTERVAL 24 HOUR
        ORDER BY ci.fecha_cancelacion DESC LIMIT 10`
@@ -308,7 +308,7 @@ router.get('/alertas', async (req, res) => {
               u.nombre AS tecnico_nombre
        FROM orden_repuestos r
        JOIN ordenes_trabajo o ON o.id = r.orden_id AND o.tenant_id = @tenant
-       JOIN motos m ON m.id = o.moto_id AND m.tenant_id = @tenant
+       JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
        LEFT JOIN usuarios u ON u.id = o.tecnico_id AND u.tenant_id = @tenant
        WHERE r.tenant_id = @tenant AND r.estado = 'solicitado'
          AND r.created_at >= NOW() - INTERVAL 24 HOUR
@@ -346,7 +346,7 @@ router.get('/ordenes', async (req, res) => {
               (SELECT COUNT(*) FROM orden_fotos WHERE orden_id = o.id AND tenant_id = @tenant) AS total_fotos
        FROM ordenes_trabajo o
        JOIN clientes c ON o.cliente_id = c.id AND c.tenant_id = @tenant
-       JOIN motos m ON o.moto_id = m.id AND m.tenant_id = @tenant
+       JOIN vehiculos m ON o.vehiculo_id = m.id AND m.tenant_id = @tenant
        LEFT JOIN usuarios t ON o.tecnico_id = t.id AND t.tenant_id = @tenant
        LEFT JOIN sucursales s ON s.id = o.sucursal_id AND s.tenant_id = @tenant
        WHERE ${filtro}
@@ -429,7 +429,7 @@ router.get('/cotizaciones', async (req, res) => {
               t.nombre AS tecnico_nombre
        FROM ordenes_trabajo o
        JOIN clientes c ON o.cliente_id = c.id AND c.tenant_id = @tenant
-       JOIN motos m ON o.moto_id = m.id AND m.tenant_id = @tenant
+       JOIN vehiculos m ON o.vehiculo_id = m.id AND m.tenant_id = @tenant
        LEFT JOIN usuarios t ON o.tecnico_id = t.id AND t.tenant_id = @tenant
        WHERE o.tenant_id = @tenant AND o.estado NOT IN ('entregada','cancelada')
          AND (o.costo_mano_obra > 0 OR o.costo_repuestos > 0)${filtroAprob}
@@ -613,7 +613,7 @@ router.post('/cotizaciones/:id/enviar', async (req, res) => {
     const [[o]] = await req.db.query(
       `SELECT o.cliente_id, o.numero_orden, m.marca, m.modelo,
               (SELECT id FROM citas WHERE orden_id = o.id AND tenant_id = @tenant LIMIT 1) AS cita_id
-       FROM ordenes_trabajo o JOIN motos m ON m.id = o.moto_id AND m.tenant_id = @tenant WHERE o.id = ? AND o.tenant_id = @tenant`,
+       FROM ordenes_trabajo o JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant WHERE o.id = ? AND o.tenant_id = @tenant`,
       [req.params.id]
     );
     // Preferencia del taller: avisar al cliente cuando la cotización está lista.
@@ -640,7 +640,7 @@ router.get('/clientes/:id/ordenes', async (req, res) => {
       `SELECT o.id, o.numero_orden, o.estado, o.problema_reportado, o.sucursal_id,
               m.marca, m.modelo, m.placa
        FROM ordenes_trabajo o
-       JOIN motos m ON o.moto_id = m.id AND m.tenant_id = @tenant
+       JOIN vehiculos m ON o.vehiculo_id = m.id AND m.tenant_id = @tenant
        WHERE o.tenant_id = @tenant AND o.cliente_id = ? AND o.estado NOT IN ('entregada','cancelada')
        ORDER BY o.fecha_ingreso DESC`,
       [req.params.id]
@@ -835,7 +835,7 @@ router.get('/clientes', async (req, res) => {
     const q = (req.query.q || '').trim();
     let sql = `
       SELECT c.id, c.nombre, c.apellido, c.telefono, c.email,
-             (SELECT COUNT(*) FROM motos WHERE cliente_id = c.id AND activa = 1 AND tenant_id = @tenant) AS total_motos,
+             (SELECT COUNT(*) FROM vehiculos WHERE cliente_id = c.id AND activa = 1 AND tenant_id = @tenant) AS total_motos,
              (SELECT COUNT(*) FROM citas WHERE cliente_id = c.id AND tenant_id = @tenant) AS total_citas
       FROM clientes c
       WHERE c.tenant_id = @tenant AND c.activo = 1`;
@@ -843,7 +843,7 @@ router.get('/clientes', async (req, res) => {
     if (q) {
       sql += ` AND (c.nombre LIKE ? OR c.apellido LIKE ? OR c.telefono LIKE ? OR c.email LIKE ? OR c.cedula LIKE ?
                OR CONCAT(c.nombre, " ", c.apellido) LIKE ?
-               OR EXISTS (SELECT 1 FROM motos mm WHERE mm.cliente_id = c.id AND mm.activa = 1 AND mm.tenant_id = @tenant AND mm.placa LIKE ?))`;
+               OR EXISTS (SELECT 1 FROM vehiculos mm WHERE mm.cliente_id = c.id AND mm.activa = 1 AND mm.tenant_id = @tenant AND mm.placa LIKE ?))`;
       const like = `%${q}%`;
       params.push(like, like, like, like, like, like, like);
     }
@@ -872,7 +872,7 @@ router.get('/avances', async (req, res) => {
        FROM orden_avances a
        JOIN ordenes_trabajo o ON o.id = a.orden_id AND o.tenant_id = @tenant
        JOIN clientes c ON c.id = o.cliente_id AND c.tenant_id = @tenant
-       JOIN motos m ON m.id = o.moto_id AND m.tenant_id = @tenant
+       JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
        JOIN usuarios u ON u.id = a.usuario_id AND u.tenant_id = @tenant
        WHERE a.tenant_id = @tenant
        ORDER BY a.created_at DESC LIMIT 40`

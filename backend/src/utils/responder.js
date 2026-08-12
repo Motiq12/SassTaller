@@ -7,7 +7,7 @@
 // formulario mal llenado se ve igual que una caída real. Salió de la prueba de carga:
 // referencias inexistentes generaban 500 y disparaban la tasa de error al 6%.
 const POR_DATO_INVALIDO = {
-  // FK que apunta a una fila que no existe (cliente_id, moto_id… inventados).
+  // FK que apunta a una fila que no existe (cliente_id, vehiculo_id… inventados).
   ER_NO_REFERENCED_ROW: 'Alguno de los datos relacionados no existe',
   ER_NO_REFERENCED_ROW_2: 'Alguno de los datos relacionados no existe',
   // Borrar algo de lo que todavía cuelgan otras filas.

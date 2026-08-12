@@ -45,7 +45,7 @@ async function notificarCambioEstado(db, citaId, estado) {
       `SELECT ci.cliente_id, cl.notif_avances, cl.nombre AS cliente_nombre, cl.email AS cliente_email,
               m.marca, m.modelo
        FROM citas ci
-       LEFT JOIN motos m ON m.id = ci.moto_id AND m.tenant_id = @tenant
+       LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant
        LEFT JOIN clientes cl ON cl.id = ci.cliente_id AND cl.tenant_id = @tenant
        WHERE ci.id = ? AND ci.tenant_id = @tenant`,
       [citaId]
@@ -120,7 +120,7 @@ async function notificarCitaAgendada(db, citaId, { reprogramada = false } = {}) 
               cl.notif_avances, m.marca, m.modelo
        FROM citas ci
        LEFT JOIN clientes cl ON cl.id = ci.cliente_id AND cl.tenant_id = @tenant
-       LEFT JOIN motos m ON m.id = ci.moto_id AND m.tenant_id = @tenant
+       LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant
        WHERE ci.id = ? AND ci.tenant_id = @tenant`,
       [citaId]
     );
@@ -171,7 +171,7 @@ async function notificarPresupuestoListo(db, ordenId) {
       `SELECT ot.cliente_id, ot.numero_orden, m.marca, m.modelo,
               (SELECT id FROM citas WHERE orden_id = ot.id AND tenant_id = @tenant LIMIT 1) AS cita_id
        FROM ordenes_trabajo ot
-       LEFT JOIN motos m ON m.id = ot.moto_id AND m.tenant_id = @tenant
+       LEFT JOIN vehiculos m ON m.id = ot.vehiculo_id AND m.tenant_id = @tenant
        WHERE ot.id = ? AND ot.tenant_id = @tenant`,
       [ordenId]
     );

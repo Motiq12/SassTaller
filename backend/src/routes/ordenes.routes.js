@@ -34,7 +34,7 @@ router.get('/', async (req, res) => {
              u.nombre AS tecnico_nombre
       FROM ordenes_trabajo ot
       JOIN clientes c ON ot.cliente_id = c.id AND c.tenant_id = @tenant
-      JOIN motos m ON ot.moto_id = m.id AND m.tenant_id = @tenant
+      JOIN vehiculos m ON ot.vehiculo_id = m.id AND m.tenant_id = @tenant
       LEFT JOIN usuarios u ON ot.tecnico_id = u.id AND u.tenant_id = @tenant
       WHERE ot.tenant_id = @tenant`;
     const params = [];
@@ -54,15 +54,15 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const {
-      moto_id, cliente_id, problema_reportado, kilometraje_ingreso,
+      vehiculo_id, cliente_id, problema_reportado, kilometraje_ingreso,
       nivel_combustible, accesorios_entregados, estado_fisico,
       prioridad, categoria, fecha_estimada_entrega,
     } = req.body;
 
     const problemaReportado = String(problema_reportado || '').trim();
 
-    if (!moto_id || !cliente_id || !problemaReportado) {
-      return res.status(400).json({ error: 'moto_id, cliente_id y problema_reportado son requeridos' });
+    if (!vehiculo_id || !cliente_id || !problemaReportado) {
+      return res.status(400).json({ error: 'vehiculo_id, cliente_id y problema_reportado son requeridos' });
     }
     if (!textoDentroDeLimite(problemaReportado, MAX_PROBLEMA_REPORTADO)) {
       return res.status(400).json({ error: `problema_reportado no puede exceder ${MAX_PROBLEMA_REPORTADO} caracteres` });
@@ -92,12 +92,12 @@ router.post('/', async (req, res) => {
       await conn.beginTransaction();
       const [result] = await conn.query(
         `INSERT INTO ordenes_trabajo
-          (tenant_id,numero_orden, moto_id, cliente_id, sucursal_id, recepcionista_id, problema_reportado,
+          (tenant_id,numero_orden, vehiculo_id, cliente_id, sucursal_id, recepcionista_id, problema_reportado,
            kilometraje_ingreso, nivel_combustible, accesorios_entregados, estado_fisico,
            prioridad, categoria, fecha_estimada_entrega)
          VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          numero_orden, moto_id, cliente_id, sucursal_id, req.usuario.id, problemaReportado,
+          numero_orden, vehiculo_id, cliente_id, sucursal_id, req.usuario.id, problemaReportado,
           kilometraje_ingreso || null, nivel_combustible || 'cuarto',
           accesorios_entregados || null, estado_fisico || null,
           prioridad || 'normal', categoria || 'diagnostico',
@@ -132,7 +132,7 @@ router.get('/:id', async (req, res) => {
               (ot.costo_mano_obra + ot.costo_repuestos - ot.descuento) AS total
        FROM ordenes_trabajo ot
        JOIN clientes c ON ot.cliente_id = c.id AND c.tenant_id = @tenant
-       JOIN motos m ON ot.moto_id = m.id AND m.tenant_id = @tenant
+       JOIN vehiculos m ON ot.vehiculo_id = m.id AND m.tenant_id = @tenant
        LEFT JOIN usuarios u ON ot.tecnico_id = u.id AND u.tenant_id = @tenant
        LEFT JOIN usuarios r ON ot.recepcionista_id = r.id AND r.tenant_id = @tenant
        LEFT JOIN sucursales s ON s.id = ot.sucursal_id AND s.tenant_id = @tenant

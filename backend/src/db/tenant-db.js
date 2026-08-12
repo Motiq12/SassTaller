@@ -19,7 +19,7 @@ const { pool } = require('./pool');
 // `tenants` no está: es la tabla raíz, vive por encima del scope.
 const TABLAS_CON_TENANT = new Set([
   'citas', 'clientes', 'configuracion', 'email_verify_codes', 'garantia_fotos',
-  'garantias', 'login_codes', 'mensaje_lecturas', 'mensajes_internos', 'motos',
+  'garantias', 'login_codes', 'mensaje_lecturas', 'mensajes_internos', 'vehiculos',
   'notificaciones', 'orden_avances', 'orden_checklist', 'orden_contadores',
   'orden_fotos', 'orden_repuestos', 'orden_tiempos', 'ordenes_trabajo',
   'password_reset_codes', 'promos', 'recompensas_canjeadas', 'servicios',

@@ -20,7 +20,7 @@ const SELECT_GARANTIA = `
          u.nombre AS creado_por_nombre
   FROM garantias g
   JOIN ordenes_trabajo o ON o.id = g.orden_id AND o.tenant_id = @tenant
-  JOIN motos m           ON m.id = o.moto_id AND m.tenant_id = @tenant
+  JOIN vehiculos m           ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
   JOIN clientes c        ON c.id = o.cliente_id AND c.tenant_id = @tenant
   LEFT JOIN usuarios u   ON u.id = g.creado_por AND u.tenant_id = @tenant
 `;

@@ -166,10 +166,10 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-router.get('/:id/motos', async (req, res) => {
+router.get('/:id/vehiculos', async (req, res) => {
   try {
     const [rows] = await req.db.query(
-      'SELECT * FROM motos WHERE cliente_id = ? AND activa = 1 AND tenant_id = @tenant ORDER BY created_at DESC',
+      'SELECT * FROM vehiculos WHERE cliente_id = ? AND activa = 1 AND tenant_id = @tenant ORDER BY created_at DESC',
       [req.params.id]
     );
     res.json({ data: rows });
@@ -184,7 +184,7 @@ router.get('/:id/ordenes', async (req, res) => {
       `SELECT ot.*, m.marca, m.modelo, m.placa,
               u.nombre AS tecnico_nombre
        FROM ordenes_trabajo ot
-       JOIN motos m ON ot.moto_id = m.id AND m.tenant_id = @tenant
+       JOIN vehiculos m ON ot.vehiculo_id = m.id AND m.tenant_id = @tenant
        LEFT JOIN usuarios u ON ot.tecnico_id = u.id AND u.tenant_id = @tenant
        WHERE ot.cliente_id = ? AND ot.tenant_id = @tenant
        ORDER BY ot.fecha_ingreso DESC`,
@@ -226,7 +226,7 @@ router.delete('/:id', async (req, res) => {
     await conn.query('DELETE FROM email_verify_codes WHERE cliente_id = ? AND tenant_id = @tenant', [id]);
 
     // Sus motos salen de los listados activos, pero siguen ligadas a las órdenes.
-    await conn.query('UPDATE motos SET activa = 0 WHERE cliente_id = ? AND tenant_id = @tenant', [id]);
+    await conn.query('UPDATE vehiculos SET activa = 0 WHERE cliente_id = ? AND tenant_id = @tenant', [id]);
 
     // nombre/apellido/telefono son NOT NULL: se reemplazan por un marcador.
     await conn.query(

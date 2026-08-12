@@ -130,7 +130,7 @@ app.use('/api/auth',      require('./routes/auth.routes'));
 app.use('/api/onboarding', require('./routes/onboarding.routes'));
 app.use('/api/marca',     require('./routes/marca.routes'));
 app.use('/api/clientes',  require('./routes/clientes.routes'));
-app.use('/api/motos',     require('./routes/motos.routes'));
+app.use('/api/vehiculos', require('./routes/vehiculos.routes'));
 app.use('/api/ordenes',   require('./routes/ordenes.routes'));
 app.use('/api/citas',     require('./routes/citas.routes'));
 app.use('/api/usuarios',  require('./routes/usuarios.routes'));

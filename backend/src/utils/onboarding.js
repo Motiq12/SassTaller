@@ -8,6 +8,32 @@
 // registrarse, así que su lugar natural es el alta, no el boot.
 const bcrypt = require('bcrypt');
 const { DEFAULTS } = require('./configuracion');
+const { normalizarTipos } = require('./tipos-vehiculo');
+
+// Servicios comunes a cualquier taller, y los propios de cada tipo. El taller los
+// edita después; esto es solo para que no abra el sistema con la lista vacía.
+const SERVICIOS_COMUNES = [
+  'Cambio de aceite y filtros',
+  'Revisión completa',
+  'Cambio de pastillas de freno',
+  'Diagnóstico electrónico',
+  'Cambio de neumáticos',
+  'Mantenimiento preventivo',
+  'Sistema eléctrico',
+  'Afinamiento',
+];
+
+const SERVICIOS_POR_TIPO = {
+  moto: ['Kit de transmisión (cadena y piñones)', 'Ajuste de frenos y suspensión'],
+  auto: ['Cambio de bujías', 'Alineado y balanceo', 'Cambio de correa de distribución', 'Recarga de aire acondicionado'],
+};
+
+function serviciosIniciales(tipos) {
+  const propios = tipos.flatMap(t => SERVICIOS_POR_TIPO[t] || []);
+  // 'Otro' va al final siempre: es la salida de emergencia cuando el trabajo no
+  // encaja en ninguna categoría, y arriba estorbaría.
+  return [...new Set([...SERVICIOS_COMUNES, ...propios]), 'Otro'];
+}
 
 // Slugs que no puede tomar un taller: son subdominios de infraestructura, y
 // dejarlos libres permitiría que alguien registre `api` o `www` y se quede con el
@@ -47,6 +73,9 @@ function motivoSlugInvalido(slug) {
 // `conn` debe ser una conexión con transacción ya abierta. Devuelve { tenantId, adminId }.
 async function crearTaller(conn, datos) {
   const { nombre, slug, plan = 'trial', admin, sucursal, contacto = {} } = datos;
+  // Tipos que atiende el taller. normalizarTipos nunca devuelve vacío: un taller sin
+  // ningún tipo no podría registrar vehículos.
+  const tipos = normalizarTipos(datos.tipos);
 
   const [tenant] = await conn.query(
     "INSERT INTO tenants (nombre, slug, plan, estado) VALUES (?, ?, ?, 'activo')",
@@ -67,14 +96,16 @@ async function crearTaller(conn, datos) {
     `INSERT INTO configuracion
        (tenant_id, id, nombre_taller, telefono, email, direccion,
         max_citas_hora, dias_anticipacion, duracion_cita_min, cancelacion_horas_min,
-        horarios, garantia_dias, metodos_pago, visitas_para_cortesia, zona_horaria_offset)
-     VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        horarios, garantia_dias, metodos_pago, visitas_para_cortesia, zona_horaria_offset,
+        tipos_vehiculo)
+     VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       tenantId, nombre, contacto.telefono || '', contacto.email || admin.email, contacto.direccion || '',
       DEFAULTS.max_citas_hora, DEFAULTS.dias_anticipacion, DEFAULTS.duracion_cita_min,
       DEFAULTS.cancelacion_horas_min, JSON.stringify(DEFAULTS.horarios),
       DEFAULTS.garantia_dias, JSON.stringify(DEFAULTS.metodos_pago),
       DEFAULTS.visitas_para_cortesia, DEFAULTS.zona_horaria_offset,
+      JSON.stringify(tipos),
     ]
   );
 
@@ -85,25 +116,17 @@ async function crearTaller(conn, datos) {
     [tenantId, sucursal?.nombre || nombre, sucursal?.direccion || contacto.direccion || null, sucursal?.telefono || contacto.telefono || null]
   );
 
-  // 4) Catálogo de servicios inicial, editable después desde el panel.
+  // 4) Catálogo de servicios inicial según lo que atiende, editable desde el panel.
+  //    Sembrar el catálogo entero a todos sería peor que no sembrar nada: un taller
+  //    de autos abriría el sistema y encontraría "Kit de transmisión (cadena y
+  //    piñones)" en su lista de servicios, y pensaría que el software no es para él.
+  const servicios = serviciosIniciales(tipos);
   await conn.query(
-    `INSERT INTO servicios (tenant_id, nombre, orden)
-     SELECT ?, v.nombre, v.orden FROM (
-                 SELECT 'Cambio de aceite y filtros' AS nombre, 1 AS orden
-       UNION ALL SELECT 'Revisión completa', 2
-       UNION ALL SELECT 'Cambio de pastillas de freno', 3
-       UNION ALL SELECT 'Kit de transmisión (cadena y piñones)', 4
-       UNION ALL SELECT 'Diagnóstico electrónico', 5
-       UNION ALL SELECT 'Cambio de neumáticos', 6
-       UNION ALL SELECT 'Mantenimiento preventivo', 7
-       UNION ALL SELECT 'Sistema eléctrico', 8
-       UNION ALL SELECT 'Afinamiento', 9
-       UNION ALL SELECT 'Otro', 99
-     ) v`,
-    [tenantId]
+    `INSERT INTO servicios (tenant_id, nombre, orden) VALUES ${servicios.map(() => '(?, ?, ?)').join(', ')}`,
+    servicios.flatMap((s, i) => [tenantId, s, i + 1])
   );
 
-  return { tenantId, adminId: usuario.insertId };
+  return { tenantId, adminId: usuario.insertId, tipos };
 }
 
 module.exports = { crearTaller, normalizarSlug, motivoSlugInvalido, SLUGS_RESERVADOS };

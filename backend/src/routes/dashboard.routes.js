@@ -114,7 +114,7 @@ router.get('/atrasos', async (req, res) => {
               c.nombre AS cliente_nombre, c.apellido AS cliente_apellido,
               t.nombre AS tecnico_nombre
        FROM ordenes_trabajo o
-       JOIN motos m    ON m.id = o.moto_id AND m.tenant_id = @tenant
+       JOIN vehiculos m    ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
        JOIN clientes c ON c.id = o.cliente_id AND c.tenant_id = @tenant
        LEFT JOIN usuarios t ON t.id = o.tecnico_id AND t.tenant_id = @tenant
        WHERE o.tenant_id = @tenant AND o.estado NOT IN ('entregada','cancelada')

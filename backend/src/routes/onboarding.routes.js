@@ -9,6 +9,7 @@ const { emailValido } = require('../utils/validar');
 const { consumir } = require('../utils/rate-limit');
 const { antibot } = require('../utils/antibot');
 const { crearTaller, normalizarSlug, motivoSlugInvalido } = require('../utils/onboarding');
+const { TIPOS } = require('../utils/tipos-vehiculo');
 
 const MIN_PASSWORD = 8;
 
@@ -31,6 +32,19 @@ router.get('/disponible', async (req, res) => {
   } catch (err) {
     fail(res, err);
   }
+});
+
+// GET /api/onboarding/tipos — catálogo de tipos de vehículo y sus campos propios.
+// Lo consumen el formulario de alta y el de vehículos. Va servido desde acá y no
+// duplicado en el frontend: con dos copias, agregar un tipo obligaría a acordarse
+// de tocar los dos lados, y el día que alguien se olvide el formulario pediría un
+// dato que el servidor descarta sin avisar.
+router.get('/tipos', (req, res) => {
+  res.json({
+    data: Object.entries(TIPOS).map(([clave, t]) => ({
+      clave, etiqueta: t.etiqueta, plural: t.plural, unidadUso: t.unidadUso, campos: t.campos,
+    })),
+  });
 });
 
 // POST /api/onboarding — da de alta un taller y devuelve la sesión de su admin.
@@ -79,7 +93,7 @@ router.post('/', antibot(), async (req, res) => {
       return res.status(409).json({ error: 'Ese identificador ya está en uso' });
     }
 
-    const { tenantId, adminId } = await crearTaller(conn, {
+    const { tenantId, adminId, tipos } = await crearTaller(conn, {
       nombre: String(nombre).trim(),
       slug,
       admin: {
@@ -89,6 +103,7 @@ router.post('/', antibot(), async (req, res) => {
         telefono: admin.telefono,
       },
       sucursal,
+      tipos: req.body.tipos,
       contacto,
     });
 
@@ -103,7 +118,7 @@ router.post('/', antibot(), async (req, res) => {
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '8h' });
 
     res.status(201).json({
-      data: { token, tipo: 'staff', usuario: payload, taller: { id: tenantId, nombre, slug } },
+      data: { token, tipo: 'staff', usuario: payload, taller: { id: tenantId, nombre, slug, tipos } },
       message: 'Taller creado',
     });
   } catch (err) {

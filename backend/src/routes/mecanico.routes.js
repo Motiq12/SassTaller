@@ -27,7 +27,7 @@ const SELECT_CITA = `
          m.marca, m.modelo, m.placa,
          c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.telefono AS cliente_telefono
   FROM citas ci
-  LEFT JOIN motos m    ON m.id = ci.moto_id
+  LEFT JOIN vehiculos m    ON m.id = ci.vehiculo_id
   JOIN clientes c      ON c.id = ci.cliente_id
   LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id`;
 
@@ -420,7 +420,7 @@ router.get('/alertas', async (req, res) => {
               DATE_FORMAT(ci.fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(ci.hora, '%H:%i') AS hora,
               ci.tipo_servicio, m.marca, m.modelo
        FROM citas ci
-       LEFT JOIN motos m ON m.id = ci.moto_id AND m.tenant_id = @tenant
+       LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant
        WHERE ci.tenant_id = @tenant AND ci.tecnico_id = ? AND ci.created_at >= NOW() - INTERVAL 24 HOUR
        ORDER BY ci.created_at DESC LIMIT 10`,
       [yo]
@@ -430,7 +430,7 @@ router.get('/alertas', async (req, res) => {
               o.numero_orden, o.id AS orden_id, o.estado,
               o.aprobacion_cliente, m.marca, m.modelo
        FROM ordenes_trabajo o
-       JOIN motos m ON m.id = o.moto_id AND m.tenant_id = @tenant
+       JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
        WHERE o.tenant_id = @tenant AND o.tecnico_id = ? AND o.updated_at >= NOW() - INTERVAL 24 HOUR
          AND o.estado NOT IN ('recepcion')
        ORDER BY o.updated_at DESC LIMIT 10`,

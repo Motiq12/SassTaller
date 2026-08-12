@@ -49,7 +49,7 @@ async function ensureSchema() {
     // Fotos del portal (data URL base64, igual que orden_fotos/promos): avatar del
     // cliente y foto de cada moto. MEDIUMTEXT aguanta imágenes comprimidas (~16 MB máx).
     await addColumnIfMissing('clientes', 'foto', 'MEDIUMTEXT NULL');
-    await addColumnIfMissing('motos', 'foto', 'MEDIUMTEXT NULL');
+    await addColumnIfMissing('vehiculos', 'foto', 'MEDIUMTEXT NULL');
 
     // Preferencias de notificación por cliente (el cliente decide si quiere recibirlas).
     // notif_avances: avisos de cambio de estado de sus servicios (aplicado hoy).
@@ -282,22 +282,22 @@ async function ensureSchema() {
     // (sin espacios/guiones, mayúsculas) + índice único. Se guarda cada paso por
     // separado para que, si hay placas duplicadas heredadas, el índice falle sin
     // abortar el resto de la migración (la validación de la app sigue cubriendo).
-    await tryStep('motos.placa_norm', () =>
+    await tryStep('vehiculos.placa_norm', () =>
       addColumnIfMissing(
-        'motos', 'placa_norm',
+        'vehiculos', 'placa_norm',
         "VARCHAR(32) AS (UPPER(REPLACE(REPLACE(placa,' ',''),'-',''))) STORED"
       )
     );
     // La placa es única DENTRO de cada taller, no en todo el SaaS: que otro taller
     // atienda esa moto no es asunto de este. El índice global anterior
-    // (uq_motos_placa_norm) se elimina si sobrevive de una versión previa —si no,
+    // (uq_vehiculos_placa_norm) se elimina si sobrevive de una versión previa —si no,
     // este mismo arranque volvería a imponer unicidad entre talleres y el segundo
     // que registre la placa recibiría un choque que no le corresponde.
-    await tryStep('uq_motos_tenant', () =>
-      crearIndiceSiFalta('motos', 'uq_motos_tenant', '(tenant_id, placa_norm)', { unico: true })
+    await tryStep('uq_vehiculos_tenant', () =>
+      crearIndiceSiFalta('vehiculos', 'uq_vehiculos_tenant', '(tenant_id, placa_norm)', { unico: true })
     );
-    await tryStep('quitar uq_motos_placa_norm global', () =>
-      borrarIndiceSiExiste('motos', 'uq_motos_placa_norm')
+    await tryStep('quitar uq_vehiculos_placa_norm global', () =>
+      borrarIndiceSiExiste('vehiculos', 'uq_vehiculos_placa_norm')
     );
 
     // Panel del mecánico v2: perfil profesional (lo edita el propio técnico).

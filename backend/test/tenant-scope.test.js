@@ -15,7 +15,7 @@ const RUTAS = path.join(__dirname, '../src/routes');
 
 const YA_MIGRADOS = [
   'clientes.routes.js',
-  'motos.routes.js',
+  'vehiculos.routes.js',
   'recepcion.routes.js',
   'portal.routes.js',
   'ordenes.routes.js',

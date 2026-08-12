@@ -30,7 +30,7 @@ async function enviarRecordatorios() {
               s.nombre AS sucursal
        FROM citas ci
        JOIN clientes cl ON cl.id = ci.cliente_id AND cl.tenant_id = @tenant
-       LEFT JOIN motos m ON m.id = ci.moto_id AND m.tenant_id = @tenant
+       LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant
        LEFT JOIN sucursales s ON s.id = ci.sucursal_id AND s.tenant_id = @tenant
        WHERE ci.fecha = ? AND ci.estado = 'agendado' AND ci.recordatorio_enviado = 0
          AND ci.tenant_id = @tenant`,
