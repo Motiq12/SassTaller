@@ -36,10 +36,11 @@ export class MotiqPanelPage implements OnInit {
   busqueda = '';
   private escribiendo$ = new Subject<string>();
 
-  // Los mismos que acepta el backend (PLANES en motiq.routes.js). Tenía cuatro y dos
-  // no existían allá: elegirlos daba error 400. Mientras el plan no limite nada de
-  // verdad, inventar escalones acá es prometer algo que el sistema no cumple.
-  readonly PLANES = ['trial', 'pro'];
+  // Espejo de PLANES en backend/src/utils/limites.js, que es la única fuente de
+  // verdad. Si acá aparece uno que allá no existe, el backend responde 400; y si
+  // falta uno, desde el panel no se puede mover un taller a ese plan — que es lo que
+  // pasaba con "gratis", justo el plan al que caen solos al vencer la prueba.
+  readonly PLANES = ['trial', 'gratis', 'pro'];
 
   constructor(
     private motiq: MotiqService,
@@ -246,7 +247,7 @@ export class MotiqPanelPage implements OnInit {
   }
 
   rotuloPlan(p: string): string {
-    return { trial: 'Prueba', basico: 'Básico', pro: 'Pro', enterprise: 'Enterprise' }[p] || p;
+    return { trial: 'Prueba', gratis: 'Gratis', pro: 'Pro' }[p] || p;
   }
 
   colorEstado(e: string): string {
