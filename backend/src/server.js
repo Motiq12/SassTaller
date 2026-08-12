@@ -8,6 +8,7 @@ const { testConnection } = require('./db/pool');
 const { ensureSchema } = require('./db/auto-migrate');
 const { verificarListaContraEsquema } = require('./db/tenant-db');
 const { iniciarJobs } = require('./jobs/scheduler');
+const { iniciarRefrescoEstados } = require('./utils/estado-tenant');
 const { apiLimiter, authLimiter, adminLimiter } = require('./middleware/rate-limit');
 
 const app = express();
@@ -128,6 +129,7 @@ app.use('/api/admin', adminLimiter);
 
 app.use('/api/auth',      require('./routes/auth.routes'));
 app.use('/api/onboarding', require('./routes/onboarding.routes'));
+app.use('/api/motiq',     require('./routes/motiq.routes'));
 app.use('/api/marca',     require('./routes/marca.routes'));
 app.use('/api/clientes',  require('./routes/clientes.routes'));
 app.use('/api/vehiculos', require('./routes/vehiculos.routes'));
@@ -194,6 +196,10 @@ const correrJobs = bajoCluster ? process.env.JOBS === '1' : true;
   // del guard (o al revés). Sin esto, una tabla nueva pasaría sin filtro por tenant
   // y el guard la dejaría entrar sin quejarse.
   await verificarListaContraEsquema();
+  // Qué talleres están suspendidos, en memoria y antes de escuchar: los middlewares
+  // lo consultan en cada request y no puede haber una ventana donde uno suspendido
+  // trabaje porque la foto todavía no cargó.
+  await iniciarRefrescoEstados();
   // Tareas de fondo (recordatorios de cita, no-show). Después de migrar, para que
   // las columnas que usan (recordatorio_enviado, no_show) ya existan.
   // Solo un proceso las programa: si no, cada cliente recibiría un correo por worker.

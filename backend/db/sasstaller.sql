@@ -111,7 +111,7 @@ CREATE TABLE `clientes` (
   KEY `idx_clientes_activo_nombre` (`activo`,`nombre`,`apellido`),
   KEY `idx_clientes_tenant` (`tenant_id`),
   CONSTRAINT `fk_clientes_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=35 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -120,7 +120,7 @@ CREATE TABLE `clientes` (
 
 LOCK TABLES `clientes` WRITE;
 /*!40000 ALTER TABLE `clientes` DISABLE KEYS */;
-INSERT INTO `clientes` (`id`, `nombre`, `apellido`, `telefono`, `email`, `cedula`, `direccion`, `password_hash`, `visitas`, `cortesia_disponible`, `notif_avances`, `notif_recordatorios`, `activo`, `created_at`, `updated_at`, `foto`, `email_verificado`, `email_pendiente`, `tenant_id`) VALUES (1,'Cliente','DelUno','111-1111',NULL,NULL,NULL,NULL,0,0,1,1,1,'2026-08-12 01:46:08','2026-08-12 01:46:08',NULL,1,NULL,1),(2,'Cliente','DelDos','222-2222',NULL,NULL,NULL,NULL,0,0,1,1,1,'2026-08-12 01:46:08','2026-08-12 01:46:08',NULL,1,NULL,2);
+INSERT INTO `clientes` (`id`, `nombre`, `apellido`, `telefono`, `email`, `cedula`, `direccion`, `password_hash`, `visitas`, `cortesia_disponible`, `notif_avances`, `notif_recordatorios`, `activo`, `created_at`, `updated_at`, `foto`, `email_verificado`, `email_pendiente`, `tenant_id`) VALUES (1,'Cliente','DelUno','111-1111',NULL,NULL,NULL,NULL,0,0,1,1,1,'2026-08-12 01:46:08','2026-08-12 01:46:08',NULL,1,NULL,1),(2,'Cliente','DelDos','222-2222',NULL,NULL,NULL,NULL,0,0,1,1,1,'2026-08-12 01:46:08','2026-08-12 01:46:08',NULL,1,NULL,2),(32,'Cliente','Autos','8888-7777',NULL,'1-2222-3333',NULL,NULL,0,0,1,1,1,'2026-08-12 17:54:49','2026-08-12 17:54:49',NULL,1,NULL,36),(33,'Ana','Uno','8888-1111','cliente-1786557361919@t.com','1-2222-3333',NULL,'$2b$10$KPp0s9ggMXn4MOjS.WoeQu4u8QEiP5yWCmZxhF1PGLrsVlBDhnlQG',0,0,1,1,1,'2026-08-12 17:56:02','2026-08-12 17:56:02',NULL,1,NULL,1),(34,'Ana','Dos','8888-2222','cliente-1786557361919@t.com','1-2222-3333',NULL,'$2b$10$Yg7X/bHUL7tSUtt7YqIE8OU7xMSml.3ZAbeE773KpZW.bOpfld8vG',0,0,1,1,1,'2026-08-12 17:56:02','2026-08-12 17:56:02',NULL,1,NULL,2);
 /*!40000 ALTER TABLE `clientes` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -154,7 +154,7 @@ CREATE TABLE `configuracion` (
   `metodos_pago` json DEFAULT NULL,
   `tenant_id` int NOT NULL,
   `tipos_vehiculo` json DEFAULT NULL COMMENT 'Tipos que atiende el taller, ej. ["moto","auto"]',
-  `color_primario` varchar(7) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Color de marca del taller en hex (#rrggbb). NULL = por defecto',
+  `color_primario` varchar(7) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Color de marca del taller en hex (#rrggbb). NULL = por defecto',
   PRIMARY KEY (`tenant_id`,`id`),
   KEY `idx_configuracion_tenant` (`tenant_id`),
   CONSTRAINT `fk_configuracion_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
@@ -167,7 +167,7 @@ CREATE TABLE `configuracion` (
 
 LOCK TABLES `configuracion` WRITE;
 /*!40000 ALTER TABLE `configuracion` DISABLE KEYS */;
-INSERT INTO `configuracion` (`id`, `nombre_taller`, `telefono`, `email`, `direccion`, `logo`, `max_citas_hora`, `dias_anticipacion`, `duracion_cita_min`, `horarios`, `notif_estado`, `notif_recordatorio`, `notif_cotizacion`, `notif_email_entrega`, `updated_at`, `cancelacion_horas_min`, `visitas_para_cortesia`, `zona_horaria_offset`, `garantia_dias`, `metodos_pago`, `tenant_id`, `tipos_vehiculo`, `color_primario`) VALUES (1,'MS Motos','','','',NULL,2,30,90,'[{\"dia\": 0, \"abre\": \"08:00\", \"activo\": 0, \"cierra\": \"13:00\"}, {\"dia\": 1, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 2, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 3, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 4, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 5, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 6, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"13:00\"}]',1,1,1,0,'2026-08-12 06:09:57',2,7,-6,30,NULL,1,'[\"moto\"]','#e11d48');
+INSERT INTO `configuracion` (`id`, `nombre_taller`, `telefono`, `email`, `direccion`, `logo`, `max_citas_hora`, `dias_anticipacion`, `duracion_cita_min`, `horarios`, `notif_estado`, `notif_recordatorio`, `notif_cotizacion`, `notif_email_entrega`, `updated_at`, `cancelacion_horas_min`, `visitas_para_cortesia`, `zona_horaria_offset`, `garantia_dias`, `metodos_pago`, `tenant_id`, `tipos_vehiculo`, `color_primario`) VALUES (1,'MS Motos','','','',NULL,2,30,90,'[{\"dia\": 0, \"abre\": \"08:00\", \"activo\": 0, \"cierra\": \"13:00\"}, {\"dia\": 1, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 2, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 3, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 4, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 5, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 6, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"13:00\"}]',1,1,1,0,'2026-08-12 06:09:57',2,7,-6,30,NULL,1,'[\"moto\"]','#e11d48'),(1,'Autos Premium',NULL,'marca-289201@t.com',NULL,NULL,2,30,90,'[{\"dia\": 0, \"abre\": \"08:00\", \"activo\": 0, \"cierra\": \"13:00\"}, {\"dia\": 1, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 2, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 3, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 4, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 5, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 6, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"13:00\"}]',1,1,1,0,'2026-08-12 17:54:49',2,7,-6,30,'[{\"valor\": \"efectivo\", \"etiqueta\": \"Efectivo\"}, {\"valor\": \"sinpe\", \"etiqueta\": \"SINPE Móvil\"}, {\"valor\": \"tarjeta\", \"etiqueta\": \"Tarjeta\"}, {\"valor\": \"transferencia\", \"etiqueta\": \"Transferencia\"}]',35,'[\"auto\"]','#0f766e'),(1,'Taller Solo Autos','','duenio-autos-289722@t.com','',NULL,2,30,90,'[{\"dia\": 0, \"abre\": \"08:00\", \"activo\": 0, \"cierra\": \"13:00\"}, {\"dia\": 1, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 2, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 3, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 4, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 5, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 6, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"13:00\"}]',1,1,1,0,'2026-08-12 17:54:49',2,7,-6,30,'[{\"valor\": \"efectivo\", \"etiqueta\": \"Efectivo\"}, {\"valor\": \"sinpe\", \"etiqueta\": \"SINPE Móvil\"}, {\"valor\": \"tarjeta\", \"etiqueta\": \"Tarjeta\"}, {\"valor\": \"transferencia\", \"etiqueta\": \"Transferencia\"}]',36,'[\"auto\"]',NULL),(1,'Taller Prueba','2222-0000','duenio-290086@t.com','Calle Falsa 123',NULL,2,30,90,'[{\"dia\": 0, \"abre\": \"08:00\", \"activo\": 0, \"cierra\": \"13:00\"}, {\"dia\": 1, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 2, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 3, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 4, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 5, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 6, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"13:00\"}]',1,1,1,0,'2026-08-12 17:54:50',2,7,-6,30,'[{\"valor\": \"efectivo\", \"etiqueta\": \"Efectivo\"}, {\"valor\": \"sinpe\", \"etiqueta\": \"SINPE Móvil\"}, {\"valor\": \"tarjeta\", \"etiqueta\": \"Tarjeta\"}, {\"valor\": \"transferencia\", \"etiqueta\": \"Transferencia\"}]',37,'[\"moto\"]',NULL),(1,'Taller Prueba','2222-0000','duenio-314640@t.com','Calle Falsa 123',NULL,2,30,90,'[{\"dia\": 0, \"abre\": \"08:00\", \"activo\": 0, \"cierra\": \"13:00\"}, {\"dia\": 1, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 2, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 3, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 4, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 5, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 6, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"13:00\"}]',1,1,1,0,'2026-08-12 17:55:14',2,7,-6,30,'[{\"valor\": \"efectivo\", \"etiqueta\": \"Efectivo\"}, {\"valor\": \"sinpe\", \"etiqueta\": \"SINPE Móvil\"}, {\"valor\": \"tarjeta\", \"etiqueta\": \"Tarjeta\"}, {\"valor\": \"transferencia\", \"etiqueta\": \"Transferencia\"}]',38,'[\"moto\"]',NULL),(1,'Autos Web 451627','','autos-web-451627@t.com','',NULL,2,30,90,'[{\"dia\": 0, \"abre\": \"08:00\", \"activo\": 0, \"cierra\": \"13:00\"}, {\"dia\": 1, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 2, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 3, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 4, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 5, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 6, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"13:00\"}]',1,1,1,0,'2026-08-12 17:57:43',2,7,-6,30,'[{\"valor\": \"efectivo\", \"etiqueta\": \"Efectivo\"}, {\"valor\": \"sinpe\", \"etiqueta\": \"SINPE Móvil\"}, {\"valor\": \"tarjeta\", \"etiqueta\": \"Tarjeta\"}, {\"valor\": \"transferencia\", \"etiqueta\": \"Transferencia\"}]',39,'[\"auto\"]',NULL);
 /*!40000 ALTER TABLE `configuracion` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -193,7 +193,7 @@ CREATE TABLE `email_verify_codes` (
   KEY `idx_email_verify_codes_tenant` (`tenant_id`),
   CONSTRAINT `email_verify_codes_ibfk_1` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`),
   CONSTRAINT `fk_email_verify_codes_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=21 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -202,6 +202,7 @@ CREATE TABLE `email_verify_codes` (
 
 LOCK TABLES `email_verify_codes` WRITE;
 /*!40000 ALTER TABLE `email_verify_codes` DISABLE KEYS */;
+INSERT INTO `email_verify_codes` (`id`, `cliente_id`, `code_hash`, `expires_at`, `used`, `attempts`, `created_at`, `proposito`, `tenant_id`) VALUES (21,33,'$2b$10$FQGblzONyjkfhTb9WvpksuKUUuVUg95cnsAdvShCJbZ7crnXDmv3e','2026-08-12 12:06:02',0,0,'2026-08-12 17:56:02','registro',1),(22,34,'$2b$10$NSlpSv84jSxu.ts9vJJR.u3kwQUdBlITJN/6ON2TkRkRrIB7QJFD2','2026-08-12 12:06:02',0,0,'2026-08-12 17:56:02','registro',2);
 /*!40000 ALTER TABLE `email_verify_codes` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -713,6 +714,37 @@ LOCK TABLES `password_reset_codes` WRITE;
 UNLOCK TABLES;
 
 --
+-- Table structure for table `plataforma_admins`
+--
+
+DROP TABLE IF EXISTS `plataforma_admins`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `plataforma_admins` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `email` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `password_hash` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `activo` tinyint(1) NOT NULL DEFAULT '1',
+  `ultimo_acceso` datetime DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_plataforma_email` (`email`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `plataforma_admins`
+--
+
+LOCK TABLES `plataforma_admins` WRITE;
+/*!40000 ALTER TABLE `plataforma_admins` DISABLE KEYS */;
+-- (las cuentas de Motiq no se exportan: creá la tuya con `npm run motiq:admin`)
+/*!40000 ALTER TABLE `plataforma_admins` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `promos`
 --
 
@@ -798,7 +830,7 @@ CREATE TABLE `servicios` (
   UNIQUE KEY `uq_servicios_tenant` (`tenant_id`,`nombre`),
   KEY `idx_servicios_tenant` (`tenant_id`),
   CONSTRAINT `fk_servicios_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=516 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=588 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -807,7 +839,7 @@ CREATE TABLE `servicios` (
 
 LOCK TABLES `servicios` WRITE;
 /*!40000 ALTER TABLE `servicios` DISABLE KEYS */;
-INSERT INTO `servicios` (`id`, `nombre`, `activo`, `orden`, `created_at`, `updated_at`, `tenant_id`) VALUES (1,'Cambio de aceite y filtros',1,1,'2026-08-11 23:49:09','2026-08-11 23:49:09',1),(2,'Revisión completa',1,2,'2026-08-11 23:49:09','2026-08-11 23:49:09',1),(3,'Cambio de pastillas de freno',1,3,'2026-08-11 23:49:09','2026-08-11 23:49:09',1),(4,'Kit de transmisión (cadena y piñones)',1,4,'2026-08-11 23:49:09','2026-08-11 23:49:09',1),(5,'Diagnóstico electrónico',1,5,'2026-08-11 23:49:09','2026-08-11 23:49:09',1),(6,'Cambio de neumáticos',1,6,'2026-08-11 23:49:09','2026-08-11 23:49:09',1),(7,'Mantenimiento preventivo',1,7,'2026-08-11 23:49:09','2026-08-11 23:49:09',1),(8,'Sistema eléctrico',1,8,'2026-08-11 23:49:09','2026-08-11 23:49:09',1),(9,'Afinamiento',1,9,'2026-08-11 23:49:09','2026-08-11 23:49:09',1),(10,'Otro',1,99,'2026-08-11 23:49:09','2026-08-11 23:49:09',1),(42,'Cambio de aceite y filtros',1,1,'2026-08-12 02:09:32','2026-08-12 02:09:32',2),(43,'Revisión completa',1,2,'2026-08-12 02:09:32','2026-08-12 02:09:32',2),(44,'Cambio de pastillas de freno',1,3,'2026-08-12 02:09:32','2026-08-12 02:09:32',2),(45,'Kit de transmisión (cadena y piñones)',1,4,'2026-08-12 02:09:32','2026-08-12 02:09:32',2),(46,'Diagnóstico electrónico',1,5,'2026-08-12 02:09:32','2026-08-12 02:09:32',2),(47,'Cambio de neumáticos',1,6,'2026-08-12 02:09:32','2026-08-12 02:09:32',2),(48,'Mantenimiento preventivo',1,7,'2026-08-12 02:09:32','2026-08-12 02:09:32',2),(49,'Sistema eléctrico',1,8,'2026-08-12 02:09:32','2026-08-12 02:09:32',2),(50,'Afinamiento',1,9,'2026-08-12 02:09:32','2026-08-12 02:09:32',2),(51,'Otro',1,99,'2026-08-12 02:09:32','2026-08-12 02:09:32',2);
+INSERT INTO `servicios` (`id`, `nombre`, `activo`, `orden`, `created_at`, `updated_at`, `tenant_id`) VALUES (1,'Cambio de aceite y filtros',1,1,'2026-08-11 23:49:09','2026-08-11 23:49:09',1),(2,'Revisión completa',1,2,'2026-08-11 23:49:09','2026-08-11 23:49:09',1),(3,'Cambio de pastillas de freno',1,3,'2026-08-11 23:49:09','2026-08-11 23:49:09',1),(4,'Kit de transmisión (cadena y piñones)',1,4,'2026-08-11 23:49:09','2026-08-11 23:49:09',1),(5,'Diagnóstico electrónico',1,5,'2026-08-11 23:49:09','2026-08-11 23:49:09',1),(6,'Cambio de neumáticos',1,6,'2026-08-11 23:49:09','2026-08-11 23:49:09',1),(7,'Mantenimiento preventivo',1,7,'2026-08-11 23:49:09','2026-08-11 23:49:09',1),(8,'Sistema eléctrico',1,8,'2026-08-11 23:49:09','2026-08-11 23:49:09',1),(9,'Afinamiento',1,9,'2026-08-11 23:49:09','2026-08-11 23:49:09',1),(10,'Otro',1,99,'2026-08-11 23:49:09','2026-08-11 23:49:09',1),(42,'Cambio de aceite y filtros',1,1,'2026-08-12 02:09:32','2026-08-12 02:09:32',2),(43,'Revisión completa',1,2,'2026-08-12 02:09:32','2026-08-12 02:09:32',2),(44,'Cambio de pastillas de freno',1,3,'2026-08-12 02:09:32','2026-08-12 02:09:32',2),(45,'Kit de transmisión (cadena y piñones)',1,4,'2026-08-12 02:09:32','2026-08-12 02:09:32',2),(46,'Diagnóstico electrónico',1,5,'2026-08-12 02:09:32','2026-08-12 02:09:32',2),(47,'Cambio de neumáticos',1,6,'2026-08-12 02:09:32','2026-08-12 02:09:32',2),(48,'Mantenimiento preventivo',1,7,'2026-08-12 02:09:32','2026-08-12 02:09:32',2),(49,'Sistema eléctrico',1,8,'2026-08-12 02:09:32','2026-08-12 02:09:32',2),(50,'Afinamiento',1,9,'2026-08-12 02:09:32','2026-08-12 02:09:32',2),(51,'Otro',1,99,'2026-08-12 02:09:32','2026-08-12 02:09:32',2),(521,'Cambio de aceite y filtros',1,1,'2026-08-12 17:54:49','2026-08-12 17:54:49',35),(522,'Revisión completa',1,2,'2026-08-12 17:54:49','2026-08-12 17:54:49',35),(523,'Cambio de pastillas de freno',1,3,'2026-08-12 17:54:49','2026-08-12 17:54:49',35),(524,'Diagnóstico electrónico',1,4,'2026-08-12 17:54:49','2026-08-12 17:54:49',35),(525,'Cambio de neumáticos',1,5,'2026-08-12 17:54:49','2026-08-12 17:54:49',35),(526,'Mantenimiento preventivo',1,6,'2026-08-12 17:54:49','2026-08-12 17:54:49',35),(527,'Sistema eléctrico',1,7,'2026-08-12 17:54:49','2026-08-12 17:54:49',35),(528,'Afinamiento',1,8,'2026-08-12 17:54:49','2026-08-12 17:54:49',35),(529,'Cambio de bujías',1,9,'2026-08-12 17:54:49','2026-08-12 17:54:49',35),(530,'Alineado y balanceo',1,10,'2026-08-12 17:54:49','2026-08-12 17:54:49',35),(531,'Cambio de correa de distribución',1,11,'2026-08-12 17:54:49','2026-08-12 17:54:49',35),(532,'Recarga de aire acondicionado',1,12,'2026-08-12 17:54:49','2026-08-12 17:54:49',35),(533,'Otro',1,13,'2026-08-12 17:54:49','2026-08-12 17:54:49',35),(534,'Cambio de aceite y filtros',1,1,'2026-08-12 17:54:49','2026-08-12 17:54:49',36),(535,'Revisión completa',1,2,'2026-08-12 17:54:49','2026-08-12 17:54:49',36),(536,'Cambio de pastillas de freno',1,3,'2026-08-12 17:54:49','2026-08-12 17:54:49',36),(537,'Diagnóstico electrónico',1,4,'2026-08-12 17:54:49','2026-08-12 17:54:49',36),(538,'Cambio de neumáticos',1,5,'2026-08-12 17:54:49','2026-08-12 17:54:49',36),(539,'Mantenimiento preventivo',1,6,'2026-08-12 17:54:49','2026-08-12 17:54:49',36),(540,'Sistema eléctrico',1,7,'2026-08-12 17:54:49','2026-08-12 17:54:49',36),(541,'Afinamiento',1,8,'2026-08-12 17:54:49','2026-08-12 17:54:49',36),(542,'Cambio de bujías',1,9,'2026-08-12 17:54:49','2026-08-12 17:54:49',36),(543,'Alineado y balanceo',1,10,'2026-08-12 17:54:49','2026-08-12 17:54:49',36),(544,'Cambio de correa de distribución',1,11,'2026-08-12 17:54:49','2026-08-12 17:54:49',36),(545,'Recarga de aire acondicionado',1,12,'2026-08-12 17:54:49','2026-08-12 17:54:49',36),(546,'Otro',1,13,'2026-08-12 17:54:49','2026-08-12 17:54:49',36),(547,'Cambio de aceite y filtros',1,1,'2026-08-12 17:54:50','2026-08-12 17:54:50',37),(548,'Revisión completa',1,2,'2026-08-12 17:54:50','2026-08-12 17:54:50',37),(549,'Cambio de pastillas de freno',1,3,'2026-08-12 17:54:50','2026-08-12 17:54:50',37),(550,'Diagnóstico electrónico',1,4,'2026-08-12 17:54:50','2026-08-12 17:54:50',37),(551,'Cambio de neumáticos',1,5,'2026-08-12 17:54:50','2026-08-12 17:54:50',37),(552,'Mantenimiento preventivo',1,6,'2026-08-12 17:54:50','2026-08-12 17:54:50',37),(553,'Sistema eléctrico',1,7,'2026-08-12 17:54:50','2026-08-12 17:54:50',37),(554,'Afinamiento',1,8,'2026-08-12 17:54:50','2026-08-12 17:54:50',37),(555,'Kit de transmisión (cadena y piñones)',1,9,'2026-08-12 17:54:50','2026-08-12 17:54:50',37),(556,'Ajuste de frenos y suspensión',1,10,'2026-08-12 17:54:50','2026-08-12 17:54:50',37),(557,'Otro',1,11,'2026-08-12 17:54:50','2026-08-12 17:54:50',37),(558,'Kit de transmisión (cadena y piñones)',1,4,'2026-08-12 17:55:04','2026-08-12 17:55:04',36),(559,'Kit de transmisión (cadena y piñones)',1,4,'2026-08-12 17:55:04','2026-08-12 17:55:04',35),(561,'Cambio de aceite y filtros',1,1,'2026-08-12 17:55:14','2026-08-12 17:55:14',38),(562,'Revisión completa',1,2,'2026-08-12 17:55:14','2026-08-12 17:55:14',38),(563,'Cambio de pastillas de freno',1,3,'2026-08-12 17:55:14','2026-08-12 17:55:14',38),(564,'Diagnóstico electrónico',1,4,'2026-08-12 17:55:14','2026-08-12 17:55:14',38),(565,'Cambio de neumáticos',1,5,'2026-08-12 17:55:14','2026-08-12 17:55:14',38),(566,'Mantenimiento preventivo',1,6,'2026-08-12 17:55:14','2026-08-12 17:55:14',38),(567,'Sistema eléctrico',1,7,'2026-08-12 17:55:14','2026-08-12 17:55:14',38),(568,'Afinamiento',1,8,'2026-08-12 17:55:14','2026-08-12 17:55:14',38),(569,'Kit de transmisión (cadena y piñones)',1,9,'2026-08-12 17:55:14','2026-08-12 17:55:14',38),(570,'Ajuste de frenos y suspensión',1,10,'2026-08-12 17:55:14','2026-08-12 17:55:14',38),(571,'Otro',1,11,'2026-08-12 17:55:14','2026-08-12 17:55:14',38),(575,'Cambio de aceite y filtros',1,1,'2026-08-12 17:57:43','2026-08-12 17:57:43',39),(576,'Revisión completa',1,2,'2026-08-12 17:57:43','2026-08-12 17:57:43',39),(577,'Cambio de pastillas de freno',1,3,'2026-08-12 17:57:43','2026-08-12 17:57:43',39),(578,'Diagnóstico electrónico',1,4,'2026-08-12 17:57:43','2026-08-12 17:57:43',39),(579,'Cambio de neumáticos',1,5,'2026-08-12 17:57:43','2026-08-12 17:57:43',39),(580,'Mantenimiento preventivo',1,6,'2026-08-12 17:57:43','2026-08-12 17:57:43',39),(581,'Sistema eléctrico',1,7,'2026-08-12 17:57:43','2026-08-12 17:57:43',39),(582,'Afinamiento',1,8,'2026-08-12 17:57:43','2026-08-12 17:57:43',39),(583,'Cambio de bujías',1,9,'2026-08-12 17:57:43','2026-08-12 17:57:43',39),(584,'Alineado y balanceo',1,10,'2026-08-12 17:57:43','2026-08-12 17:57:43',39),(585,'Cambio de correa de distribución',1,11,'2026-08-12 17:57:43','2026-08-12 17:57:43',39),(586,'Recarga de aire acondicionado',1,12,'2026-08-12 17:57:43','2026-08-12 17:57:43',39),(587,'Otro',1,13,'2026-08-12 17:57:43','2026-08-12 17:57:43',39);
 /*!40000 ALTER TABLE `servicios` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -831,7 +863,7 @@ CREATE TABLE `sucursales` (
   PRIMARY KEY (`id`),
   KEY `idx_sucursales_tenant` (`tenant_id`),
   CONSTRAINT `fk_sucursales_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=35 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=40 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -840,7 +872,7 @@ CREATE TABLE `sucursales` (
 
 LOCK TABLES `sucursales` WRITE;
 /*!40000 ALTER TABLE `sucursales` DISABLE KEYS */;
-INSERT INTO `sucursales` (`id`, `nombre`, `direccion`, `telefono`, `activa`, `orden`, `created_at`, `updated_at`, `tenant_id`) VALUES (1,'Liberia',NULL,NULL,1,1,'2026-08-11 23:48:52','2026-08-11 23:48:52',1),(2,'Cañas',NULL,NULL,1,2,'2026-08-11 23:48:52','2026-08-11 23:48:52',1);
+INSERT INTO `sucursales` (`id`, `nombre`, `direccion`, `telefono`, `activa`, `orden`, `created_at`, `updated_at`, `tenant_id`) VALUES (1,'Liberia',NULL,NULL,1,1,'2026-08-11 23:48:52','2026-08-11 23:48:52',1),(2,'Cañas',NULL,NULL,1,2,'2026-08-11 23:48:52','2026-08-11 23:48:52',1),(35,'Autos Premium',NULL,NULL,1,1,'2026-08-12 17:54:49','2026-08-12 17:54:49',35),(36,'Taller Solo Autos',NULL,NULL,1,1,'2026-08-12 17:54:49','2026-08-12 17:54:49',36),(37,'Sede Central','Calle Falsa 123','2222-0000',1,1,'2026-08-12 17:54:50','2026-08-12 17:54:50',37),(38,'Sede Central','Calle Falsa 123','2222-0000',1,1,'2026-08-12 17:55:14','2026-08-12 17:55:14',38),(39,'Autos Web 451627',NULL,NULL,1,1,'2026-08-12 17:57:43','2026-08-12 17:57:43',39);
 /*!40000 ALTER TABLE `sucursales` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -890,15 +922,18 @@ DROP TABLE IF EXISTS `tenants`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `tenants` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `nombre` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `slug` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'subdominio/identificador publico',
-  `plan` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'trial',
-  `estado` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'activo' COMMENT 'activo|suspendido|cancelado',
+  `nombre` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `slug` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'subdominio/identificador publico',
+  `plan` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'trial',
+  `estado` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'activo' COMMENT 'activo|suspendido|cancelado',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `motivo_estado` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Por que se suspendio o reactivo (lo escribe el admin de Motiq)',
+  `trial_hasta` date DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_tenant_slug` (`slug`)
-) ENGINE=InnoDB AUTO_INCREMENT=35 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  UNIQUE KEY `uq_tenant_slug` (`slug`),
+  KEY `idx_tenants_estado` (`estado`)
+) ENGINE=InnoDB AUTO_INCREMENT=40 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -907,7 +942,7 @@ CREATE TABLE `tenants` (
 
 LOCK TABLES `tenants` WRITE;
 /*!40000 ALTER TABLE `tenants` DISABLE KEYS */;
-INSERT INTO `tenants` (`id`, `nombre`, `slug`, `plan`, `estado`, `created_at`, `updated_at`) VALUES (1,'MS Motors','ms-motors','pro','activo','2026-08-12 00:29:01','2026-08-12 00:29:01'),(2,'Moto Zone','moto-zone','trial','activo','2026-08-12 01:46:08','2026-08-12 01:46:08');
+INSERT INTO `tenants` (`id`, `nombre`, `slug`, `plan`, `estado`, `created_at`, `updated_at`, `motivo_estado`, `trial_hasta`) VALUES (1,'MS Motors','ms-motors','pro','activo','2026-08-12 00:29:01','2026-08-12 00:29:01',NULL,NULL),(2,'Moto Zone','moto-zone','trial','activo','2026-08-12 01:46:08','2026-08-12 17:56:03',NULL,NULL),(35,'Autos Premium','marca-289201','trial','activo','2026-08-12 17:54:49','2026-08-12 17:54:49',NULL,NULL),(36,'Taller Solo Autos','autos-289722','trial','activo','2026-08-12 17:54:49','2026-08-12 17:54:49',NULL,NULL),(37,'Taller Prueba','taller-prueba-290086','trial','activo','2026-08-12 17:54:50','2026-08-12 17:54:50',NULL,NULL),(38,'Taller Prueba','taller-prueba-314640','trial','activo','2026-08-12 17:55:14','2026-08-12 17:55:14',NULL,NULL),(39,'Autos Web 451627','autos-web-451627','trial','activo','2026-08-12 17:57:43','2026-08-12 17:57:43',NULL,NULL);
 /*!40000 ALTER TABLE `tenants` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -944,7 +979,7 @@ CREATE TABLE `usuarios` (
   CONSTRAINT `fk_usuarios_sucursal` FOREIGN KEY (`sucursal_id`) REFERENCES `sucursales` (`id`),
   CONSTRAINT `fk_usuarios_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
   CONSTRAINT `usuarios_ibfk_1` FOREIGN KEY (`sucursal_id`) REFERENCES `sucursales` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=38 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=43 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -953,7 +988,7 @@ CREATE TABLE `usuarios` (
 
 LOCK TABLES `usuarios` WRITE;
 /*!40000 ALTER TABLE `usuarios` DISABLE KEYS */;
-INSERT INTO `usuarios` (`id`, `nombre`, `email`, `password_hash`, `rol`, `telefono`, `especialidades`, `horario`, `sucursal_id`, `activo`, `created_at`, `updated_at`, `foto`, `totp_secret`, `totp_activado`, `totp_backup`, `totp_ultimo_contador`, `tenant_id`) VALUES (1,'Administrador','admin@taller.com','$2b$10$sFrG6pTctxPrAEbZ.9s6sOAwdddSVgyBTNz7bLW5sY3atgqrMT7h2','admin',NULL,NULL,NULL,NULL,1,'2026-08-11 23:48:53','2026-08-11 23:48:53',NULL,NULL,0,NULL,NULL,1),(2,'Recepción','recepcion@taller.com','$2b$10$zQQc0arTvE19uB5Dgq0.7.rtY4ENRhmtkYbzSwqkQLeZaPwZjhJz6','recepcion',NULL,NULL,NULL,NULL,1,'2026-08-11 23:48:53','2026-08-11 23:48:53',NULL,NULL,0,NULL,NULL,1),(5,'Admin Zone','admin@taller.com','$2b$10$k42ivd3qsBrA0YLrBdPq1ujvtCmJlPrTFmIXtWWlyIPNyQowhPj3e','admin',NULL,NULL,NULL,NULL,1,'2026-08-12 01:46:08','2026-08-12 01:46:30',NULL,NULL,0,NULL,NULL,2);
+INSERT INTO `usuarios` (`id`, `nombre`, `email`, `password_hash`, `rol`, `telefono`, `especialidades`, `horario`, `sucursal_id`, `activo`, `created_at`, `updated_at`, `foto`, `totp_secret`, `totp_activado`, `totp_backup`, `totp_ultimo_contador`, `tenant_id`) VALUES (1,'Administrador','admin@taller.com','$2b$10$sFrG6pTctxPrAEbZ.9s6sOAwdddSVgyBTNz7bLW5sY3atgqrMT7h2','admin',NULL,NULL,NULL,NULL,1,'2026-08-11 23:48:53','2026-08-11 23:48:53',NULL,NULL,0,NULL,NULL,1),(2,'Recepción','recepcion@taller.com','$2b$10$zQQc0arTvE19uB5Dgq0.7.rtY4ENRhmtkYbzSwqkQLeZaPwZjhJz6','recepcion',NULL,NULL,NULL,NULL,1,'2026-08-11 23:48:53','2026-08-11 23:48:53',NULL,NULL,0,NULL,NULL,1),(5,'Admin Zone','admin@taller.com','$2b$10$k42ivd3qsBrA0YLrBdPq1ujvtCmJlPrTFmIXtWWlyIPNyQowhPj3e','admin',NULL,NULL,NULL,NULL,1,'2026-08-12 01:46:08','2026-08-12 01:46:30',NULL,NULL,0,NULL,NULL,2),(38,'Dueño','marca-289201@t.com','$2b$10$nSI3RWPfYWtFeZ4.FW2fS.yikEgKgmtuDu848NVoc0JelJlTMvtMy','admin',NULL,NULL,NULL,NULL,1,'2026-08-12 17:54:49','2026-08-12 17:54:49',NULL,NULL,0,NULL,NULL,35),(39,'Dueño Autos','duenio-autos-289722@t.com','$2b$10$uHK1pe92CGNZz78iAgHE/ef5676vC9ez6XoaJs/5jXr.9dAaltc6m','admin',NULL,NULL,NULL,NULL,1,'2026-08-12 17:54:49','2026-08-12 17:54:49',NULL,NULL,0,NULL,NULL,36),(40,'Dueño Prueba','duenio-290086@t.com','$2b$10$CAT3ZgLYrJSBYHtn1RzlXev.M9hoDUHL3315bVUjo3XAzLFD5H.pq','admin','8888-0000',NULL,NULL,NULL,1,'2026-08-12 17:54:50','2026-08-12 17:54:50',NULL,NULL,0,NULL,NULL,37),(41,'Dueño Prueba','duenio-314640@t.com','$2b$10$G25KGyo/TjxU1yaSXAgl9uNieIG4pJY07Hz9tk5qarievbghwdT2e','admin','8888-0000',NULL,NULL,NULL,1,'2026-08-12 17:55:14','2026-08-12 17:55:14',NULL,NULL,0,NULL,NULL,38),(42,'Dueño Autos Web','autos-web-451627@t.com','$2b$10$ITQLrJu7lC88W5RKhQI2a.XrJXV2hx2dSDSYQEp0C4JpR7IfBqVWO','admin',NULL,NULL,NULL,NULL,1,'2026-08-12 17:57:43','2026-08-12 17:57:43',NULL,NULL,0,NULL,NULL,39);
 /*!40000 ALTER TABLE `usuarios` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -967,7 +1002,7 @@ DROP TABLE IF EXISTS `vehiculos`;
 CREATE TABLE `vehiculos` (
   `id` int NOT NULL AUTO_INCREMENT,
   `cliente_id` int NOT NULL,
-  `tipo` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `tipo` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `marca` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `modelo` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `anio` year DEFAULT NULL,
@@ -991,7 +1026,7 @@ CREATE TABLE `vehiculos` (
   KEY `idx_vehiculos_tipo` (`tenant_id`,`tipo`),
   CONSTRAINT `fk_motos_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
   CONSTRAINT `vehiculos_ibfk_1` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=29 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=35 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1000,6 +1035,7 @@ CREATE TABLE `vehiculos` (
 
 LOCK TABLES `vehiculos` WRITE;
 /*!40000 ALTER TABLE `vehiculos` DISABLE KEYS */;
+INSERT INTO `vehiculos` (`id`, `cliente_id`, `tipo`, `marca`, `modelo`, `anio`, `placa`, `color`, `numero_motor`, `numero_chasis`, `kilometraje_actual`, `foto_url`, `activa`, `created_at`, `updated_at`, `foto`, `tenant_id`, `atributos`) VALUES (29,1,'moto','Honda','CB125',NULL,'ABC-123',NULL,NULL,NULL,0,NULL,1,'2026-08-12 17:22:00','2026-08-12 17:22:00',NULL,1,NULL),(30,2,'moto','Yamaha','FZ',NULL,'ABC-123',NULL,NULL,NULL,0,NULL,1,'2026-08-12 17:22:00','2026-08-12 17:22:00',NULL,2,NULL),(31,32,'auto','Toyota','Corolla',NULL,'AUT-722',NULL,NULL,NULL,0,NULL,1,'2026-08-12 17:54:49','2026-08-12 17:54:49',NULL,36,'{\"puertas\": 4, \"carroceria\": \"Sedán\", \"combustible\": \"Gasolina\", \"transmision\": \"Automática\"}'),(32,32,'auto','Nissan','Versa',NULL,'XXX-722',NULL,NULL,NULL,0,NULL,1,'2026-08-12 17:54:49','2026-08-12 17:54:49',NULL,36,NULL),(33,1,'moto','Honda','CB125',NULL,'A4B-465',NULL,NULL,NULL,0,NULL,1,'2026-08-12 17:56:00','2026-08-12 17:56:00',NULL,1,NULL),(34,2,'moto','Yamaha','FZ',NULL,'A4B-465',NULL,NULL,NULL,0,NULL,1,'2026-08-12 17:56:00','2026-08-12 17:56:00',NULL,2,NULL);
 /*!40000 ALTER TABLE `vehiculos` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1049,4 +1085,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-08-12 11:19:07
+-- Dump completed on 2026-08-12 11:58:37

@@ -12,7 +12,8 @@
     "crear-usuario-app": "node scripts/crear-usuario-app.js",
     "start:single": "node src/server.js",
     "db:importar": "node db/importar.js",
-    "db:exportar": "node db/exportar.js"
+    "db:exportar": "node db/exportar.js",
+    "motiq:admin": "node scripts/crear-admin-motiq.js"
   },
   "keywords": [],
   "author": "",

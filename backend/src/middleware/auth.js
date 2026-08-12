@@ -12,7 +12,11 @@ module.exports = function authMiddleware(req, res, next) {
     // El token debe ser de PERSONAL: los del portal de clientes se firman con el
     // mismo secreto pero llevan tipo:'cliente' y no tienen rol. Sin este chequeo,
     // un cliente autenticado podría usar su token en las rutas de staff.
-    if (payload.tipo === 'cliente' || !payload.rol) {
+    // Se nombran los dos tipos ajenos en vez de confiar solo en `!rol`: el token de
+    // plataforma tampoco lleva rol, así que hoy caería igual, pero dejarlo explícito
+    // evita que alguien le agregue un `rol` al payload de Motiq más adelante y le
+    // abra sin querer todas las rutas de los talleres.
+    if (payload.tipo === 'cliente' || payload.tipo === 'plataforma' || !payload.rol) {
       return res.status(403).json({ error: 'Token no válido para esta sección' });
     }
     // Token parcial de 2FA (contraseña correcta pero falta el segundo factor): solo

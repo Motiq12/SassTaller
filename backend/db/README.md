@@ -35,6 +35,19 @@ es la demostración de que un correo puede repetirse entre talleres. Al entrar,
 indicá el taller (campo `taller` en el login) o el sistema lo resuelve por la
 contraseña.
 
+## Entrar al panel de Motiq
+
+El panel de la plataforma (`/api/motiq`) es aparte de los talleres: se ven **todos**
+desde ahí, así que esas cuentas **no vienen en el volcado** — la tabla llega vacía
+a propósito. Creá la tuya:
+
+```bash
+npm run motiq:admin -- "Tu nombre" vos@motiq.cr
+```
+
+Imprime una contraseña generada **una sola vez** (en la base queda solo el hash).
+Si la perdés, volvé a correr lo mismo con el mismo correo y te la cambia.
+
 ## Actualizar el volcado
 
 Cuando cambie el esquema o los datos base:
@@ -59,6 +72,7 @@ Y se commitea el `sasstaller.sql` resultante.
 - `001-multitenant.sql` — `tenant_id` en todas las tablas
 - `002-vehiculos.sql` — `motos` pasa a `vehiculos`, con tipo y atributos
 - `003-marca-por-taller.sql` — color de marca por taller
+- `004-plataforma.sql` — cuentas de Motiq, y estado/plan de cada taller
 
 El volcado ya las tiene aplicadas: solo hacen falta para entender cómo se llegó
 acá, o para migrar una base vieja.

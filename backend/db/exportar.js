@@ -66,6 +66,18 @@ if (r.status !== 0) {
   process.exit(1);
 }
 
+// Las cuentas de Motiq NO viajan en el volcado: son las únicas que ven los datos de
+// todos los talleres a la vez, y un hash de bcrypt commiteado queda en el historial
+// de git para siempre. La tabla sí va (con su estructura), vacía; cada quien crea la
+// suya con `npm run motiq:admin`.
+const sql = fs.readFileSync(DESTINO, 'utf8');
+const sinAdmins = sql.replace(/^INSERT INTO `plataforma_admins`.*$/gm,
+  '-- (las cuentas de Motiq no se exportan: creá la tuya con `npm run motiq:admin`)');
+if (sinAdmins !== sql) {
+  fs.writeFileSync(DESTINO, sinAdmins);
+  console.log('  · se omitieron las cuentas de plataforma_admins');
+}
+
 const kb = (fs.statSync(DESTINO).size / 1024).toFixed(1);
 console.log(`✔ ${path.relative(process.cwd(), DESTINO)} — ${kb} KB`);
 if (!SOLO_ESTRUCTURA) {
