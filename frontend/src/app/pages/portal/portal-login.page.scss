@@ -31,46 +31,52 @@
   .ico-hammer { font-size: 26px; color: var(--ion-color-primary-tint); transform: rotate(72deg) translateX(2px); }
 }
 
-// Forzar fondo oscuro en autofill de Chrome (quita el amarillo)
+// Chrome pinta de amarillo lo que autocompleta. Se tapa con el fondo del campo —
+// que ahora sigue al tema, no un gris fijo: con el negro de antes, en modo claro
+// el correo autocompletado aparecía en un recuadro oscuro en medio del formulario.
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 40px #1a1a1a inset !important;
-  -webkit-text-fill-color: #f5f5f5 !important;
-  caret-color: #f5f5f5 !important;
+  -webkit-box-shadow: 0 0 0 40px var(--ion-item-background, #fff) inset !important;
+  -webkit-text-fill-color: var(--ion-text-color, #111) !important;
+  caret-color: var(--ion-text-color, #111);
   transition: background-color 5000s ease-in-out 0s;
 }
 
+// Los enlaces de abajo del formulario. Los colores eran para el fondo negro que
+// tenía esta pantalla; sobre la superficie clara del panel nuevo no se leían.
 .portal-link {
   display: block;
   text-align: center;
-  margin-top: 22px;
+  margin-top: 18px;
   font-size: 13px;
   font-weight: 600;
-  color: #a3a3a3;
+  color: var(--ion-color-medium-shade, #6b7280);
   text-decoration: underline;
   text-underline-offset: 4px;
-  text-decoration-color: #404040;
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
   position: relative;
   z-index: 1;
   cursor: pointer;
 
-  &:active { color: var(--ion-color-primary-tint); }
+  &:hover, &:active { color: var(--ion-color-primary); }
 
-  // CTA principal: "Crear una cuenta"
+  // CTA secundario: "Crear una cuenta". Es la acción que sigue en importancia al
+  // botón de ingresar, así que se separa del resto en vez de ser un enlace más.
   &.strong {
-    color: #fff;
+    color: var(--ion-color-primary);
     font-weight: 700;
     font-size: 14px;
-    text-decoration-color: var(--ion-color-primary);
+    text-decoration-color: color-mix(in srgb, var(--ion-color-primary) 45%, transparent);
     text-underline-offset: 5px;
+    margin-top: 22px;
   }
-  // Links secundarios (olvidé contraseña / personal)
+  // Links secundarios (olvidé contraseña / registrar un taller)
   &.sub {
-    margin-top: 12px;
+    margin-top: 10px;
     font-size: 12px;
-    color: #8a8a8a;
+    color: var(--ion-color-medium, #9ca3af);
   }
   // Reenviar deshabilitado durante el cooldown
   &.disabled {

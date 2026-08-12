@@ -488,127 +488,199 @@ ion-toast {
 }
 
 // ————————————————————————————————
-// Login — negro neutro + tarjeta "marco de teléfono"
+// Acceso (login, registro, recuperar) — dos paneles
+//
+// Antes era una foto oscura a pantalla completa con una tarjeta flotando encima.
+// Se veía como la portada de una app, no como la entrada de un sistema de trabajo:
+// el formulario —que es a lo que la gente viene— competía con el fondo, y sobre
+// negro el autocompletado del navegador y los mensajes de error se leen peor.
+//
+// Ahora se parte en dos: a la izquierda la MARCA (la del taller, no la nuestra, con
+// su color y su logo), a la derecha el formulario sobre una superficie limpia. Es la
+// forma en que se resuelve esto en el software que se cobra, y no por moda: separar
+// identidad de tarea deja cada mitad haciendo una sola cosa.
+//
+// El corte es solo con CSS, sin tocar el HTML de las tres pantallas: el bloque
+// .login-header pasa a ser el panel de marca y todo lo demás cae en la columna
+// del formulario. Por eso las tres cambian juntas y ninguna queda desparejada.
 // ————————————————————————————————
 .login-content {
-  // Foto del taller de fondo + velo oscuro para mantener legible la tarjeta
-  --background:
-    linear-gradient(180deg, rgba(10,10,10,.80) 0%, rgba(10,10,10,.88) 45%, rgba(10,10,10,.94) 100%),
-    url('/assets/portal/taller-bg.jpg') center / cover no-repeat fixed;
+  --background: var(--ion-background-color, #fff);
 
   .login-container {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
+    // El ancho va explícito: dentro del contenedor de scroll de ion-content este div
+    // se encoge al contenido, y sin esto la columna `1fr` del formulario colapsaba a
+    // 80px y las etiquetas se partían en tres líneas.
+    width: 100%;
+    box-sizing: border-box;
     min-height: 100%;
-    padding: 20px;
+    display: grid;
+    grid-template-columns: 1fr;
+    align-content: start;
+  }
+
+  // ---- Panel de marca ----
+  .login-header {
     position: relative;
     overflow: hidden;
+    color: #fff;
+    text-align: center;
+    padding: 2.5rem 1.5rem 2.25rem;
+    // El color del taller manda y la foto queda de textura por debajo. Se hace con
+    // el color semitransparente encima, no con `multiply`: multiplicando, la foto
+    // oscura se comía el color y el panel salía casi negro para cualquier taller —
+    // justo lo contrario de lo que tiene que demostrar esta pantalla.
+    background:
+      linear-gradient(155deg,
+        color-mix(in srgb, var(--ion-color-primary) 93%, transparent) 0%,
+        color-mix(in srgb, var(--ion-color-primary) 88%, transparent) 100%),
+      url('/assets/portal/taller-bg.jpg') center / cover no-repeat;
 
-    // resplandores de fondo
-    &::before, &::after {
-      content: '';
-      position: absolute;
-      width: 320px; height: 320px;
-      border-radius: 999px;
-      filter: blur(80px);
-      pointer-events: none;
+    .logo-wrapper {
+      width: 78px;
+      height: 78px;
+      background: #fff;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.1rem;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, .28);
+
+      ion-icon { font-size: 38px; color: var(--ion-color-primary); }
+      img { width: 56px; height: 56px; object-fit: contain; }
     }
-    &::before { top: -40px; left: -60px;  background: rgba(190, 18, 60, .14); }
-    &::after  { bottom: -40px; right: -60px; background: rgba(225, 29, 72, .12); }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: clamp(1.7rem, 4vw, 2.15rem);
+      font-weight: 800;
+      margin: 0 0 .45rem;
+      letter-spacing: -0.035em;
+      color: #fff;
+    }
+
+    p {
+      font-size: 11px;
+      color: rgba(255, 255, 255, .78);
+      margin: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-weight: 700;
+    }
+  }
+
+  // ---- Columna del formulario ----
+  // La tarjeta deja de ser una tarjeta: sin sombra ni borde redondo enorme, es el
+  // formulario y ya. Una caja flotante dentro de un panel que ya está separado es
+  // un marco dentro de otro marco.
+  ion-card {
+    width: 100%;
+    max-width: 400px;
+    margin: 1.75rem auto 0;
+    --background: transparent;
+    background: transparent;
+    border: 0;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+
+    ion-card-content { padding-inline: 0; }
+
+    ion-item {
+      --background: var(--ion-item-background, #fff);
+      --border-color: transparent;
+      --highlight-color-focused: var(--ion-color-primary);
+      --padding-start: 14px;
+      --inner-padding-end: 8px;
+      --min-height: 62px;
+      margin-bottom: .6rem;
+      border: 1px solid color-mix(in srgb, var(--ion-text-color, #000) 14%, transparent);
+      border-radius: 12px;
+      transition: border-color .15s ease, box-shadow .15s ease;
+
+      // El foco se ve en el campo entero, no en una rayita de abajo: en un login con
+      // dos campos hay que saber de un vistazo en cuál se está escribiendo.
+      &:focus-within {
+        border-color: var(--ion-color-primary);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--ion-color-primary) 18%, transparent);
+      }
+
+      ion-label {
+        color: var(--ion-color-medium-shade, #6b7280) !important;
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      ion-input {
+        color: var(--ion-text-color, #111);
+        font-weight: 500;
+        --placeholder-color: var(--ion-color-medium, #9ca3af);
+      }
+    }
+
+    // CTA principal (Ingresar / Crear cuenta / Enviar código)
+    ion-button[expand="block"] {
+      margin-top: 1rem;
+      height: 50px;
+      --background: var(--ion-color-primary);
+      --background-activated: var(--ion-color-primary-shade);
+      --border-radius: 12px;
+      --box-shadow: 0 6px 18px color-mix(in srgb, var(--ion-color-primary) 30%, transparent);
+      font-weight: 600;
+      letter-spacing: 0;
+    }
+
+    // Botón "ojo" para ver/ocultar la contraseña dentro del campo
+    ion-button[fill="clear"] {
+      margin: 0;
+      height: 38px;
+      --background: transparent;
+      --background-activated: transparent;
+      --background-hover: transparent;
+      --box-shadow: none;
+      --color: var(--ion-color-medium, #9ca3af);
+      --padding-start: 6px;
+      --padding-end: 6px;
+    }
+  }
+
+  // De tablet para arriba, los dos paneles quedan lado a lado y el de marca ocupa
+  // todo el alto. En teléfono no: ahí robaría la pantalla que necesita el teclado.
+  @media (min-width: 860px) {
+    // El panel de marca se saca del flujo en vez de ocupar una columna de la rejilla.
+    // Como columna abarcando todas las filas, su alto lo terminaba fijando el
+    // contenido del formulario y quedaba un recuadro a media pantalla; absoluto ocupa
+    // el alto completo pase lo que pase del otro lado.
+    .login-container {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 2.5rem 2.5rem 2.5rem calc(40% + 2.5rem);
+    }
 
     .login-header {
-      text-align: center;
-      color: white;
-      margin-bottom: 26px;
-      position: relative;
-      z-index: 1;
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 40%;
+      min-width: 320px;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      text-align: left;
+      padding: 3.5rem 3rem;
 
-      .logo-wrapper {
-        width: 76px;
-        height: 76px;
-        background: #0a0a0a;
-        border: 1px solid #262626;
-        border-radius: 22px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto 18px;
-        box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 10px 30px rgba(0,0,0,.6);
-
-        ion-icon { font-size: 38px; color: var(--ion-color-primary); }
-        img { width: 54px; height: 54px; object-fit: contain; }
-      }
-
-      h1 {
-        font-family: var(--font-display);
-        font-size: 32px;
-        font-weight: 800;
-        margin: 0 0 6px;
-        letter-spacing: -0.04em;
-        color: #fff;
-      }
-
-      p {
-        font-size: 11px;
-        // #737373 daba 4,04:1 sobre el fondo oscuro del portal (hace falta 4,5).
-        color: #8A8A8A;
-        margin: 0;
-        text-transform: uppercase;
-        letter-spacing: 0.18em;
-        font-weight: 700;
-      }
+      .logo-wrapper { margin-inline: 0; }
     }
 
-    ion-card {
-      width: 100%;
-      max-width: 420px;
-      --background: #171717;
-      border: 1px solid #262626;
-      border-radius: 36px !important;
-      box-shadow: 0 24px 70px rgba(0,0,0,.6) !important;
-      position: relative;
-      z-index: 1;
-      padding: 12px 8px;
+    .login-container > *:not(.login-header) { width: min(400px, 100%); }
 
-      ion-item {
-        --background: transparent;
-        --border-color: #262626;
-        --color: #fff;
-        --highlight-color-focused: var(--ion-color-primary);
-
-        ion-label {
-          color: #8A8A8A !important;   // 4,04:1 -> cumple 4,5:1 en oscuro
-          font-size: 11px !important;
-          font-weight: 700 !important;
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-        }
-        ion-input { color: #fff; font-weight: 500; --placeholder-color: #525252; }
-      }
-
-      // CTA principal (Ingresar / Crear cuenta / Enviar código)
-      ion-button[expand="block"] {
-        margin-top: 14px;
-        --background: var(--ion-color-primary);
-        --background-activated: var(--ion-color-primary-shade);
-        --box-shadow: 0 8px 24px rgba(225, 29, 72, .35);
-      }
-
-      // Botón "ojo" para ver/ocultar la contraseña dentro del campo
-      ion-button[fill="clear"] {
-        margin: 0;
-        height: 38px;
-        --background: transparent;
-        --background-activated: transparent;
-        --background-hover: transparent;
-        --box-shadow: none;
-        --color: #8a8a8a;
-        --padding-start: 6px;
-        --padding-end: 6px;
-      }
-    }
+    ion-card { margin-top: 0; }
   }
 }
 
