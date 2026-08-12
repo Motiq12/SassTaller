@@ -33,7 +33,7 @@
             <span class="garantia-orden">{{ g.numero_orden }}</span>
             <ion-badge [color]="estadoColor(g.estado!)">{{ estadoLabel(g.estado!) }}</ion-badge>
           </div>
-          <p class="garantia-moto">
+          <p class="garantia-vehiculo">
             <ion-icon name="bicycle-outline"></ion-icon>
             {{ g.marca }} {{ g.modelo }}
             <span *ngIf="g.placa"> · {{ g.placa }}</span>
@@ -73,7 +73,7 @@
       <!-- Contexto -->
       <ion-card>
         <ion-card-content>
-          <p class="modal-moto"><strong>{{ seleccionada.marca }} {{ seleccionada.modelo }}</strong>
+          <p class="modal-vehiculo"><strong>{{ seleccionada.marca }} {{ seleccionada.modelo }}</strong>
             <span *ngIf="seleccionada.placa"> · {{ seleccionada.placa }}</span></p>
           <p class="modal-cliente">{{ seleccionada.cliente_nombre }} {{ seleccionada.cliente_apellido }}
             <span *ngIf="seleccionada.cliente_telefono"> · {{ seleccionada.cliente_telefono }}</span></p>

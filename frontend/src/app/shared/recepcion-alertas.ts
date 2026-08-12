@@ -28,10 +28,10 @@ export function alertaColor(a: any): string {
 
 export function alertaTexto(a: any): string {
   const cliente = `${a?.cliente_nombre || ''} ${a?.cliente_apellido || ''}`.trim();
-  const moto = [a?.marca, a?.modelo].filter(Boolean).join(' ') || 'la moto';
+  const vehiculo = [a?.marca, a?.modelo].filter(Boolean).join(' ') || 'la vehiculo';
   switch (a?.tipo) {
     case 'foto':
-      return `${a.tecnico_nombre || 'El mecánico'} subió evidencia · ${moto}`;
+      return `${a.tecnico_nombre || 'El mecánico'} subió evidencia · ${vehiculo}`;
     case 'lista':
       return `${a.numero_orden} lista para entrega · ${cliente}`;
     case 'aprobacion':
@@ -41,7 +41,7 @@ export function alertaTexto(a: any): string {
     case 'cita_cancelada':
       return `Cita cancelada por ${cliente || 'el cliente'} — ${a.fecha_corta || ''} ${a.hora || ''}`.trim();
     case 'repuesto':
-      return `${a.tecnico_nombre || 'Mecánico'} solicita: ${a.repuesto_nombre} ×${a.repuesto_cantidad || 1} · ${moto}`;
+      return `${a.tecnico_nombre || 'Mecánico'} solicita: ${a.repuesto_nombre} ×${a.repuesto_cantidad || 1} · ${vehiculo}`;
     default:
       return a?.mensaje || '';
   }

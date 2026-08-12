@@ -34,7 +34,7 @@
     <div class="cita-list" *ngIf="!cargando">
       <div class="cita-card" *ngFor="let c of citas">
         <div class="cita-head">
-          <h4>{{ c.marca || 'Moto' }} {{ c.modelo || '' }}<span class="placa mono" *ngIf="c.placa"> · {{ c.placa }}</span></h4>
+          <h4>{{ c.marca || 'Vehiculo' }} {{ c.modelo || '' }}<span class="placa mono" *ngIf="c.placa"> · {{ c.placa }}</span></h4>
           <span class="st-badge entregado">Entregado</span>
         </div>
         <div class="cita-info">

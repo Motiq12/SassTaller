@@ -7,13 +7,13 @@ import { proximoServicio, ProximoServicio } from '../../utils/mantenimiento';
 
 @Component({
   standalone: false,
-  selector: 'app-portal-moto-historial',
-  templateUrl: './portal-moto-historial.page.html',
-  styleUrls: ['./portal-moto-historial.page.scss'],
+  selector: 'app-portal-vehiculo-historial',
+  templateUrl: './portal-vehiculo-historial.page.html',
+  styleUrls: ['./portal-vehiculo-historial.page.scss'],
 })
-export class PortalMotoHistorialPage implements OnInit, OnDestroy {
+export class PortalVehiculoHistorialPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
-  moto: any = null;
+  vehiculo: any = null;
   servicios: any[] = [];
   cargando = true;
   totalGastado = 0;
@@ -30,7 +30,7 @@ export class PortalMotoHistorialPage implements OnInit, OnDestroy {
     this.cargando = true;
     this.portal.getMotoHistorial(id).pipe(takeUntil(this.destroy$)).subscribe({
       next: r => {
-        this.moto = r.data.moto;
+        this.vehiculo = r.data.vehiculo;
         this.servicios = r.data.servicios || [];
         this.totalGastado = this.servicios.reduce((s, x) => s + Number(x.monto || 0), 0);
         this.proximo = proximoServicio(this.servicios);
@@ -54,11 +54,11 @@ export class PortalMotoHistorialPage implements OnInit, OnDestroy {
       : this.proximo.estado === 'al_dia' ? 'checkmark-circle' : 'time-outline';
   }
 
-  // Lleva a Agendar con la moto y el servicio recomendado precargados.
+  // Lleva a Agendar con la vehiculo y el servicio recomendado precargados.
   agendarServicio() {
-    if (!this.moto) return;
+    if (!this.vehiculo) return;
     this.router.navigate(['/portal/agendar'], {
-      queryParams: { moto: this.moto.id, servicio: this.proximo?.servicio || undefined },
+      queryParams: { vehiculo: this.vehiculo.id, servicio: this.proximo?.servicio || undefined },
     });
   }
   verCita(s: any) { this.router.navigate(['/portal/cita', s.id]); }

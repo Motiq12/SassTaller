@@ -192,8 +192,8 @@ export class RecepcionPage implements OnInit, OnDestroy {
   }
   // Avisar por WhatsApp que una orden está lista para retirar.
   async whatsappLista(o: any) {
-    const moto = [o.marca, o.modelo].filter(Boolean).join(' ') || 'tu moto';
-    const msg = `Hola ${o.cliente_nombre} 👋, tu ${moto} ya está lista para retirar (orden ${o.numero_orden}). ¡Te esperamos! 🏍️`;
+    const vehiculo = [o.marca, o.modelo].filter(Boolean).join(' ') || 'tu vehiculo';
+    const msg = `Hola ${o.cliente_nombre} 👋, tu ${vehiculo} ya está lista para retirar (orden ${o.numero_orden}). ¡Te esperamos! 🏍️`;
     if (!abrirWhatsApp(o.cliente_telefono, msg)) {
       const t = await this.toast.create({ message: 'Este cliente no tiene teléfono cargado', duration: 2200, color: 'warning' });
       await t.present();

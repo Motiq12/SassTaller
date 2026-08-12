@@ -3,7 +3,7 @@
 .section-label { display: block; font-size: 11px; font-weight: 800; text-transform: uppercase;
   letter-spacing: 0.12em; color: var(--n-400); margin-bottom: 14px; }
 
-/* ═══ HERO: perfil de la moto (panel oscuro, mismo lenguaje que el cockpit) ═══ */
+/* ═══ HERO: perfil de la vehiculo (panel oscuro, mismo lenguaje que el cockpit) ═══ */
 .cockpit {
   background: linear-gradient(155deg, #1a1a1c 0%, #0a0a0b 70%);
   border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 24px;
@@ -11,7 +11,7 @@
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28); animation: cardRise .4s var(--ease-out) both;
 
   .ck-main { display: flex; align-items: center; gap: 14px; }
-  .ck-moto { width: 76px; height: 60px; flex-shrink: 0; border-radius: 14px;
+  .ck-vehiculo { width: 76px; height: 60px; flex-shrink: 0; border-radius: 14px;
     display: flex; align-items: center; justify-content: center;
     background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08);
     color: rgba(255, 255, 255, 0.55); overflow: hidden;

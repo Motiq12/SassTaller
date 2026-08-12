@@ -16,44 +16,44 @@ export interface WaMensaje {
   build: (c: WaContexto) => string;
 }
 
-const moto = (c: WaContexto) => `${c.marca || ''} ${c.modelo || ''}`.trim();
+const vehiculo = (c: WaContexto) => `${c.marca || ''} ${c.modelo || ''}`.trim();
 const colones = (n?: number) => `₡${(n || 0).toLocaleString('es-CR')}`;
 
 export const WA_MENSAJES: WaMensaje[] = [
   {
     key: 'recibida',
-    label: 'Moto recibida',
-    build: c => `Hola ${c.nombre}, recibimos tu ${moto(c)} en el taller (orden ${c.numero_orden}). Te iremos avisando del avance. ¡Gracias!`,
+    label: 'Vehiculo recibida',
+    build: c => `Hola ${c.nombre}, recibimos tu ${vehiculo(c)} en el taller (orden ${c.numero_orden}). Te iremos avisando del avance. ¡Gracias!`,
   },
   {
     key: 'diagnostico',
     label: 'Diagnóstico listo',
-    build: c => `Hola ${c.nombre}, ya revisamos tu ${moto(c)} y tenemos el diagnóstico. En breve te enviamos el presupuesto para tu aprobación.`,
+    build: c => `Hola ${c.nombre}, ya revisamos tu ${vehiculo(c)} y tenemos el diagnóstico. En breve te enviamos el presupuesto para tu aprobación.`,
   },
   {
     key: 'aprobacion',
     label: 'Presupuesto para aprobar',
-    build: c => `Hola ${c.nombre}, el presupuesto de tu ${moto(c)} está listo${c.total ? ` (total ${colones(c.total)})` : ''}. Podés revisarlo y aprobarlo desde el portal: ${c.portalLink || ''}`,
+    build: c => `Hola ${c.nombre}, el presupuesto de tu ${vehiculo(c)} está listo${c.total ? ` (total ${colones(c.total)})` : ''}. Podés revisarlo y aprobarlo desde el portal: ${c.portalLink || ''}`,
   },
   {
     key: 'repuestos',
     label: 'Esperando repuestos',
-    build: c => `Hola ${c.nombre}, estamos a la espera de repuestos para tu ${moto(c)}. Apenas lleguen, continuamos con la reparación y te avisamos.`,
+    build: c => `Hola ${c.nombre}, estamos a la espera de repuestos para tu ${vehiculo(c)}. Apenas lleguen, continuamos con la reparación y te avisamos.`,
   },
   {
     key: 'reparacion',
     label: 'En reparación',
-    build: c => `Hola ${c.nombre}, ya estamos trabajando en la reparación de tu ${moto(c)}. Te avisamos cuando esté lista.`,
+    build: c => `Hola ${c.nombre}, ya estamos trabajando en la reparación de tu ${vehiculo(c)}. Te avisamos cuando esté lista.`,
   },
   {
     key: 'lista',
     label: 'Lista para entrega',
-    build: c => `Hola ${c.nombre}, ¡buenas noticias! Tu ${moto(c)} ya está lista para retirar (orden ${c.numero_orden}). Te esperamos en el taller. 🎉`,
+    build: c => `Hola ${c.nombre}, ¡buenas noticias! Tu ${vehiculo(c)} ya está lista para retirar (orden ${c.numero_orden}). Te esperamos en el taller. 🎉`,
   },
   {
     key: 'entregada',
     label: 'Entrega / factura',
-    build: c => `Hola ${c.nombre}, gracias por confiar en nosotros. La factura de tu ${moto(c)}${c.total ? ` por ${colones(c.total)}` : ''} está lista. ¡Que disfrutes tu moto!`,
+    build: c => `Hola ${c.nombre}, gracias por confiar en nosotros. La factura de tu ${vehiculo(c)}${c.total ? ` por ${colones(c.total)}` : ''} está lista. ¡Que disfrutes tu vehiculo!`,
   },
 ];
 
@@ -93,13 +93,13 @@ export function abrirWhatsApp(telefono: string | null | undefined, mensaje: stri
 // según el estado de la cita (distinto del estado de la orden).
 export function mensajeCita(c: any): string {
   const nombre = (c?.cliente_nombre || '').trim();
-  const moto = `${c?.marca || ''} ${c?.modelo || ''}`.trim() || 'tu moto';
+  const vehiculo = `${c?.marca || ''} ${c?.modelo || ''}`.trim() || 'tu vehiculo';
   if (c?.estado === 'listo') {
-    return `Hola ${nombre}, ¡buenas noticias! Tu ${moto} ya está lista para retirar${c?.numero_orden ? ` (orden ${c.numero_orden})` : ''}. Te esperamos en el taller. 🎉`;
+    return `Hola ${nombre}, ¡buenas noticias! Tu ${vehiculo} ya está lista para retirar${c?.numero_orden ? ` (orden ${c.numero_orden})` : ''}. Te esperamos en el taller. 🎉`;
   }
   if (c?.estado === 'en_revision' || c?.estado === 'en_mantenimiento') {
-    return `Hola ${nombre}, te contamos sobre el avance de tu ${moto} en el taller.`;
+    return `Hola ${nombre}, te contamos sobre el avance de tu ${vehiculo} en el taller.`;
   }
   const hora = (c?.hora || '').slice(0, 5);
-  return `Hola ${nombre} 👋, te recordamos tu cita${hora ? ` hoy a las ${hora}` : ''} para ${moto}. ¿Nos confirmás tu asistencia? 🏍️`;
+  return `Hola ${nombre} 👋, te recordamos tu cita${hora ? ` hoy a las ${hora}` : ''} para ${vehiculo}. ¿Nos confirmás tu asistencia? 🏍️`;
 }

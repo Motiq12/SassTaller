@@ -22,7 +22,7 @@ export class RecepcionAgendarPage implements OnInit, OnDestroy {
   qCliente = '';
   clientes: any[] = [];
   cliente: any = null;
-  motos: any[] = [];
+  vehiculos: any[] = [];
   tecnicos: any[] = [];
   servicios: string[] = [];
   sucursales: any[] = [];
@@ -85,7 +85,7 @@ export class RecepcionAgendarPage implements OnInit, OnDestroy {
     });
   }
 
-  // Al volver de crear un cliente/moto, refresca las motos del cliente elegido.
+  // Al volver de crear un cliente/vehiculo, refresca las vehiculos del cliente elegido.
   ionViewWillEnter() { if (this.cliente) this.cargarMotos(this.cliente.id); }
 
   setModo(m: 'ahora' | 'agendar') {
@@ -110,20 +110,20 @@ export class RecepcionAgendarPage implements OnInit, OnDestroy {
 
   private cargarMotos(clienteId: number) {
     this.rec.getMotos(clienteId).pipe(takeUntil(this.destroy$)).subscribe({
-      next: r => { this.motos = r.data; if (r.data.length === 1) this.form.moto_id = r.data[0].id; },
-      error: () => { this.motos = []; },
+      next: r => { this.vehiculos = r.data; if (r.data.length === 1) this.form.moto_id = r.data[0].id; },
+      error: () => { this.vehiculos = []; },
     });
   }
 
   limpiarCliente() {
     this.cliente = null; this.qCliente = ''; this.clientes = [];
-    this.motos = []; this.form.moto_id = null;
+    this.vehiculos = []; this.form.moto_id = null;
   }
 
   // Altas nuevas: reusan los formularios existentes.
   crearCliente() { this.router.navigate(['/cliente-form']); }
   registrarMoto() {
-    if (this.cliente) this.router.navigate(['/moto-form'], { queryParams: { cliente_id: this.cliente.id } });
+    if (this.cliente) this.router.navigate(['/vehiculo-form'], { queryParams: { cliente_id: this.cliente.id } });
   }
 
   // Al cambiar de sucursal cambian los mecánicos disponibles y, en agendar, el cupo.
@@ -160,7 +160,7 @@ export class RecepcionAgendarPage implements OnInit, OnDestroy {
 
   confirmar() {
     if (!this.valido) {
-      this.aviso(this.modo === 'agendar' ? 'Completá servicio, fecha y hora' : 'Elegí moto y describí el problema', 'warning');
+      this.aviso(this.modo === 'agendar' ? 'Completá servicio, fecha y hora' : 'Elegí vehiculo y describí el problema', 'warning');
       return;
     }
     this.guardando = true;

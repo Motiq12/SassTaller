@@ -1,6 +1,6 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>Mis motos</ion-title>
+    <ion-title>Mis vehiculos</ion-title>
     <app-portal-actions slot="end"></app-portal-actions>
   </ion-toolbar>
 </ion-header>
@@ -10,10 +10,10 @@
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
-  <div class="motos">
+  <div class="vehiculos">
     <div class="intro">
       <h2>Mi Garaje</h2>
-      <p>Tus motos, su historial y cuándo les toca servicio.</p>
+      <p>Tus vehiculos, su historial y cuándo les toca servicio.</p>
     </div>
 
     <div *ngIf="cargando" style="display:flex;flex-direction:column;gap:10px">
@@ -21,9 +21,9 @@
       <div class="skeleton" style="height:96px"></div>
     </div>
 
-    <!-- Lista de motos (cada tarjeta abre el perfil) -->
-    <div class="moto-list" *ngIf="!cargando && motos.length">
-      <div class="mc" *ngFor="let m of motos" (click)="verHistorial(m)">
+    <!-- Lista de vehiculos (cada tarjeta abre el perfil) -->
+    <div class="vehiculo-list" *ngIf="!cargando && vehiculos.length">
+      <div class="mc" *ngFor="let m of vehiculos" (click)="verHistorial(m)">
         <div class="mc-i" [class.has-foto]="m.foto">
           <img *ngIf="m.foto; else mcIcon" [src]="m.foto" [alt]="m.marca + ' ' + m.modelo">
           <ng-template #mcIcon><ion-icon name="bicycle"></ion-icon></ng-template>
@@ -37,30 +37,30 @@
           <span class="mc-aviso" [ngClass]="avisoMoto(m).tono"><i></i>{{ avisoMoto(m).texto }}</span>
         </div>
         <div class="mc-acts" (click)="$event.stopPropagation()">
-          <button class="mc-e" (click)="editar(m)" title="Editar" aria-label="Editar moto"><ion-icon name="create-outline"></ion-icon></button>
-          <button class="mc-e del" (click)="eliminar(m)" title="Eliminar" aria-label="Eliminar moto"><ion-icon name="trash-outline"></ion-icon></button>
+          <button class="mc-e" (click)="editar(m)" title="Editar" aria-label="Editar vehiculo"><ion-icon name="create-outline"></ion-icon></button>
+          <button class="mc-e del" (click)="eliminar(m)" title="Eliminar" aria-label="Eliminar vehiculo"><ion-icon name="trash-outline"></ion-icon></button>
         </div>
       </div>
     </div>
 
-    <div class="empty-state" *ngIf="!cargando && motos.length === 0 && !mostrarForm">
+    <div class="empty-state" *ngIf="!cargando && vehiculos.length === 0 && !mostrarForm">
       <ion-icon name="bicycle-outline"></ion-icon>
-      <p>Todavía no registraste ninguna moto.</p>
+      <p>Todavía no registraste ninguna vehiculo.</p>
     </div>
 
     <!-- Botón agregar -->
     <button class="cta-o" (click)="abrirForm()" *ngIf="!mostrarForm">
-      <ion-icon name="add-outline"></ion-icon> Agregar moto
+      <ion-icon name="add-outline"></ion-icon> Agregar vehiculo
     </button>
 
     <!-- Formulario -->
     <section class="cd" *ngIf="mostrarForm">
-      <span class="lb">{{ editandoId ? 'Editar moto' : 'Registrar nueva moto' }}</span>
+      <span class="lb">{{ editandoId ? 'Editar vehiculo' : 'Registrar nueva vehiculo' }}</span>
 
-      <!-- Foto de la moto (opcional) -->
-      <div class="moto-foto">
+      <!-- Foto de la vehiculo (opcional) -->
+      <div class="vehiculo-foto">
         <div class="mf-prev" [class.empty]="!nueva.foto" (click)="!procesandoFoto && fotoInput.click()">
-          <img *ngIf="nueva.foto; else mfPlace" [src]="nueva.foto" alt="Foto de la moto">
+          <img *ngIf="nueva.foto; else mfPlace" [src]="nueva.foto" alt="Foto de la vehiculo">
           <ng-template #mfPlace>
             <ion-icon [name]="procesandoFoto ? 'hourglass-outline' : 'camera-outline'"></ion-icon>
           </ng-template>
@@ -97,7 +97,7 @@
 
       <button class="cta" (click)="guardar()" [disabled]="!valido || enviando">
         <ion-spinner *ngIf="enviando" name="crescent"></ion-spinner>
-        {{ enviando ? 'Guardando...' : (editandoId ? 'Guardar cambios' : 'Guardar moto') }}
+        {{ enviando ? 'Guardando...' : (editandoId ? 'Guardar cambios' : 'Guardar vehiculo') }}
       </button>
       <button class="cta-o" (click)="cerrarForm()" [disabled]="enviando">Cancelar</button>
     </section>

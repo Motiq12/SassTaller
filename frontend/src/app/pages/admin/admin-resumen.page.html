@@ -106,7 +106,7 @@
         <div *ngFor="let a of atrasosFiltrados" (click)="abrirOrden(a.id)" class="sem-row">
           <div class="sem-detail">
             <div class="mono sem-orden">{{ a.numero_orden }}</div>
-            <div class="sem-moto">{{ a.marca }} {{ a.modelo }}</div>
+            <div class="sem-vehiculo">{{ a.marca }} {{ a.modelo }}</div>
           </div>
           <span class="bg" [ngClass]="semBadge[semaforo(a.dias_restantes)]">{{ semaforoTexto(a.dias_restantes) }}</span>
         </div>
@@ -138,7 +138,7 @@
           <p class="op-comentario op-sincom" *ngIf="!o.comentario">Sin comentario</p>
         </div>
         <div class="op-meta">
-          <span class="op-moto" *ngIf="o.marca">{{ o.marca }} {{ o.modelo }}</span>
+          <span class="op-vehiculo" *ngIf="o.marca">{{ o.marca }} {{ o.modelo }}</span>
           <span class="mono op-orden" *ngIf="o.numero_orden">{{ o.numero_orden }}</span>
           <span class="op-fecha">{{ fechaCortaOp(o.fecha) }}<ng-container *ngIf="o.tecnico_nombre"> · {{ o.tecnico_nombre }}</ng-container></span>
         </div>

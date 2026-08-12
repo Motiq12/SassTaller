@@ -1,6 +1,6 @@
 // Heurística de mantenimiento (portal del cliente).
 // La recomendación es POR TIEMPO: la BD no guarda el km de cada servicio, así que se
-// estima a partir de la fecha del último servicio de cada tipo. El km de la moto se
+// estima a partir de la fecha del último servicio de cada tipo. El km de la vehiculo se
 // muestra como dato, no se usa para calcular.
 
 // Meses recomendados entre servicios del mismo tipo. Las claves son nombres del
@@ -16,7 +16,7 @@ export const INTERVALOS_MESES: Record<string, number> = {
   'Cambio de neumáticos': 24,
 };
 
-// Servicio base sugerido cuando la moto aún no tiene historial.
+// Servicio base sugerido cuando la vehiculo aún no tiene historial.
 const SERVICIO_BASE = 'Cambio de aceite y filtros';
 
 export type EstadoServicio = 'vencido' | 'pronto' | 'al_dia';
@@ -39,7 +39,7 @@ export function mesesDesde(fecha?: string | null): number {
   return Math.max(0, meses);
 }
 
-// Servicio más urgente a recomendar, a partir del historial de la moto.
+// Servicio más urgente a recomendar, a partir del historial de la vehiculo.
 // `servicios` = lista de citas entregadas con { tipo_servicio, fecha }.
 export function proximoServicio(servicios: { tipo_servicio?: string; motivo?: string; fecha?: string }[]): ProximoServicio {
   if (!servicios || !servicios.length) {

@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { Router } from '@angular/router';
 import { Subject, debounceTime, switchMap, catchError, of } from 'rxjs';
-import { TallerService } from '../../services/taller.service';
+import { TallerService, TipoVehiculo } from '../../services/taller.service';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 
@@ -27,6 +27,19 @@ export class RegistroTallerPage {
   slugEditado = false;      // si el usuario lo tocó, deja de derivarse del nombre
   telefono = '';
   direccion = '';
+
+  // Qué vehículos atiende. Define su catálogo de servicios inicial, los campos del
+  // formulario de vehículo y cómo lo llama la interfaz. Arranca con motos marcado
+  // porque es el caso más común y deja el formulario válido desde el inicio; el
+  // taller de autos lo cambia con un toque.
+  tiposDisponibles: TipoVehiculo[] = [];
+  // Mapa clave->marcado, para que cada checkbox tenga su propio ngModel. Arranca
+  // con motos porque es el caso más común y deja el formulario válido de entrada.
+  tiposMarcados: Record<string, boolean> = { moto: true };
+
+  get tiposElegidos(): string[] {
+    return Object.keys(this.tiposMarcados).filter(k => this.tiposMarcados[k]);
+  }
 
   // Datos del dueño (primer admin)
   adminNombre = '';
@@ -71,6 +84,14 @@ export class RegistroTallerPage {
       this.disponible = res.data.disponible;
       this.motivoSlug = res.data.motivo;
     });
+
+    this.taller.tipos().subscribe({
+      next: res => { this.tiposDisponibles = res.data; },
+      // Sin catálogo no se puede elegir, pero tampoco tiene sentido bloquear el alta:
+      // el servidor cae a 'moto' si no le llega nada, así que el taller queda creado
+      // y puede corregirlo desde su configuración.
+      error: () => { this.tiposDisponibles = []; },
+    });
   }
 
   // Mientras no toque el campo, el identificador se deriva del nombre del taller:
@@ -106,6 +127,7 @@ export class RegistroTallerPage {
       && this.adminPassword.length >= 8
       && this.adminPassword === this.adminPassword2
       && this.disponible === true
+      && this.tiposElegidos.length > 0
       && !this.enviando;
   }
 
@@ -116,6 +138,7 @@ export class RegistroTallerPage {
     this.taller.registrarTaller({
       nombre: this.nombre.trim(),
       slug: this.slug,
+      tipos: this.tiposElegidos,
       admin: {
         nombre: this.adminNombre.trim(),
         email: this.adminEmail.trim().toLowerCase(),

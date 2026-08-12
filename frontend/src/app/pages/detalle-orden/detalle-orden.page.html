@@ -15,7 +15,7 @@
 <ion-content *ngIf="!cargando && orden">
   <div class="ot">
 
-    <!-- Hero: estado + moto + stepper -->
+    <!-- Hero: estado + vehiculo + stepper -->
     <div class="ot-hero">
       <span class="status-pill">{{ estadoLabel(orden.estado!) }}</span>
       <h2 class="ot-model">{{ orden.marca }} {{ orden.modelo }} {{ orden.anio }}</h2>
@@ -49,10 +49,10 @@
 
     <div class="ot-grid">
 
-    <!-- Mini cards: moto + client -->
+    <!-- Mini cards: vehiculo + client -->
     <div class="info-duo">
       <div class="mini-card">
-        <div class="mini-icon moto-icon"><ion-icon name="bicycle-outline"></ion-icon></div>
+        <div class="mini-icon vehiculo-icon"><ion-icon name="bicycle-outline"></ion-icon></div>
         <div class="mini-body">
           <span class="mini-title">{{ orden.marca }} {{ orden.modelo }}</span>
           <span class="mini-sub" *ngIf="orden.placa">Placa: {{ orden.placa }}</span>

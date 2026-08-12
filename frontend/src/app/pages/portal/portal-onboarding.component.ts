@@ -27,11 +27,11 @@ export class PortalOnboardingComponent implements OnInit {
     {
       icon: 'calendar-outline',
       titulo: 'Agendá en segundos',
-      texto: 'Elegí tu moto, el servicio y el horario. ¿Apurado? Tocá “Sugerir próximo horario libre”.',
+      texto: 'Elegí tu vehiculo, el servicio y el horario. ¿Apurado? Tocá “Sugerir próximo horario libre”.',
     },
     {
       icon: 'construct-outline',
-      titulo: 'Seguí tu moto en vivo',
+      titulo: 'Seguí tu vehiculo en vivo',
       texto: 'Mirá el progreso, los avances y las fotos del taller. Confirmá tu asistencia con un toque.',
     },
     {

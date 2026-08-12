@@ -119,7 +119,7 @@ export class PortalService {
     secureRemove(TOKEN_KEY);
     secureRemove(CLIENTE_KEY);
     // Limpia el cache offline para no mostrar datos de otra cuenta tras cerrar sesión.
-    ['citas', 'resumen', 'motos'].forEach(n => localStorage.removeItem(`tallerms_cache_${n}`));
+    ['citas', 'resumen', 'vehiculos'].forEach(n => localStorage.removeItem(`tallerms_cache_${n}`));
     this.clienteSubject.next(null);
     this.noLeidasSubject.next(0);
   }
@@ -158,23 +158,23 @@ export class PortalService {
   }
 
   getMotos(): Observable<{ data: any[] }> {
-    return this.conCache('motos', this.http.get<{ data: any[] }>(`${this.url}/motos`));
+    return this.conCache('vehiculos', this.http.get<{ data: any[] }>(`${this.url}/vehiculos`));
   }
 
   crearMoto(data: { marca: string; modelo: string; placa: string; anio?: number | null; color?: string; kilometraje_actual?: number | null; foto?: string | null }): Observable<{ data: any }> {
-    return this.http.post<{ data: any }>(`${this.url}/motos`, data);
+    return this.http.post<{ data: any }>(`${this.url}/vehiculos`, data);
   }
 
   editarMoto(id: number, data: { marca: string; modelo: string; placa: string; anio?: number | null; color?: string; kilometraje_actual?: number | null; foto?: string | null }): Observable<{ data: any }> {
-    return this.http.put<{ data: any }>(`${this.url}/motos/${id}`, data);
+    return this.http.put<{ data: any }>(`${this.url}/vehiculos/${id}`, data);
   }
 
   eliminarMoto(id: number): Observable<any> {
-    return this.http.delete(`${this.url}/motos/${id}`);
+    return this.http.delete(`${this.url}/vehiculos/${id}`);
   }
 
   // Cache offline "suave": guarda la última respuesta buena en localStorage y, si la
-  // red falla, devuelve esa copia (para ver citas/motos/inicio sin conexión).
+  // red falla, devuelve esa copia (para ver citas/vehiculos/inicio sin conexión).
   private conCache<T>(nombre: string, fuente: Observable<T>): Observable<T> {
     const key = `tallerms_cache_${nombre}`;
     return fuente.pipe(
@@ -268,9 +268,9 @@ export class PortalService {
     return this.http.get<{ data: any }>(`${this.url}/proximo-libre`, { params: { sucursal_id: sucursalId } as any });
   }
 
-  // Línea de tiempo de servicios de una moto (citas entregadas).
-  getMotoHistorial(id: number): Observable<{ data: { moto: any; servicios: any[] } }> {
-    return this.http.get<{ data: any }>(`${this.url}/motos/${id}/historial`);
+  // Línea de tiempo de servicios de una vehiculo (citas entregadas).
+  getMotoHistorial(id: number): Observable<{ data: { vehiculo: any; servicios: any[] } }> {
+    return this.http.get<{ data: any }>(`${this.url}/vehiculos/${id}/historial`);
   }
 
   calificarCita(id: number, calificacion: number, comentario?: string): Observable<any> {

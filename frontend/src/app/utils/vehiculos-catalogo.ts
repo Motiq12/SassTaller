@@ -1,4 +1,4 @@
-// Catálogo de marcas y modelos de motos para el autocompletado del portal.
+// Catálogo de marcas y modelos de vehiculos para el autocompletado del portal.
 // No es exhaustivo ni una restricción: el cliente puede escribir una marca/modelo
 // que no esté en la lista (el backend acepta cualquier texto). Solo asiste la carga.
 

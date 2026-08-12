@@ -4,19 +4,19 @@ import { AlertController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PortalService } from '../../services/portal.service';
-import { MARCAS_MOTO, modelosDeMarca } from '../../utils/motos-catalogo';
+import { MARCAS_MOTO, modelosDeMarca } from '../../utils/vehiculos-catalogo';
 import { comprimirImagen } from '../../utils/imagen';
 import { mesesDesde } from '../../utils/mantenimiento';
 
 @Component({
   standalone: false,
-  selector: 'app-portal-motos',
-  templateUrl: './portal-motos.page.html',
-  styleUrls: ['./portal-motos.page.scss'],
+  selector: 'app-portal-vehiculos',
+  templateUrl: './portal-vehiculos.page.html',
+  styleUrls: ['./portal-vehiculos.page.scss'],
 })
-export class PortalMotosPage implements OnInit, OnDestroy {
+export class PortalVehiculosPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
-  motos: any[] = [];
+  vehiculos: any[] = [];
   cargando = true;
 
   mostrarForm = false;
@@ -31,7 +31,7 @@ export class PortalMotosPage implements OnInit, OnDestroy {
 
   constructor(private portal: PortalService, private toast: ToastController, private alert: AlertController, private router: Router) {}
 
-  verHistorial(m: any) { this.router.navigate(['/portal/moto', m.id, 'historial']); }
+  verHistorial(m: any) { this.router.navigate(['/portal/vehiculo', m.id, 'historial']); }
 
   // Aviso de servicio a nivel lista (a partir de la fecha del último servicio entregado).
   // Umbral por tiempo: ≥12 m "le toca", 6–11 m "revisión sugerida", <6 m "al día".
@@ -49,7 +49,7 @@ export class PortalMotosPage implements OnInit, OnDestroy {
   cargar() {
     this.cargando = true;
     this.portal.getMotos().pipe(takeUntil(this.destroy$)).subscribe({
-      next: res => { this.motos = res.data; this.cargando = false; },
+      next: res => { this.vehiculos = res.data; this.cargando = false; },
       error: () => { this.cargando = false; },
     });
   }
@@ -74,7 +74,7 @@ export class PortalMotosPage implements OnInit, OnDestroy {
     this.mostrarForm = true;
   }
 
-  // —— Foto de la moto ——
+  // —— Foto de la vehiculo ——
   async onFoto(ev: Event) {
     const input = ev.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -143,19 +143,19 @@ export class PortalMotosPage implements OnInit, OnDestroy {
     op.pipe(takeUntil(this.destroy$)).subscribe({
       next: res => {
         if (this.editandoId) {
-          const i = this.motos.findIndex(m => m.id === this.editandoId);
-          if (i >= 0) this.motos[i] = res.data;
-          this.mostrarToast('Moto actualizada');
+          const i = this.vehiculos.findIndex(m => m.id === this.editandoId);
+          if (i >= 0) this.vehiculos[i] = res.data;
+          this.mostrarToast('Vehiculo actualizada');
         } else {
-          this.motos.unshift(res.data);
-          this.mostrarToast('Moto registrada');
+          this.vehiculos.unshift(res.data);
+          this.mostrarToast('Vehiculo registrada');
         }
         this.cerrarForm();
         this.enviando = false;
       },
       error: err => {
         this.enviando = false;
-        this.mostrarToast(err.error?.error || 'No se pudo guardar la moto', 'danger');
+        this.mostrarToast(err.error?.error || 'No se pudo guardar la vehiculo', 'danger');
       },
     });
   }
@@ -163,7 +163,7 @@ export class PortalMotosPage implements OnInit, OnDestroy {
   async eliminar(m: any) {
     const al = await this.alert.create({
       cssClass: 'portal-alert',
-      header: 'Eliminar moto',
+      header: 'Eliminar vehiculo',
       message: `¿Querés eliminar tu ${m.marca} ${m.modelo} (${m.placa})? Dejará de aparecer en tu lista.`,
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
@@ -176,11 +176,11 @@ export class PortalMotosPage implements OnInit, OnDestroy {
   private confirmarEliminar(m: any) {
     this.portal.eliminarMoto(m.id).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
-        this.motos = this.motos.filter(x => x.id !== m.id);
+        this.vehiculos = this.vehiculos.filter(x => x.id !== m.id);
         if (this.editandoId === m.id) this.cerrarForm();
-        this.mostrarToast('Moto eliminada');
+        this.mostrarToast('Vehiculo eliminada');
       },
-      error: err => this.mostrarToast(err.error?.error || 'No se pudo eliminar la moto', 'danger'),
+      error: err => this.mostrarToast(err.error?.error || 'No se pudo eliminar la vehiculo', 'danger'),
     });
   }
 

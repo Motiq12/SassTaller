@@ -5,13 +5,13 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { CitasService } from '../../services/citas.service';
 import { ClientesService } from '../../services/clientes.service';
-import { MotosService } from '../../services/motos.service';
+import { VehiculosService } from '../../services/vehiculos.service';
 import { DashboardService } from '../../services/dashboard.service';
 import { RecepcionService } from '../../services/recepcion.service';
 import { AuthService } from '../../services/auth.service';
 import { Cita } from '../../models/cita.model';
 import { Cliente } from '../../models/cliente.model';
-import { Moto } from '../../models/moto.model';
+import { Vehiculo } from '../../models/vehiculo.model';
 
 @Component({ standalone: false,
   selector: 'app-cita-form',
@@ -29,7 +29,7 @@ export class CitaFormPage implements OnInit, OnDestroy {
 
   busquedaCliente = '';
   clientes: Cliente[] = [];
-  motos: Moto[] = [];
+  vehiculos: Vehiculo[] = [];
   tecnicos: any[] = [];
   // Catálogo del servidor, el mismo que ve el cliente en el portal. Antes esta
   // pantalla tenía su propia lista con otros nombres, así que una cita creada acá
@@ -42,7 +42,7 @@ export class CitaFormPage implements OnInit, OnDestroy {
     private router: Router,
     private citaSvc: CitasService,
     private clienteSvc: ClientesService,
-    private motoSvc: MotosService,
+    private motoSvc: VehiculosService,
     private dashSvc: DashboardService,
     private recepcionSvc: RecepcionService,
     public auth: AuthService,
@@ -66,7 +66,7 @@ export class CitaFormPage implements OnInit, OnDestroy {
         this.form = res.data;
         this.busquedaCliente = `${res.data.cliente_nombre} ${res.data.cliente_apellido}`;
         if (res.data.cliente_id) {
-          this.motoSvc.getAll({ cliente_id: res.data.cliente_id }).pipe(takeUntil(this.destroy$)).subscribe(r => this.motos = r.data);
+          this.motoSvc.getAll({ cliente_id: res.data.cliente_id }).pipe(takeUntil(this.destroy$)).subscribe(r => this.vehiculos = r.data);
         }
       });
     }
@@ -82,7 +82,7 @@ export class CitaFormPage implements OnInit, OnDestroy {
     this.form.cliente_id = c.id!;
     this.busquedaCliente = `${c.nombre} ${c.apellido}`;
     this.clientes = [];
-    this.motoSvc.getAll({ cliente_id: c.id }).pipe(takeUntil(this.destroy$)).subscribe(res => this.motos = res.data);
+    this.motoSvc.getAll({ cliente_id: c.id }).pipe(takeUntil(this.destroy$)).subscribe(res => this.vehiculos = res.data);
   }
 
   async guardar() {

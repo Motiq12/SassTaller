@@ -76,8 +76,8 @@
             <div class="ci-hora mono">{{ c.hora || '—' }}</div>
             <div class="ci-info">
               <strong>{{ c.cliente_nombre }} {{ c.cliente_apellido }}</strong>
-              <span class="ci-moto" *ngIf="c.marca">{{ c.marca }} {{ c.modelo }}<ng-container *ngIf="c.placa"> · {{ c.placa }}</ng-container></span>
-              <span class="ci-moto" *ngIf="c.tecnico_nombre"><ion-icon name="construct-outline"></ion-icon> {{ c.tecnico_nombre }}</span>
+              <span class="ci-vehiculo" *ngIf="c.marca">{{ c.marca }} {{ c.modelo }}<ng-container *ngIf="c.placa"> · {{ c.placa }}</ng-container></span>
+              <span class="ci-vehiculo" *ngIf="c.tecnico_nombre"><ion-icon name="construct-outline"></ion-icon> {{ c.tecnico_nombre }}</span>
               <div class="ci-badges">
                 <span class="pill" [ngClass]="estadoPill[c.estado]">{{ estadoLabel[c.estado] || c.estado }}</span>
                 <span class="badge llego" *ngIf="llego(c)"><ion-icon name="checkmark-circle"></ion-icon> Llegó</span>

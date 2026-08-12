@@ -54,7 +54,7 @@
         <div class="cita-list">
           <div class="cita-card" *ngFor="let c of citasHoy">
             <div class="cita-head">
-              <h4>{{ c.marca || 'Moto' }} {{ c.modelo || '' }}<span class="placa mono" *ngIf="c.placa"> · {{ c.placa }}</span></h4>
+              <h4>{{ c.marca || 'Vehiculo' }} {{ c.modelo || '' }}<span class="placa mono" *ngIf="c.placa"> · {{ c.placa }}</span></h4>
               <span class="st-badge" [ngClass]="estadoBadge[c.estado]">{{ estadoLabel[c.estado] }}</span>
             </div>
             <div class="cita-info">

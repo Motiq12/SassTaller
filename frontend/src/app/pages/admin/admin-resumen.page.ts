@@ -139,13 +139,13 @@ export class AdminResumenPage implements OnInit, OnDestroy {
         const filas = res.data.map((o: any) => ({
           numero_orden: o.numero_orden, estado: this.estadoTexto(o.estado),
           cliente: `${o.cliente_nombre || ''} ${o.cliente_apellido || ''}`.trim(),
-          moto: `${o.marca || ''} ${o.modelo || ''}`.trim(), placa: o.placa || '',
+          vehiculo: `${o.marca || ''} ${o.modelo || ''}`.trim(), placa: o.placa || '',
           tecnico: o.tecnico_nombre || '', ingreso: fechaCorta(o.fecha_ingreso),
           total: (o.costo_mano_obra || 0) + (o.costo_repuestos || 0) - (o.descuento || 0),
         }));
         descargarCSV(`ordenes_${this.hoy()}`, [
           { key: 'numero_orden', label: 'Orden' }, { key: 'estado', label: 'Estado' },
-          { key: 'cliente', label: 'Cliente' }, { key: 'moto', label: 'Moto' }, { key: 'placa', label: 'Placa' },
+          { key: 'cliente', label: 'Cliente' }, { key: 'vehiculo', label: 'Vehiculo' }, { key: 'placa', label: 'Placa' },
           { key: 'tecnico', label: 'Técnico' }, { key: 'ingreso', label: 'Ingreso' }, { key: 'total', label: 'Total' },
         ], filas);
         this.exportando = false; this.aviso(`${filas.length} órdenes exportadas`);
@@ -160,12 +160,12 @@ export class AdminResumenPage implements OnInit, OnDestroy {
       next: res => {
         const filas = res.data.map((o: any) => ({
           numero_orden: o.numero_orden, cliente: `${o.cliente_nombre || ''} ${o.cliente_apellido || ''}`.trim(),
-          moto: `${o.marca || ''} ${o.modelo || ''}`.trim(), entrega: fechaCorta(o.fecha_entrega_real),
+          vehiculo: `${o.marca || ''} ${o.modelo || ''}`.trim(), entrega: fechaCorta(o.fecha_entrega_real),
           metodo_pago: o.metodo_pago || '',
           total: (o.costo_mano_obra || 0) + (o.costo_repuestos || 0) - (o.descuento || 0),
         }));
         descargarCSV(`facturacion_${this.hoy()}`, [
-          { key: 'numero_orden', label: 'Orden' }, { key: 'cliente', label: 'Cliente' }, { key: 'moto', label: 'Moto' },
+          { key: 'numero_orden', label: 'Orden' }, { key: 'cliente', label: 'Cliente' }, { key: 'vehiculo', label: 'Vehiculo' },
           { key: 'entrega', label: 'Entrega' }, { key: 'metodo_pago', label: 'Método de pago' }, { key: 'total', label: 'Total' },
         ], filas);
         this.exportando = false; this.aviso(`${filas.length} facturas exportadas`);

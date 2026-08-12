@@ -73,12 +73,12 @@
           <div class="cita-row" *ngFor="let c of citasDia">
             <div class="ci-hora mono">{{ c.hora || '—' }}</div>
             <div class="ci-info">
-              <strong>{{ c.marca || 'Moto' }} {{ c.modelo || '' }}<span class="placa" *ngIf="c.placa"> · {{ c.placa }}</span></strong>
-              <span class="ci-moto" *ngIf="c.tipo_servicio">{{ c.tipo_servicio }}</span>
-              <span class="ci-moto" *ngIf="c.cliente_nombre">
+              <strong>{{ c.marca || 'Vehiculo' }} {{ c.modelo || '' }}<span class="placa" *ngIf="c.placa"> · {{ c.placa }}</span></strong>
+              <span class="ci-vehiculo" *ngIf="c.tipo_servicio">{{ c.tipo_servicio }}</span>
+              <span class="ci-vehiculo" *ngIf="c.cliente_nombre">
                 <ion-icon name="person-outline"></ion-icon> {{ c.cliente_nombre }} {{ c.cliente_apellido }}
               </span>
-              <span class="ci-moto mono" *ngIf="c.monto > 0">
+              <span class="ci-vehiculo mono" *ngIf="c.monto > 0">
                 <ion-icon name="cash-outline"></ion-icon> {{ c.monto | currency:'CRC':'symbol-narrow':'1.0-0' }}
               </span>
               <div class="ci-badges">

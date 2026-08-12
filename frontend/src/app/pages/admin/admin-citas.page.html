@@ -41,7 +41,7 @@
             <span class="oc-num mono">{{ o.numero_orden }}</span>
             <span class="bg" [ngClass]="ordenBadge[o.estado]">{{ ordenLabel(o.estado) }}</span>
           </div>
-          <div class="oc-moto">
+          <div class="oc-vehiculo">
             <ion-icon name="bicycle-outline"></ion-icon>
             <strong>{{ o.marca }} {{ o.modelo }}</strong>
             <span class="mono" *ngIf="o.placa">· {{ o.placa }}</span>
@@ -84,12 +84,12 @@
         <div class="tbl-wrap">
           <table class="tbl">
             <thead>
-              <tr><th>#</th><th>Moto / Placa</th><th>Cliente</th><th>Servicio</th><th>Fecha y hora</th><th>Mecánico</th><th>Estado</th><th>Acción</th></tr>
+              <tr><th>#</th><th>Vehiculo / Placa</th><th>Cliente</th><th>Servicio</th><th>Fecha y hora</th><th>Mecánico</th><th>Estado</th><th>Acción</th></tr>
             </thead>
             <tbody>
               <tr *ngFor="let c of citas">
                 <td class="mono clr-tx3">#{{ c.id }}</td>
-                <td><strong>{{ c.marca || 'Moto' }} {{ c.modelo || '' }}</strong><br><span class="mono clr-tx3" style="font-size:11px">{{ c.placa || '—' }}</span></td>
+                <td><strong>{{ c.marca || 'Vehiculo' }} {{ c.modelo || '' }}</strong><br><span class="mono clr-tx3" style="font-size:11px">{{ c.placa || '—' }}</span></td>
                 <td>{{ c.cliente_nombre }} {{ c.cliente_apellido }}</td>
                 <td style="font-size:12px">{{ c.tipo_servicio || c.motivo }}</td>
                 <td class="mono" style="font-size:11px">{{ c.fecha | date:'dd/MM/yy' }} · {{ c.hora?.slice(0,5) }}</td>

@@ -94,10 +94,10 @@ export class AdminCitasPage implements OnInit, OnDestroy {
   abrirOrden(o: any) { this.router.navigate(['/detalle-orden', o.id]); }
 
   async verDetalleCita(c: any) {
-    const moto = [c.marca, c.modelo].filter(Boolean).join(' ') || 'Moto';
+    const vehiculo = [c.marca, c.modelo].filter(Boolean).join(' ') || 'Vehiculo';
     const fecha = c.fecha ? new Date(c.fecha).toLocaleDateString('es-CR') : '—';
     const lineas = [
-      `${moto}${c.placa ? ' · ' + c.placa : ''}`,
+      `${vehiculo}${c.placa ? ' · ' + c.placa : ''}`,
       `Cliente: ${c.cliente_nombre || ''} ${c.cliente_apellido || ''}`,
       `Servicio: ${c.tipo_servicio || c.motivo || '—'}`,
       `Fecha: ${fecha} · ${c.hora?.slice(0, 5) || ''}`,
@@ -115,12 +115,12 @@ export class AdminCitasPage implements OnInit, OnDestroy {
 
   exportar() {
     descargarCSV(`citas_${new Date().toISOString().slice(0, 10)}`, [
-      { key: 'id', label: '#' }, { key: 'moto', label: 'Moto' }, { key: 'placa', label: 'Placa' },
+      { key: 'id', label: '#' }, { key: 'vehiculo', label: 'Vehiculo' }, { key: 'placa', label: 'Placa' },
       { key: 'cliente', label: 'Cliente' }, { key: 'servicio', label: 'Servicio' },
       { key: 'fecha', label: 'Fecha' }, { key: 'hora', label: 'Hora' },
       { key: 'tecnico', label: 'Mecánico' }, { key: 'sucursal', label: 'Sucursal' }, { key: 'estado', label: 'Estado' },
     ], this.citas.map(c => ({
-      id: c.id, moto: `${c.marca || ''} ${c.modelo || ''}`.trim(), placa: c.placa || '',
+      id: c.id, vehiculo: `${c.marca || ''} ${c.modelo || ''}`.trim(), placa: c.placa || '',
       cliente: `${c.cliente_nombre || ''} ${c.cliente_apellido || ''}`.trim(),
       servicio: c.tipo_servicio || c.motivo || '', fecha: fechaCorta(c.fecha),
       hora: (c.hora || '').slice(0, 5), tecnico: c.tecnico_nombre || '',

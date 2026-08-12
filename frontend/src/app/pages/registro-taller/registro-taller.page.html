@@ -48,6 +48,28 @@
           </ion-note>
         </div>
 
+        <!-- Define su catálogo de servicios inicial, los campos del formulario de
+             vehículo y cómo lo llama la interfaz. Se puede marcar más de uno. -->
+        <ion-item lines="none" class="etiqueta-grupo">
+          <ion-label>
+            <p class="titulo-grupo">¿Qué vehículos atienden?</p>
+            <p class="ayuda-grupo">Podés marcar más de uno. Define tu catálogo de servicios.</p>
+          </ion-label>
+        </ion-item>
+        <!-- Enlace de dos vías sobre un mapa, en vez de manejar el evento a mano.
+             Con [checked] + (ionChange) el estado del checkbox y el del componente
+             son dos cosas que hay que mantener sincronizadas, y ahí aparecen los
+             clics que no toman efecto. Con ngModel hay un solo estado. -->
+        <ion-item class="tipo-item" *ngFor="let t of tiposDisponibles">
+          <ion-checkbox
+            justify="start" labelPlacement="end"
+            [(ngModel)]="tiposMarcados[t.clave]"
+            [name]="'tipo_' + t.clave">{{ t.plural }}</ion-checkbox>
+        </ion-item>
+        <ion-note color="danger" class="aviso" *ngIf="tiposDisponibles.length && !tiposElegidos.length">
+          Elegí al menos un tipo de vehículo
+        </ion-note>
+
         <ion-item>
           <ion-input
             label="Teléfono" labelPlacement="stacked" placeholder="2222-0000"

@@ -20,7 +20,7 @@
     <div class="filtros" *ngIf="!cargando && citas.length">
       <div class="buscador">
         <ion-icon name="search-outline"></ion-icon>
-        <input type="text" [(ngModel)]="busqueda" placeholder="Buscar por moto, placa o servicio">
+        <input type="text" [(ngModel)]="busqueda" placeholder="Buscar por vehiculo, placa o servicio">
         <button class="bx" *ngIf="busqueda" (click)="busqueda=''" aria-label="Limpiar"><ion-icon name="close-circle"></ion-icon></button>
       </div>
       <div class="chips" *ngIf="vista==='pendientes'">

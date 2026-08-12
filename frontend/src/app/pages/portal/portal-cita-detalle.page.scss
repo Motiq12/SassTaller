@@ -33,7 +33,7 @@
     padding: 4px 11px; border-radius: 999px; }
 
   .ck-main { position: relative; display: flex; align-items: center; gap: 14px; }
-  .ck-moto { width: 76px; height: 60px; flex-shrink: 0; border-radius: 14px;
+  .ck-vehiculo { width: 76px; height: 60px; flex-shrink: 0; border-radius: 14px;
     display: flex; align-items: center; justify-content: center;
     background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08);
     color: rgba(255, 255, 255, 0.55); overflow: hidden;
@@ -71,7 +71,7 @@
     background: linear-gradient(90deg, #10B981, var(--ion-color-primary), #f43f5e);
     transition: width .8s cubic-bezier(.4, 0, .2, 1);
   }
-  .tl-moto {
+  .tl-vehiculo {
     position: absolute; top: 50%; transform: translate(-50%, -50%);
     transition: left .8s cubic-bezier(.4, 0, .2, 1);
     ion-icon {

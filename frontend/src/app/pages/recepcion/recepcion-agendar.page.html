@@ -40,13 +40,13 @@
       </div>
 
       <div class="ig" *ngIf="cliente">
-        <label>Moto{{ modo === 'ahora' ? ' *' : '' }}</label>
-        <select [(ngModel)]="form.moto_id" *ngIf="motos.length">
-          <option [ngValue]="null">{{ modo === 'ahora' ? 'Elegí la moto' : 'Sin especificar' }}</option>
-          <option *ngFor="let m of motos" [ngValue]="m.id">{{ m.marca }} {{ m.modelo }}{{ m.placa ? ' — ' + m.placa : '' }}</option>
+        <label>Vehiculo{{ modo === 'ahora' ? ' *' : '' }}</label>
+        <select [(ngModel)]="form.moto_id" *ngIf="vehiculos.length">
+          <option [ngValue]="null">{{ modo === 'ahora' ? 'Elegí la vehiculo' : 'Sin especificar' }}</option>
+          <option *ngFor="let m of vehiculos" [ngValue]="m.id">{{ m.marca }} {{ m.modelo }}{{ m.placa ? ' — ' + m.placa : '' }}</option>
         </select>
         <button type="button" class="link-nuevo" (click)="registrarMoto()">
-          <ion-icon name="add-outline"></ion-icon> {{ motos.length ? 'Registrar otra moto' : 'Este cliente no tiene motos · Registrar' }}
+          <ion-icon name="add-outline"></ion-icon> {{ vehiculos.length ? 'Registrar otra vehiculo' : 'Este cliente no tiene vehiculos · Registrar' }}
         </button>
       </div>
 
@@ -76,7 +76,7 @@
 
       <div class="ig">
         <label>Problema reportado *</label>
-        <textarea [(ngModel)]="form.problema_reportado" placeholder="Lo que dice el cliente sobre su moto..."></textarea>
+        <textarea [(ngModel)]="form.problema_reportado" placeholder="Lo que dice el cliente sobre su vehiculo..."></textarea>
       </div>
 
       <div class="grid2">
@@ -134,7 +134,7 @@
 
       <div class="ig" style="margin-bottom:4px">
         <label>Problema o notas (opcional)</label>
-        <textarea [(ngModel)]="form.motivo" placeholder="Anotá lo que dijo el cliente sobre su moto..."></textarea>
+        <textarea [(ngModel)]="form.motivo" placeholder="Anotá lo que dijo el cliente sobre su vehiculo..."></textarea>
       </div>
     </section>
 

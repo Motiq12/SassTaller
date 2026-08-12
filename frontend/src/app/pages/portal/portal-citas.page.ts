@@ -21,7 +21,7 @@ export class PortalCitasPage implements OnInit, OnDestroy {
   reporteAbierto = new Set<number>();
   confirmando = new Set<number>();
 
-  // Buscador (por moto/placa/servicio) y filtro por estado (solo en pendientes).
+  // Buscador (por vehiculo/placa/servicio) y filtro por estado (solo en pendientes).
   busqueda = '';
   filtroEstado = '';
 
@@ -60,7 +60,7 @@ export class PortalCitasPage implements OnInit, OnDestroy {
   limpiarFiltros() { this.busqueda = ''; this.filtroEstado = ''; }
   toggleEstado(e: string) { this.filtroEstado = this.filtroEstado === e ? '' : e; }
 
-  // Texto de la cita contra el que se busca (moto, placa, servicio).
+  // Texto de la cita contra el que se busca (vehiculo, placa, servicio).
   private coincide(c: any): boolean {
     const q = this.busqueda.trim().toLowerCase();
     if (!q) return true;

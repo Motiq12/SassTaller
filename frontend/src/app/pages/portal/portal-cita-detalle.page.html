@@ -26,7 +26,7 @@
       </div>
 
       <div class="ck-main">
-        <div class="ck-moto" [class.has-photo]="cita.moto_foto">
+        <div class="ck-vehiculo" [class.has-photo]="cita.moto_foto">
           <img *ngIf="cita.moto_foto; else motoSvg" [src]="cita.moto_foto" [alt]="cita.marca + ' ' + cita.modelo">
           <ng-template #motoSvg>
             <svg viewBox="0 0 64 40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -58,7 +58,7 @@
       </div>
       <div class="tl-progress-bar" *ngIf="cita.estado !== 'cancelado'">
         <div class="tl-progress-fill" [style.width.%]="progPct"></div>
-        <div class="tl-moto" [style.left.%]="progPct">
+        <div class="tl-vehiculo" [style.left.%]="progPct">
           <ion-icon name="bicycle"></ion-icon>
         </div>
       </div>

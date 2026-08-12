@@ -4,21 +4,21 @@ import { Location } from '@angular/common';
 import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { MotosService } from '../../services/motos.service';
-import { Moto } from '../../models/moto.model';
+import { VehiculosService } from '../../services/vehiculos.service';
+import { Vehiculo } from '../../models/vehiculo.model';
 
 @Component({ standalone: false,
-  selector: 'app-moto-form',
-  templateUrl: './moto-form.page.html',
-  styleUrls: ['./moto-form.page.scss'],
+  selector: 'app-vehiculo-form',
+  templateUrl: './vehiculo-form.page.html',
+  styleUrls: ['./vehiculo-form.page.scss'],
 })
-export class MotoFormPage implements OnInit, OnDestroy {
+export class VehiculoFormPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   esEdicion = false;
   motoId: number | null = null;
   guardando = false;
 
-  form: Moto = {
+  form: Vehiculo = {
     cliente_id: 0, marca: '', modelo: '',
     anio: null, placa: '', color: '',
     numero_motor: '', numero_chasis: '', kilometraje_actual: 0,
@@ -33,7 +33,7 @@ export class MotoFormPage implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     private location: Location,
-    private motoSvc: MotosService,
+    private motoSvc: VehiculosService,
     private loading: LoadingController,
     private toast: ToastController
   ) {}
@@ -62,7 +62,7 @@ export class MotoFormPage implements OnInit, OnDestroy {
     op.pipe(takeUntil(this.destroy$)).subscribe({
       next: async () => {
         await l.dismiss(); this.guardando = false;
-        const t = await this.toast.create({ message: 'Moto guardada', duration: 2000, color: 'success' });
+        const t = await this.toast.create({ message: 'Vehiculo guardada', duration: 2000, color: 'success' });
         await t.present();
         this.location.back();
       },

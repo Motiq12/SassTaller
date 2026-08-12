@@ -92,7 +92,7 @@
       </ion-button>
     </ion-card-header>
     <ion-list>
-      <ion-item *ngFor="let m of motos" button (click)="abrirHistorial(m)" detail="true">
+      <ion-item *ngFor="let m of vehiculos" button (click)="abrirHistorial(m)" detail="true">
         <ion-icon name="bicycle-outline" slot="start" color="primary"></ion-icon>
         <ion-label>
           <h2>{{ m.marca }} {{ m.modelo }} {{ m.anio }}</h2>
@@ -100,8 +100,8 @@
           <p>{{ m.kilometraje_actual | number }} km</p>
         </ion-label>
       </ion-item>
-      <ion-item *ngIf="motos.length === 0">
-        <ion-label color="medium"><p>Sin motos registradas</p></ion-label>
+      <ion-item *ngIf="vehiculos.length === 0">
+        <ion-label color="medium"><p>Sin vehiculos registradas</p></ion-label>
       </ion-item>
     </ion-list>
   </ion-card>

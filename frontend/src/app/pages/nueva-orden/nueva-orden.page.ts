@@ -4,10 +4,10 @@ import { AlertController, LoadingController, ToastController } from '@ionic/angu
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { ClientesService } from '../../services/clientes.service';
-import { MotosService } from '../../services/motos.service';
+import { VehiculosService } from '../../services/vehiculos.service';
 import { OrdenesService } from '../../services/ordenes.service';
 import { Cliente } from '../../models/cliente.model';
-import { Moto } from '../../models/moto.model';
+import { Vehiculo } from '../../models/vehiculo.model';
 
 @Component({ standalone: false,
   selector: 'app-nueva-orden',
@@ -16,7 +16,7 @@ import { Moto } from '../../models/moto.model';
 })
 export class NuevaOrdenPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
-  paso = 1; // 1=cliente, 2=moto, 3=recepcion
+  paso = 1; // 1=cliente, 2=vehiculo, 3=recepcion
 
   // Paso 1
   busquedaCliente = '';
@@ -24,8 +24,8 @@ export class NuevaOrdenPage implements OnInit, OnDestroy {
   clienteSeleccionado: Cliente | null = null;
 
   // Paso 2
-  motos: Moto[] = [];
-  motoSeleccionada: Moto | null = null;
+  vehiculos: Vehiculo[] = [];
+  motoSeleccionada: Vehiculo | null = null;
 
   // Paso 3
   form = {
@@ -41,7 +41,7 @@ export class NuevaOrdenPage implements OnInit, OnDestroy {
 
   constructor(
     private clienteSvc: ClientesService,
-    private motoSvc: MotosService,
+    private motoSvc: VehiculosService,
     private ordenSvc: OrdenesService,
     private router: Router,
     private loading: LoadingController,
@@ -61,11 +61,11 @@ export class NuevaOrdenPage implements OnInit, OnDestroy {
     this.clienteSeleccionado = c;
     this.clientes = [];
     this.busquedaCliente = `${c.nombre} ${c.apellido}`;
-    this.motoSvc.getAll({ cliente_id: c.id }).pipe(takeUntil(this.destroy$)).subscribe(res => this.motos = res.data);
+    this.motoSvc.getAll({ cliente_id: c.id }).pipe(takeUntil(this.destroy$)).subscribe(res => this.vehiculos = res.data);
     this.paso = 2;
   }
 
-  seleccionarMoto(m: Moto) {
+  seleccionarMoto(m: Vehiculo) {
     this.motoSeleccionada = m;
     this.paso = 3;
   }

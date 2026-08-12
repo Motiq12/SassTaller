@@ -36,7 +36,7 @@
           <span class="qs-ava">{{ (c.nombre || '?').charAt(0) }}{{ (c.apellido || '').charAt(0) }}</span>
           <span class="qs-info">
             <strong>{{ c.nombre }} {{ c.apellido }}</strong>
-            <span>{{ c.telefono }}<ng-container *ngIf="c.total_motos"> · {{ c.total_motos }} moto(s)</ng-container></span>
+            <span>{{ c.telefono }}<ng-container *ngIf="c.total_motos"> · {{ c.total_motos }} vehiculo(s)</ng-container></span>
           </span>
           <ion-icon name="chevron-forward"></ion-icon>
         </button>
@@ -150,7 +150,7 @@
                     <span class="tag-prox" *ngIf="c.id === proximaId && g.key === 'porVenir'">Próxima</span>
                     <span class="tag-atr" *ngIf="esAtrasada(c)">Atrasada</span>
                   </strong>
-                  <span>{{ c.marca || 'Moto' }} {{ c.modelo || '' }}<ng-container *ngIf="c.tipo_servicio"> · {{ c.tipo_servicio }}</ng-container></span>
+                  <span>{{ c.marca || 'Vehiculo' }} {{ c.modelo || '' }}<ng-container *ngIf="c.tipo_servicio"> · {{ c.tipo_servicio }}</ng-container></span>
                   <span class="cita-suc" *ngIf="c.sucursal_nombre"><ion-icon name="location-outline"></ion-icon> {{ c.sucursal_nombre }}</span>
                   <!-- En espera: cuánto lleva. Si no, la señal de confirmación de asistencia. -->
                   <span class="conf espera" *ngIf="g.key === 'esperando'" [class.larga]="esperaLarga(c)">

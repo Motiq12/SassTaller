@@ -1,9 +1,9 @@
 <ion-header>
   <ion-toolbar>
     <ion-buttons slot="start">
-      <ion-back-button defaultHref="/portal/motos" text=""></ion-back-button>
+      <ion-back-button defaultHref="/portal/vehiculos" text=""></ion-back-button>
     </ion-buttons>
-    <ion-title>Perfil de la moto</ion-title>
+    <ion-title>Perfil de la vehiculo</ion-title>
   </ion-toolbar>
 </ion-header>
 
@@ -14,13 +14,13 @@
     <div class="skeleton" style="height:200px"></div>
   </div>
 
-  <div class="hist" *ngIf="!cargando && moto">
+  <div class="hist" *ngIf="!cargando && vehiculo">
 
-    <!-- ═══ HERO: perfil de la moto ═══ -->
+    <!-- ═══ HERO: perfil de la vehiculo ═══ -->
     <section class="cockpit">
       <div class="ck-main">
-        <div class="ck-moto" [class.has-photo]="moto.foto">
-          <img *ngIf="moto.foto; else motoSvg" [src]="moto.foto" [alt]="moto.marca + ' ' + moto.modelo">
+        <div class="ck-vehiculo" [class.has-photo]="vehiculo.foto">
+          <img *ngIf="vehiculo.foto; else motoSvg" [src]="vehiculo.foto" [alt]="vehiculo.marca + ' ' + vehiculo.modelo">
           <ng-template #motoSvg>
             <svg viewBox="0 0 64 40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <circle cx="13" cy="28" r="9"/><circle cx="51" cy="28" r="9"/>
@@ -29,14 +29,14 @@
           </ng-template>
         </div>
         <div class="ck-id">
-          <h1>{{ moto.marca }} {{ moto.modelo }}</h1>
-          <span class="ck-plate mono" *ngIf="moto.placa">{{ moto.placa | uppercase }}</span>
+          <h1>{{ vehiculo.marca }} {{ vehiculo.modelo }}</h1>
+          <span class="ck-plate mono" *ngIf="vehiculo.placa">{{ vehiculo.placa | uppercase }}</span>
         </div>
       </div>
       <div class="ck-tele">
-        <div class="tl" *ngIf="moto.kilometraje_actual"><span class="tk">Kilometraje</span><span class="tv mono">{{ moto.kilometraje_actual | number }} km</span></div>
-        <div class="tl" *ngIf="moto.anio"><span class="tk">Año</span><span class="tv mono">{{ moto.anio }}</span></div>
-        <div class="tl" *ngIf="moto.color"><span class="tk">Color</span><span class="tv">{{ moto.color }}</span></div>
+        <div class="tl" *ngIf="vehiculo.kilometraje_actual"><span class="tk">Kilometraje</span><span class="tv mono">{{ vehiculo.kilometraje_actual | number }} km</span></div>
+        <div class="tl" *ngIf="vehiculo.anio"><span class="tk">Año</span><span class="tv mono">{{ vehiculo.anio }}</span></div>
+        <div class="tl" *ngIf="vehiculo.color"><span class="tk">Color</span><span class="tv">{{ vehiculo.color }}</span></div>
         <div class="tl"><span class="tk">Servicios</span><span class="tv mono">{{ servicios.length }}</span></div>
       </div>
     </section>
@@ -89,14 +89,14 @@
     <!-- Vacío: sin servicios todavía -->
     <div class="empty" *ngIf="!servicios.length">
       <ion-icon name="time-outline"></ion-icon>
-      <p>Esta moto todavía no tiene servicios completados.</p>
+      <p>Esta vehiculo todavía no tiene servicios completados.</p>
     </div>
 
     <div style="height:40px"></div>
   </div>
 
-  <div class="hist empty" *ngIf="!cargando && !moto">
+  <div class="hist empty" *ngIf="!cargando && !vehiculo">
     <ion-icon name="alert-circle-outline"></ion-icon>
-    <p>No se encontró la moto.</p>
+    <p>No se encontró la vehiculo.</p>
   </div>
 </ion-content>

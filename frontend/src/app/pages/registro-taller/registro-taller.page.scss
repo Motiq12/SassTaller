@@ -57,3 +57,24 @@
     font-weight: 600;
   }
 }
+
+/* Selección de tipos de vehículo: su encabezado no es un campo más, así que se
+   distingue del resto del formulario para que se lea como una pregunta aparte. */
+.etiqueta-grupo {
+  --padding-start: 1rem;
+  --min-height: auto;
+  margin-top: 0.5rem;
+}
+
+.titulo-grupo {
+  font-weight: 600;
+  color: var(--ion-color-dark);
+  margin: 0 0 0.15rem;
+}
+
+.ayuda-grupo {
+  color: var(--ion-color-medium);
+  font-size: 0.8rem;
+  margin: 0;
+}
+

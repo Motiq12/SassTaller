@@ -17,7 +17,7 @@ export class PortalAgendarPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   servicios: string[] = [];
   readonly horas = HORAS;
-  motos: any[] = [];
+  vehiculos: any[] = [];
   sucursales: any[] = [];
   hoy = new Date().toISOString().slice(0, 10);
 
@@ -37,8 +37,8 @@ export class PortalAgendarPage implements OnInit, OnDestroy {
     private toast: ToastController
   ) {}
 
-  // Prefill desde "Mi Garaje" (?moto=&servicio=): se aplica una sola vez al cargar motos.
-  private prefill: { moto?: number; servicio?: string } | null = null;
+  // Prefill desde "Mi Garaje" (?vehiculo=&servicio=): se aplica una sola vez al cargar vehiculos.
+  private prefill: { vehiculo?: number; servicio?: string } | null = null;
 
   ngOnInit() {
     this.cargarMotos();
@@ -47,21 +47,21 @@ export class PortalAgendarPage implements OnInit, OnDestroy {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) { this.cargarParaEditar(+id); return; }
     const qp = this.route.snapshot.queryParamMap;
-    const motoQ = qp.get('moto');
+    const motoQ = qp.get('vehiculo');
     const servQ = qp.get('servicio');
-    if (motoQ || servQ) this.prefill = { moto: motoQ ? +motoQ : undefined, servicio: servQ || undefined };
+    if (motoQ || servQ) this.prefill = { vehiculo: motoQ ? +motoQ : undefined, servicio: servQ || undefined };
   }
   ionViewWillEnter() { this.cargarMotos(); }
 
   // Las dos cargas son asíncronas y el prefill necesita ambas, así que cada una avisa
-  // al llegar y el prefill se aplica cuando ya están las dos. Sin esto, si las motos
+  // al llegar y el prefill se aplica cuando ya están las dos. Sin esto, si las vehiculos
   // llegaban antes que los servicios, el servicio sugerido se perdía en silencio.
   private motosListas = false;
   private serviciosListos = false;
 
   cargarMotos() {
     this.portal.getMotos().pipe(takeUntil(this.destroy$)).subscribe(r => {
-      this.motos = r.data;
+      this.vehiculos = r.data;
       this.motosListas = true;
       this.aplicarPrefill();
     });
@@ -74,11 +74,11 @@ export class PortalAgendarPage implements OnInit, OnDestroy {
     });
   }
 
-  // Precarga moto + servicio sugeridos (validados contra los datos reales), una sola vez.
+  // Precarga vehiculo + servicio sugeridos (validados contra los datos reales), una sola vez.
   private aplicarPrefill() {
     if (!this.prefill || this.editId) return;
     if (!this.motosListas || !this.serviciosListos) return;
-    if (this.prefill.moto && this.motos.some(m => m.id === this.prefill!.moto)) this.form.moto_id = this.prefill.moto;
+    if (this.prefill.vehiculo && this.vehiculos.some(m => m.id === this.prefill!.vehiculo)) this.form.moto_id = this.prefill.vehiculo;
     if (this.prefill.servicio && this.servicios.includes(this.prefill.servicio)) this.form.tipo_servicio = this.prefill.servicio;
     this.prefill = null;
   }
@@ -193,14 +193,14 @@ export class PortalAgendarPage implements OnInit, OnDestroy {
     setTimeout(() => (this.msgHora = ''), 2500);
   }
 
-  // Moto seleccionada (para el preview con foto bajo el selector).
-  get motoSel(): any { return this.motos.find(m => m.id === this.form.moto_id) || null; }
+  // Vehiculo seleccionada (para el preview con foto bajo el selector).
+  get motoSel(): any { return this.vehiculos.find(m => m.id === this.form.moto_id) || null; }
 
   // Dirección de la sucursal elegida (para mostrarla bajo el selector).
   get sucursalSelDir(): string | null {
     return this.sucursales.find(s => s.id === this.form.sucursal_id)?.direccion || null;
   }
-  irAMotos() { this.router.navigate(['/portal/motos']); }
+  irAMotos() { this.router.navigate(['/portal/vehiculos']); }
 
   get valido(): boolean {
     return !!(this.form.sucursal_id && this.form.moto_id && this.form.tipo_servicio && this.form.fecha && this.form.hora);
@@ -239,7 +239,7 @@ export class PortalAgendarPage implements OnInit, OnDestroy {
   }
 
   async agendar() {
-    if (!this.valido) return this.toastMsg('Completá moto, servicio, fecha y hora', 'warning');
+    if (!this.valido) return this.toastMsg('Completá vehiculo, servicio, fecha y hora', 'warning');
     if (this.horaPasada(this.form.hora)) return this.toastMsg('Esa hora ya pasó. Elegí un horario más tarde.', 'warning');
     if (this.horaLlena(this.form.hora)) return this.toastMsg('Esa hora ya no está disponible', 'warning');
     const editando = this.editId;

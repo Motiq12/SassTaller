@@ -1,4 +1,4 @@
-export interface Moto {
+export interface Vehiculo {
   id?: number;
   cliente_id: number;
   marca: string;

@@ -3,25 +3,25 @@
     <ion-buttons slot="start">
       <ion-back-button></ion-back-button>
     </ion-buttons>
-    <ion-title *ngIf="moto">{{ moto.marca }} {{ moto.modelo }}</ion-title>
+    <ion-title *ngIf="vehiculo">{{ vehiculo.marca }} {{ vehiculo.modelo }}</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content *ngIf="!cargando && moto">
+<ion-content *ngIf="!cargando && vehiculo">
   <ion-card>
     <ion-card-header>
-      <ion-card-title>{{ moto.marca }} {{ moto.modelo }} {{ moto.anio }}</ion-card-title>
-      <ion-card-subtitle>{{ moto.cliente_nombre }} {{ moto.cliente_apellido }}</ion-card-subtitle>
+      <ion-card-title>{{ vehiculo.marca }} {{ vehiculo.modelo }} {{ vehiculo.anio }}</ion-card-title>
+      <ion-card-subtitle>{{ vehiculo.cliente_nombre }} {{ vehiculo.cliente_apellido }}</ion-card-subtitle>
     </ion-card-header>
     <ion-list>
-      <ion-item *ngIf="moto.placa">
-        <ion-label><strong>Placa:</strong> {{ moto.placa }}</ion-label>
+      <ion-item *ngIf="vehiculo.placa">
+        <ion-label><strong>Placa:</strong> {{ vehiculo.placa }}</ion-label>
       </ion-item>
-      <ion-item *ngIf="moto.color">
-        <ion-label><strong>Color:</strong> {{ moto.color }}</ion-label>
+      <ion-item *ngIf="vehiculo.color">
+        <ion-label><strong>Color:</strong> {{ vehiculo.color }}</ion-label>
       </ion-item>
       <ion-item>
-        <ion-label><strong>Kilometraje:</strong> {{ moto.kilometraje_actual | number }} km</ion-label>
+        <ion-label><strong>Kilometraje:</strong> {{ vehiculo.kilometraje_actual | number }} km</ion-label>
       </ion-item>
     </ion-list>
   </ion-card>
@@ -43,7 +43,7 @@
 
   <ion-card *ngIf="historial.length === 0">
     <ion-card-content class="ion-text-center" color="medium">
-      <p>Sin servicios registrados para esta moto</p>
+      <p>Sin servicios registrados para esta vehiculo</p>
     </ion-card-content>
   </ion-card>
 </ion-content>

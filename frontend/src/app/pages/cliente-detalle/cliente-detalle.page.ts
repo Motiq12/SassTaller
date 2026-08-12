@@ -6,7 +6,7 @@ import { takeUntil } from 'rxjs/operators';
 import { ClientesService } from '../../services/clientes.service';
 import { AuthService } from '../../services/auth.service';
 import { Cliente } from '../../models/cliente.model';
-import { Moto } from '../../models/moto.model';
+import { Vehiculo } from '../../models/vehiculo.model';
 import { Orden } from '../../models/orden.model';
 import { abrirWhatsApp } from '../../shared/whatsapp.util';
 
@@ -18,7 +18,7 @@ import { abrirWhatsApp } from '../../shared/whatsapp.util';
 export class ClienteDetallePage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   cliente: Cliente | null = null;
-  motos: Moto[] = [];
+  vehiculos: Vehiculo[] = [];
   ordenes: Orden[] = [];
   cargando = true;
 
@@ -44,14 +44,14 @@ export class ClienteDetallePage implements OnInit, OnDestroy {
 
   recargar(id: number) {
     this.clienteSvc.getById(id).pipe(takeUntil(this.destroy$)).subscribe(res => { this.cliente = res.data; this.cargando = false; });
-    this.clienteSvc.getMotos(id).pipe(takeUntil(this.destroy$)).subscribe(res => this.motos = res.data);
+    this.clienteSvc.getMotos(id).pipe(takeUntil(this.destroy$)).subscribe(res => this.vehiculos = res.data);
     this.clienteSvc.getOrdenes(id).pipe(takeUntil(this.destroy$)).subscribe(res => this.ordenes = res.data);
   }
 
   editarCliente() { this.router.navigate(['/cliente-form', this.cliente!.id]); }
-  nuevaMoto() { this.router.navigate(['/moto-form'], { queryParams: { cliente_id: this.cliente!.id } }); }
+  nuevaMoto() { this.router.navigate(['/vehiculo-form'], { queryParams: { cliente_id: this.cliente!.id } }); }
   abrirOrden(id: number) { this.router.navigate(['/detalle-orden', id]); }
-  abrirHistorial(moto: Moto) { this.router.navigate(['/moto-historial', moto.id]); }
+  abrirHistorial(vehiculo: Vehiculo) { this.router.navigate(['/vehiculo-historial', vehiculo.id]); }
 
   async canjearCortesia() {
     const conf = await this.alert.create({
@@ -131,7 +131,7 @@ export class ClienteDetallePage implements OnInit, OnDestroy {
   async eliminarCliente() {
     const conf = await this.alert.create({
       header: 'Eliminar cliente',
-      message: `¿Eliminar a ${this.cliente!.nombre} ${this.cliente!.apellido || ''}? Se borran sus datos personales, su acceso al portal y sus motos salen de los listados. Las órdenes y facturas ya registradas se conservan. No se puede deshacer.`,
+      message: `¿Eliminar a ${this.cliente!.nombre} ${this.cliente!.apellido || ''}? Se borran sus datos personales, su acceso al portal y sus vehiculos salen de los listados. Las órdenes y facturas ya registradas se conservan. No se puede deshacer.`,
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         {
@@ -157,7 +157,7 @@ export class ClienteDetallePage implements OnInit, OnDestroy {
   async compartirCredenciales(password: string) {
     const url = `${location.origin}/portal/login`;
     const msg =
-      `Hola ${this.cliente!.nombre}, ya podés seguir el estado de tu moto en línea:\n` +
+      `Hola ${this.cliente!.nombre}, ya podés seguir el estado de tu vehiculo en línea:\n` +
       `${url}\n\nUsuario: ${this.cliente!.email}\nContraseña: ${password}\n\n` +
       `Ahí vas a ver el avance y aprobar presupuestos.`;
     const a = await this.alert.create({

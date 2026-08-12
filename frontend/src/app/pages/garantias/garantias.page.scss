@@ -16,7 +16,7 @@
   color: var(--text-accent);  // AA
 }
 
-.garantia-moto {
+.garantia-vehiculo {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -73,7 +73,7 @@
 }
 
 // Modal
-.modal-moto { font-size: 15px; margin: 0 0 4px; }
+.modal-vehiculo { font-size: 15px; margin: 0 0 4px; }
 .modal-cliente { font-size: 13px; color: var(--ion-color-medium); margin: 0 0 10px; }
 .modal-problema { font-size: 14px; margin: 0 0 6px; line-height: 1.4; }
 .modal-creado { font-size: 11px; color: var(--ion-color-medium); margin: 0; }

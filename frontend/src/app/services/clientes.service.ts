@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { Cliente } from '../models/cliente.model';
-import { Moto } from '../models/moto.model';
+import { Vehiculo } from '../models/vehiculo.model';
 import { Orden } from '../models/orden.model';
 
 @Injectable({ providedIn: 'root' })
@@ -29,8 +29,8 @@ export class ClientesService {
     return this.http.put<{ data: Cliente }>(`${this.url}/${id}`, cliente);
   }
 
-  getMotos(id: number): Observable<{ data: Moto[] }> {
-    return this.http.get<{ data: Moto[] }>(`${this.url}/${id}/motos`);
+  getMotos(id: number): Observable<{ data: Vehiculo[] }> {
+    return this.http.get<{ data: Vehiculo[] }>(`${this.url}/${id}/vehiculos`);
   }
 
   getOrdenes(id: number): Observable<{ data: Orden[] }> {

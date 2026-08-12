@@ -2,30 +2,30 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { MotosService } from '../../services/motos.service';
-import { Moto } from '../../models/moto.model';
+import { VehiculosService } from '../../services/vehiculos.service';
+import { Vehiculo } from '../../models/vehiculo.model';
 import { Orden } from '../../models/orden.model';
 
 @Component({ standalone: false,
-  selector: 'app-moto-historial',
-  templateUrl: './moto-historial.page.html',
-  styleUrls: ['./moto-historial.page.scss'],
+  selector: 'app-vehiculo-historial',
+  templateUrl: './vehiculo-historial.page.html',
+  styleUrls: ['./vehiculo-historial.page.scss'],
 })
-export class MotoHistorialPage implements OnInit, OnDestroy {
+export class VehiculoHistorialPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
-  moto: Moto | null = null;
+  vehiculo: Vehiculo | null = null;
   historial: Orden[] = [];
   cargando = true;
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private motoSvc: MotosService
+    private motoSvc: VehiculosService
   ) {}
 
   ngOnInit() {
     const id = +(this.route.snapshot.paramMap.get('id') || 0);
-    this.motoSvc.getById(id).pipe(takeUntil(this.destroy$)).subscribe(res => { this.moto = res.data; this.cargando = false; });
+    this.motoSvc.getById(id).pipe(takeUntil(this.destroy$)).subscribe(res => { this.vehiculo = res.data; this.cargando = false; });
     this.motoSvc.getHistorial(id).pipe(takeUntil(this.destroy$)).subscribe(res => this.historial = res.data);
   }
 

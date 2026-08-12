@@ -24,12 +24,12 @@
         </div>
       </div>
 
-      <!-- Moto (opcional) -->
-      <div class="fg" *ngIf="motos.length">
-        <label>Moto (opcional)</label>
+      <!-- Vehiculo (opcional) -->
+      <div class="fg" *ngIf="vehiculos.length">
+        <label>Vehiculo (opcional)</label>
         <select [(ngModel)]="form.moto_id">
-          <option [ngValue]="undefined">Seleccionar moto</option>
-          <option *ngFor="let m of motos" [ngValue]="m.id">{{ m.marca }} {{ m.modelo }}{{ m.placa ? ' (' + m.placa + ')' : '' }}</option>
+          <option [ngValue]="undefined">Seleccionar vehiculo</option>
+          <option *ngFor="let m of vehiculos" [ngValue]="m.id">{{ m.marca }} {{ m.modelo }}{{ m.placa ? ' (' + m.placa + ')' : '' }}</option>
         </select>
       </div>
 

@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Capacitor } from '@capacitor/core';
-import { Observable } from 'rxjs';
+import { Observable, shareReplay } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 const TALLER_KEY = 'tallerms_taller';
@@ -13,6 +13,27 @@ export interface DisponibilidadSlug {
   slug: string;
   disponible: boolean;
   motivo: string | null;
+}
+
+// Campo propio de un tipo de vehículo (cilindrada de una moto, puertas de un auto).
+// La definición viene del servidor: si el frontend tuviera su propia copia, agregar
+// un tipo obligaría a tocar los dos lados y el formulario podría pedir un dato que
+// el servidor descarta sin avisar.
+export interface CampoTipo {
+  clave: string;
+  etiqueta: string;
+  tipo: 'numero' | 'opcion' | 'texto';
+  opciones?: string[];
+  min?: number;
+  max?: number;
+}
+
+export interface TipoVehiculo {
+  clave: string;
+  etiqueta: string;
+  plural: string;
+  unidadUso: string;
+  campos: CampoTipo[];
 }
 
 /**
@@ -81,15 +102,31 @@ export class TallerService {
     );
   }
 
+  /**
+   * Tipos de vehículo que ofrece el sistema, con sus campos propios. Se cachea:
+   * es un catálogo fijo que no cambia entre pantallas, y lo consultan tanto el
+   * alta del taller como el formulario de vehículo.
+   */
+  tipos(): Observable<{ data: TipoVehiculo[] }> {
+    if (!this.tiposCache) {
+      this.tiposCache = this.http
+        .get<{ data: TipoVehiculo[] }>(`${this.apiUrl}/onboarding/tipos`)
+        .pipe(shareReplay(1));
+    }
+    return this.tiposCache;
+  }
+  private tiposCache?: Observable<{ data: TipoVehiculo[] }>;
+
   /** Alta de un taller nuevo. Devuelve sesión de admin lista para usar. */
   registrarTaller(datos: {
     nombre: string;
     slug?: string;
+    tipos: string[];
     admin: { nombre: string; email: string; password: string; telefono?: string };
     contacto?: { telefono?: string; direccion?: string };
     sucursal?: { nombre?: string };
-  }): Observable<{ data: { token: string; usuario: any; taller: { id: number; nombre: string; slug: string } } }> {
-    return this.http.post<{ data: { token: string; usuario: any; taller: { id: number; nombre: string; slug: string } } }>(
+  }): Observable<{ data: { token: string; usuario: any; taller: { id: number; nombre: string; slug: string; tipos: string[] } } }> {
+    return this.http.post<{ data: { token: string; usuario: any; taller: { id: number; nombre: string; slug: string; tipos: string[] } } }>(
       `${this.apiUrl}/onboarding`, datos
     );
   }

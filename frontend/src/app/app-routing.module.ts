@@ -69,19 +69,19 @@ const routes: Routes = [
     loadChildren: () => import('./pages/cliente-detalle/cliente-detalle.module').then(m => m.ClienteDetallePageModule),
   },
   {
-    path: 'moto-form',
+    path: 'vehiculo-form',
     canActivate: [AuthGuard],
-    loadChildren: () => import('./pages/moto-form/moto-form.module').then(m => m.MotoFormPageModule),
+    loadChildren: () => import('./pages/vehiculo-form/vehiculo-form.module').then(m => m.VehiculoFormPageModule),
   },
   {
-    path: 'moto-form/:id',
+    path: 'vehiculo-form/:id',
     canActivate: [AuthGuard],
-    loadChildren: () => import('./pages/moto-form/moto-form.module').then(m => m.MotoFormPageModule),
+    loadChildren: () => import('./pages/vehiculo-form/vehiculo-form.module').then(m => m.VehiculoFormPageModule),
   },
   {
-    path: 'moto-historial/:id',
+    path: 'vehiculo-historial/:id',
     canActivate: [AuthGuard],
-    loadChildren: () => import('./pages/moto-historial/moto-historial.module').then(m => m.MotoHistorialPageModule),
+    loadChildren: () => import('./pages/vehiculo-historial/vehiculo-historial.module').then(m => m.VehiculoHistorialPageModule),
   },
   {
     path: 'cita-form',
