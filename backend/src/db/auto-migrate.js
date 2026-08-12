@@ -423,10 +423,12 @@ async function ensureSchema() {
     // Horarios: 0=Dom … 6=Sáb. L-V 08-17, Sáb 08-13, Dom cerrado.
     await tryStep('seed configuracion', () =>
       pool.query(
+        // Configuración del taller original (tenant 1), explícito. Los talleres
+        // nuevos reciben la suya en el alta, con los datos que declararon.
         `INSERT IGNORE INTO configuracion
-           (id, nombre_taller, telefono, email, direccion,
+           (tenant_id, id, nombre_taller, telefono, email, direccion,
             max_citas_hora, dias_anticipacion, duracion_cita_min, horarios)
-         VALUES (1, 'MS Motos', '', '', '', 2, 30, 90, ?)`,
+         VALUES (1, 1, 'MS Motos', '', '', '', 2, 30, 90, ?)`,
         [JSON.stringify([
           { dia: 0, abre: '08:00', cierra: '13:00', activo: 0 },
           { dia: 1, abre: '08:00', cierra: '17:00', activo: 1 },
@@ -456,7 +458,10 @@ async function ensureSchema() {
       )
     `);
     await tryStep('seed sucursales', () =>
-      pool.query("INSERT IGNORE INTO sucursales (id, nombre, orden) VALUES (1, 'Liberia', 1), (2, 'Cañas', 2)")
+      // Sedes del taller original (tenant 1). Va explícito y solo para él: los
+      // talleres nuevos crean su primera sucursal en el alta (utils/onboarding),
+      // con SUS datos. Sembrar "Liberia" y "Cañas" a todos sería absurdo.
+      pool.query("INSERT IGNORE INTO sucursales (tenant_id, id, nombre, orden) VALUES (1, 1, 'Liberia', 1), (1, 2, 'Cañas', 2)")
     );
 
     // Catálogo de servicios editable desde el panel. Antes vivía hardcodeado en

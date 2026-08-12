@@ -127,6 +127,7 @@ app.use('/api', apiLimiter);
 app.use('/api/admin', adminLimiter);
 
 app.use('/api/auth',      require('./routes/auth.routes'));
+app.use('/api/onboarding', require('./routes/onboarding.routes'));
 app.use('/api/marca',     require('./routes/marca.routes'));
 app.use('/api/clientes',  require('./routes/clientes.routes'));
 app.use('/api/motos',     require('./routes/motos.routes'));
