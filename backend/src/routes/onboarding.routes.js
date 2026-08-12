@@ -9,6 +9,8 @@ const { emailValido } = require('../utils/validar');
 const { consumir } = require('../utils/rate-limit');
 const { antibot } = require('../utils/antibot');
 const { crearTaller, normalizarSlug, motivoSlugInvalido } = require('../utils/onboarding');
+const { fijarPlan } = require('../utils/estado-tenant');
+const { finDeTrial } = require('../utils/limites');
 const { TIPOS } = require('../utils/tipos-vehiculo');
 const { paraTenant } = require('../db/tenant-db');
 const { nuevoCodigo, VIGENCIA_MIN } = require('../utils/verificacion-usuario');
@@ -120,6 +122,16 @@ router.post('/', antibot(), async (req, res) => {
     });
 
     await conn.commit();
+
+    // La foto en memoria de los planes (utils/estado-tenant) se refresca cada 30s, así
+    // que un taller recién creado no está en ella. Sin esta línea, durante el primer
+    // medio minuto de vida —justo cuando su dueño entra por primera vez— /auth/me
+    // devolvía plan:null: la franja de "te quedan 30 días" no aparecía, y los límites
+    // caían al plan más permisivo por el respaldo de limitesDe().
+    //
+    // Va DESPUÉS del commit a propósito: si la transacción se cae, la caché no puede
+    // quedar afirmando un taller que no llegó a existir.
+    fijarPlan(tenantId, 'trial', finDeTrial());
 
     // Sesión inmediata: el admin entra a su taller recién creado sin volver a
     // escribir la contraseña que acaba de elegir.
