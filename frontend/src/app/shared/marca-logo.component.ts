@@ -1,5 +1,7 @@
 import { Component, Input } from '@angular/core';
 import { MarcaService } from '../services/marca.service';
+import { TallerService } from '../services/taller.service';
+import { PRODUCTO } from './producto';
 
 /**
  * Logo del taller, con sus iniciales como respaldo.
@@ -15,16 +17,24 @@ import { MarcaService } from '../services/marca.service';
   selector: 'app-marca-logo',
   standalone: false,
   template: `
-    <img *ngIf="(marca.marca$ | async)?.logo as logo" [src]="logo" [alt]="marca.actual.nombre_taller"
-         class="marca-img" [style.height.px]="tamano" [style.width.px]="tamano" />
-    <span *ngIf="!(marca.marca$ | async)?.logo" class="marca-iniciales"
+    <!-- Orden: el logo del taller manda; si no hay taller resuelto se muestra el de
+         Motiq (estamos en su puerta); y si tampoco carga, las iniciales. -->
+    <img *ngIf="src as url" [src]="url" [alt]="rotulo" class="marca-img"
+         [style.height.px]="tamano" [style.width.px]="tamano" (error)="falloImagen = true" />
+    <span *ngIf="!src" class="marca-iniciales"
           [style.height.px]="tamano" [style.width.px]="tamano"
           [style.font-size.px]="tamano * 0.4"
-          [attr.aria-label]="marca.actual.nombre_taller">{{ marca.iniciales }}</span>
+          [attr.aria-label]="rotulo">{{ marca.iniciales }}</span>
   `,
   styles: [`
     :host { display: inline-flex; align-items: center; }
-    .marca-img { object-fit: contain; border-radius: 8px; }
+    .marca-img {
+      object-fit: contain;
+      border-radius: 8px;
+      background: #fff;
+      padding: 6%;
+      box-sizing: border-box;
+    }
     .marca-iniciales {
       display: inline-flex;
       align-items: center;
@@ -40,5 +50,21 @@ import { MarcaService } from '../services/marca.service';
 export class MarcaLogoComponent {
   /** Lado en píxeles. Cuadrado a propósito: sirve igual para un isotipo o iniciales. */
   @Input() tamano = 36;
-  constructor(public marca: MarcaService) {}
+
+  // Si el archivo del logo no carga (todavía no lo subieron, ruta mal), se cae a
+  // las iniciales en vez de dejar el ícono roto del navegador.
+  falloImagen = false;
+
+  constructor(public marca: MarcaService, private taller: TallerService) {}
+
+  get rotulo(): string { return this.marca.rotuloPublico; }
+
+  /** Logo a mostrar, o null para que se pinten las iniciales. */
+  get src(): string | null {
+    if (this.falloImagen) return null;
+    const delTaller = this.marca.actual.logo;
+    if (delTaller) return delTaller;
+    // Sin taller resuelto estamos en una pantalla de Motiq: va su isotipo.
+    return this.taller.actual() ? null : PRODUCTO.logo;
+  }
 }

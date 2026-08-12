@@ -78,7 +78,7 @@
   transition: all .15s;
   &:active { transform: scale(.97); }
   &.sel { background: var(--ion-color-primary); color: #fff; border-color: var(--ion-color-primary);
-    box-shadow: 0 4px 12px rgba(225, 29, 72, 0.25); }
+    box-shadow: 0 4px 12px rgba(var(--ion-color-primary-rgb), 0.25); }
   &.full { background: var(--n-100); color: var(--n-400); border-color: transparent;
     text-decoration: line-through; cursor: not-allowed; }
 }

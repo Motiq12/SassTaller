@@ -89,7 +89,7 @@
   width: 100%; padding: 14px; border: none; border-radius: 16px;
   background: var(--ion-color-primary); color: #fff;
   font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
-  box-shadow: 0 8px 20px rgba(225, 29, 72, 0.22);
+  box-shadow: 0 8px 20px rgba(var(--ion-color-primary-rgb), 0.22);
   display: flex; align-items: center; justify-content: center; gap: 8px;
   transition: transform 0.15s var(--ease, ease);
   &:active { transform: scale(0.98); }

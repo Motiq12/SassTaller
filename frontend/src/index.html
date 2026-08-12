@@ -27,14 +27,14 @@
   <meta name="format-detection" content="telephone=no" />
   <meta name="msapplication-tap-highlight" content="no" />
 
-  <link rel="icon" type="image/png" href="assets/logo/ms-iso.png" />
-  <meta name="theme-color" content="#E11D48" />
+  <link rel="icon" type="image/png" href="assets/logo/motiq-iso.png" />
+  <meta name="theme-color" content="#1e3a5f" />
 
   <!-- add to homescreen for ios -->
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
   <meta name="apple-mobile-web-app-title" content="Motiq" />
-  <link rel="apple-touch-icon" href="assets/logo/ms-iso.png" />
+  <link rel="apple-touch-icon" href="assets/logo/motiq-iso.png" />
 
   <!-- Pantalla de arranque ("Pulso mínimo"): cubre el instante entre el HTML
        inicial y la primera pantalla real de Angular (tanto en web como justo
@@ -48,7 +48,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #E11D48;
+      background: #1e3a5f;
       transition: opacity .35s ease;
     }
     #boot-splash.hide { opacity: 0; pointer-events: none; }
@@ -66,6 +66,13 @@
       position: relative;
       width: 84px;
       height: 84px;
+      /* Placa clara detrás del isotipo: el logo de Motiq es azul marino y sobre el
+         fondo oscuro del arranque desaparecería. Con esto alcanza UN solo archivo
+         de logo para el favicon, el ícono de la app y esta pantalla. */
+      background: #ffffff;
+      border-radius: 20px;
+      padding: 10px;
+      box-sizing: border-box;
       opacity: 0;
       transform: scale(.94);
       animation: boot-mark 1.6s cubic-bezier(.2, .7, .3, 1) forwards;
@@ -92,7 +99,7 @@
 <body>
   <div id="boot-splash" aria-hidden="true">
     <div class="boot-glow"></div>
-    <img class="boot-mark" src="assets/logo/ms-iso-white.png" alt="" />
+    <img class="boot-mark" src="assets/logo/motiq-iso.png" alt="" />
   </div>
   <script>
     (function () {

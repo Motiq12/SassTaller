@@ -60,7 +60,7 @@
   transition: border-color .2s, transform .15s;
 
   &:hover {
-    border-color: rgba(225, 29, 72, .15);
+    border-color: rgba(var(--ion-color-primary-rgb), .15);
   }
 
   &:active {
@@ -119,7 +119,7 @@
   transition: border-color .2s, transform .15s;
 
   &:hover {
-    border-color: rgba(225, 29, 72, .15);
+    border-color: rgba(var(--ion-color-primary-rgb), .15);
   }
 
   &:active {

@@ -74,7 +74,7 @@
 
 /* Barra de progreso */
 .pr-t { height: 8px; background: var(--n-200); border-radius: 999px; overflow: hidden; margin: 10px 0 4px; }
-.pr-f { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--ion-color-primary), #f43f5e);
+.pr-f { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--ion-color-primary), var(--ion-color-primary-tint));
   transition: width .5s var(--ease, cubic-bezier(0.32, 0.72, 0, 1));
   &.full { background: var(--emerald-700); } }
 .pr-l { font-size: 10px; color: var(--n-400); }

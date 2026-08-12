@@ -38,7 +38,7 @@ ion-item-sliding:not(:last-child) .nf-item { border-bottom: 1px solid var(--hair
     &.t-azul   { background: rgba(99,102,241,.14);  color: #4f46e5; }
     &.t-verde  { background: var(--emerald-50);     color: var(--emerald-700); }
     &.t-ambar  { background: var(--amber-100);      color: var(--amber-700); }
-    &.t-rojo   { background: rgba(225,29,72,.13);    color: var(--ion-color-danger, #e11d48); }
+    &.t-rojo   { background: rgba(var(--ion-color-primary-rgb),.13);    color: var(--ion-color-danger, var(--ion-color-primary)); }
     &.t-rosa   { background: var(--rose-50);        color: var(--rose-700); }
   }
   .nf-b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
@@ -50,7 +50,7 @@ ion-item-sliding:not(:last-child) .nf-item { border-bottom: 1px solid var(--hair
   &.nueva .nf-msg { font-weight: 700; }
 }
 
-ion-item-option { --background: var(--ion-color-danger, #e11d48); }
+ion-item-option { --background: var(--ion-color-danger, var(--ion-color-primary)); }
 
 .hint-swipe {
   text-align: center; font-size: 11px; color: var(--n-400); margin: 12px 0 0;

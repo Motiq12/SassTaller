@@ -3,14 +3,14 @@
 /* Header con gradiente y avatar grande */
 .profile-header {
   display: flex; flex-direction: column; align-items: center; text-align: center;
-  background: linear-gradient(160deg, rgba(225, 29, 72, .08), rgba(16, 185, 129, .06));
+  background: linear-gradient(160deg, rgba(var(--ion-color-primary-rgb), .08), rgba(16, 185, 129, .06));
   border: 1px solid var(--hairline); border-radius: 26px; padding: 28px 20px 22px; margin-bottom: 18px;
   position: relative; overflow: hidden;
 
   &::before {
     content: ''; position: absolute; top: -40px; right: -40px;
     width: 120px; height: 120px; border-radius: 50%;
-    background: rgba(225, 29, 72, .06);
+    background: rgba(var(--ion-color-primary-rgb), .06);
   }
 
   .avatar-wrap { position: relative; flex-shrink: 0; width: 80px; height: 80px; margin-bottom: 14px; }
@@ -19,7 +19,7 @@
     background: var(--ion-color-primary); color: #fff; border: 3px solid rgba(255, 255, 255, .15);
     display: flex; align-items: center; justify-content: center;
     font-family: var(--font-display); font-size: 30px; font-weight: 800;
-    box-shadow: 0 6px 20px rgba(225, 29, 72, .25);
+    box-shadow: 0 6px 20px rgba(var(--ion-color-primary-rgb), .25);
     img { width: 100%; height: 100%; object-fit: cover; display: block; }
     &:active { transform: scale(.96); }
     &:disabled { opacity: .7; cursor: default; }
@@ -28,7 +28,7 @@
     position: absolute; right: -2px; bottom: -2px; width: 28px; height: 28px; border-radius: 50%;
     background: var(--ion-color-primary); border: 2px solid var(--ion-card-background); cursor: pointer; padding: 0;
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 2px 8px rgba(225, 29, 72, .3);
+    box-shadow: 0 2px 8px rgba(var(--ion-color-primary-rgb), .3);
     ion-icon { font-size: 14px; color: #fff; }
     &.cargando ion-icon { color: rgba(255, 255, 255, .6); }
     &:active { transform: scale(.9); }
@@ -99,7 +99,7 @@
     width: 100%; padding: 12px 14px; border: 1px solid var(--hairline); border-radius: 14px;
     font-family: inherit; font-size: 14px; background: rgba(255, 255, 255, .03);
     color: var(--ion-text-color); outline: none; transition: border-color .2s, box-shadow .2s;
-    &:focus { border-color: var(--ion-color-primary); box-shadow: 0 0 0 3px rgba(225, 29, 72, .08); }
+    &:focus { border-color: var(--ion-color-primary); box-shadow: 0 0 0 3px rgba(var(--ion-color-primary-rgb), .08); }
     &::placeholder { color: var(--n-500); }
   }
 }
@@ -117,7 +117,7 @@
     font-family: inherit; font-weight: 800; line-height: 1;
     display: flex; align-items: center; justify-content: center; transition: all .2s;
     &.on { background: var(--ion-color-primary); border-color: var(--ion-color-primary); color: #fff;
-      box-shadow: 0 2px 8px rgba(225, 29, 72, .25); }
+      box-shadow: 0 2px 8px rgba(var(--ion-color-primary-rgb), .25); }
     &:active { transform: scale(.94); }
   }
 }
@@ -143,7 +143,7 @@
   padding: 10px 16px; border-radius: 12px; cursor: pointer;
   font-family: inherit; font-size: 13px; font-weight: 700; line-height: 1;
   background: var(--ion-color-primary); color: #fff; border: none;
-  box-shadow: 0 2px 8px rgba(225, 29, 72, .2);
+  box-shadow: 0 2px 8px rgba(var(--ion-color-primary-rgb), .2);
   transition: transform .15s;
   ion-icon { font-size: 17px; }
   &.on { background: none; color: var(--ion-color-danger); border: 1.5px solid var(--ion-color-danger);
@@ -171,9 +171,9 @@
   background: var(--ion-color-primary); color: #fff;
   font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
   display: flex; align-items: center; justify-content: center; gap: 8px;
-  box-shadow: 0 4px 14px rgba(225, 29, 72, .2);
+  box-shadow: 0 4px 14px rgba(var(--ion-color-primary-rgb), .2);
   transition: transform .15s, box-shadow .15s;
-  &:hover { box-shadow: 0 6px 20px rgba(225, 29, 72, .3); }
+  &:hover { box-shadow: 0 6px 20px rgba(var(--ion-color-primary-rgb), .3); }
   &:active { transform: scale(.98); }
   &:disabled { opacity: .5; cursor: default; box-shadow: none; }
   &.outline { background: none; border: 1.5px solid var(--hairline); color: var(--ion-text-color); box-shadow: none; }
@@ -188,7 +188,7 @@
 /* Cambio de correo a la espera de confirmación: borde de acento para que se note
    que hay algo sin terminar, sin llegar a leerse como un error. */
 .correo-pendiente {
-  border-color: rgba(225, 29, 72, .35);
+  border-color: rgba(var(--ion-color-primary-rgb), .35);
   .cp-texto { font-size: 13px; line-height: 1.55; color: var(--n-500); margin: -6px 0 14px;
     strong { color: var(--ion-text-color); word-break: break-word; } }
   .cp-codigo { font-family: var(--font-mono, monospace); font-size: 22px; font-weight: 700;

@@ -212,7 +212,7 @@
 
 // Reseña baja (1-2★): franja carmesí para que salte a la vista.
 .op-baja {
-  background: rgba(225, 29, 72, .08);
+  background: rgba(var(--ion-color-primary-rgb), .08);
   border-left: 3px solid var(--cr);
   border-radius: 8px;
   padding-left: 10px;

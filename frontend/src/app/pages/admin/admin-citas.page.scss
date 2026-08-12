@@ -24,7 +24,7 @@
 .orden-card {
   background: var(--sur2); border: 1px solid var(--bd); border-radius: 20px;
   padding: 16px; cursor: pointer; transition: transform .12s, border-color .15s;
-  &:hover { border-color: rgba(225, 29, 72, .15); }
+  &:hover { border-color: rgba(var(--ion-color-primary-rgb), .15); }
   &:active { transform: scale(.98); }
 }
 .oc-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px;

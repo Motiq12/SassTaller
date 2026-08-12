@@ -72,7 +72,7 @@
   &.flujo-proceso  { background: rgba(245, 158, 11, .12); .d-cnt { background: rgba(245, 158, 11, .20); color: var(--amber-700); } }
   &.flujo-completo { background: rgba(16, 185, 129, .10); .d-cnt { background: rgba(16, 185, 129, .18); color: var(--emerald-700); } }
   &.today { border-color: var(--ion-color-primary); .d-num { color: var(--text-accent); } }
-  &.sel { border-color: var(--ion-color-primary); box-shadow: 0 0 0 2px rgba(225, 29, 72, .25); }
+  &.sel { border-color: var(--ion-color-primary); box-shadow: 0 0 0 2px rgba(var(--ion-color-primary-rgb), .25); }
 }
 
 .cal-legend {

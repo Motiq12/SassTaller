@@ -146,7 +146,7 @@
   margin: 0 0 16px; padding: 14px 16px; cursor: pointer;
   background: var(--ion-color-primary); color: #fff; border: none; border-radius: 18px;
   font-family: inherit; font-size: 14px; font-weight: 800;
-  box-shadow: 0 8px 20px rgba(225, 29, 72, 0.22);
+  box-shadow: 0 8px 20px rgba(var(--ion-color-primary-rgb), 0.22);
   transition: transform .14s;
   ion-icon { font-size: 20px; }
   span { flex: 1; text-align: left; }
@@ -228,7 +228,7 @@
 /* Resaltado próxima/espera-larga: velo tenue + barra de acento (legible en claro y oscuro). */
 .cita-row.proxima, .cita-row.espera-larga { border-radius: 12px;
   margin: 0 -8px; padding-left: 11px; padding-right: 8px; }
-.cita-row.proxima { background: rgba(225, 29, 72, 0.07); box-shadow: inset 3px 0 0 var(--ion-color-primary); }
+.cita-row.proxima { background: rgba(var(--ion-color-primary-rgb), 0.07); box-shadow: inset 3px 0 0 var(--ion-color-primary); }
 .cita-row.atrasada .cita-hora { color: var(--amber-700); }
 .tag-prox, .tag-atr {
   font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em;

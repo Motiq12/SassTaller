@@ -14,7 +14,7 @@
     color: var(--tx2); font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
     transition: all .2s;
     &:hover { background: var(--sur2); color: var(--tx); }
-    &.on { background: var(--cr); color: #fff; border-color: var(--cr); box-shadow: 0 2px 8px rgba(225, 29, 72, .25); }
+    &.on { background: var(--cr); color: #fff; border-color: var(--cr); box-shadow: 0 2px 8px rgba(var(--ion-color-primary-rgb), .25); }
   }
 }
 
@@ -30,9 +30,9 @@
 .cal-day {
   min-height: 64px; background: var(--sur2); border-radius: 14px; padding: 10px;
   cursor: pointer; border: 1.5px solid transparent; transition: all .2s; position: relative;
-  &:hover { border-color: rgba(225, 29, 72, .2); background: var(--sur3); }
+  &:hover { border-color: rgba(var(--ion-color-primary-rgb), .2); background: var(--sur3); }
   &.empty { background: transparent; cursor: default; &:hover { border-color: transparent; } }
-  &.today { border-color: var(--cr); background: rgba(225, 29, 72, .06);
+  &.today { border-color: var(--cr); background: rgba(var(--ion-color-primary-rgb), .06);
     .day-num { color: var(--cr); font-weight: 900; font-size: 14px; } }
   &.low { background: rgba(74, 222, 128, .04); }
   &.high { background: rgba(251, 113, 133, .06); }

@@ -17,4 +17,11 @@
 export const PRODUCTO = {
   nombre: 'Motiq',
   descripcion: 'Gestión de talleres',
+  // Isotipo del producto. Es el mismo archivo que usan el favicon y el ícono de la
+  // app instalada: un solo asset para toda la identidad de Motiq. Si falta, la
+  // interfaz cae a las iniciales y no queda una imagen rota.
+  logo: 'assets/logo/motiq-iso.png',
+  // Azul marino del isotipo. Es el color por defecto de la app; cada taller lo
+  // pisa con el suyo desde su configuración.
+  color: '#1e3a5f',
 };

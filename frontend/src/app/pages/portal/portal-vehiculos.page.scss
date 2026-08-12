@@ -16,7 +16,7 @@
   background: var(--ion-card-background); border: 1px solid var(--hairline);
   border-radius: 20px; box-shadow: var(--shadow-sm); padding: 14px; margin-bottom: 10px;
   transition: border-color .2s, transform .15s;
-  &:hover { border-color: rgba(225, 29, 72, .15); }
+  &:hover { border-color: rgba(var(--ion-color-primary-rgb), .15); }
   &:active { transform: scale(.99); }
 
   .mc-i { width: 54px; height: 54px; border-radius: 14px; flex-shrink: 0; overflow: hidden;

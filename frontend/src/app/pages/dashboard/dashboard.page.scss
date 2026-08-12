@@ -149,7 +149,7 @@
       background: var(--n-200); color: var(--n-500);
       &.on { background: var(--rose-700); color: #fff; }
     }
-    &.active { background: var(--ion-color-primary); color: #fff; box-shadow: 0 2px 8px rgba(225,29,72,.3); }
+    &.active { background: var(--ion-color-primary); color: #fff; box-shadow: 0 2px 8px rgba(var(--ion-color-primary-rgb),.3); }
   }
 }
 
@@ -289,6 +289,6 @@
 .btn-rose {
   background: var(--ion-color-primary);
   color: #fff;
-  box-shadow: 0 6px 16px rgba(225,29,72,.22);
+  box-shadow: 0 6px 16px rgba(var(--ion-color-primary-rgb),.22);
 }
 .btn-out.wide { width: 100%; }

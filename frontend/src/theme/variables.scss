@@ -1,15 +1,20 @@
-// TallerMS — Sistema de diseño "Crimson Ops"
+// Motiq — Sistema de diseño
 // Lenguaje del export de Stitch: acento carmesí (rose), neutros fríos, esquinas
 // muy redondeadas (24px), tipografía Outfit + Plus Jakarta Sans + JetBrains Mono.
 
 :root {
-  // —— Acento de marca: carmesí / rose ——
-  --ion-color-primary: #e11d48;
-  --ion-color-primary-rgb: 225, 29, 72;
+  // —— Acento de marca: azul marino del isotipo de Motiq ——
+  // Es el color POR DEFECTO del producto. Cada taller lo pisa con el suyo desde su
+  // configuración (MarcaService reescribe estas mismas variables en caliente), así
+  // que esto es lo que ve un taller que todavía no eligió color.
+  // Antes era el carmesí del taller original: eso hacía que un taller nuevo abriera
+  // el sistema con el color de otra empresa.
+  --ion-color-primary: #1e3a5f;
+  --ion-color-primary-rgb: 30, 58, 95;
   --ion-color-primary-contrast: #ffffff;
   --ion-color-primary-contrast-rgb: 255, 255, 255;
-  --ion-color-primary-shade: #be123c;
-  --ion-color-primary-tint: #f43f5e;
+  --ion-color-primary-shade: #1a3252;
+  --ion-color-primary-tint: #354e6f;
 
   // —— Secondary: grafito neutro (estructura, no compite con el acento) ——
   --ion-color-secondary: #262626;
@@ -84,7 +89,8 @@
   --ion-overlay-background-color: #ffffff;
   --ion-tab-bar-background: #ffffff;
   --ion-tab-bar-color: #a3a3a3;
-  --ion-tab-bar-color-selected: #e11d48;
+  // Sigue al color de marca: si el taller elige el suyo, la pestaña activa acompaña.
+  --ion-tab-bar-color-selected: var(--ion-color-primary);
 
   // —— Escala neutral cruda (para SCSS de páginas) ——
   --n-50: #fafafa;
@@ -108,7 +114,7 @@
   --rose-700: #be123c;
   // Carmín para TEXTO pequeño sobre fondo de la app: oscuro en claro (AA ≈5.2:1),
   // se aclara en modo oscuro (ver bloque dark) para no quedar ilegible sobre negro.
-  --text-accent: #be123c;
+  --text-accent: var(--ion-color-primary-shade);
   --emerald-50: #ecfdf5;
   --emerald-600: #059669;
   --emerald-700: #047857;
@@ -134,7 +140,7 @@
   --shadow-xs: 0 1px 2px rgba(10, 10, 10, 0.04);
   --shadow-sm: 0 1px 2px rgba(10, 10, 10, 0.04), 0 1px 3px rgba(10, 10, 10, 0.06);
   --shadow-md: 0 1px 3px rgba(10, 10, 10, 0.05), 0 6px 20px rgba(10, 10, 10, 0.07);
-  --shadow-accent: 0 10px 24px rgba(225, 29, 72, 0.28);
+  --shadow-accent: 0 10px 24px rgba(var(--ion-color-primary-rgb), 0.28);
   --hairline: rgba(10, 10, 10, 0.07);
 }
 
@@ -154,7 +160,7 @@
     --ion-overlay-background-color: #171717;
     --ion-tab-bar-background: #0f0f0f;
     --ion-tab-bar-color: #737373;
-    --ion-tab-bar-color-selected: #f43f5e;
+    --ion-tab-bar-color-selected: var(--ion-color-primary-tint);
 
     --ion-color-light: #262626;
     --ion-color-light-rgb: 38, 38, 38;
