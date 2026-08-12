@@ -5,6 +5,7 @@ import { BehaviorSubject, Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { Usuario, LoginResponse } from '../models/usuario.model';
 import { secureGet, secureSet, secureRemove } from '../shared/secure-store.util';
+import { TallerService } from './taller.service';
 
 const TOKEN_KEY = 'tallerms_token';
 const USUARIO_KEY = 'tallerms_usuario';
@@ -32,7 +33,7 @@ export class AuthService {
 
   usuario$ = this.usuarioSubject.asObservable();
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private taller: TallerService) {}
 
   // Hidrata la sesión desde el Keychain/Keystore en plataforma nativa. Se llama desde
   // un APP_INITIALIZER (app.module.ts) para que termine ANTES de que arranquen los
@@ -46,8 +47,14 @@ export class AuthService {
     }
   }
 
+  // El `taller` viaja en el login porque con multi-tenant el correo ya no identifica
+  // a una persona sola: el mismo correo puede existir en varios talleres. Si no se
+  // pudo resolver (sin subdominio y sin taller guardado) no se manda la clave, y el
+  // backend resuelve por contraseña o pide elegir entre los que coincidan.
   login(email: string, password: string): Observable<{ data: LoginResponse }> {
-    return this.http.post<{ data: LoginResponse }>(`${this.apiUrl}/auth/login`, { email, password }).pipe(
+    return this.http.post<{ data: LoginResponse }>(
+      `${this.apiUrl}/auth/login`, this.taller.conTaller({ email, password })
+    ).pipe(
       tap(res => this.guardarSesion(res.data.token, res.data.usuario))
     );
   }
@@ -56,7 +63,9 @@ export class AuthService {
   // Si el usuario tiene verificación en dos pasos, la respuesta NO trae sesión:
   // llega `requiere_2fa` + `token_parcial` para canjear en verificar2FA().
   loginUnificado(email: string, password: string): Observable<{ data: LoginUnificadoResp }> {
-    return this.http.post<{ data: LoginUnificadoResp }>(`${this.apiUrl}/auth/login`, { email, password });
+    return this.http.post<{ data: LoginUnificadoResp }>(
+      `${this.apiUrl}/auth/login`, this.taller.conTaller({ email, password })
+    );
   }
 
   // ── Verificación en dos pasos (personal) ──

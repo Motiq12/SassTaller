@@ -4,6 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { BehaviorSubject, Observable, of, tap, catchError, throwError } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { secureGet, secureSet, secureRemove } from '../shared/secure-store.util';
+import { TallerService } from './taller.service';
 
 export interface ClientePortal {
   id: number;
@@ -37,7 +38,7 @@ export class PortalService {
   private noLeidasSubject = new BehaviorSubject<number>(0);
   noLeidas$ = this.noLeidasSubject.asObservable();
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private taller: TallerService) {}
 
   // Hidrata la sesión desde el Keychain/Keystore en plataforma nativa. Se llama desde
   // un APP_INITIALIZER (app.module.ts) para que termine ANTES de que arranquen los
@@ -52,7 +53,7 @@ export class PortalService {
   }
 
   login(email: string, password: string): Observable<{ data: { token: string; cliente: ClientePortal } }> {
-    return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/login`, { email, password }).pipe(
+    return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/login`, this.taller.conTaller({ email, password })).pipe(
       tap(res => this.guardarSesion(res.data.token, res.data.cliente))
     );
   }
@@ -60,41 +61,41 @@ export class PortalService {
   // Ya NO abre sesión: crea la cuenta sin verificar y manda un código al correo.
   // El llamador sigue a verificarRegistro() para completar el ingreso.
   registro(data: { nombre: string; apellido: string; telefono: string; email: string; cedula?: string; password: string; website?: string; turnstileToken?: string }): Observable<{ data: { requiere_verificacion: boolean; email: string }; message: string }> {
-    return this.http.post<{ data: { requiere_verificacion: boolean; email: string }; message: string }>(`${this.url}/registro`, data);
+    return this.http.post<{ data: { requiere_verificacion: boolean; email: string }; message: string }>(`${this.url}/registro`, this.taller.conTaller(data));
   }
 
   // Paso 2 del registro: confirma el código de 6 dígitos y recién ahí entra (auto-login).
   verificarRegistro(email: string, codigo: string): Observable<{ data: { token: string; cliente: ClientePortal } }> {
-    return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/registro/verificar`, { email, codigo }).pipe(
+    return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/registro/verificar`, this.taller.conTaller({ email, codigo })).pipe(
       tap(res => this.guardarSesion(res.data.token, res.data.cliente))
     );
   }
 
   // Pide un código de verificación nuevo (no llegó / venció). Respuesta genérica.
   reenviarVerificacion(email: string, antibot: AntiBot = {}): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.url}/registro/reenviar`, { email, ...antibot });
+    return this.http.post<{ message: string }>(`${this.url}/registro/reenviar`, this.taller.conTaller({ email, ...antibot }));
   }
 
   // Paso 1: pide que envíen un código de recuperación al correo (respuesta genérica).
   solicitarCodigo(email: string, antibot: AntiBot = {}): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.url}/recuperar/solicitar`, { email, ...antibot });
+    return this.http.post<{ message: string }>(`${this.url}/recuperar/solicitar`, this.taller.conTaller({ email, ...antibot }));
   }
 
   // Paso 2: valida el código y define la nueva contraseña (auto-login).
   confirmarRecuperacion(data: { email: string; codigo: string; password: string }): Observable<{ data: { token: string; cliente: ClientePortal } }> {
-    return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/recuperar/confirmar`, data).pipe(
+    return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/recuperar/confirmar`, this.taller.conTaller(data)).pipe(
       tap(res => this.guardarSesion(res.data.token, res.data.cliente))
     );
   }
 
   // Ingreso sin contraseña (OTP). Paso 1: pide el código al correo (respuesta genérica).
   solicitarCodigoLogin(email: string, antibot: AntiBot = {}): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.url}/otp/solicitar`, { email, ...antibot });
+    return this.http.post<{ message: string }>(`${this.url}/otp/solicitar`, this.taller.conTaller({ email, ...antibot }));
   }
 
   // Paso 2: valida el código y entra (auto-login, guarda la sesión).
   verificarCodigoLogin(email: string, codigo: string): Observable<{ data: { token: string; cliente: ClientePortal } }> {
-    return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/otp/verificar`, { email, codigo }).pipe(
+    return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/otp/verificar`, this.taller.conTaller({ email, codigo })).pipe(
       tap(res => this.guardarSesion(res.data.token, res.data.cliente))
     );
   }

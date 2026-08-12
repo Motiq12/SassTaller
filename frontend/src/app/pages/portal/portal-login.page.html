@@ -99,5 +99,8 @@
 
     <a *ngIf="!paso2fa" class="portal-link strong" routerLink="/portal/registro">Crear una cuenta</a>
     <a *ngIf="!paso2fa && modo === 'clave'" class="portal-link sub" routerLink="/portal/recuperar">¿Olvidaste tu contraseña?</a>
+    <!-- Dos altas distintas que es fácil confundir: arriba, un CLIENTE que se registra
+         en este taller; acá, un TALLER que se da de alta en el SaaS. -->
+    <a *ngIf="!paso2fa" class="portal-link sub" routerLink="/registro-taller">¿Tenés un taller? Registralo acá</a>
   </div>
 </ion-content>

@@ -9,6 +9,12 @@ const routes: Routes = [
   { path: '', redirectTo: 'tabs', pathMatch: 'full' },
   // Login unificado (personal + clientes): vive en /portal/login. /login redirige ahí.
   { path: 'login', redirectTo: 'portal/login', pathMatch: 'full' },
+  // Alta de un taller nuevo en el SaaS. Pública y sin guard a propósito: quien entra
+  // acá todavía no tiene cuenta ni taller — crearlos es justamente lo que viene a hacer.
+  {
+    path: 'registro-taller',
+    loadChildren: () => import('./pages/registro-taller/registro-taller.module').then(m => m.RegistroTallerPageModule),
+  },
   {
     path: 'portal',
     loadChildren: () => import('./pages/portal/portal.module').then(m => m.PortalPageModule),

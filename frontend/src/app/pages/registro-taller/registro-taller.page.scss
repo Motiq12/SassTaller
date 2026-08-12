@@ -1,0 +1,59 @@
+.registro-wrap {
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.titulo {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+}
+
+.subtitulo {
+  color: var(--ion-color-medium);
+  margin: 0 0 1.25rem;
+  font-size: 0.9rem;
+}
+
+.bloque {
+  margin-bottom: 1rem;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* El estado del identificador va pegado a su campo: es la única validación que
+   depende del servidor, así que necesita un lugar fijo donde el ojo la busque. */
+.estado-slug {
+  padding: 0.4rem 1rem 0.6rem;
+  font-size: 0.85rem;
+
+  ion-note {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  ion-spinner {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.aviso {
+  display: block;
+  padding: 0.25rem 1rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+.pie {
+  text-align: center;
+  margin-top: 1.25rem;
+  font-size: 0.9rem;
+  color: var(--ion-color-medium);
+
+  a {
+    color: var(--ion-color-primary);
+    text-decoration: none;
+    font-weight: 600;
+  }
+}
