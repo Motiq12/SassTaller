@@ -10,8 +10,20 @@ const { consumir } = require('../utils/rate-limit');
 const { antibot } = require('../utils/antibot');
 const { crearTaller, normalizarSlug, motivoSlugInvalido } = require('../utils/onboarding');
 const { TIPOS } = require('../utils/tipos-vehiculo');
+const { paraTenant } = require('../db/tenant-db');
+const { nuevoCodigo, VIGENCIA_MIN } = require('../utils/verificacion-usuario');
+const { enviarCodigoCorreoStaff } = require('../services/mailer');
 
 const MIN_PASSWORD = 8;
+
+// El código de verificación del dueño, en cuanto el taller existe. Necesita un cliente
+// scopeado al tenant recién creado: el pool sin scope de este archivo es la excepción
+// del alta, y no hay razón para extenderla a algo que ya sabe a qué taller pertenece.
+async function enviarPrimerCodigo(tenantId, usuarioId, email, nombre) {
+  const db = paraTenant(tenantId);
+  const codigo = await nuevoCodigo(db, usuarioId);
+  await enviarCodigoCorreoStaff(email, { nombre, codigo, minutos: VIGENCIA_MIN });
+}
 
 // GET /api/onboarding/disponible?slug=... — para validar en vivo mientras se escribe,
 // sin tener que mandar el formulario entero para descubrir que el nombre está tomado.
@@ -116,6 +128,13 @@ router.post('/', antibot(), async (req, res) => {
       email: String(admin.email).trim().toLowerCase(), rol: 'admin', tenant_id: tenantId,
     };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '8h' });
+
+    // Código para confirmar el correo del dueño. Va DESPUÉS del commit y sin await sobre
+    // la respuesta: el taller ya está creado y su sesión lista, así que un correo que no
+    // sale (Resend caído, sin API key en desarrollo) no puede convertir un alta exitosa
+    // en un error. Si falla, el aviso en pantalla ofrece reenviarlo.
+    enviarPrimerCodigo(tenantId, adminId, payload.email, payload.nombre)
+      .catch(err => console.warn('⚠️  No se pudo enviar el código de verificación:', err.message));
 
     res.status(201).json({
       data: { token, tipo: 'staff', usuario: payload, taller: { id: tenantId, nombre, slug, tipos } },

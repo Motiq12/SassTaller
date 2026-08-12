@@ -29,6 +29,13 @@
   </div>
 
   <div class="admin" *ngIf="!cargando">
+    <!-- Estado de la cuenta y primeros pasos. Van ARRIBA de los KPIs: para un taller
+         recién registrado los números están todos en cero y lo único accionable de la
+         pantalla es esto. -->
+    <app-correo-aviso></app-correo-aviso>
+    <app-cuenta-franja></app-cuenta-franja>
+    <app-arranque></app-arranque>
+
     <!-- KPIs principales -->
     <div class="kpi-grid">
       <div class="kpi cr"><div class="kpi-label">En taller</div><div class="kpi-val">{{ op?.motos_activas ?? 0 }}</div></div>

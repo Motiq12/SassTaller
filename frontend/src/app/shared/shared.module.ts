@@ -7,13 +7,21 @@ import { ChatContactosComponent } from './chat/chat-contactos.component';
 import { ChatHiloComponent } from './chat/chat-hilo.component';
 import { DosFaComponent } from './dosfa/dosfa.component';
 import { MarcaLogoComponent } from './marca-logo.component';
+import { ArranqueComponent } from './arranque.component';
+import { CuentaFranjaComponent } from './cuenta-franja.component';
+import { CorreoAvisoComponent } from './correo-aviso.component';
 
 @NgModule({
-  declarations: [EstadoLabelPipe, EstadoColorPipe, ChatContactosComponent, ChatHiloComponent, DosFaComponent, MarcaLogoComponent],
+  declarations: [
+    EstadoLabelPipe, EstadoColorPipe, ChatContactosComponent, ChatHiloComponent,
+    DosFaComponent, MarcaLogoComponent, ArranqueComponent, CuentaFranjaComponent,
+    CorreoAvisoComponent,
+  ],
   imports: [CommonModule, FormsModule, IonicModule],
   exports: [
     CommonModule, FormsModule, IonicModule, EstadoLabelPipe, EstadoColorPipe,
     ChatContactosComponent, ChatHiloComponent, DosFaComponent, MarcaLogoComponent,
+    ArranqueComponent, CuentaFranjaComponent, CorreoAvisoComponent,
   ],
 })
 export class SharedModule {}

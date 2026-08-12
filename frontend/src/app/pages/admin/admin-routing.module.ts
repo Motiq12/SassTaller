@@ -13,6 +13,7 @@ import { AdminConfigPage } from './admin-config.page';
 import { AdminServiciosPage } from './admin-servicios.page';
 import { AdminMensajesPage } from './admin-mensajes.page';
 import { AdminPerfilPage } from './admin-perfil.page';
+import { AdminPortalPage } from './admin-portal.page';
 
 const routes: Routes = [
   {
@@ -32,6 +33,7 @@ const routes: Routes = [
       { path: 'servicios', component: AdminServiciosPage },
       { path: 'config', component: AdminConfigPage },
       { path: 'perfil', component: AdminPerfilPage },
+      { path: 'portal', component: AdminPortalPage },
     ],
   },
 ];

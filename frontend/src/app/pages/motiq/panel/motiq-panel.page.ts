@@ -104,6 +104,50 @@ export class MotiqPanelPage implements OnInit {
     await a.present();
   }
 
+  // Del contacto al taller andando. El nombre y el identificador se confirman acá porque
+  // lo que la persona escribió en "Empresa" al pedir la demo suele ser aproximado, y el
+  // identificador termina siendo su dirección pública: conviene mirarlo antes.
+  async crearTaller(c: ContactoDemo) {
+    const a = await this.alerta.create({
+      header: 'Crear el taller',
+      message: `Se crea con ${c.email} como administrador y se le genera una contraseña.`,
+      inputs: [
+        { name: 'nombre', type: 'text', placeholder: 'Nombre del taller', value: c.empresa || '' },
+        { name: 'slug', type: 'text', placeholder: 'Identificador (opcional, sale del nombre)' },
+      ],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Crear',
+          handler: (d: { nombre: string; slug: string }) => {
+            if (!d.nombre?.trim()) { this.toast.error('Falta el nombre del taller'); return false; }
+            this.motiq.crearTallerDesdeContacto(c.id, d.nombre.trim(), d.slug?.trim()).subscribe({
+              next: (r) => { this.mostrarCredenciales(r.data); this.cargar(); },
+              error: (e) => this.toast.error(e?.error?.error || 'No se pudo crear el taller'),
+            });
+            return true;
+          },
+        },
+      ],
+    });
+    await a.present();
+  }
+
+  // La contraseña se muestra UNA vez: en la base solo queda el hash. Va en un diálogo
+  // que hay que cerrar a mano, no en un toast que se va solo a los tres segundos.
+  private async mostrarCredenciales(d: { taller: { nombre: string; slug: string }; admin: { email: string; password: string } }) {
+    const a = await this.alerta.create({
+      header: `${d.taller.nombre} creado`,
+      message: `Identificador: ${d.taller.slug}<br><br>`
+        + `Usuario: ${d.admin.email}<br>`
+        + `Contraseña: <strong>${d.admin.password}</strong><br><br>`
+        + 'Anotala ahora: no se vuelve a mostrar.',
+      buttons: ['Ya la guardé'],
+      backdropDismiss: false,
+    });
+    await a.present();
+  }
+
   rotuloContacto(e: string): string {
     return { nuevo: 'Sin atender', contactado: 'Ya lo contacté', cerrado: 'Cerrado', descartado: 'Descartado' }[e] || e;
   }

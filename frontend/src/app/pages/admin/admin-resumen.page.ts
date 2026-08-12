@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -10,6 +10,8 @@ import { ESTADO_CONFIG, EstadoOrden } from '../../models/orden.model';
 import { descargarCSV, fechaCorta } from '../../shared/csv.util';
 import { generarPDF, formatMoneda, formatPct, escapeHtml } from '../../shared/pdf.util';
 import { MarcaService } from '../../services/marca.service';
+import { CuentaService } from '../../services/cuenta.service';
+import { ArranqueComponent } from '../../shared/arranque.component';
 
 type Sem = 'rojo' | 'amarillo' | 'verde' | 'gris';
 
@@ -20,6 +22,11 @@ type Sem = 'rojo' | 'amarillo' | 'verde' | 'gris';
   styleUrls: ['./admin-resumen.page.scss'],
 })
 export class AdminResumenPage implements OnInit, OnDestroy {
+  // Los pasos del arranque se completan en otras pantallas (config, empleados, nueva
+  // orden). Ionic solo dispara ionViewWillEnter en la página ruteada, no en los hijos,
+  // así que el refresco al volver acá lo tiene que empujar esta página.
+  @ViewChild(ArranqueComponent) arranque?: ArranqueComponent;
+
   private destroy$ = new Subject<void>();
   data: any = null;        // /api/admin/resumen (citas)
   op: any = null;          // /api/dashboard/resumen (órdenes/operativo)
@@ -56,11 +63,12 @@ export class AdminResumenPage implements OnInit, OnDestroy {
     private toast: ToastController,
     private router: Router,
     private marcaSvc: MarcaService,
+    private cuentaSvc: CuentaService,
   ) {}
 
   ngOnInit() { this.cargar(); }
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
-  ionViewWillEnter() { this.cargar(); }
+  ionViewWillEnter() { this.cargar(); this.arranque?.cargar(); this.cuentaSvc.cargar().subscribe(); }
 
   cargar(ev?: any) {
     this.cargando = true;

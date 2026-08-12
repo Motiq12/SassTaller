@@ -628,6 +628,87 @@ async function ensureSchema() {
          INDEX idx_contactos_estado (estado, created_at)
        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
     ));
+
+    // Datos de ejemplo: un taller que está evaluando el sistema no puede juzgar una
+    // lista vacía, pero los datos de mentira tienen que poder irse de un botón. La
+    // marca va en la fila y no en una tabla aparte porque el borrado tiene que ser
+    // exacto — "todo lo creado ese día" se llevaría por delante lo que cargó de verdad.
+    for (const tabla of ['clientes', 'vehiculos', 'ordenes_trabajo', 'citas']) {
+      await addColumnIfMissing(tabla, 'es_ejemplo', 'TINYINT(1) NOT NULL DEFAULT 0');
+    }
+
+    // Si el taller cerró a mano el checklist de arranque. Es lo ÚNICO que se guarda de
+    // él: los cuatro pasos se derivan de los datos (¿tiene logo?, ¿hay más de un
+    // usuario?, ¿hay alguna orden?), porque un progreso guardado aparte puede terminar
+    // diciendo que algo está hecho cuando ya no lo está.
+    await addColumnIfMissing('configuracion', 'arranque_oculto', 'TINYINT(1) NOT NULL DEFAULT 0');
+
+    // Correo del personal verificado.
+    //
+    // Por defecto 1, no 0: los usuarios que ya existían se crearon cuando esto no se
+    // pedía, y marcarlos a todos como sin verificar les pondría un aviso en pantalla
+    // por algo que nunca se les pidió. Los nuevos dueños de taller salen con 0 desde
+    // el alta (ver utils/onboarding).
+    await addColumnIfMissing('usuarios', 'email_verificado', 'TINYINT(1) NOT NULL DEFAULT 1');
+
+    // Códigos de verificación del PERSONAL. Tabla aparte de email_verify_codes a
+    // propósito: esa tiene cliente_id NOT NULL con clave foránea a clientes, y meter
+    // ahí un usuario obligaría a aflojar esa restricción —la que hoy garantiza que
+    // ningún código quede huérfano— para ahorrarse una tabla de seis columnas.
+    await tryStep('tabla usuario_verify_codes', () => pool.query(
+      `CREATE TABLE IF NOT EXISTS usuario_verify_codes (
+         id         INT AUTO_INCREMENT PRIMARY KEY,
+         tenant_id  INT NOT NULL,
+         usuario_id INT NOT NULL,
+         code_hash  VARCHAR(255) NOT NULL,
+         expires_at DATETIME NOT NULL,
+         used       TINYINT(1) NOT NULL DEFAULT 0,
+         attempts   INT NOT NULL DEFAULT 0,
+         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+         KEY idx_uvc_usuario (usuario_id),
+         KEY idx_uvc_tenant (tenant_id),
+         CONSTRAINT fk_uvc_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id),
+         CONSTRAINT fk_uvc_tenant  FOREIGN KEY (tenant_id)  REFERENCES tenants (id)
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+    ));
+
+    // ── Índices: el taller va PRIMERO ────────────────────────────────────────
+    //
+    // Toda consulta del sistema lleva `tenant_id = ?` (lo obliga el guard de
+    // tenant-db). Un índice que arranca por `fecha` o por `nombre` deja a MySQL
+    // entrar por ahí y descartar después las filas de los otros talleres: con dos
+    // clientes no se nota, con doscientos cada taller paga el costo de leer la
+    // agenda de todos.
+    //
+    // Se crea el nuevo ANTES de borrar el viejo, siempre: si el índice respalda una
+    // clave foránea, InnoDB rechaza el DROP mientras no haya otro que la cubra.
+    const reindexar = [
+      ['citas',             'idx_citas_tenant_fecha',      '(tenant_id, fecha, hora)',                    'idx_citas_fecha_hora'],
+      ['clientes',          'idx_clientes_tenant_nombre',  '(tenant_id, activo, nombre, apellido)',       'idx_clientes_activo_nombre'],
+      ['mensajes_internos', 'idx_msg_tenant_broadcast',    '(tenant_id, tipo, destino_rol, created_at)',  'idx_msg_broadcast'],
+      ['mensajes_internos', 'idx_msg_tenant_sucursal',     '(tenant_id, sucursal_id)',                    'idx_msg_sucursal'],
+      ['mensaje_lecturas',  'idx_ml_tenant_usuario',       '(tenant_id, usuario_id)',                     'idx_ml_usuario'],
+      ['web_vitals',        'idx_wv_tenant_metrica',       '(tenant_id, metrica, created_at)',            'idx_wv_metrica'],
+      ['web_vitals',        'idx_wv_tenant_ruta',          '(tenant_id, ruta)',                           'idx_wv_ruta'],
+      // Restos del renombre motos → vehículos: el índice se sigue llamando `moto_id`
+      // aunque la columna es `vehiculo_id`. Respaldan una FK, así que el orden
+      // crear-y-después-borrar no es una preferencia de estilo: sin él, el DROP falla.
+      ['citas',             'idx_citas_vehiculo',          '(vehiculo_id)',                               'moto_id'],
+      ['ordenes_trabajo',   'idx_ordenes_vehiculo',        '(vehiculo_id)',                               'moto_id'],
+    ];
+    for (const [tabla, nuevo, columnas, viejo] of reindexar) {
+      await tryStep(`índice ${nuevo}`, async () => {
+        await crearIndiceSiFalta(tabla, nuevo, columnas);
+        await borrarIndiceSiExiste(tabla, viejo);
+      });
+    }
+
+    // Claves foráneas duplicadas en `citas`: quedaron dos constraints sobre la misma
+    // columna (el de nombre automático de MySQL y otro con nombre propio, agregado por
+    // una migración posterior). No rompen nada, pero InnoDB comprueba las dos en cada
+    // alta y cada cambio de cita.
+    await quitarFkDuplicadas('citas', 'tecnico_id');
+    await quitarFkDuplicadas('citas', 'sucursal_id');
   } catch (err) {
     console.error('⚠️  Auto-migración falló:', err.code || err.message);
   }
@@ -654,6 +735,32 @@ async function borrarIndiceSiExiste(tabla, nombre) {
   if (existe.n) {
     await pool.query(`DROP INDEX ${nombre} ON ${tabla}`);
     console.log(`🔧 Migración: índice ${nombre} en ${tabla} eliminado`);
+  }
+}
+
+// Deja UNA sola clave foránea por columna, borrando las repetidas.
+//
+// Se busca por columna y no por nombre a propósito: `citas_ibfk_4` es un nombre que
+// pone MySQL solo, y en una base creada por otro camino puede corresponder a otra
+// columna. Borrar por nombre funcionaría en la base de hoy y sacaría la única FK de
+// otra columna en la de mañana.
+//
+// Se conserva la de nombre explícito (`fk_...`) y se van las automáticas: son las que
+// no volvería a crear ninguna migración.
+async function quitarFkDuplicadas(tabla, columna) {
+  const [filas] = await pool.query(
+    `SELECT CONSTRAINT_NAME AS nombre FROM information_schema.KEY_COLUMN_USAGE
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?
+        AND REFERENCED_TABLE_NAME IS NOT NULL
+      ORDER BY (CONSTRAINT_NAME LIKE 'fk\\_%') DESC`,
+    [tabla, columna]
+  );
+  // La primera de la lista es la que se queda (la de nombre explícito, si hay).
+  for (const f of filas.slice(1)) {
+    await tryStep(`FK duplicada ${f.nombre}`, async () => {
+      await pool.query(`ALTER TABLE ${tabla} DROP FOREIGN KEY ${f.nombre}`);
+      console.log(`🔧 Migración: FK duplicada ${f.nombre} en ${tabla}.${columna} eliminada`);
+    });
   }
 }
 

@@ -120,7 +120,7 @@ CREATE TABLE `clientes` (
 
 LOCK TABLES `clientes` WRITE;
 /*!40000 ALTER TABLE `clientes` DISABLE KEYS */;
-INSERT INTO `clientes` (`id`, `nombre`, `apellido`, `telefono`, `email`, `cedula`, `direccion`, `password_hash`, `visitas`, `cortesia_disponible`, `notif_avances`, `notif_recordatorios`, `activo`, `created_at`, `updated_at`, `foto`, `email_verificado`, `email_pendiente`, `tenant_id`) VALUES (1,'Cliente','DelUno','111-1111',NULL,NULL,NULL,NULL,0,0,1,1,1,'2026-08-12 01:46:08','2026-08-12 01:46:08',NULL,1,NULL,1),(2,'Cliente','DelDos','222-2222',NULL,NULL,NULL,NULL,0,0,1,1,1,'2026-08-12 01:46:08','2026-08-12 01:46:08',NULL,1,NULL,2),(33,'Ana','Uno','8888-1111','cliente-1786557361919@t.com','1-2222-3333',NULL,'$2b$10$KPp0s9ggMXn4MOjS.WoeQu4u8QEiP5yWCmZxhF1PGLrsVlBDhnlQG',0,0,1,1,1,'2026-08-12 17:56:02','2026-08-12 17:56:02',NULL,1,NULL,1),(34,'Ana','Dos','8888-2222','cliente-1786557361919@t.com','1-2222-3333',NULL,'$2b$10$Yg7X/bHUL7tSUtt7YqIE8OU7xMSml.3ZAbeE773KpZW.bOpfld8vG',0,0,1,1,1,'2026-08-12 17:56:02','2026-08-12 17:56:02',NULL,1,NULL,2),(35,'Ana','Uno','8888-1111','cliente-1786558071993@t.com','1-2222-3333',NULL,'$2b$10$S5/aBPEfW9FuNSpIPMIsF.E8jGY0x8dOx/Vm6bUBQQFIbDBtCXipu',0,0,1,1,1,'2026-08-12 18:07:52','2026-08-12 18:07:52',NULL,1,NULL,1),(36,'Ana','Dos','8888-2222','cliente-1786558071993@t.com','1-2222-3333',NULL,'$2b$10$phw6cBSlWNsUk/GKYOGySu5uYmDVqsuBxV37aGcojWX8qQKjguUtm',0,0,1,1,1,'2026-08-12 18:07:52','2026-08-12 18:07:52',NULL,1,NULL,2),(37,'Ana','Uno','8888-1111','cliente-1786558348758@t.com','1-2222-3333',NULL,'$2b$10$WuyqP/mEwJgZUwedinY/DepPLUMYg38gmPK7QKoApuihKbZP82wom',0,0,1,1,1,'2026-08-12 18:12:28','2026-08-12 18:12:29',NULL,1,NULL,1),(38,'Ana','Dos','8888-2222','cliente-1786558348758@t.com','1-2222-3333',NULL,'$2b$10$hUPOgPeSMZX.0qD1wxx1e.OTzjgicFU8.0V6.R56gYCN5yGg8Fp5W',0,0,1,1,1,'2026-08-12 18:12:28','2026-08-12 18:12:29',NULL,1,NULL,2),(40,'Ana','Uno','8888-1111','cliente-1786563032083@t.com','1-2222-3333',NULL,'$2b$10$LYO49yE7SK6/c1Bqtk56ZOzXs7eOAn6eOmrcRv6am.SvtDn76ArQS',0,0,1,1,1,'2026-08-12 19:30:32','2026-08-12 19:30:32',NULL,1,NULL,1),(41,'Ana','Dos','8888-2222','cliente-1786563032083@t.com','1-2222-3333',NULL,'$2b$10$WH.FvMtHKr.dD4TE02ya0eoL0RELLN9sBHxJQeCsghXJT2snLfioO',0,0,1,1,1,'2026-08-12 19:30:32','2026-08-12 19:30:32',NULL,1,NULL,2);
+INSERT INTO `clientes` (`id`, `nombre`, `apellido`, `telefono`, `email`, `cedula`, `direccion`, `password_hash`, `visitas`, `cortesia_disponible`, `notif_avances`, `notif_recordatorios`, `activo`, `created_at`, `updated_at`, `foto`, `email_verificado`, `email_pendiente`, `tenant_id`) VALUES (1,'Cliente','DelUno','111-1111',NULL,NULL,NULL,NULL,0,0,1,1,1,'2026-08-12 01:46:08','2026-08-12 01:46:08',NULL,1,NULL,1),(2,'Cliente','DelDos','222-2222',NULL,NULL,NULL,NULL,0,0,1,1,1,'2026-08-12 01:46:08','2026-08-12 01:46:08',NULL,1,NULL,2);
 /*!40000 ALTER TABLE `clientes` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -202,7 +202,7 @@ CREATE TABLE `contactos_demo` (
 
 LOCK TABLES `contactos_demo` WRITE;
 /*!40000 ALTER TABLE `contactos_demo` DISABLE KEYS */;
-INSERT INTO `contactos_demo` (`id`, `nombre`, `email`, `telefono`, `empresa`, `volumen`, `mensaje`, `estado`, `nota_interna`, `origen`, `created_at`, `updated_at`) VALUES (2,'Encargado de Flota','purdy970554@ejemplo.cr',NULL,NULL,NULL,'Insisto','nuevo',NULL,NULL,'2026-08-12 19:29:40','2026-08-12 19:29:43');
+-- (sin filas: residuo de pruebas, ver db/README.md)
 /*!40000 ALTER TABLE `contactos_demo` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -237,7 +237,7 @@ CREATE TABLE `email_verify_codes` (
 
 LOCK TABLES `email_verify_codes` WRITE;
 /*!40000 ALTER TABLE `email_verify_codes` DISABLE KEYS */;
-INSERT INTO `email_verify_codes` (`id`, `cliente_id`, `code_hash`, `expires_at`, `used`, `attempts`, `created_at`, `proposito`, `tenant_id`) VALUES (21,33,'$2b$10$FQGblzONyjkfhTb9WvpksuKUUuVUg95cnsAdvShCJbZ7crnXDmv3e','2026-08-12 12:06:02',0,0,'2026-08-12 17:56:02','registro',1),(22,34,'$2b$10$NSlpSv84jSxu.ts9vJJR.u3kwQUdBlITJN/6ON2TkRkRrIB7QJFD2','2026-08-12 12:06:02',0,0,'2026-08-12 17:56:02','registro',2),(23,35,'$2b$10$blZvmkInTqi7Xnwp5d4bke2bhMGzA2/vJ6t6CR0B5Yf6BB5.n8OXS','2026-08-12 12:17:52',0,0,'2026-08-12 18:07:52','registro',1),(24,36,'$2b$10$6FaH6R1QvBtSGbdjdhs0meQz.xEET1XdVYsac83rkvjEfg7zttEQm','2026-08-12 12:17:52',0,0,'2026-08-12 18:07:52','registro',2),(25,37,'$2b$10$S8XmNTizBbH3KFzbtSIwPe4qaMmiVk30D0aspmAriD0pQu0yJJxyW','2026-08-12 12:22:28',0,0,'2026-08-12 18:12:28','registro',1),(26,38,'$2b$10$irUwsY1tpbBuZH3thh1s3.pdKeBtGfLTAXE3napvL.Z5wwRoUhzKe','2026-08-12 12:22:29',0,0,'2026-08-12 18:12:29','registro',2),(27,40,'$2b$10$O6y9fAd7JGgszvOly.UIluYNQBey/MxA8fOeQiwvbUt9rv5o4c1Ou','2026-08-12 13:40:32',0,0,'2026-08-12 19:30:32','registro',1),(28,41,'$2b$10$RAYqIWE1gy8nvfOaq8nxZ.zVn.LGNFDgad7Gx1seASuniwTz2vhju','2026-08-12 13:40:32',0,0,'2026-08-12 19:30:32','registro',2);
+-- (sin filas: residuo de pruebas, ver db/README.md)
 /*!40000 ALTER TABLE `email_verify_codes` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -977,7 +977,7 @@ CREATE TABLE `tenants` (
 
 LOCK TABLES `tenants` WRITE;
 /*!40000 ALTER TABLE `tenants` DISABLE KEYS */;
-INSERT INTO `tenants` (`id`, `nombre`, `slug`, `plan`, `estado`, `created_at`, `updated_at`, `motivo_estado`, `trial_hasta`) VALUES (1,'MS Motors','ms-motors','pro','activo','2026-08-12 00:29:01','2026-08-12 00:29:01',NULL,NULL),(2,'Moto Zone','moto-zone','trial','activo','2026-08-12 01:46:08','2026-08-12 19:30:06',NULL,NULL);
+INSERT INTO `tenants` (`id`, `nombre`, `slug`, `plan`, `estado`, `created_at`, `updated_at`, `motivo_estado`, `trial_hasta`) VALUES (1,'MS Motors','ms-motors','pro','activo','2026-08-12 00:29:01','2026-08-12 00:29:01',NULL,NULL),(2,'Moto Zone','moto-zone','trial','activo','2026-08-12 01:46:08','2026-08-12 19:30:06',NULL,'2026-09-11');
 /*!40000 ALTER TABLE `tenants` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1070,7 +1070,7 @@ CREATE TABLE `vehiculos` (
 
 LOCK TABLES `vehiculos` WRITE;
 /*!40000 ALTER TABLE `vehiculos` DISABLE KEYS */;
-INSERT INTO `vehiculos` (`id`, `cliente_id`, `tipo`, `marca`, `modelo`, `anio`, `placa`, `color`, `numero_motor`, `numero_chasis`, `kilometraje_actual`, `foto_url`, `activa`, `created_at`, `updated_at`, `foto`, `tenant_id`, `atributos`) VALUES (29,1,'moto','Honda','CB125',NULL,'ABC-123',NULL,NULL,NULL,0,NULL,1,'2026-08-12 17:22:00','2026-08-12 17:22:00',NULL,1,NULL),(30,2,'moto','Yamaha','FZ',NULL,'ABC-123',NULL,NULL,NULL,0,NULL,1,'2026-08-12 17:22:00','2026-08-12 17:22:00',NULL,2,NULL),(33,1,'moto','Honda','CB125',NULL,'A4B-465',NULL,NULL,NULL,0,NULL,1,'2026-08-12 17:56:00','2026-08-12 17:56:00',NULL,1,NULL),(34,2,'moto','Yamaha','FZ',NULL,'A4B-465',NULL,NULL,NULL,0,NULL,1,'2026-08-12 17:56:00','2026-08-12 17:56:00',NULL,2,NULL),(35,1,'moto','Honda','CB125',NULL,'A3B-570',NULL,NULL,NULL,0,NULL,1,'2026-08-12 18:12:27','2026-08-12 18:12:27',NULL,1,NULL),(36,2,'moto','Yamaha','FZ',NULL,'A3B-570',NULL,NULL,NULL,0,NULL,1,'2026-08-12 18:12:27','2026-08-12 18:12:27',NULL,2,NULL),(39,1,'moto','Honda','CB125',NULL,'A5B-375',NULL,NULL,NULL,0,NULL,1,'2026-08-12 19:30:13','2026-08-12 19:30:13',NULL,1,NULL),(40,2,'moto','Yamaha','FZ',NULL,'A5B-375',NULL,NULL,NULL,0,NULL,1,'2026-08-12 19:30:13','2026-08-12 19:30:13',NULL,2,NULL);
+INSERT INTO `vehiculos` (`id`, `cliente_id`, `tipo`, `marca`, `modelo`, `anio`, `placa`, `color`, `numero_motor`, `numero_chasis`, `kilometraje_actual`, `foto_url`, `activa`, `created_at`, `updated_at`, `foto`, `tenant_id`, `atributos`) VALUES (29,1,'moto','Honda','CB125',NULL,'ABC-123',NULL,NULL,NULL,0,NULL,1,'2026-08-12 17:22:00','2026-08-12 17:22:00',NULL,1,NULL),(30,2,'moto','Yamaha','FZ',NULL,'ABC-123',NULL,NULL,NULL,0,NULL,1,'2026-08-12 17:22:00','2026-08-12 17:22:00',NULL,2,NULL);
 /*!40000 ALTER TABLE `vehiculos` ENABLE KEYS */;
 UNLOCK TABLES;
 

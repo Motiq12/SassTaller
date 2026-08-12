@@ -98,6 +98,17 @@ export class AuthService {
     return this.http.post<{ message: string }>(`${this.apiUrl}/auth/2fa/desactivar`, { password });
   }
 
+  // Confirmación del correo del personal. No es 2FA ni le pone una traba a nadie: ese
+  // correo es la única vía para recuperar la contraseña, y hasta ahora nadie comprobaba
+  // que existiera.
+  enviarCodigoCorreo(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/verificar-correo/enviar`, {});
+  }
+
+  confirmarCorreo(codigo: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/verificar-correo`, { codigo });
+  }
+
   // Guarda la sesión del personal (la usa el login unificado cuando tipo === 'staff').
   aplicarSesionStaff(token: string, usuario: Usuario) {
     this.guardarSesion(token, usuario);

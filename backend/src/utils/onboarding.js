@@ -9,6 +9,7 @@
 const bcrypt = require('bcrypt');
 const { DEFAULTS } = require('./configuracion');
 const { normalizarTipos } = require('./tipos-vehiculo');
+const { finDeTrial } = require('./limites');
 
 // Servicios comunes a cualquier taller, y los propios de cada tipo. El taller los
 // edita después; esto es solo para que no abra el sistema con la lista vacía.
@@ -77,16 +78,24 @@ async function crearTaller(conn, datos) {
   // ningún tipo no podría registrar vehículos.
   const tipos = normalizarTipos(datos.tipos);
 
+  // La prueba se cuenta desde el alta. Sin esta fecha, `plan='trial'` sería una etiqueta
+  // sin consecuencia — nada vencería nunca — y los "30 días" que promete la landing no
+  // serían verdad. Solo la lleva el trial: un taller que entra directo a Pro no vence.
   const [tenant] = await conn.query(
-    "INSERT INTO tenants (nombre, slug, plan, estado) VALUES (?, ?, ?, 'activo')",
-    [nombre, slug, plan]
+    "INSERT INTO tenants (nombre, slug, plan, estado, trial_hasta) VALUES (?, ?, ?, 'activo', ?)",
+    [nombre, slug, plan, plan === 'trial' ? finDeTrial() : null]
   );
   const tenantId = tenant.insertId;
 
   // 1) Usuario admin: es el dueño de la cuenta y la única forma de entrar.
+  //
+  // `email_verificado = 0`: este correo se escribió hace diez segundos en un formulario
+  // y nadie lo comprobó. Es la única vía para recuperar la contraseña, así que un dedazo
+  // acá deja la cuenta incomunicada. El alta sigue igual —no bloquea nada—, pero queda
+  // marcado para pedir la confirmación (ver utils/verificacion-usuario).
   const hash = await bcrypt.hash(admin.password, 10);
   const [usuario] = await conn.query(
-    "INSERT INTO usuarios (tenant_id, nombre, email, password_hash, rol, telefono, activo) VALUES (?, ?, ?, ?, 'admin', ?, 1)",
+    "INSERT INTO usuarios (tenant_id, nombre, email, password_hash, rol, telefono, activo, email_verificado) VALUES (?, ?, ?, ?, 'admin', ?, 1, 0)",
     [tenantId, admin.nombre, admin.email, hash, admin.telefono || null]
   );
 

@@ -6,6 +6,7 @@
 const cron = require('node-cron');
 const { enviarRecordatorios } = require('./recordatorios');
 const { marcarNoShows } = require('./no-show');
+const { revisarVencimientos } = require('./vencimientos');
 
 let iniciado = false;
 
@@ -25,7 +26,11 @@ function iniciarJobs() {
   // No-show: 07:00 UTC ≈ 01:00 en CR, con el día anterior ya cerrado.
   cron.schedule('0 7 * * *', () => ejecutar('no-show', marcarNoShows));
 
-  console.log('⏰ Jobs programados: recordatorios (14:00 UTC), no-show (07:00 UTC)');
+  // Vencimientos de prueba: 13:00 UTC ≈ 07:00 en CR. Temprano y antes del correo de
+  // recordatorios, para que quien abra el sistema en la mañana ya vea su plan al día.
+  cron.schedule('0 13 * * *', () => ejecutar('vencimientos', revisarVencimientos));
+
+  console.log('⏰ Jobs programados: recordatorios (14:00 UTC), no-show (07:00 UTC), vencimientos (13:00 UTC)');
 }
 
 // Corre un job con manejo de errores: un fallo se loguea y no tumba el proceso.

@@ -11,6 +11,9 @@ const { fail } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const { emailValido } = require('../utils/validar');
 const { consumir } = require('../utils/rate-limit');
+const { resumenCuenta } = require('../utils/cuenta');
+const { nuevoCodigo, canjear, VIGENCIA_MIN } = require('../utils/verificacion-usuario');
+const { enviarCodigoCorreoStaff } = require('../services/mailer');
 const totp = require('../utils/totp');
 
 function firmar(payload) {
@@ -134,11 +137,59 @@ router.post('/login', async (req, res) => {
 router.get('/me', auth, async (req, res) => {
   try {
     const [[usuario]] = await req.db.query(
-      'SELECT id, nombre, email, rol, activo, created_at FROM usuarios WHERE id = ? AND tenant_id = @tenant',
+      'SELECT id, nombre, email, rol, activo, email_verificado, created_at FROM usuarios WHERE id = ? AND tenant_id = @tenant',
       [req.usuario.id]
     );
     if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
-    res.json({ data: usuario });
+
+    // La cuenta viaja acá porque /me es lo primero que pide la app al abrir: el aviso de
+    // "te quedan N días" y los topes del plan tienen que estar disponibles antes de que
+    // el taller toque nada, y sin un segundo viaje al servidor para averiguarlos.
+    res.json({ data: usuario, cuenta: await resumenCuenta(req.db) });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// ───────────────────────────────────────────────────────────
+// Verificación del correo del personal.
+//
+// No bloquea nada: el taller trabaja igual sin confirmarlo. Existe porque ese correo es
+// la única vía para recuperar la contraseña y para que Motiq avise del fin de la prueba,
+// y un dedazo al registrarse deja la cuenta incomunicada sin que nadie se entere.
+// ───────────────────────────────────────────────────────────
+
+// POST /api/auth/verificar-correo/enviar — manda (o reenvía) el código.
+router.post('/verificar-correo/enviar', auth, async (req, res) => {
+  try {
+    const [[u]] = await req.db.query(
+      'SELECT id, nombre, email, email_verificado FROM usuarios WHERE id = ? AND tenant_id = @tenant',
+      [req.usuario.id]
+    );
+    if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
+    if (u.email_verificado) return res.json({ message: 'Tu correo ya está confirmado' });
+
+    // Cada código cuesta un correo enviado: sin tope, el botón de reenviar es una
+    // ametralladora gratis contra la reputación del dominio.
+    const limite = consumir(`verif-staff:${u.id}`, { porMinuto: 1, porHora: 6 });
+    if (!limite.ok) {
+      return res.status(429).json({ error: `Esperá ${limite.retryAfter}s antes de pedir otro código.` });
+    }
+
+    const codigo = await nuevoCodigo(req.db, u.id);
+    await enviarCodigoCorreoStaff(u.email, { nombre: u.nombre, codigo, minutos: VIGENCIA_MIN });
+    res.json({ message: `Te mandamos un código a ${u.email}` });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// POST /api/auth/verificar-correo — canjea el código.
+router.post('/verificar-correo', auth, async (req, res) => {
+  try {
+    const motivo = await canjear(req.db, req.usuario.id, req.body?.codigo);
+    if (motivo) return res.status(400).json({ error: motivo });
+    res.json({ message: 'Correo confirmado' });
   } catch (err) {
     fail(res, err);
   }

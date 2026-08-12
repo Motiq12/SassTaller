@@ -1,0 +1,68 @@
+<ion-header>
+  <ion-toolbar class="admin-topbar">
+    <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+    <ion-title>Portal de clientes</ion-title>
+    <app-admin-actions slot="end"></app-admin-actions>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="admin-dark">
+  <div class="admin">
+    <p class="intro">
+      Tu cliente entra al portal y ve en qué va su vehículo, qué se le encontró y cuándo
+      lo puede retirar — sin llamar a preguntar. Estas son las tres formas de llevarlo ahí.
+    </p>
+
+    <!-- 1. El link -->
+    <div class="cd">
+      <span class="cd-title"><ion-icon name="link-outline"></ion-icon> El link de tu taller</span>
+      <div class="enlace-fila">
+        <code class="enlace">{{ enlace }}</code>
+        <button class="btn btn-cr btn-sm" (click)="copiar('enlace')">
+          <ion-icon [name]="copiado === 'enlace' ? 'checkmark-outline' : 'copy-outline'"></ion-icon>
+          {{ copiado === 'enlace' ? 'Copiado' : 'Copiar' }}
+        </button>
+      </div>
+      <p class="ayuda">
+        Sirve para cualquier cliente. La primera vez se registra con su correo y ya queda
+        asociado a los vehículos que tenga en el taller.
+      </p>
+    </div>
+
+    <!-- 2. El QR, para el mostrador -->
+    <div class="cd cartel">
+      <span class="cd-title no-print"><ion-icon name="qr-code-outline"></ion-icon> Para pegar en el mostrador</span>
+
+      <div class="cartel-hoja">
+        <h2>Seguí tu vehículo en línea</h2>
+        <img *ngIf="qr" [src]="qr" alt="Código QR del portal de clientes" class="qr" />
+        <p class="cartel-pie">{{ nombreTaller }}</p>
+      </div>
+
+      <div class="acciones no-print">
+        <button class="btn btn-sm" (click)="imprimir()">
+          <ion-icon name="print-outline"></ion-icon> Imprimir el cartel
+        </button>
+      </div>
+      <p class="ayuda no-print">
+        Escanean con la cámara del teléfono y entran directo. Es la forma que más funciona:
+        se lo llevan puesto mientras esperan.
+      </p>
+    </div>
+
+    <!-- 3. El mensaje ya escrito -->
+    <div class="cd">
+      <span class="cd-title"><ion-icon name="chatbubble-ellipses-outline"></ion-icon> El mensaje para mandarle</span>
+      <pre class="mensaje">{{ texto }}</pre>
+      <div class="acciones">
+        <button class="btn btn-cr btn-sm" (click)="abrirWhatsapp()">
+          <ion-icon name="logo-whatsapp"></ion-icon> Abrir WhatsApp
+        </button>
+        <button class="btn btn-sm" (click)="copiar('texto')">
+          <ion-icon [name]="copiado === 'texto' ? 'checkmark-outline' : 'copy-outline'"></ion-icon>
+          {{ copiado === 'texto' ? 'Copiado' : 'Copiar el texto' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</ion-content>

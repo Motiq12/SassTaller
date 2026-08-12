@@ -203,7 +203,33 @@ $suave: #5b6876;
   text-transform: none;
 }
 
+// Tres columnas necesitan más ancho que dos; sin esto la tercera cae sola a una fila
+// aparte y la comparación deja de leerse de un vistazo, que es todo su propósito.
+.tres {
+  max-width: 1080px;
+}
+
 .planes {
+  // La columna del medio no tiene botón (no hay nada que contratar: es donde se queda
+  // el que no paga). Sin esto quedaría más corta que las otras dos y desalineada.
+  > .plan { display: flex; flex-direction: column; }
+  > .plan ul { flex: 1 1 auto; }
+
+  .plazo {
+    margin: -0.75rem 0 1rem;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.55;
+  }
+
+  .nota {
+    margin: 0.5rem 0 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    opacity: 0.7;
+  }
+
   > .plan {
     background: #fff;
     border: 1px solid rgba(0, 0, 0, 0.1);

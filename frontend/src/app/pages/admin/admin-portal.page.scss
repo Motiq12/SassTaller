@@ -1,0 +1,113 @@
+.intro {
+  margin: 0 0 16px;
+  font-size: 14px;
+  opacity: .75;
+  max-width: 62ch;
+}
+
+.enlace-fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 10px 0 6px;
+}
+
+.enlace {
+  flex: 1 1 260px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .10);
+  font-size: 13px;
+  /* La dirección puede ser larga y no tiene espacios: sin esto se sale de la tarjeta
+     y arrastra la página entera hacia el costado. */
+  overflow-wrap: anywhere;
+}
+
+.ayuda {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  opacity: .6;
+  max-width: 62ch;
+}
+
+.acciones {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.mensaje {
+  margin: 10px 0 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .10);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;   /* respeta el salto de línea antes del link */
+}
+
+/* El cartel: en pantalla se ve como una hoja blanca dentro del panel oscuro, para que
+   se entienda que es algo que se imprime y no un bloque más de la interfaz. */
+.cartel-hoja {
+  margin: 12px 0 0;
+  padding: 28px 20px;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #0a0a0a;
+  text-align: center;
+}
+
+.cartel-hoja h2 {
+  margin: 0 0 18px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.qr {
+  width: 220px;
+  height: 220px;
+  max-width: 100%;
+  display: block;
+  margin: 0 auto;
+}
+
+.cartel-pie {
+  margin: 18px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  opacity: .8;
+}
+
+/* Al imprimir sale SOLO el cartel. Sin esto saldría el panel entero —menú, tarjetas,
+   botones— y nadie pega eso en un mostrador. */
+@media print {
+  :host { background: #fff; }
+  ion-header,
+  .intro,
+  .no-print,
+  .cd:not(.cartel),
+  .cartel .acciones,
+  .cartel .cd-title { display: none !important; }
+
+  .cd.cartel { border: 0; background: transparent; padding: 0; }
+
+  .cartel-hoja {
+    border-radius: 0;
+    padding: 0;
+    /* Centrado en la hoja: el cartel es lo único que se imprime. */
+    min-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .cartel-hoja h2 { font-size: 28px; }
+  .qr { width: 320px; height: 320px; }
+}

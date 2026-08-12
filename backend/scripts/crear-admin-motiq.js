@@ -9,8 +9,8 @@
 // --password si hace falta.
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const bcrypt = require('bcrypt');
-const crypto = require('crypto');
 const { pool } = require('../src/db/pool');
+const { generarPassword } = require('../src/utils/password');
 
 const args = process.argv.slice(2).filter(a => !a.startsWith('--'));
 const nombre = args[0];
@@ -24,19 +24,6 @@ if (!nombre || !email) {
 if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
   console.error('✖ El correo no tiene un formato válido');
   process.exit(1);
-}
-
-// Sin caracteres que rompan un .env o una URL si después se copia a algún lado.
-function generarPassword(n = 20) {
-  const U = 'ABCDEFGHJKLMNPQRSTUVWXYZ', L = 'abcdefghijkmnopqrstuvwxyz', D = '23456789', S = '!@%&*_-+=?';
-  const todo = U + L + D + S;
-  const salida = [U, L, D, S].map(s => s[crypto.randomInt(s.length)]);
-  while (salida.length < n) salida.push(todo[crypto.randomInt(todo.length)]);
-  for (let i = salida.length - 1; i > 0; i--) {
-    const j = crypto.randomInt(i + 1);
-    [salida[i], salida[j]] = [salida[j], salida[i]];
-  }
-  return salida.join('');
 }
 
 (async () => {

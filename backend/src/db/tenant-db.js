@@ -23,7 +23,7 @@ const TABLAS_CON_TENANT = new Set([
   'notificaciones', 'orden_avances', 'orden_checklist', 'orden_contadores',
   'orden_fotos', 'orden_repuestos', 'orden_tiempos', 'ordenes_trabajo',
   'password_reset_codes', 'promos', 'recompensas_canjeadas', 'servicios',
-  'sucursales', 'tareas_mecanico', 'usuarios', 'web_vitals',
+  'sucursales', 'tareas_mecanico', 'usuario_verify_codes', 'usuarios', 'web_vitals',
 ]);
 
 // Detecta las tablas nombradas en la consulta junto con su alias, si tiene.

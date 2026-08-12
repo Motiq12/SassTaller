@@ -58,6 +58,27 @@ export class TallerService {
 
   constructor(private http: HttpClient) {
     try { this.guardado = localStorage.getItem(TALLER_KEY); } catch { this.guardado = null; }
+    this.tomarDeLaUrl();
+  }
+
+  /**
+   * `?taller=slug` en la dirección: es lo que hace que un link compartido funcione.
+   *
+   * Sin esto, el link que el taller le manda a su cliente por WhatsApp no resuelve a
+   * ningún taller: hoy todavía no hay un subdominio por cliente (todos viven en el
+   * mismo dominio) y el visitante nuevo no tiene nada guardado, así que el portal se
+   * abriría sin saber de quién es. Se guarda al entrar porque el parámetro desaparece
+   * en cuanto la aplicación navega a otra ruta.
+   *
+   * Pisa lo guardado a propósito: si alguien ya visitó otro taller en ese navegador, el
+   * link que acaba de abrir es una intención más nueva y más explícita que esa memoria.
+   */
+  private tomarDeLaUrl(): void {
+    try {
+      const slug = new URLSearchParams(window.location.search).get('taller');
+      // El mismo formato que valida el servidor al registrar (ver utils/onboarding).
+      if (slug && /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(slug)) this.fijar(slug);
+    } catch { /* sin window (SSR/pruebas) o URL rara: se sigue con lo que haya */ }
   }
 
   // Slug del subdominio, o null si no hay uno utilizable.

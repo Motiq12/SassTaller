@@ -10,10 +10,15 @@ const { fail } = require('../utils/responder');
 const { emailValido } = require('../utils/validar');
 const { consumir } = require('../utils/rate-limit');
 const authPlataforma = require('../middleware/auth-plataforma');
-const { fijarEstado } = require('../utils/estado-tenant');
+const { fijarEstado, fijarPlan } = require('../utils/estado-tenant');
+// Los planes se declaran en utils/limites junto con lo que incluye cada uno: tener acá
+// una segunda lista sería la forma de que un día acepte un plan que no tiene límites
+// definidos, y ese taller quedaría sin topes sin que nadie lo decidiera.
+const { PLANES } = require('../utils/limites');
+const { crearTaller, normalizarSlug, motivoSlugInvalido } = require('../utils/onboarding');
+const { generarPassword } = require('../utils/password');
 
 const ESTADOS = ['activo', 'suspendido', 'cancelado'];
-const PLANES = ['trial', 'pro'];
 
 // POST /api/motiq/login — sesión de administración de la plataforma.
 router.post('/login', async (req, res) => {
@@ -145,6 +150,78 @@ router.patch('/contactos/:id', async (req, res) => {
   }
 });
 
+// POST /api/motiq/contactos/:id/taller — cerrar la venta: crear el taller desde el
+// contacto que pidió la demo.
+//
+// Es el paso que faltaba del embudo. Sin esto, cerrar con un cliente grande significaba
+// pedirle que se registrara solo en la misma pantalla pública del taller de un mecánico
+// —después de haber hablado por teléfono— o hacerle el alta a mano en MySQL.
+router.post('/contactos/:id/taller', async (req, res) => {
+  let conn;
+  try {
+    const [[contacto]] = await pool.query('SELECT * FROM contactos_demo WHERE id = ?', [req.params.id]);
+    if (!contacto) return res.status(404).json({ error: 'Contacto no encontrado' });
+
+    // El nombre del taller sale de lo que escribió en "Empresa", pero se puede corregir:
+    // lo que dictó por teléfono suele ser más preciso que lo que tipeó apurado.
+    const nombre = String(req.body.nombre || contacto.empresa || '').trim();
+    if (!nombre) return res.status(400).json({ error: 'Falta el nombre del taller' });
+
+    const slug = normalizarSlug(req.body.slug || nombre);
+    const motivo = motivoSlugInvalido(slug);
+    if (motivo) return res.status(400).json({ error: motivo });
+
+    const plan = PLANES.includes(req.body.plan) ? req.body.plan : 'pro';
+
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+
+    const [[tomado]] = await conn.query('SELECT id FROM tenants WHERE slug = ? FOR UPDATE', [slug]);
+    if (tomado) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Ese identificador ya está en uso' });
+    }
+
+    // La contraseña se genera y se muestra una sola vez: elegirla nosotros por el
+    // cliente termina en un "Taller2026" que nadie cambia nunca.
+    const password = generarPassword();
+    const { tenantId, tipos } = await crearTaller(conn, {
+      nombre, slug, plan,
+      admin: { nombre: contacto.nombre, email: contacto.email, password, telefono: contacto.telefono },
+      tipos: req.body.tipos,
+      contacto: { telefono: contacto.telefono, email: contacto.email },
+    });
+
+    // El contacto queda cerrado en el mismo movimiento: si esto fuera un paso aparte,
+    // el lead atendido seguiría figurando como pendiente en la bandeja.
+    await conn.query(
+      `UPDATE contactos_demo SET estado = 'cerrado',
+              nota_interna = CONCAT(COALESCE(nota_interna, ''), ?)
+        WHERE id = ?`,
+      [`\nTaller creado: ${slug} (plan ${plan}).`, contacto.id]
+    );
+
+    await conn.commit();
+
+    res.status(201).json({
+      data: {
+        taller: { id: tenantId, nombre, slug, plan, tipos },
+        // Se devuelve para dictársela al cliente. No queda guardada en ningún lado.
+        admin: { email: contacto.email, password },
+      },
+      message: 'Taller creado. Guardá la contraseña: no se vuelve a mostrar.',
+    });
+  } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'Ese identificador o correo ya está en uso' });
+    }
+    fail(res, err);
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
 // GET /api/motiq/resumen — el estado del negocio de un vistazo.
 router.get('/resumen', async (req, res) => {
   try {
@@ -153,6 +230,8 @@ router.get('/resumen', async (req, res) => {
               COALESCE(SUM(estado = 'activo'), 0)      AS activos,
               COALESCE(SUM(estado = 'suspendido'), 0)  AS suspendidos,
               COALESCE(SUM(plan = 'trial'), 0)         AS en_prueba,
+              COALESCE(SUM(plan = 'gratis'), 0)        AS en_gratis,
+              COALESCE(SUM(plan = 'pro'), 0)           AS en_pro,
               COALESCE(SUM(created_at >= NOW() - INTERVAL 30 DAY), 0) AS nuevos_30d
        FROM tenants`
     );
@@ -243,11 +322,25 @@ router.patch('/talleres/:id/plan', async (req, res) => {
     const { plan, trial_hasta } = req.body;
     if (!PLANES.includes(plan)) return res.status(400).json({ error: `Plan inválido (${PLANES.join(', ')})` });
 
+    // Solo el trial vence. Mandar la fecha en cualquier otro plan sería contradictorio,
+    // así que se ignora en vez de guardarse a medias.
+    const vence = plan === 'trial' ? (String(trial_hasta || '').trim() || null) : null;
+    // La columna es DATE: una fecha mal escrita hoy reventaba en MySQL y salía como un
+    // 500 genérico, que no le dice a nadie qué corregir.
+    if (vence && !/^\d{4}-\d{2}-\d{2}$/.test(vence)) {
+      return res.status(400).json({ error: 'La fecha de fin de prueba debe ser AAAA-MM-DD' });
+    }
+
     const [r] = await pool.query(
       'UPDATE tenants SET plan = ?, trial_hasta = ? WHERE id = ?',
-      [plan, plan === 'trial' ? (trial_hasta || null) : null, req.params.id]
+      [plan, vence, req.params.id]
     );
     if (!r.affectedRows) return res.status(404).json({ error: 'Taller no encontrado' });
+
+    // Igual que con el estado: los topes del plan se leen de memoria en cada request,
+    // así que pasar a Pro tiene que valer desde el request siguiente y no cuando toque
+    // el refresco. A los otros workers del cluster les llega por ahí.
+    fijarPlan(Number(req.params.id), plan, vence);
     res.json({ message: 'Plan actualizado' });
   } catch (err) {
     fail(res, err);

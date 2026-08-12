@@ -14,6 +14,7 @@ import { AdminConfigPage } from './admin-config.page';
 import { AdminServiciosPage } from './admin-servicios.page';
 import { AdminMensajesPage } from './admin-mensajes.page';
 import { AdminPerfilPage } from './admin-perfil.page';
+import { AdminPortalPage } from './admin-portal.page';
 import { AdminActionsComponent } from './admin-actions.component';
 
 @NgModule({
@@ -32,6 +33,7 @@ import { AdminActionsComponent } from './admin-actions.component';
     AdminServiciosPage,
     AdminMensajesPage,
     AdminPerfilPage,
+    AdminPortalPage,
     AdminActionsComponent,
   ],
 })

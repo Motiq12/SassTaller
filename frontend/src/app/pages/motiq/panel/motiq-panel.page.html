@@ -89,6 +89,11 @@
           <span class="desde">{{ c.created_at | date: 'medium' }}</span>
           <div class="acciones">
             <ion-button size="small" fill="outline" (click)="atender(c)">Atender</ion-button>
+            <!-- Cierra el círculo: del que preguntó al taller andando, sin pedirle que
+                 se registre solo después de haber hablado por teléfono. -->
+            <ion-button size="small" *ngIf="c.estado !== 'cerrado'" (click)="crearTaller(c)">
+              Crear taller
+            </ion-button>
           </div>
         </div>
       </div>

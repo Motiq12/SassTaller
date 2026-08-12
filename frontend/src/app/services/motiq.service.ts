@@ -124,6 +124,15 @@ export class MotiqService {
     return this.http.patch<{ message: string }>(`${this.apiUrl}/motiq/contactos/${id}`, { estado, nota_interna });
   }
 
+  // Cierra el embudo: crea el taller a partir del contacto. Devuelve la contraseña
+  // generada del admin, y es la única vez que se puede ver.
+  crearTallerDesdeContacto(id: number, nombre: string, slug?: string): Observable<{
+    data: { taller: { id: number; nombre: string; slug: string; plan: string }; admin: { email: string; password: string } };
+    message: string;
+  }> {
+    return this.http.post<any>(`${this.apiUrl}/motiq/contactos/${id}/taller`, { nombre, slug });
+  }
+
   resumen(): Observable<{ data: ResumenPlataforma }> {
     return this.http.get<{ data: ResumenPlataforma }>(`${this.apiUrl}/motiq/resumen`);
   }

@@ -14,6 +14,25 @@ export class AdminService {
     return this.http.get<{ data: any }>(`${this.url}/resumen`);
   }
 
+  // Primeros pasos del taller. Los cuatro se derivan de los datos en el servidor, así
+  // que esto se vuelve a pedir cada vez que se entra al panel.
+  getArranque(): Observable<{ data: { pasos: any; completo: boolean; oculto: boolean; hay_ejemplo: boolean } }> {
+    return this.http.get<{ data: any }>(`${this.url}/arranque`);
+  }
+
+  ocultarArranque(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.url}/arranque/ocultar`, {});
+  }
+
+  // Datos de mentira para poder mirar el sistema antes de cargar los propios.
+  cargarEjemplo(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.url}/ejemplo`, {});
+  }
+
+  borrarEjemplo(): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.url}/ejemplo`);
+  }
+
   // Gestión de citas: reusa /api/citas con filtros (estado, búsqueda, fecha, sucursal).
   getCitas(filtros: { estado?: string; q?: string; fecha?: string; sucursal_id?: number | string } = {}): Observable<{ data: any[] }> {
     const params: any = {};

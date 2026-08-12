@@ -6,6 +6,7 @@ const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { emailValido } = require('../utils/validar');
 const { sucursalValida } = require('../utils/sucursales');
+const { topeAlcanzado } = require('../utils/cuenta');
 
 router.use(auth, requireRol('admin'));
 
@@ -43,6 +44,14 @@ router.post('/', async (req, res) => {
     // Piso de contraseña (igual que el portal): frena contraseñas triviales del personal.
     if (String(password).length < 8) return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
     if (!ROLES.includes(rol)) return res.status(400).json({ error: 'Rol no válido' });
+
+    // Tope del plan. Se comprueba antes del hash: bcrypt cuesta ~100ms y no tiene
+    // sentido pagarlos para después rechazar el alta. El 402 distingue "tu plan no
+    // llega" de un 403 de permisos — quien está acá es admin y tiene todo el derecho,
+    // lo que falta es plan, y el frontend lo trata distinto por eso.
+    const tope = await topeAlcanzado(req.db, 'usuarios');
+    if (tope) return res.status(402).json({ error: tope, tope: 'usuarios' });
+
     const hash = await bcrypt.hash(password, 10);
     const sucursal_id = await sucursalDelBody(req.db, req.body.sucursal_id);
     const [result] = await req.db.query(

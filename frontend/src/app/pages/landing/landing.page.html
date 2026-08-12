@@ -98,24 +98,40 @@
   <!-- Precios -->
   <section class="bloque" id="precios">
     <h2>Precios</h2>
-    <div class="dos planes">
+    <!-- Tres columnas y no dos: al terminar la prueba nadie se queda afuera, y eso hay
+         que decirlo acá. Prometer "30 días" sin contar qué pasa el día 31 hace que la
+         pregunta se la haga igual, pero solo. -->
+    <div class="dos tres planes">
       <article class="plan">
         <h3>Prueba</h3>
         <p class="precio">Gratis</p>
+        <p class="plazo">30 días</p>
         <ul>
-          <li>El sistema completo, 30 días</li>
+          <li>El sistema completo, sin recortes</li>
           <li>Sin tarjeta</li>
-          <li>Tus datos quedan si seguís</li>
+          <li>Tus datos quedan cuando termina</li>
         </ul>
         <ion-button expand="block" (click)="probarGratis()">Empezar</ion-button>
+      </article>
+      <article class="plan">
+        <h3>Gratis</h3>
+        <p class="precio">₡0</p>
+        <p class="plazo">Para siempre</p>
+        <ul>
+          <li>Órdenes, clientes y vehículos sin límite</li>
+          <li>Portal de clientes incluido</li>
+          <li>Una sucursal y hasta 2 usuarios</li>
+        </ul>
+        <p class="nota">Es donde queda tu taller cuando termina la prueba. No se borra nada.</p>
       </article>
       <article class="plan destacado">
         <h3>Pro</h3>
         <p class="precio">A convenir</p>
+        <p class="plazo">Por mes</p>
         <ul>
-          <li>Usuarios y vehículos sin límite</li>
+          <li>Usuarios sin límite</li>
           <li>Varias sucursales</li>
-          <li>Tu marca en el portal de clientes</li>
+          <li>Tu logo y tus colores en el portal</li>
           <li>Soporte directo</li>
         </ul>
         <ion-button expand="block" fill="outline" (click)="irA('contacto')">Hablemos</ion-button>

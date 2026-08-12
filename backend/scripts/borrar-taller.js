@@ -15,6 +15,7 @@
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const { pool } = require('../src/db/pool');
 const { TABLAS_CON_TENANT } = require('../src/db/tenant-db');
+const { ordenDeBorrado } = require('../src/utils/orden-borrado');
 
 const args = process.argv.slice(2);
 const EN_SERIO = args.includes('--si');
@@ -28,6 +29,10 @@ if (!slug && !patron) {
 }
 
 (async () => {
+  // El orden se calcula una vez, antes de tocar nada: si el esquema tuviera un ciclo de
+  // claves foráneas, es mejor enterarse acá que con medio taller borrado.
+  const orden = await ordenDeBorrado(pool, TABLAS_CON_TENANT);
+
   const conn = await pool.getConnection();
   try {
     const [talleres] = patron
@@ -59,23 +64,23 @@ if (!slug && !patron) {
       // que ya no existe, y esas filas no las alcanza ninguna consulta con scope.
       await conn.beginTransaction();
       try {
-        // Las claves foráneas obligan a un orden; en vez de mantenerlo a mano —y que
-        // se rompa en cuanto alguien agregue una tabla— se desactiva la comprobación
-        // dentro de la transacción y se borra todo junto.
-        await conn.query('SET FOREIGN_KEY_CHECKS = 0');
+        // Se borra en orden de dependencias, con las claves foráneas ENCENDIDAS.
+        //
+        // Antes esto hacía `SET FOREIGN_KEY_CHECKS = 0` porque mantener el orden a mano
+        // se rompía al agregar una tabla. El orden ahora se deduce del esquema real en
+        // cada corrida (ver utils/orden-borrado), así que una tabla nueva entra sola —y
+        // sin tener que apagar la única red que avisa si algo quedó colgando.
         let filas = 0;
-        for (const tabla of TABLAS_CON_TENANT) {
+        for (const tabla of orden) {
           const [r] = await conn.query(`DELETE FROM \`${tabla}\` WHERE tenant_id = ?`, [t.id]);
           filas += r.affectedRows;
         }
         const [r] = await conn.query('DELETE FROM tenants WHERE id = ?', [t.id]);
         filas += r.affectedRows;
-        await conn.query('SET FOREIGN_KEY_CHECKS = 1');
         await conn.commit();
         console.log(`   borradas ${filas} filas`);
       } catch (err) {
         await conn.rollback();
-        await conn.query('SET FOREIGN_KEY_CHECKS = 1');
         throw err;
       }
     }

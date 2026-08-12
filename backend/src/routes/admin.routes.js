@@ -8,6 +8,8 @@ const { getConfig, clearCache } = require('../utils/configuracion');
 const { getSucursales, clearCache: clearSucursalesCache } = require('../utils/sucursales');
 const { getServiciosFilas, clearCache: clearServicios } = require('../utils/servicios');
 const { fotoValida, textoDentroDeLimite } = require('../utils/validar');
+const { topeAlcanzado, puedeMarcaPropia } = require('../utils/cuenta');
+const { cargarEjemplo, borrarEjemplo } = require('../utils/ejemplo');
 
 // Color de marca valido: exactamente #rrggbb. Se valida en el servidor y no solo en
 // el formulario porque el valor termina inyectado en una variable CSS del navegador.
@@ -18,6 +20,77 @@ function colorHex(v) {
 
 // Panel del administrador: métricas ejecutivas. Solo admin.
 router.use(auth, requireRol('admin'));
+
+// ───────────────────────────────────────────────────────────
+// Arranque: los primeros pasos de un taller recién registrado.
+// ───────────────────────────────────────────────────────────
+
+// GET /api/admin/arranque — qué le falta al taller para estar andando.
+//
+// Los cuatro pasos se DERIVAN de los datos, no se guardan. Un progreso guardado aparte
+// puede terminar afirmando que algo está hecho cuando ya no lo está (borraron al único
+// empleado, quitaron el logo), y entonces el checklist miente. Lo único que se persiste
+// es si lo cerraron a mano.
+router.get('/arranque', async (req, res) => {
+  try {
+    const [[p]] = await req.db.query(
+      `SELECT
+         (SELECT COUNT(*) FROM configuracion
+            WHERE tenant_id = @tenant AND (logo IS NOT NULL OR color_primario IS NOT NULL)) AS marca,
+         (SELECT COUNT(*) FROM usuarios  WHERE tenant_id = @tenant AND activo = 1)           AS usuarios,
+         (SELECT COUNT(*) FROM ordenes_trabajo WHERE tenant_id = @tenant)                    AS ordenes,
+         (SELECT COUNT(*) FROM clientes  WHERE tenant_id = @tenant AND password_hash IS NOT NULL) AS con_portal,
+         (SELECT COUNT(*) FROM clientes  WHERE tenant_id = @tenant AND es_ejemplo = 1)       AS ejemplo,
+         (SELECT COALESCE(MAX(arranque_oculto), 0) FROM configuracion WHERE tenant_id = @tenant) AS oculto`
+    );
+
+    const pasos = {
+      marca:  Number(p.marca) > 0,
+      equipo: Number(p.usuarios) > 1,   // el admin que registró el taller ya cuenta como uno
+      orden:  Number(p.ordenes) > 0,
+      portal: Number(p.con_portal) > 0,
+    };
+    const completo = Object.values(pasos).every(Boolean);
+
+    res.json({ data: { pasos, completo, oculto: Number(p.oculto) === 1, hay_ejemplo: Number(p.ejemplo) > 0 } });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// POST /api/admin/arranque/ocultar — "ya entendí, sacámelo de encima".
+router.post('/arranque/ocultar', async (req, res) => {
+  try {
+    await req.db.query('UPDATE configuracion SET arranque_oculto = 1 WHERE id = 1 AND tenant_id = @tenant');
+    clearCache();
+    res.json({ message: 'Listo' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// POST /api/admin/ejemplo — llenar el taller con datos de mentira para poder mirarlo.
+router.post('/ejemplo', async (req, res) => {
+  try {
+    const r = await cargarEjemplo(req.db);
+    res.status(201).json({
+      data: r,
+      message: r.ya ? 'Los datos de ejemplo ya estaban cargados' : 'Datos de ejemplo cargados',
+    });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// DELETE /api/admin/ejemplo — sacarlos. Solo toca lo marcado como ejemplo.
+router.delete('/ejemplo', async (req, res) => {
+  try {
+    const r = await borrarEjemplo(req.db);
+    res.json({ data: r, message: 'Datos de ejemplo eliminados' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
 
 // GET /api/admin/resumen — KPIs del mes + distribución de citas + ingresos por servicio.
 router.get('/resumen', async (req, res) => {
@@ -585,12 +658,18 @@ router.put('/configuracion', async (req, res) => {
     // formas de pago anteriores que dejar el cierre de orden sin ninguna opción.
     const metodosJson = metodos && metodos.length ? JSON.stringify(metodos) : null;
 
+    // Marca propia (logo y color) según el plan. Cuando NO le toca, las dos columnas se
+    // dejan fuera del UPDATE en vez de guardarse en null: el taller que puso su logo
+    // durante la prueba no puede perderlo al pasar a gratis. Se apaga la marca, no se
+    // borra — si mañana pasa a Pro, su logo sigue ahí.
+    const marcaPropia = puedeMarcaPropia(req.db.tenantId);
+
     await req.db.query(
       // WHERE lleva el taller: sin él esto escribía sobre la fila id=1 de TODOS los
       // talleres, porque la clave de configuracion es (tenant_id, id).
       `UPDATE configuracion SET
-         nombre_taller = ?, telefono = ?, email = ?, direccion = ?, logo = ?,
-         color_primario = ?,
+         nombre_taller = ?, telefono = ?, email = ?, direccion = ?,
+         ${marcaPropia ? 'logo = ?, color_primario = ?,' : ''}
          max_citas_hora = ?, dias_anticipacion = ?, duracion_cita_min = ?, cancelacion_horas_min = ?,
          garantia_dias = ?,
          ${horarios ? 'horarios = ?,' : ''}
@@ -604,11 +683,10 @@ router.put('/configuracion', async (req, res) => {
         (b.telefono || '').trim() || null,
         (b.email || '').trim() || null,
         (b.direccion || '').trim() || null,
-        b.logo || null,
         // Color de marca: se acepta solo #rrggbb. Cualquier otra cosa se guarda como
         // NULL y el sistema usa su color por defecto — el valor termina en una
         // variable CSS, así que no puede entrar texto arbitrario.
-        colorHex(b.color_primario),
+        ...(marcaPropia ? [b.logo || null, colorHex(b.color_primario)] : []),
         num(b.max_citas_hora, 2),
         num(b.dias_anticipacion, 30),
         num(b.duracion_cita_min, 90),
@@ -623,7 +701,12 @@ router.put('/configuracion', async (req, res) => {
       ]
     );
     clearCache();
-    res.json({ data: await getConfig(req.db), message: 'Configuración guardada' });
+    // Si mandó logo o color y su plan no los incluye, se lo dice. Guardar en silencio
+    // algo que no se aplicó lo dejaría preguntándose por qué su portal sigue igual.
+    const aviso = !marcaPropia && (b.logo || b.color_primario)
+      ? 'El logo y el color propios son del plan Pro. El resto se guardó.'
+      : null;
+    res.json({ data: await getConfig(req.db), message: 'Configuración guardada', aviso });
   } catch (err) {
     fail(res, err);
   }
@@ -693,6 +776,12 @@ router.post('/sucursales', async (req, res) => {
   try {
     const nombre = (req.body.nombre || '').trim();
     if (!nombre) return res.status(400).json({ error: 'El nombre de la sucursal es requerido' });
+
+    // Tope del plan (ver utils/limites). El plan gratuito incluye una sucursal; el
+    // taller que abre la segunda es justamente con el que hay que hablar.
+    const tope = await topeAlcanzado(req.db, 'sucursales');
+    if (tope) return res.status(402).json({ error: tope, tope: 'sucursales' });
+
     const [[{ orden }]] = await req.db.query('SELECT COALESCE(MAX(orden), 0) + 1 AS orden FROM sucursales WHERE tenant_id = @tenant');
     const [result] = await req.db.query(
       'INSERT INTO sucursales (tenant_id,nombre, direccion, telefono, orden) VALUES (@tenant, ?, ?, ?, ?)',
