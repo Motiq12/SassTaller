@@ -7,11 +7,15 @@ const router = require('express').Router();
 const { getConfig } = require('../utils/configuracion');
 const { fail } = require('../utils/responder');
 const auth = require('../middleware/auth');
+const tenantPublico = require('../middleware/tenant-publico');
 
 // El logo se guarda como data URL en base64. Sirve para pintarlo en pantalla, pero NO
 // dentro de un correo: Gmail y compañía descartan las imágenes `data:`. Por eso hace
 // falta este endpoint, que lo devuelve como un archivo de imagen de verdad.
-const LOGO_POR_DEFECTO = '/assets/logo/ms-logo-white.png';
+//
+// Sin logo cargado NO se cae a un archivo de la app: el que había era el de MS Motos,
+// y servírselo a otro taller sería ponerle la marca de un tercero. Se responde 404 y
+// la interfaz muestra las iniciales del taller, que sirven para cualquier empresa.
 const DATA_URL_RE = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/;
 
 // Convierte el logo guardado (data URL) en bytes servibles. Devuelve null si no hay
@@ -28,15 +32,14 @@ function logoDesdeDataUrl(logo) {
 
 // GET /api/marca/logo — imagen del taller. Público a propósito: lo pide el cliente de
 // correo del destinatario, que no manda cabeceras de sesión.
-router.get('/logo', async (req, res) => {
+router.get('/logo', tenantPublico, async (req, res) => {
   try {
+    // Esta ruta no tiene middleware de sesion detras, asi que si tenantPublico no
+    // resolvio el taller no hay de donde sacar el logo. Se dice cual falta.
+    if (!req.db) return res.status(400).json({ error: 'Falta indicar el taller' });
     const { logo } = await getConfig(req.db);
     const img = logoDesdeDataUrl(logo);
-    if (!img) {
-      // Sin logo cargado (o con un valor que no sabemos interpretar): se cae al que
-      // viene con la app, para que nunca quede un hueco roto en el correo.
-      return res.redirect(302, LOGO_POR_DEFECTO);
-    }
+    if (!img) return res.status(404).end();
     const { contentType, buffer } = img;
     res.set({
       'Content-Type': contentType,
@@ -45,6 +48,30 @@ router.get('/logo', async (req, res) => {
       'Cache-Control': 'public, max-age=300',
     });
     res.send(buffer);
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// GET /api/marca/publica — identidad visible del taller SIN sesión.
+//
+// El login, el registro y la recuperación de contraseña se pintan antes de que
+// exista un token, así que no pueden usar la ruta autenticada. Sin esto, esas
+// pantallas tendrían que mostrar una marca fija — que es exactamente el problema
+// que estamos resolviendo.
+//
+// Devuelve solo lo que ya se ve en la pantalla de login de cualquier taller
+// (nombre, logo, color): nada que no publicaría en su puerta.
+router.get('/publica', tenantPublico, async (req, res) => {
+  try {
+    const c = await getConfig(req.db);
+    res.json({
+      data: {
+        nombre_taller: c.nombre_taller,
+        logo: c.logo || null,
+        color_primario: c.color_primario || null,
+      },
+    });
   } catch (err) {
     fail(res, err);
   }
@@ -62,6 +89,7 @@ router.get('/', auth, async (req, res) => {
         email: c.email,
         direccion: c.direccion,
         logo: c.logo || null,
+        color_primario: c.color_primario || null,
         garantia_dias: c.garantia_dias,
         metodos_pago: c.metodos_pago,
       },

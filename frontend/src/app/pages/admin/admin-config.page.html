@@ -14,10 +14,25 @@
         <!-- Info del taller -->
         <div class="cd mb">
           <span class="cd-title"><ion-icon name="storefront-outline"></ion-icon> Información del taller</span>
-          <div class="fg"><label>Nombre del negocio</label><input [(ngModel)]="config.nombre_taller" placeholder="MS Motos"></div>
+          <div class="fg"><label>Nombre del negocio</label><input [(ngModel)]="config.nombre_taller" placeholder="Nombre de tu taller"></div>
           <div class="fg"><label>Teléfono / WhatsApp</label><input [(ngModel)]="config.telefono" placeholder="+506 0000-0000"></div>
-          <div class="fg"><label>Correo de contacto</label><input type="email" [(ngModel)]="config.email" placeholder="info@msmotos.com"></div>
+          <div class="fg"><label>Correo de contacto</label><input type="email" [(ngModel)]="config.email" placeholder="info@tutaller.com"></div>
           <div class="fg"><label>Dirección</label><input [(ngModel)]="config.direccion" placeholder="San José, Costa Rica"></div>
+          <!-- Color de marca: se aplica a botones, encabezados y acentos de toda la
+               app. El selector nativo y el campo de texto editan el mismo valor: el
+               primero para elegir a ojo, el segundo para pegar el hex exacto de la
+               identidad corporativa, que es lo que hace una empresa con manual de marca. -->
+          <div class="fg">
+            <label>Color de marca</label>
+            <div class="color-fila">
+              <input type="color" class="color-picker" [(ngModel)]="colorElegido" (ngModelChange)="previsualizarColor()">
+              <input class="color-hex" [(ngModel)]="colorElegido" (ngModelChange)="previsualizarColor()"
+                     placeholder="#1d4ed8" maxlength="7" autocapitalize="off" spellcheck="false">
+              <button type="button" class="btn btn-rd btn-sm" (click)="quitarColor()">Quitar</button>
+            </div>
+            <small class="color-ayuda">Se ve al instante; se guarda al tocar Guardar.</small>
+          </div>
+
           <div class="fg">
             <label>Logo del taller</label>
             <div *ngIf="config.logo" class="config-logo-preview">

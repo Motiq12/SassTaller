@@ -36,6 +36,9 @@ module.exports = async function tenantPublico(req, res, next) {
     if (!tenant) return res.status(404).json({ error: 'Taller no encontrado o inactivo' });
 
     req.tenantId = tenant.id;
+    // El slug queda a mano: los correos lo necesitan para armar la URL del logo,
+    // que es publica y por lo tanto tiene que decir de que taller es.
+    req.tallerSlug = slug;
     req.db = paraTenant(tenant.id);
     next();
   } catch (err) {

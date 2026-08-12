@@ -17,10 +17,15 @@ function baseUrlPublica() {
 // Se apunta a /api/marca/logo y no al archivo del bundle: ese endpoint devuelve el
 // logo cargado desde la configuración (guardado como data URL, que en un correo no
 // se puede usar) y, si no hay ninguno, redirige al que trae la app.
-function logoUrl() {
+// El logo del correo lleva el taller en la URL. /api/marca/logo es público —lo pide
+// el cliente de correo del destinatario, que no manda sesión— así que sin el slug el
+// servidor no sabría de qué taller servir la imagen. Sin slug se omite el logo: es
+// preferible un correo sin imagen a uno con la marca de otro taller.
+function logoUrl(slug) {
   if (process.env.MAIL_LOGO_URL) return process.env.MAIL_LOGO_URL;
   const base = baseUrlPublica();
-  return base ? `${base}/api/marca/logo` : null;
+  if (!base || !slug) return null;
+  return `${base}/api/marca/logo?taller=${encodeURIComponent(slug)}`;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -59,7 +64,7 @@ async function enviarCorreo({ to, subject, html, devLog }) {
       const detalle = await resp.text().catch(() => '');
       console.error(`⚠️  Resend rechazó el envío a ${to}:`, resp.status, detalle);
       if (resp.status === 403 || /testing|verify a domain|own email/i.test(detalle)) {
-        console.error('   → Causa típica: dominio sin verificar en Resend. Verificá un dominio y definí MAIL_FROM (p. ej. "MS Motos <no-reply@TU-DOMINIO>").');
+        console.error('   → Causa típica: dominio sin verificar en Resend. Verificá un dominio y definí MAIL_FROM (p. ej. "Tu Taller <no-reply@TU-DOMINIO>").');
       }
       return false;
     }
@@ -75,9 +80,11 @@ async function enviarCorreo({ to, subject, html, devLog }) {
 // ─────────────────────────────────────────────────────────────
 
 // Envoltorio común: tarjeta oscura con encabezado del taller.
-function envoltorio(taller, titulo, cuerpoHtml) {
-  const nombre = escapar(taller || 'MS Motos');
-  const logo = logoUrl();
+function envoltorio(taller, titulo, cuerpoHtml, slug) {
+  // Sin nombre no se cae al de otro taller: se usa uno neutro. Este correo lo
+  // recibe el cliente final, asi que la marca equivocada aca es la mas visible.
+  const nombre = escapar(taller || 'Tu taller');
+  const logo = logoUrl(slug);
 
   // El alt del logo lleva el nombre del taller con el mismo estilo que el rótulo de
   // texto: si el cliente de correo bloquea imágenes (Outlook lo hace por defecto),
@@ -111,7 +118,7 @@ function escapar(s) {
     .replace(/"/g, '&quot;');
 }
 
-function plantillaCodigo(nombre, codigo) {
+function plantillaCodigo(nombre, codigo, taller, slug) {
   const cuerpo = `
     ${parrafo(`Hola${nombre ? ' ' + escapar(nombre) : ''}, usá este código para restablecer tu contraseña. Vence en 10 minutos.`)}
     <div style="text-align:center;padding:12px 0 8px;">
@@ -122,10 +129,10 @@ function plantillaCodigo(nombre, codigo) {
     <p style="color:#737373;font-size:12px;line-height:1.5;margin:12px 0 0;">
       Si no pediste este cambio, podés ignorar este correo. Nadie podrá cambiar tu contraseña sin este código.
     </p>`;
-  return envoltorio('Taller MS', 'Recuperá tu contraseña', cuerpo);
+  return envoltorio(taller, 'Recuperá tu contraseña', cuerpo, slug);
 }
 
-function plantillaCodigoLogin(nombre, codigo) {
+function plantillaCodigoLogin(nombre, codigo, taller, slug) {
   const cuerpo = `
     ${parrafo(`Hola${nombre ? ' ' + escapar(nombre) : ''}, usá este código para ingresar a tu cuenta. Vence en 10 minutos.`)}
     <div style="text-align:center;padding:12px 0 8px;">
@@ -136,10 +143,10 @@ function plantillaCodigoLogin(nombre, codigo) {
     <p style="color:#737373;font-size:12px;line-height:1.5;margin:12px 0 0;">
       Si no intentaste ingresar, ignorá este correo. Nadie puede entrar a tu cuenta sin este código.
     </p>`;
-  return envoltorio('Taller MS', 'Tu código de ingreso', cuerpo);
+  return envoltorio(taller, 'Tu código de ingreso', cuerpo, slug);
 }
 
-function plantillaCodigoVerificacion(nombre, codigo) {
+function plantillaCodigoVerificacion(nombre, codigo, taller, slug) {
   const cuerpo = `
     ${parrafo(`Hola${nombre ? ' ' + escapar(nombre) : ''}, ¡bienvenido! Usá este código para confirmar tu correo y activar tu cuenta. Vence en 10 minutos.`)}
     <div style="text-align:center;padding:12px 0 8px;">
@@ -150,12 +157,12 @@ function plantillaCodigoVerificacion(nombre, codigo) {
     <p style="color:#737373;font-size:12px;line-height:1.5;margin:12px 0 0;">
       Si no creaste esta cuenta, podés ignorar este correo.
     </p>`;
-  return envoltorio('Taller MS', 'Confirmá tu correo', cuerpo);
+  return envoltorio(taller, 'Confirmá tu correo', cuerpo, slug);
 }
 
 // Confirmación de la dirección NUEVA al cambiar el correo desde el perfil.
 // Va dirigido a la dirección nueva: recibirlo es justamente la prueba de que existe.
-function plantillaCambioCorreo(nombre, codigo) {
+function plantillaCambioCorreo(nombre, codigo, taller, slug) {
   const cuerpo = `
     ${parrafo(`Hola${nombre ? ' ' + escapar(nombre) : ''}, pediste cambiar el correo de tu cuenta a esta dirección. Confirmá con este código, que vence en 10 minutos.`)}
     <div style="text-align:center;padding:12px 0 8px;">
@@ -167,12 +174,12 @@ function plantillaCambioCorreo(nombre, codigo) {
       Hasta que confirmes, tu cuenta sigue usando el correo anterior. Si no pediste este
       cambio, ignorá este mensaje: sin el código no se cambia nada.
     </p>`;
-  return envoltorio('Taller MS', 'Confirmá tu correo nuevo', cuerpo);
+  return envoltorio(taller, 'Confirmá tu correo nuevo', cuerpo, slug);
 }
 
 // Aviso a la dirección ANTERIOR de que alguien pidió mudar la cuenta. No lleva código:
 // su único fin es que el dueño real se entere a tiempo si le robaron la sesión.
-function plantillaAvisoCambioCorreo(nombre, emailNuevo) {
+function plantillaAvisoCambioCorreo(nombre, emailNuevo, taller, slug) {
   const cuerpo = `
     ${parrafo(`Hola${nombre ? ' ' + escapar(nombre) : ''}, se pidió cambiar el correo de tu cuenta a <strong style="color:#fafafa;">${escapar(emailNuevo)}</strong>.`)}
     ${parrafo('Si fuiste vos, no tenés que hacer nada: confirmá con el código que enviamos a esa dirección.')}
@@ -182,10 +189,10 @@ function plantillaAvisoCambioCorreo(nombre, emailNuevo) {
         tener acceso a tu cuenta. Mientras no se confirme, este correo sigue siendo el válido.
       </p>
     </div>`;
-  return envoltorio('Taller MS', 'Pidieron cambiar tu correo', cuerpo);
+  return envoltorio(taller, 'Pidieron cambiar tu correo', cuerpo, slug);
 }
 
-function plantillaRecordatorio({ nombre, hora, servicio, moto, sucursal, taller }) {
+function plantillaRecordatorio({ nombre, hora, servicio, moto, sucursal, taller, slug }) {
   const donde = sucursal ? ` en ${escapar(sucursal)}` : '';
   const cuerpo = `
     ${parrafo(`Hola${nombre ? ' ' + escapar(nombre) : ''}, te recordamos tu cita para <strong style="color:#fafafa;">mañana a las ${escapar(hora)}</strong>${donde}.`)}
@@ -196,67 +203,67 @@ function plantillaRecordatorio({ nombre, hora, servicio, moto, sucursal, taller 
       <p style="color:#fafafa;font-size:15px;margin:0;">${escapar(moto)}</p>
     </div>
     ${parrafo('Si no podés asistir, avisanos para reprogramar. ¡Te esperamos!')}`;
-  return envoltorio(taller, 'Recordatorio de tu cita', cuerpo);
+  return envoltorio(taller, 'Recordatorio de tu cita', cuerpo, slug);
 }
 
 // Aviso de hito del servicio (lista para entrega / entregada).
-function plantillaEstado({ nombre, titulo, mensaje, taller }) {
+function plantillaEstado({ nombre, titulo, mensaje, taller, slug }) {
   const cuerpo = `
     ${parrafo(`Hola${nombre ? ' ' + escapar(nombre) : ''},`)}
     ${parrafo(escapar(mensaje))}
     ${parrafo('Gracias por confiar en nosotros.')}`;
-  return envoltorio(taller, titulo, cuerpo);
+  return envoltorio(taller, titulo, cuerpo, slug);
 }
 
 // ─────────────────────────────────────────────────────────────
 // API pública (una función por tipo de correo).
 // ─────────────────────────────────────────────────────────────
 
-async function enviarCodigoReset(email, nombre, codigo) {
+async function enviarCodigoReset(email, nombre, codigo, taller = {}) {
   return enviarCorreo({
     to: email,
     subject: 'Tu código para recuperar la contraseña',
-    html: plantillaCodigo(nombre, codigo),
+    html: plantillaCodigo(nombre, codigo, taller.nombre, taller.slug),
     devLog: `Código de recuperación para ${email}: ${codigo}`,
   });
 }
 
 // Código de ingreso sin contraseña (OTP) para el portal del cliente.
-async function enviarCodigoLogin(email, nombre, codigo) {
+async function enviarCodigoLogin(email, nombre, codigo, taller = {}) {
   return enviarCorreo({
     to: email,
     subject: 'Tu código de ingreso',
-    html: plantillaCodigoLogin(nombre, codigo),
+    html: plantillaCodigoLogin(nombre, codigo, taller.nombre, taller.slug),
     devLog: `Código de ingreso para ${email}: ${codigo}`,
   });
 }
 
 // Código para confirmar el correo al auto-registrarse en el portal.
-async function enviarCodigoVerificacion(email, nombre, codigo) {
+async function enviarCodigoVerificacion(email, nombre, codigo, taller = {}) {
   return enviarCorreo({
     to: email,
     subject: 'Confirmá tu correo',
-    html: plantillaCodigoVerificacion(nombre, codigo),
+    html: plantillaCodigoVerificacion(nombre, codigo, taller.nombre, taller.slug),
     devLog: `Código de verificación para ${email}: ${codigo}`,
   });
 }
 
 // Código a la dirección nueva para confirmar un cambio de correo desde el perfil.
-async function enviarCodigoCambioCorreo(emailNuevo, nombre, codigo) {
+async function enviarCodigoCambioCorreo(emailNuevo, nombre, codigo, taller = {}) {
   return enviarCorreo({
     to: emailNuevo,
     subject: 'Confirmá tu correo nuevo',
-    html: plantillaCambioCorreo(nombre, codigo),
+    html: plantillaCambioCorreo(nombre, codigo, taller.nombre, taller.slug),
     devLog: `Código de cambio de correo para ${emailNuevo}: ${codigo}`,
   });
 }
 
 // Aviso a la dirección anterior. Que falle no debe frenar el cambio: es informativo.
-async function enviarAvisoCambioCorreo(emailAnterior, nombre, emailNuevo) {
+async function enviarAvisoCambioCorreo(emailAnterior, nombre, emailNuevo, taller = {}) {
   return enviarCorreo({
     to: emailAnterior,
     subject: 'Pidieron cambiar el correo de tu cuenta',
-    html: plantillaAvisoCambioCorreo(nombre, emailNuevo),
+    html: plantillaAvisoCambioCorreo(nombre, emailNuevo, taller.nombre, taller.slug),
     devLog: `Aviso de cambio de correo a ${emailAnterior} (nuevo: ${emailNuevo})`,
   });
 }

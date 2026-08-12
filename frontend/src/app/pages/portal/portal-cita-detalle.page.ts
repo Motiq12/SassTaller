@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ToastController, AlertController } from '@ionic/angular';
+import { MarcaService } from '../../services/marca.service';
 import { Subject, interval } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PortalService } from '../../services/portal.service';
@@ -37,6 +38,7 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
     private portal: PortalService,
     private toast: ToastController,
     private alert: AlertController,
+    public marca: MarcaService,
   ) {}
 
   // Cada etapa con su posición relativa al estado actual (pasado | activo | futuro).
@@ -219,7 +221,7 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
         h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #999; margin: 0 0 6px; }
       </style></head><body><div class="doc">
       <div class="hd">
-        <div><h1>MS Motos</h1><div class="sub">Comprobante de servicio</div></div>
+        <div><h1>${esc(this.marca.actual.nombre_taller)}</h1><div class="sub">Comprobante de servicio</div></div>
         <div class="num"><strong>${esc(c.numero_orden || ('Cita #' + c.id))}</strong><br>${esc(fecha)}</div>
       </div>
       <div class="grid">
@@ -231,7 +233,7 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
       ${o?.diagnostico ? `<div class="diag"><strong>Diagnóstico:</strong> ${esc(o.diagnostico)}</div>` : ''}
       ${filas.length ? `<h3>Detalle</h3><table>${filas.join('')}</table>` : ''}
       <div class="total"><span>Total</span><span>${money(total)}</span></div>
-      <div class="ft">Gracias por confiar en MS Motos · Documento generado el ${new Date().toLocaleDateString('es-CR')}</div>
+      <div class="ft">Gracias por confiar en ${esc(this.marca.actual.nombre_taller)} · Documento generado el ${new Date().toLocaleDateString('es-CR')}</div>
       </div>
       <script>window.onload = function(){ window.print(); }</script>
       </body></html>`;

@@ -9,6 +9,13 @@ const { getSucursales, clearCache: clearSucursalesCache } = require('../utils/su
 const { getServiciosFilas, clearCache: clearServicios } = require('../utils/servicios');
 const { fotoValida, textoDentroDeLimite } = require('../utils/validar');
 
+// Color de marca valido: exactamente #rrggbb. Se valida en el servidor y no solo en
+// el formulario porque el valor termina inyectado en una variable CSS del navegador.
+function colorHex(v) {
+  const t = String(v || '').trim();
+  return /^#[0-9a-fA-F]{6}$/.test(t) ? t.toLowerCase() : null;
+}
+
 // Panel del administrador: métricas ejecutivas. Solo admin.
 router.use(auth, requireRol('admin'));
 
@@ -579,20 +586,29 @@ router.put('/configuracion', async (req, res) => {
     const metodosJson = metodos && metodos.length ? JSON.stringify(metodos) : null;
 
     await req.db.query(
+      // WHERE lleva el taller: sin él esto escribía sobre la fila id=1 de TODOS los
+      // talleres, porque la clave de configuracion es (tenant_id, id).
       `UPDATE configuracion SET
          nombre_taller = ?, telefono = ?, email = ?, direccion = ?, logo = ?,
+         color_primario = ?,
          max_citas_hora = ?, dias_anticipacion = ?, duracion_cita_min = ?, cancelacion_horas_min = ?,
          garantia_dias = ?,
          ${horarios ? 'horarios = ?,' : ''}
          ${metodosJson ? 'metodos_pago = ?,' : ''}
          notif_estado = ?, notif_recordatorio = ?, notif_cotizacion = ?, notif_email_entrega = ?
-       WHERE id = 1`,
+       WHERE id = 1 AND tenant_id = @tenant`,
       [
-        (b.nombre_taller || '').trim() || 'MS Motos',
+        // Sin nombre se deja el del propio taller, no uno inventado: poner acá el
+        // nombre de otro taller fue justamente el problema que estamos corrigiendo.
+        (b.nombre_taller || '').trim() || 'Mi taller',
         (b.telefono || '').trim() || null,
         (b.email || '').trim() || null,
         (b.direccion || '').trim() || null,
         b.logo || null,
+        // Color de marca: se acepta solo #rrggbb. Cualquier otra cosa se guarda como
+        // NULL y el sistema usa su color por defecto — el valor termina en una
+        // variable CSS, así que no puede entrar texto arbitrario.
+        colorHex(b.color_primario),
         num(b.max_citas_hora, 2),
         num(b.dias_anticipacion, 30),
         num(b.duracion_cita_min, 90),

@@ -310,3 +310,32 @@
   margin-top: 2px;
   ion-icon { font-size: 15px; }
 }
+
+/* Color de marca: el selector nativo y el hex editan el mismo valor — uno para
+   elegir a ojo, otro para pegar el color exacto del manual de marca. */
+.color-fila {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+.color-picker {
+  width: 46px;
+  height: 38px;
+  padding: 2px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.color-hex {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-transform: lowercase;
+}
+
+.color-ayuda {
+  display: block;
+  margin-top: .35rem;
+  opacity: .65;
+  font-size: .78rem;
+}

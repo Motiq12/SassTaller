@@ -55,6 +55,16 @@ function tokenCliente(cliente) {
   return { payload, token };
 }
 
+
+// Identidad del taller para encabezar los correos: su nombre y su slug (que el
+// endpoint publico del logo necesita para saber cual servir).
+async function marcaDelTaller(db, slug) {
+  try {
+    const cfg = await getConfig(db);
+    return { nombre: cfg.nombre_taller, slug: slug || null };
+  } catch { return {}; }
+}
+
 // Tramo publico (login, registro, recuperar, OTP): el taller sale del subdominio
 // o de un campo `taller`, porque todavia no hay token del que leerlo.
 router.use(tenantPublico);
@@ -108,15 +118,15 @@ async function nuevoCodigoVerificacion(db, clienteId, proposito) {
   return codigo;
 }
 
-async function enviarVerificacion(db, clienteId, email, nombre) {
+async function enviarVerificacion(db, slug, clienteId, email, nombre) {
   const codigo = await nuevoCodigoVerificacion(db, clienteId, 'registro');
-  await enviarCodigoVerificacion(email, nombre, codigo);
+  await enviarCodigoVerificacion(email, nombre, codigo, await marcaDelTaller(db, slug));
 }
 
 // Código a la dirección NUEVA para confirmar un cambio de correo desde el perfil.
-async function enviarCodigoCambio(db, clienteId, emailNuevo, nombre) {
+async function enviarCodigoCambio(db, slug, clienteId, emailNuevo, nombre) {
   const codigo = await nuevoCodigoVerificacion(db, clienteId, 'cambio');
-  await enviarCodigoCambioCorreo(emailNuevo, nombre, codigo);
+  await enviarCodigoCambioCorreo(emailNuevo, nombre, codigo, await marcaDelTaller(db, slug));
 }
 
 // ¿Otra cuenta ya tiene ese correo, o lo tiene reservado como pendiente?
@@ -173,7 +183,7 @@ router.post('/registro', antibot(), async (req, res) => {
       clienteId = result.insertId;
     }
 
-    await enviarVerificacion(req.db, clienteId, email, nombre);
+    await enviarVerificacion(req.db, req.tallerSlug, clienteId, email, nombre);
     res.status(201).json({ data: { requiere_verificacion: true, email }, message: 'Te enviamos un código para confirmar tu correo.' });
   } catch (err) {
     fail(res, err);
@@ -244,7 +254,7 @@ router.post('/registro/reenviar', antibot(), async (req, res) => {
     const [[cliente]] = await req.db.query(
       'SELECT id, nombre FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND email_verificado = 0', [email]
     );
-    if (cliente) await enviarVerificacion(req.db, cliente.id, email, cliente.nombre);
+    if (cliente) await enviarVerificacion(req.db, req.tallerSlug, cliente.id, email, cliente.nombre);
 
     res.json({ message: 'Si tu cuenta está pendiente de verificar, te enviamos un nuevo código.' });
   } catch (err) {
@@ -280,7 +290,7 @@ router.post('/recuperar/solicitar', antibot(), async (req, res) => {
         'INSERT INTO password_reset_codes (tenant_id, cliente_id, code_hash, expires_at) VALUES (@tenant, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))',
         [cliente.id, codeHash]
       );
-      await enviarCodigoReset(email, cliente.nombre, codigo);
+      await enviarCodigoReset(email, cliente.nombre, codigo, await marcaDelTaller(req.db, req.tallerSlug));
     }
 
     res.json({ message: MSG_GENERICO });
@@ -361,7 +371,7 @@ router.post('/otp/solicitar', antibot(), async (req, res) => {
         'INSERT INTO login_codes (tenant_id, cliente_id, code_hash, expires_at) VALUES (@tenant, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))',
         [cliente.id, codeHash]
       );
-      await enviarCodigoLogin(email, cliente.nombre, codigo);
+      await enviarCodigoLogin(email, cliente.nombre, codigo, await marcaDelTaller(req.db, req.tallerSlug));
     }
 
     res.json({ message: MSG_OTP_GENERICO });
@@ -648,7 +658,7 @@ router.put('/perfil', async (req, res) => {
       }
 
       await req.db.query('UPDATE clientes SET email_pendiente = ? WHERE id = ? AND tenant_id = @tenant', [emailNuevo, req.cliente.id]);
-      await enviarCodigoCambio(req.db, req.cliente.id, emailNuevo, actual.nombre);
+      await enviarCodigoCambio(req.db, req.tallerSlug, req.cliente.id, emailNuevo, actual.nombre);
       // Al correo viejo le avisamos aunque el cambio no esté hecho: si le robaron la
       // sesión, ese aviso es la única forma de que el dueño se entere a tiempo.
       await enviarAvisoCambioCorreo(actual.email, actual.nombre, emailNuevo);
@@ -743,7 +753,7 @@ router.post('/perfil/email/reenviar', async (req, res) => {
       return res.status(429).json({ error: `Esperá ${limite.retryAfter}s antes de pedir otro código.` });
     }
 
-    await enviarCodigoCambio(req.db, req.cliente.id, c.email_pendiente, c.nombre);
+    await enviarCodigoCambio(req.db, req.tallerSlug, req.cliente.id, c.email_pendiente, c.nombre);
     res.json({ message: `Te enviamos otro código a ${c.email_pendiente}.` });
   } catch (err) {
     fail(res, err);

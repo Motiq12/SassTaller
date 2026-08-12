@@ -50,6 +50,6 @@ export class FacturaPage implements OnInit, OnDestroy {
   imprimir() { window.print(); }
   volver() { this.location.back(); }
 
-  get logo(): string { return this.marcaSvc.logoParaDocumento(this.marca); }
-  get nombreTaller(): string { return this.marca?.nombre_taller || 'MS Motos'; }
+  get logo(): string | null { return this.marcaSvc.logoParaDocumento(this.marca); }
+  get nombreTaller(): string { return this.marca?.nombre_taller || 'Mi taller'; }
 }

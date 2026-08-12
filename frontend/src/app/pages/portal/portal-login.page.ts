@@ -1,4 +1,5 @@
 import { Component, ElementRef, OnInit, OnDestroy, ViewChild } from '@angular/core';
+import { MarcaService } from '../../services/marca.service';
 import { Router } from '@angular/router';
 import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -51,7 +52,8 @@ export class PortalLoginPage implements OnInit, OnDestroy {
     private bio: BiometriaService,
     private router: Router,
     private loading: LoadingController,
-    private toast: ToastController
+    private toast: ToastController,
+    public marca: MarcaService
   ) {}
 
   ngOnInit() {

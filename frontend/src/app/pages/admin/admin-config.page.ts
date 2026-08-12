@@ -16,6 +16,10 @@ interface HorarioVista { dia: number; label: string; abre: string; cierra: strin
 export class AdminConfigPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   config: any = null;
+  // Color en el formulario. Se separa de config.color_primario para poder
+  // previsualizarlo sin haber guardado: lo que se ve es este, lo que se persiste
+  // se copia al guardar.
+  colorElegido = '#e11d48';
   cargando = true;
   guardando = false;
   horariosVista: HorarioVista[] = [];
@@ -44,7 +48,7 @@ export class AdminConfigPage implements OnInit, OnDestroy {
   cargar() {
     this.cargando = true;
     this.admin.getConfig().pipe(takeUntil(this.destroy$)).subscribe({
-      next: r => { this.config = r.data; this.normalizarHorarios(); this.normalizarMetodos(); this.cargando = false; },
+      next: r => { this.config = r.data; this.colorElegido = r.data?.color_primario || '#e11d48'; this.normalizarHorarios(); this.normalizarMetodos(); this.cargando = false; },
       error: () => { this.cargando = false; this.aviso('No se pudo cargar la configuración', 'danger'); },
     });
   }
@@ -114,6 +118,9 @@ export class AdminConfigPage implements OnInit, OnDestroy {
     this.guardando = true;
     const payload = {
       ...this.config,
+      // El color vive en el formulario hasta guardar; se copia acá. Vacío o inválido
+      // = sin color propio, y el sistema usa el suyo por defecto.
+      color_primario: /^#[0-9a-fA-F]{6}$/.test(this.colorElegido) ? this.colorElegido : null,
       horarios: this.horariosVista.map(h => ({ dia: h.dia, abre: h.abre, cierra: h.cierra, activo: h.activo ? 1 : 0 })),
     };
     this.admin.updateConfig(payload).pipe(takeUntil(this.destroy$)).subscribe({
@@ -124,6 +131,8 @@ export class AdminConfigPage implements OnInit, OnDestroy {
         // El logo y el nombre viajan a la factura y al PDF por MarcaService, que cachea:
         // sin esto habria que recargar la app para ver el cambio.
         this.marcaSvc.invalidar();
+        // Se reaplica ya: el color tiene que quedar fijado sin recargar la app.
+        this.marcaSvc.get().subscribe();
         this.guardando = false;
         this.aviso('Configuración guardada');
       },
@@ -155,5 +164,18 @@ export class AdminConfigPage implements OnInit, OnDestroy {
   private async aviso(message: string, color = 'success') {
     const t = await this.toast.create({ message, duration: 1800, color });
     await t.present();
+  }
+  /** Aplica el color mientras se elige, para verlo antes de guardar. */
+  previsualizarColor(): void {
+    if (/^#[0-9a-fA-F]{6}$/.test(this.colorElegido)) {
+      this.marcaSvc.aplicar({ ...this.marcaSvc.actual, color_primario: this.colorElegido });
+    }
+  }
+
+  /** Vuelve al color por defecto del sistema. */
+  quitarColor(): void {
+    this.colorElegido = '';
+    this.config.color_primario = null;
+    this.marcaSvc.aplicar({ ...this.marcaSvc.actual, color_primario: null });
   }
 }

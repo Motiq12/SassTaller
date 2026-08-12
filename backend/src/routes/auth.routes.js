@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 // rutas autenticadas de este archivo usan req.db como todas las demás.
 const { pool } = require('../db/pool');
 const { paraTenant } = require('../db/tenant-db');
+const { getConfig } = require('../utils/configuracion');
 const { fail } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const { emailValido } = require('../utils/validar');
@@ -251,7 +252,7 @@ router.post('/2fa/setup', auth, async (req, res) => {
       data: {
         secreto,
         secreto_legible: totp.secretoLegible(secreto),
-        uri: totp.uriOtpauth(secreto, u.email || `usuario-${req.usuario.id}`),
+        uri: totp.uriOtpauth(secreto, u.email || `usuario-${req.usuario.id}`, (await getConfig(req.db)).nombre_taller),
       },
     });
   } catch (err) {

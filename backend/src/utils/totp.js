@@ -87,7 +87,10 @@ function verificar(secreto, codigo, { ventana = 1, ultimoContador = 0 } = {}) {
 
 // URI otpauth:// — al abrirla desde el teléfono, la app de autenticación se
 // configura sola; en escritorio sirve para generar un QR o copiar la clave.
-function uriOtpauth(secreto, cuenta, emisor = 'MS Motos') {
+//  es el rotulo que el empleado ve en Google Authenticator. Debe ser el
+// nombre de SU taller: con uno fijo, todos los talleres del SaaS apareceran con el
+// mismo rotulo y quien trabaje en dos no podria distinguir sus codigos.
+function uriOtpauth(secreto, cuenta, emisor = 'Taller') {
   const etiqueta = encodeURIComponent(`${emisor}:${cuenta}`);
   const params = new URLSearchParams({
     secret: secreto,

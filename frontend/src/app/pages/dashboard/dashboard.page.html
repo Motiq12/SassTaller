@@ -1,6 +1,6 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>MS Motos</ion-title>
+    <ion-title>{{ (marca.marca$ | async)?.nombre_taller }}</ion-title>
     <ion-buttons slot="end">
       <ion-button [routerLink]="['/admin']" title="Panel admin">
         <ion-icon slot="icon-only" name="grid-outline"></ion-icon>

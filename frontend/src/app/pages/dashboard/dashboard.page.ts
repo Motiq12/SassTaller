@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
+import { MarcaService } from '../../services/marca.service';
 import { Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -48,7 +49,8 @@ export class DashboardPage implements OnInit, OnDestroy {
     private dashSvc: DashboardService,
     private ordenSvc: OrdenesService,
     private toast: ToastController,
-    private router: Router
+    private router: Router,
+    public marca: MarcaService
   ) {}
 
   ngOnInit() {

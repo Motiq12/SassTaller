@@ -16,13 +16,16 @@ export function escapeHtml(v: any): string {
 export async function generarPDF(
   titulo: string,
   contenido: string,
-  logoUrl = 'assets/logo/ms-iso.png',
-  nombreTaller = 'MS Motos',
+  logoUrl = null as string | null,
+  nombreTaller = 'Mi taller',
 ) {
   titulo = escapeHtml(titulo);
   nombreTaller = escapeHtml(nombreTaller);
   let logoBase64 = '';
+  // Sin logo cargado el documento sale sin imagen. Antes se caía al logo del taller
+  // original, y estamparlo en la factura de otro taller es peor que no poner ninguno.
   try {
+    if (!logoUrl) throw new Error('el taller no tiene logo');
     const resp = await fetch(logoUrl);
     const blob = await resp.blob();
     logoBase64 = await new Promise<string>((resolve) => {

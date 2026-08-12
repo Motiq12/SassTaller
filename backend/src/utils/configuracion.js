@@ -8,11 +8,15 @@
 // Valores por defecto: idénticos a los antes hardcodeados (utils/servicios.js),
 // así el comportamiento inicial no cambia aunque la fila aún no exista.
 const DEFAULTS = {
-  nombre_taller: 'MS Motos',
+  // Neutro a proposito: este es el valor que ve un taller que todavia no cargo su
+  // nombre. Poner acá el de otro taller es el problema que estamos corrigiendo.
+  nombre_taller: 'Mi taller',
   telefono: '',
   email: '',
   direccion: '',
   logo: null,
+  // Color de marca del taller. null = el sistema usa el suyo por defecto.
+  color_primario: null,
   max_citas_hora: 2,
   dias_anticipacion: 30,
   duracion_cita_min: 90,

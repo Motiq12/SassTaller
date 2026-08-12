@@ -2,6 +2,8 @@ import { Component, NgZone, OnInit } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
 import { filter, take } from 'rxjs/operators';
 import { AccesibilidadService } from './services/accesibilidad.service';
+import { MarcaService } from './services/marca.service';
+import { AuthService } from './services/auth.service';
 import { iniciarWebVitals } from './shared/web-vitals.util';
 
 declare global {
@@ -19,7 +21,13 @@ export class AppComponent implements OnInit {
   enLinea = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
   // Inyectar AccesibilidadService aplica la preferencia de tamaño de texto al arrancar.
-  constructor(private zone: NgZone, private _a11y: AccesibilidadService, private router: Router) {
+  constructor(
+    private zone: NgZone,
+    private _a11y: AccesibilidadService,
+    private router: Router,
+    private marca: MarcaService,
+    private auth: AuthService,
+  ) {
     window.addEventListener('online', () => this.zone.run(() => (this.enLinea = true)));
     window.addEventListener('offline', () => this.zone.run(() => (this.enLinea = false)));
   }
@@ -35,5 +43,14 @@ export class AppComponent implements OnInit {
     // Core Web Vitals de usuarios reales. Es la única vía para conocer el INP:
     // Lighthouse no interactúa con la página, así que en laboratorio no existe.
     iniciarWebVitals();
+
+    // Marca del taller. Con sesión se pide la completa; sin ella, la pública por
+    // slug — el login se pinta antes de que exista un token. Va acá y no en cada
+    // pantalla porque el color se aplica a toda la app: hacerlo por pantalla haría
+    // que el color parpadeara al navegar.
+    this.auth.usuario$.subscribe(u => {
+      if (u) this.marca.get().subscribe();
+      else this.marca.cargarPublica().subscribe();
+    });
   }
 }

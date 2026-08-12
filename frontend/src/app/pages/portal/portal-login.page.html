@@ -2,9 +2,9 @@
   <div class="login-container">
     <div class="login-header">
       <div class="logo-wrapper">
-        <img src="assets/logo/ms-iso-white.png" alt="MS Motos" />
+        <app-marca-logo [tamano]="84"></app-marca-logo>
       </div>
-      <h1>MS Motos</h1>
+      <h1>{{ (marca.marca$ | async)?.nombre_taller }}</h1>
       <p>Iniciá sesión para continuar</p>
     </div>
 
