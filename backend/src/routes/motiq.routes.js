@@ -17,6 +17,8 @@ const { fijarEstado, fijarPlan } = require('../utils/estado-tenant');
 const { PLANES } = require('../utils/limites');
 const { crearTaller, normalizarSlug, motivoSlugInvalido } = require('../utils/onboarding');
 const { generarPassword } = require('../utils/password');
+const { ordenDeBorrado } = require('../utils/orden-borrado');
+const { TABLAS_CON_TENANT } = require('../db/tenant-db');
 
 const ESTADOS = ['activo', 'suspendido', 'cancelado'];
 
@@ -248,7 +250,130 @@ router.get('/resumen', async (req, res) => {
     const [[c]] = await pool.query(
       `SELECT COUNT(*) AS sin_atender FROM contactos_demo WHERE estado = 'nuevo'`
     );
-    res.json({ data: { talleres: t, uso, contactos: c } });
+    // Altas por mes. Un total acumulado no dice si el negocio crece o está plano:
+    // "47 talleres" se ve igual con 20 altas este mes que con ninguna.
+    const [altas] = await pool.query(
+      `SELECT DATE_FORMAT(created_at, '%Y-%m') AS mes, COUNT(*) AS talleres
+         FROM tenants
+        WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+        GROUP BY mes ORDER BY mes`
+    );
+
+    // Los dos números por los que se llama a alguien: a quién se le acaba la prueba
+    // y quién dejó de usar el sistema. Sin esto hay que salir a buscarlos a mano.
+    const [[alertas]] = await pool.query(
+      `SELECT
+         (SELECT COUNT(*) FROM tenants
+           WHERE plan = 'trial' AND estado = 'activo' AND trial_hasta IS NOT NULL
+             AND trial_hasta BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)) AS vencen_semana,
+         (SELECT COUNT(*) FROM tenants t
+           WHERE t.estado = 'activo'
+             AND NOT EXISTS (SELECT 1 FROM ordenes_trabajo o
+                              WHERE o.tenant_id = t.id
+                                AND o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY))) AS inactivos`
+    );
+
+    res.json({ data: { talleres: t, uso, contactos: c, altas, alertas } });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// GET /api/motiq/vencimientos?dias=7 — a quién se le acaba la prueba.
+//
+// Es la lista de llamadas del día. Va con el correo y el teléfono del dueño porque el
+// paso siguiente después de mirarla es escribirle, y buscar ese dato en otra pantalla
+// es lo que hace que la llamada no ocurra.
+router.get('/vencimientos', async (req, res) => {
+  try {
+    const dias = Math.min(Math.max(Number(req.query.dias) || 7, 1), 90);
+    const [filas] = await pool.query(
+      `SELECT t.id, t.nombre, t.slug, t.plan, t.estado, t.trial_hasta,
+              DATEDIFF(t.trial_hasta, CURDATE()) AS dias_restantes,
+              (SELECT u.nombre   FROM usuarios u WHERE u.tenant_id = t.id AND u.rol = 'admin' AND u.activo = 1 ORDER BY u.id LIMIT 1) AS admin_nombre,
+              (SELECT u.email    FROM usuarios u WHERE u.tenant_id = t.id AND u.rol = 'admin' AND u.activo = 1 ORDER BY u.id LIMIT 1) AS admin_email,
+              (SELECT u.telefono FROM usuarios u WHERE u.tenant_id = t.id AND u.rol = 'admin' AND u.activo = 1 ORDER BY u.id LIMIT 1) AS admin_telefono,
+              (SELECT COUNT(*) FROM ordenes_trabajo o WHERE o.tenant_id = t.id) AS ordenes
+         FROM tenants t
+        WHERE t.plan = 'trial' AND t.estado = 'activo' AND t.trial_hasta IS NOT NULL
+          AND t.trial_hasta <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
+        ORDER BY t.trial_hasta`,
+      [dias]
+    );
+    res.json({ data: filas });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// GET /api/motiq/inactivos?dias=30 — los que se están yendo sin avisar.
+//
+// Se separa "nunca arrancó" de "dejó de usarlo": son dos problemas distintos. Al
+// primero le falló el arranque y hay que ayudarlo a cargar sus datos; el segundo ya
+// sabía usarlo y algo lo hizo parar, que es una conversación completamente otra.
+router.get('/inactivos', async (req, res) => {
+  try {
+    const dias = Math.min(Math.max(Number(req.query.dias) || 30, 1), 365);
+    const [filas] = await pool.query(
+      `SELECT t.id, t.nombre, t.slug, t.plan, t.created_at,
+              (SELECT MAX(o.created_at) FROM ordenes_trabajo o WHERE o.tenant_id = t.id) AS ultima_orden,
+              (SELECT COUNT(*) FROM ordenes_trabajo o WHERE o.tenant_id = t.id) AS ordenes,
+              (SELECT u.email FROM usuarios u WHERE u.tenant_id = t.id AND u.rol = 'admin' AND u.activo = 1 ORDER BY u.id LIMIT 1) AS admin_email
+         FROM tenants t
+        WHERE t.estado = 'activo'
+          AND NOT EXISTS (SELECT 1 FROM ordenes_trabajo o
+                           WHERE o.tenant_id = t.id AND o.created_at >= DATE_SUB(NOW(), INTERVAL ? DAY))
+        ORDER BY t.created_at DESC`,
+      [dias]
+    );
+    res.json({ data: filas });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// GET /api/motiq/talleres/:id — la ficha completa de un taller.
+//
+// Es lo que hay que tener delante cuando uno de ellos llama. Trae su gente, sus
+// sucursales y su actividad; NO trae sus datos de operación (clientes, vehículos,
+// órdenes con nombre y apellido). Ver cuántas órdenes lleva es administrar el SaaS;
+// leer quiénes son sus clientes es meterse en el negocio de otro.
+router.get('/talleres/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [[taller]] = await pool.query(
+      `SELECT t.id, t.nombre, t.slug, t.plan, t.estado, t.motivo_estado, t.trial_hasta,
+              t.created_at, DATEDIFF(t.trial_hasta, CURDATE()) AS dias_restantes,
+              c.nombre_taller, c.telefono, c.email, c.direccion, c.tipos_vehiculo,
+              c.logo IS NOT NULL AS tiene_logo, c.color_primario
+         FROM tenants t
+         LEFT JOIN configuracion c ON c.tenant_id = t.id
+        WHERE t.id = ?`,
+      [id]
+    );
+    if (!taller) return res.status(404).json({ error: 'Taller no encontrado' });
+
+    const [usuarios] = await pool.query(
+      `SELECT id, nombre, email, rol, telefono, activo, email_verificado, created_at
+         FROM usuarios WHERE tenant_id = ? ORDER BY rol = 'admin' DESC, nombre`,
+      [id]
+    );
+    const [sucursales] = await pool.query(
+      'SELECT id, nombre, direccion, telefono, activa FROM sucursales WHERE tenant_id = ? ORDER BY orden',
+      [id]
+    );
+    const [[uso]] = await pool.query(
+      `SELECT (SELECT COUNT(*) FROM clientes        WHERE tenant_id = ?) AS clientes,
+              (SELECT COUNT(*) FROM vehiculos       WHERE tenant_id = ?) AS vehiculos,
+              (SELECT COUNT(*) FROM ordenes_trabajo WHERE tenant_id = ?) AS ordenes,
+              (SELECT COUNT(*) FROM citas           WHERE tenant_id = ?) AS citas,
+              (SELECT MAX(created_at) FROM ordenes_trabajo WHERE tenant_id = ?) AS ultima_orden,
+              (SELECT COUNT(*) FROM ordenes_trabajo
+                WHERE tenant_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)) AS ordenes_30d`,
+      [id, id, id, id, id, id]
+    );
+
+    res.json({ data: { taller, usuarios, sucursales, uso } });
   } catch (err) {
     fail(res, err);
   }
@@ -342,6 +467,159 @@ router.patch('/talleres/:id/plan', async (req, res) => {
     // el refresco. A los otros workers del cluster les llega por ahí.
     fijarPlan(Number(req.params.id), plan, vence);
     res.json({ message: 'Plan actualizado' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// DELETE /api/motiq/talleres/:id — borra el taller y TODO lo suyo.
+//
+// Suspender es reversible y por eso está a un toque; esto no lo es. Se pide escribir
+// el identificador del taller para confirmar, como hace GitHub para borrar un repo: no
+// es burocracia, es la única defensa contra tocar el botón en la fila equivocada de una
+// lista donde todas las filas se ven igual.
+//
+// Existe porque un cliente que se da de baja tiene derecho a pedir que se borren sus
+// datos, y hasta ahora la única forma era entrar por SSH a correr un script.
+router.delete('/talleres/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [[taller]] = await pool.query('SELECT id, nombre, slug FROM tenants WHERE id = ?', [id]);
+    if (!taller) return res.status(404).json({ error: 'Taller no encontrado' });
+
+    if (String(req.body?.confirmacion || '').trim() !== taller.slug) {
+      return res.status(400).json({
+        error: `Para borrarlo, escribí su identificador exacto: ${taller.slug}`,
+      });
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      // El orden se deduce del esquema en cada corrida (utils/orden-borrado), con las
+      // claves foráneas ENCENDIDAS: si el orden estuviera mal, MySQL lo dice en vez de
+      // dejar filas huérfanas que nadie va a encontrar después.
+      const orden = await ordenDeBorrado(conn, TABLAS_CON_TENANT);
+      await conn.beginTransaction();
+      let filas = 0;
+      for (const tabla of orden) {
+        const [r] = await conn.query(`DELETE FROM \`${tabla}\` WHERE tenant_id = ?`, [id]);
+        filas += r.affectedRows;
+      }
+      const [r] = await conn.query('DELETE FROM tenants WHERE id = ?', [id]);
+      filas += r.affectedRows;
+      await conn.commit();
+
+      // La foto en memoria todavía lo tiene como activo, y un token suyo sin vencer
+      // seguiría pasando los middlewares hasta el refresco. Marcarlo cancelado los
+      // corta desde el request siguiente; el refresco lo saca del todo.
+      fijarEstado(id, 'cancelado');
+      console.warn(`🗑  Motiq: ${req.plataforma?.email} borró el taller ${taller.slug} (${filas} filas)`);
+      res.json({ message: `Se borró ${taller.nombre} y sus ${filas} registros`, filas });
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// ───────────── Cuentas de la plataforma ─────────────
+// Hasta acá, crear una cuenta para un compañero era entrar por SSH a correr un script.
+// Eso está bien para arrancar y deja de estarlo apenas el equipo son dos personas.
+
+// GET /api/motiq/admins — quién tiene las llaves de todo.
+router.get('/admins', async (req, res) => {
+  try {
+    const [filas] = await pool.query(
+      'SELECT id, nombre, email, activo, ultimo_acceso, created_at FROM plataforma_admins ORDER BY id'
+    );
+    res.json({ data: filas });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// POST /api/motiq/admins — suma a alguien al equipo.
+//
+// La contraseña la genera el servidor y se devuelve UNA vez, igual que en el script:
+// que la elija quien invita significa que viaja escrita en el formulario de quien
+// invita, y que casi siempre sea la misma de siempre.
+router.post('/admins', async (req, res) => {
+  try {
+    const nombre = String(req.body?.nombre || '').trim();
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    if (!nombre) return res.status(400).json({ error: 'Falta el nombre' });
+    if (!emailValido(email)) return res.status(400).json({ error: 'El correo no parece válido' });
+
+    const [[existe]] = await pool.query('SELECT id FROM plataforma_admins WHERE email = ?', [email]);
+    if (existe) return res.status(409).json({ error: 'Ya hay una cuenta con ese correo' });
+
+    const password = generarPassword();
+    const hash = await bcrypt.hash(password, 10);
+    const [r] = await pool.query(
+      'INSERT INTO plataforma_admins (nombre, email, password_hash, activo) VALUES (?, ?, ?, 1)',
+      [nombre, email, hash]
+    );
+    console.warn(`👤 Motiq: ${req.plataforma?.email} creó la cuenta de plataforma ${email}`);
+    res.status(201).json({
+      data: { id: r.insertId, nombre, email, password },
+      message: 'Cuenta creada. Copiá la contraseña ahora: no se vuelve a mostrar.',
+    });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// PATCH /api/motiq/admins/:id — activa o desactiva a alguien.
+//
+// Desactivar en vez de borrar: la fila queda para saber quién hizo qué, y el correo
+// sigue tomado (no se puede recrear la cuenta por accidente y creer que es la misma).
+router.patch('/admins/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const activo = req.body?.activo ? 1 : 0;
+    // Nadie se cierra a sí mismo la puerta: si el único admin activo se desactiva, no
+    // queda quién vuelva a entrar a reactivarlo y el panel se pierde hasta abrir la base.
+    if (id === req.plataforma?.id) {
+      return res.status(400).json({ error: 'No podés desactivar tu propia cuenta' });
+    }
+    if (!activo) {
+      const [[{ n }]] = await pool.query(
+        'SELECT COUNT(*) AS n FROM plataforma_admins WHERE activo = 1 AND id <> ?', [id]
+      );
+      if (!n) return res.status(400).json({ error: 'Tiene que quedar al menos una cuenta activa' });
+    }
+    const [r] = await pool.query('UPDATE plataforma_admins SET activo = ? WHERE id = ?', [activo, id]);
+    if (!r.affectedRows) return res.status(404).json({ error: 'Cuenta no encontrada' });
+    res.json({ message: activo ? 'Cuenta activada' : 'Cuenta desactivada' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// POST /api/motiq/password — cambiar la propia.
+//
+// Pide la actual aunque ya haya sesión: un token robado o una sesión abierta en una
+// máquina prestada no debería poder quedarse con la cuenta cambiando la clave.
+router.post('/password', async (req, res) => {
+  try {
+    const actual = String(req.body?.actual || '');
+    const nueva = String(req.body?.nueva || '');
+    if (nueva.length < 12) {
+      return res.status(400).json({ error: 'La contraseña nueva necesita al menos 12 caracteres' });
+    }
+    const [[admin]] = await pool.query(
+      'SELECT id, password_hash FROM plataforma_admins WHERE id = ? AND activo = 1', [req.plataforma.id]
+    );
+    if (!admin || !(await bcrypt.compare(actual, admin.password_hash))) {
+      return res.status(401).json({ error: 'La contraseña actual no es correcta' });
+    }
+    await pool.query('UPDATE plataforma_admins SET password_hash = ? WHERE id = ?',
+      [await bcrypt.hash(nueva, 10), admin.id]);
+    res.json({ message: 'Contraseña actualizada' });
   } catch (err) {
     fail(res, err);
   }

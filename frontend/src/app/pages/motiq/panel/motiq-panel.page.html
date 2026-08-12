@@ -19,38 +19,40 @@
   </ion-refresher>
 
   <div class="contenido">
-    <!-- Resumen -->
-    <div class="tarjetas" *ngIf="resumen">
-      <div class="tarjeta">
-        <span class="cifra">{{ resumen.talleres.total }}</span>
-        <span class="rotulo">Talleres</span>
-      </div>
-      <div class="tarjeta">
-        <span class="cifra activo">{{ resumen.talleres.activos }}</span>
-        <span class="rotulo">Activos</span>
-      </div>
-      <div class="tarjeta">
-        <span class="cifra suspendido">{{ resumen.talleres.suspendidos }}</span>
-        <span class="rotulo">Suspendidos</span>
-      </div>
-      <div class="tarjeta">
-        <span class="cifra">{{ resumen.talleres.nuevos_30d }}</span>
-        <span class="rotulo">Nuevos (30 días)</span>
-      </div>
+    <!-- Lo que hay que hacer HOY. Va arriba de todo y solo aparece cuando hay algo:
+         una fila permanente en cero se vuelve parte del decorado y deja de leerse. -->
+    <div class="pendientes" *ngIf="resumen">
+      <button type="button" class="pendiente urgente"
+              *ngIf="resumen.alertas?.vencen_semana"
+              (click)="vista = 'vencen'">
+        <ion-icon name="alarm-outline"></ion-icon>
+        <span><strong>{{ resumen.alertas.vencen_semana }}</strong> vencen esta semana</span>
+      </button>
+      <button type="button" class="pendiente"
+              *ngIf="resumen.contactos?.sin_atender"
+              (click)="vista = 'contactos'">
+        <ion-icon name="mail-unread-outline"></ion-icon>
+        <span><strong>{{ resumen.contactos.sin_atender }}</strong> sin responder</span>
+      </button>
+      <button type="button" class="pendiente"
+              *ngIf="resumen.alertas?.inactivos"
+              (click)="vista = 'inactivos'">
+        <ion-icon name="moon-outline"></ion-icon>
+        <span><strong>{{ resumen.alertas.inactivos }}</strong> sin actividad</span>
+      </button>
     </div>
 
-    <div class="uso" *ngIf="resumen">
-      En total: <strong>{{ resumen.uso.usuarios }}</strong> usuarios ·
-      <strong>{{ resumen.uso.clientes }}</strong> clientes ·
-      <strong>{{ resumen.uso.vehiculos }}</strong> vehículos ·
-      <strong>{{ resumen.uso.ordenes }}</strong> órdenes
-    </div>
-
-    <!-- Qué bandeja se está mirando -->
-    <ion-segment class="vistas" [(ngModel)]="vista">
-      <ion-segment-button value="talleres">
-        <ion-label>Talleres</ion-label>
+    <!-- Qué sección se está mirando -->
+    <ion-segment class="vistas" [(ngModel)]="vista" scrollable>
+      <ion-segment-button value="resumen"><ion-label>Resumen</ion-label></ion-segment-button>
+      <ion-segment-button value="talleres"><ion-label>Talleres</ion-label></ion-segment-button>
+      <ion-segment-button value="vencen">
+        <ion-label>
+          Vencen
+          <ion-badge color="warning" *ngIf="resumen?.alertas?.vencen_semana">{{ resumen?.alertas?.vencen_semana }}</ion-badge>
+        </ion-label>
       </ion-segment-button>
+      <ion-segment-button value="inactivos"><ion-label>Inactivos</ion-label></ion-segment-button>
       <ion-segment-button value="contactos">
         <ion-label>
           Contactos
@@ -59,7 +61,156 @@
           </ion-badge>
         </ion-label>
       </ion-segment-button>
+      <ion-segment-button value="cuentas"><ion-label>Equipo</ion-label></ion-segment-button>
     </ion-segment>
+
+    <!-- ===== Resumen ===== -->
+    <ng-container *ngIf="vista === 'resumen'">
+      <div class="tarjetas" *ngIf="resumen">
+        <div class="tarjeta">
+          <span class="cifra">{{ resumen.talleres.total }}</span>
+          <span class="rotulo">Talleres</span>
+        </div>
+        <div class="tarjeta">
+          <span class="cifra activo">{{ resumen.talleres.activos }}</span>
+          <span class="rotulo">Activos</span>
+        </div>
+        <div class="tarjeta">
+          <span class="cifra suspendido">{{ resumen.talleres.suspendidos }}</span>
+          <span class="rotulo">Suspendidos</span>
+        </div>
+        <div class="tarjeta">
+          <span class="cifra">{{ resumen.talleres.nuevos_30d }}</span>
+          <span class="rotulo">Nuevos (30 días)</span>
+        </div>
+      </div>
+
+      <!-- Reparto por plan: cuántos pagan y cuántos no. -->
+      <div class="planes-resumen" *ngIf="resumen">
+        <span><strong>{{ resumen.talleres.en_prueba }}</strong> en prueba</span>
+        <span><strong>{{ resumen.talleres.en_gratis || 0 }}</strong> en gratis</span>
+        <span class="paga"><strong>{{ resumen.talleres.en_pro || 0 }}</strong> en Pro</span>
+      </div>
+
+      <!-- Altas por mes. Un total acumulado no dice si el negocio crece o está plano. -->
+      <div class="bloque-grafico" *ngIf="altasConAltura.length">
+        <h3>Altas por mes</h3>
+        <div class="grafico">
+          <div class="columna" *ngFor="let a of altasConAltura">
+            <span class="valor">{{ a.talleres }}</span>
+            <div class="barra" [style.height.%]="a.alto"></div>
+            <span class="mes">{{ mesCorto(a.mes) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="uso" *ngIf="resumen">
+        En total: <strong>{{ resumen.uso.usuarios }}</strong> usuarios ·
+        <strong>{{ resumen.uso.clientes }}</strong> clientes ·
+        <strong>{{ resumen.uso.vehiculos }}</strong> vehículos ·
+        <strong>{{ resumen.uso.ordenes }}</strong> órdenes
+      </div>
+    </ng-container>
+
+    <!-- ===== Vencen ===== -->
+    <ng-container *ngIf="vista === 'vencen'">
+      <p class="explica">A quién se le acaba la prueba. Al vencer no se corta el acceso: pasa al plan gratuito.</p>
+      <div class="vacio" *ngIf="!vencimientos.length">
+        <ion-icon name="checkmark-circle-outline"></ion-icon>
+        <p>Nadie vence en las próximas dos semanas.</p>
+      </div>
+      <div class="taller" *ngFor="let v of vencimientos">
+        <div class="cabecera">
+          <div class="quien-es">
+            <h2>{{ v.nombre }}</h2>
+            <span class="slug">{{ v.slug }}</span>
+          </div>
+          <ion-badge [color]="colorUrgencia(v.dias_restantes)">{{ cuantoFalta(v.dias_restantes) }}</ion-badge>
+        </div>
+        <div class="numeros">
+          <span *ngIf="v.admin_nombre">{{ v.admin_nombre }}</span>
+          <span *ngIf="v.admin_email"><a [href]="'mailto:' + v.admin_email">{{ v.admin_email }}</a></span>
+          <span *ngIf="v.admin_telefono"><a [href]="'tel:' + v.admin_telefono">{{ v.admin_telefono }}</a></span>
+          <span><strong>{{ v.ordenes }}</strong> órdenes</span>
+        </div>
+        <div class="pie">
+          <span class="desde">Vence el {{ v.trial_hasta | date: 'mediumDate' }}</span>
+          <div class="acciones">
+            <ion-button size="small" fill="clear" (click)="abrirFicha(v.id)">Ver ficha</ion-button>
+            <ion-button size="small" fill="outline" (click)="cambiarPlan($any(v))">Cambiar plan</ion-button>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- ===== Inactivos ===== -->
+    <ng-container *ngIf="vista === 'inactivos'">
+      <p class="explica">
+        Talleres activos sin una orden en 30 días. Se separa quien nunca arrancó de quien
+        dejó de usarlo: son dos conversaciones distintas.
+      </p>
+      <div class="vacio" *ngIf="!inactivos.length">
+        <ion-icon name="pulse-outline"></ion-icon>
+        <p>Todos los talleres tuvieron actividad este mes.</p>
+      </div>
+      <div class="taller" *ngFor="let i of inactivos">
+        <div class="cabecera">
+          <div class="quien-es">
+            <h2>{{ i.nombre }}</h2>
+            <span class="slug">{{ i.slug }}</span>
+          </div>
+          <ion-badge [color]="i.ordenes ? 'medium' : 'danger'">
+            {{ i.ordenes ? 'se detuvo' : 'nunca arrancó' }}
+          </ion-badge>
+        </div>
+        <div class="numeros">
+          <span *ngIf="i.admin_email"><a [href]="'mailto:' + i.admin_email">{{ i.admin_email }}</a></span>
+          <span *ngIf="i.ultima_orden">última orden {{ i.ultima_orden | date: 'mediumDate' }}</span>
+          <span *ngIf="!i.ultima_orden">sin ninguna orden</span>
+        </div>
+        <div class="pie">
+          <span class="desde">Registrado {{ i.created_at | date: 'mediumDate' }}</span>
+          <div class="acciones">
+            <ion-button size="small" fill="clear" (click)="abrirFicha(i.id)">Ver ficha</ion-button>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- ===== Equipo de Motiq ===== -->
+    <ng-container *ngIf="vista === 'cuentas'">
+      <p class="explica">
+        Quién puede entrar acá. No hay permisos parciales: quien tiene cuenta ve todos los
+        talleres y puede suspenderlos.
+      </p>
+      <div class="taller" *ngFor="let c of cuentas">
+        <div class="cabecera">
+          <div class="quien-es">
+            <h2>{{ c.nombre }}</h2>
+            <span class="slug">{{ c.email }}</span>
+          </div>
+          <ion-badge [color]="c.activo ? 'success' : 'medium'">{{ c.activo ? 'activa' : 'desactivada' }}</ion-badge>
+        </div>
+        <div class="pie">
+          <span class="desde">
+            {{ c.ultimo_acceso ? ('Último acceso ' + (c.ultimo_acceso | date: 'medium')) : 'Nunca entró' }}
+          </span>
+          <div class="acciones">
+            <ion-button size="small" fill="clear" *ngIf="admin?.id === c.id" (click)="cambiarMiPassword()">
+              Cambiar mi contraseña
+            </ion-button>
+            <ion-button size="small" fill="outline" *ngIf="admin?.id !== c.id"
+                        [color]="c.activo ? 'danger' : 'success'" (click)="cambiarActivo(c)">
+              {{ c.activo ? 'Desactivar' : 'Activar' }}
+            </ion-button>
+          </div>
+        </div>
+      </div>
+      <ion-button expand="block" fill="outline" class="sumar" (click)="invitarCuenta()">
+        <ion-icon slot="start" name="person-add-outline"></ion-icon>
+        Sumar a alguien al equipo
+      </ion-button>
+    </ng-container>
 
     <!-- ===== Contactos de la landing ===== -->
     <ng-container *ngIf="vista === 'contactos'">
@@ -147,6 +298,7 @@
       <div class="pie">
         <span class="desde">Desde {{ t.created_at | date: 'mediumDate' }}</span>
         <div class="acciones">
+          <ion-button size="small" fill="clear" (click)="abrirFicha(t.id)">Ver ficha</ion-button>
           <ion-button size="small" fill="clear" (click)="cambiarPlan(t)">
             {{ rotuloPlan(t.plan) }}
             <ion-icon slot="end" name="chevron-down-outline"></ion-icon>
@@ -166,4 +318,127 @@
     </div>
     </ng-container>
   </div>
+
+  <!-- ===== Ficha de un taller =====
+       Lo que hay que tener delante cuando uno de ellos llama. NO trae sus clientes ni
+       sus órdenes con nombre y apellido: ver cuántas lleva es administrar el SaaS,
+       leer quiénes son sus clientes es meterse en el negocio de otro. -->
+  <ion-modal [isOpen]="!!ficha || cargandoFicha" (didDismiss)="cerrarFicha()">
+    <ng-template>
+      <ion-header class="ion-no-border">
+        <ion-toolbar class="barra-motiq">
+          <ion-title>{{ ficha?.taller?.nombre || 'Cargando…' }}</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="cerrarFicha()" aria-label="Cerrar">
+              <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+
+      <ion-content class="fondo-motiq">
+        <div class="cargando" *ngIf="cargandoFicha">
+          <ion-spinner name="crescent"></ion-spinner>
+        </div>
+
+        <div class="contenido ficha" *ngIf="ficha as f">
+          <div class="cabecera-ficha">
+            <div>
+              <span class="slug">{{ f.taller.slug }}</span>
+              <div class="etiquetas">
+                <ion-badge [color]="colorEstado(f.taller.estado)">{{ f.taller.estado }}</ion-badge>
+                <ion-badge color="light">{{ rotuloPlan(f.taller.plan) }}</ion-badge>
+                <ion-badge [color]="colorUrgencia(f.taller.dias_restantes)" *ngIf="f.taller.dias_restantes != null">
+                  {{ cuantoFalta(f.taller.dias_restantes) }}
+                </ion-badge>
+              </div>
+            </div>
+          </div>
+
+          <p class="motivo" *ngIf="f.taller.estado !== 'activo' && f.taller.motivo_estado">
+            <ion-icon name="alert-circle-outline"></ion-icon> {{ f.taller.motivo_estado }}
+          </p>
+
+          <!-- Uso -->
+          <div class="tarjetas chicas">
+            <div class="tarjeta"><span class="cifra">{{ f.uso.clientes }}</span><span class="rotulo">Clientes</span></div>
+            <div class="tarjeta"><span class="cifra">{{ f.uso.vehiculos }}</span><span class="rotulo">Vehículos</span></div>
+            <div class="tarjeta"><span class="cifra">{{ f.uso.ordenes }}</span><span class="rotulo">Órdenes</span></div>
+            <div class="tarjeta"><span class="cifra">{{ f.uso.ordenes_30d }}</span><span class="rotulo">Últimos 30 días</span></div>
+          </div>
+          <p class="sub-dato">
+            {{ f.uso.ultima_orden ? ('Última orden: ' + (f.uso.ultima_orden | date: 'medium')) : 'Todavía no abrió ninguna orden' }}
+            · Registrado {{ f.taller.created_at | date: 'mediumDate' }}
+          </p>
+
+          <!-- Contacto -->
+          <section>
+            <h3>Contacto</h3>
+            <ul class="datos">
+              <li *ngIf="f.taller.telefono"><a [href]="'tel:' + f.taller.telefono">{{ f.taller.telefono }}</a></li>
+              <li *ngIf="f.taller.email"><a [href]="'mailto:' + f.taller.email">{{ f.taller.email }}</a></li>
+              <li *ngIf="f.taller.direccion">{{ f.taller.direccion }}</li>
+              <li *ngIf="!f.taller.telefono && !f.taller.email">Sin datos de contacto cargados</li>
+            </ul>
+          </section>
+
+          <!-- Su gente -->
+          <section>
+            <h3>Su gente ({{ f.usuarios.length }})</h3>
+            <div class="persona" *ngFor="let u of f.usuarios">
+              <div>
+                <strong>{{ u.nombre }}</strong>
+                <span class="slug">{{ u.email }}</span>
+              </div>
+              <div class="etiquetas">
+                <ion-badge color="light">{{ u.rol }}</ion-badge>
+                <ion-badge color="medium" *ngIf="!u.activo">inactivo</ion-badge>
+                <ion-badge color="warning" *ngIf="!u.email_verificado">sin verificar</ion-badge>
+              </div>
+            </div>
+          </section>
+
+          <!-- Sus sucursales -->
+          <section>
+            <h3>Sucursales ({{ f.sucursales.length }})</h3>
+            <div class="persona" *ngFor="let s of f.sucursales">
+              <div>
+                <strong>{{ s.nombre }}</strong>
+                <span class="slug">{{ s.direccion || 'sin dirección' }}</span>
+              </div>
+              <ion-badge color="medium" *ngIf="!s.activa">cerrada</ion-badge>
+            </div>
+          </section>
+
+          <!-- Acciones -->
+          <section class="acciones-ficha">
+            <ion-button expand="block" fill="outline" (click)="cambiarPlan($any(f.taller))">
+              Cambiar plan (hoy: {{ rotuloPlan(f.taller.plan) }})
+            </ion-button>
+            <ion-button expand="block" fill="outline" color="success"
+                        *ngIf="f.taller.estado !== 'activo'" (click)="reactivar($any(f.taller))">
+              Reactivar
+            </ion-button>
+            <ion-button expand="block" fill="outline" color="danger"
+                        *ngIf="f.taller.estado === 'activo'" (click)="suspender($any(f.taller))">
+              Suspender
+            </ion-button>
+
+            <!-- Borrar va aparte y abajo, separado del resto: es lo único que no se
+                 puede deshacer, y no debería estar al lado de acciones reversibles. -->
+            <div class="zona-peligro">
+              <h4>Borrar el taller</h4>
+              <p>
+                Se lleva sus clientes, sus vehículos y su historial. Es lo que hay que hacer
+                cuando piden que se borren sus datos. No se puede deshacer.
+              </p>
+              <ion-button expand="block" color="danger" (click)="borrarTaller($any(f.taller))">
+                Borrar {{ f.taller.nombre }}
+              </ion-button>
+            </div>
+          </section>
+        </div>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
 </ion-content>

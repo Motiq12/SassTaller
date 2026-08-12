@@ -49,20 +49,19 @@ CREATE TABLE `citas` (
   `no_show` tinyint(1) NOT NULL DEFAULT '0',
   `fecha_cancelacion` datetime DEFAULT NULL,
   `tenant_id` int NOT NULL,
+  `es_ejemplo` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
-  KEY `idx_citas_fecha_hora` (`fecha`,`hora`),
   KEY `idx_citas_orden` (`orden_id`),
   KEY `idx_citas_sucursal_fecha_hora` (`sucursal_id`,`fecha`,`hora`),
   KEY `cliente_id` (`cliente_id`),
-  KEY `moto_id` (`vehiculo_id`),
   KEY `usuario_id` (`usuario_id`),
   KEY `fk_citas_tecnico` (`tecnico_id`),
   KEY `idx_citas_tenant` (`tenant_id`),
+  KEY `idx_citas_tenant_fecha` (`tenant_id`,`fecha`,`hora`),
+  KEY `idx_citas_vehiculo` (`vehiculo_id`),
   CONSTRAINT `citas_ibfk_1` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`),
   CONSTRAINT `citas_ibfk_2` FOREIGN KEY (`vehiculo_id`) REFERENCES `vehiculos` (`id`),
   CONSTRAINT `citas_ibfk_3` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`),
-  CONSTRAINT `citas_ibfk_4` FOREIGN KEY (`tecnico_id`) REFERENCES `usuarios` (`id`),
-  CONSTRAINT `citas_ibfk_5` FOREIGN KEY (`sucursal_id`) REFERENCES `sucursales` (`id`),
   CONSTRAINT `fk_citas_orden` FOREIGN KEY (`orden_id`) REFERENCES `ordenes_trabajo` (`id`),
   CONSTRAINT `fk_citas_sucursal` FOREIGN KEY (`sucursal_id`) REFERENCES `sucursales` (`id`),
   CONSTRAINT `fk_citas_tecnico` FOREIGN KEY (`tecnico_id`) REFERENCES `usuarios` (`id`),
@@ -76,7 +75,7 @@ CREATE TABLE `citas` (
 
 LOCK TABLES `citas` WRITE;
 /*!40000 ALTER TABLE `citas` DISABLE KEYS */;
-INSERT INTO `citas` (`id`, `cliente_id`, `vehiculo_id`, `usuario_id`, `tecnico_id`, `sucursal_id`, `fecha`, `hora`, `motivo`, `tipo_servicio`, `estado`, `monto`, `calificacion`, `comentario_satisfaccion`, `fecha_inicio`, `fecha_fin`, `hora_llegada`, `orden_id`, `created_at`, `updated_at`, `confirmada_cliente`, `fecha_listo`, `recordatorio_enviado`, `no_show`, `fecha_cancelacion`, `tenant_id`) VALUES (1,1,NULL,NULL,NULL,1,'2026-08-20','09:00:00','CITA-DEL-TALLER-1',NULL,'agendado',0.00,NULL,NULL,NULL,NULL,NULL,NULL,'2026-08-12 01:46:08','2026-08-12 01:47:06',0,NULL,0,0,NULL,1),(2,2,NULL,NULL,NULL,1,'2026-08-20','10:00:00','CITA-DEL-TALLER-2',NULL,'agendado',0.00,NULL,NULL,NULL,NULL,NULL,NULL,'2026-08-12 01:46:08','2026-08-12 01:47:06',0,NULL,0,0,NULL,2);
+INSERT INTO `citas` (`id`, `cliente_id`, `vehiculo_id`, `usuario_id`, `tecnico_id`, `sucursal_id`, `fecha`, `hora`, `motivo`, `tipo_servicio`, `estado`, `monto`, `calificacion`, `comentario_satisfaccion`, `fecha_inicio`, `fecha_fin`, `hora_llegada`, `orden_id`, `created_at`, `updated_at`, `confirmada_cliente`, `fecha_listo`, `recordatorio_enviado`, `no_show`, `fecha_cancelacion`, `tenant_id`, `es_ejemplo`) VALUES (1,1,NULL,NULL,NULL,1,'2026-08-20','09:00:00','CITA-DEL-TALLER-1',NULL,'agendado',0.00,NULL,NULL,NULL,NULL,NULL,NULL,'2026-08-12 01:46:08','2026-08-12 01:47:06',0,NULL,0,0,NULL,1,0),(2,2,NULL,NULL,NULL,1,'2026-08-20','10:00:00','CITA-DEL-TALLER-2',NULL,'agendado',0.00,NULL,NULL,NULL,NULL,NULL,NULL,'2026-08-12 01:46:08','2026-08-12 01:47:06',0,NULL,0,0,NULL,2,0);
 /*!40000 ALTER TABLE `citas` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -107,11 +106,12 @@ CREATE TABLE `clientes` (
   `email_verificado` tinyint(1) NOT NULL DEFAULT '1',
   `email_pendiente` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `tenant_id` int NOT NULL,
+  `es_ejemplo` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
-  KEY `idx_clientes_activo_nombre` (`activo`,`nombre`,`apellido`),
   KEY `idx_clientes_tenant` (`tenant_id`),
+  KEY `idx_clientes_tenant_nombre` (`tenant_id`,`activo`,`nombre`,`apellido`),
   CONSTRAINT `fk_clientes_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=44 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=56 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -120,7 +120,7 @@ CREATE TABLE `clientes` (
 
 LOCK TABLES `clientes` WRITE;
 /*!40000 ALTER TABLE `clientes` DISABLE KEYS */;
-INSERT INTO `clientes` (`id`, `nombre`, `apellido`, `telefono`, `email`, `cedula`, `direccion`, `password_hash`, `visitas`, `cortesia_disponible`, `notif_avances`, `notif_recordatorios`, `activo`, `created_at`, `updated_at`, `foto`, `email_verificado`, `email_pendiente`, `tenant_id`) VALUES (1,'Cliente','DelUno','111-1111',NULL,NULL,NULL,NULL,0,0,1,1,1,'2026-08-12 01:46:08','2026-08-12 01:46:08',NULL,1,NULL,1),(2,'Cliente','DelDos','222-2222',NULL,NULL,NULL,NULL,0,0,1,1,1,'2026-08-12 01:46:08','2026-08-12 01:46:08',NULL,1,NULL,2);
+INSERT INTO `clientes` (`id`, `nombre`, `apellido`, `telefono`, `email`, `cedula`, `direccion`, `password_hash`, `visitas`, `cortesia_disponible`, `notif_avances`, `notif_recordatorios`, `activo`, `created_at`, `updated_at`, `foto`, `email_verificado`, `email_pendiente`, `tenant_id`, `es_ejemplo`) VALUES (1,'Cliente','DelUno','111-1111',NULL,NULL,NULL,NULL,0,0,1,1,1,'2026-08-12 01:46:08','2026-08-12 01:46:08',NULL,1,NULL,1,0),(2,'Cliente','DelDos','222-2222',NULL,NULL,NULL,NULL,0,0,1,1,1,'2026-08-12 01:46:08','2026-08-12 01:46:08',NULL,1,NULL,2,0),(33,'Ana','Uno','8888-1111','cliente-1786557361919@t.com','1-2222-3333',NULL,'$2b$10$KPp0s9ggMXn4MOjS.WoeQu4u8QEiP5yWCmZxhF1PGLrsVlBDhnlQG',0,0,1,1,1,'2026-08-12 17:56:02','2026-08-12 17:56:02',NULL,1,NULL,1,0),(34,'Ana','Dos','8888-2222','cliente-1786557361919@t.com','1-2222-3333',NULL,'$2b$10$Yg7X/bHUL7tSUtt7YqIE8OU7xMSml.3ZAbeE773KpZW.bOpfld8vG',0,0,1,1,1,'2026-08-12 17:56:02','2026-08-12 17:56:02',NULL,1,NULL,2,0),(35,'Ana','Uno','8888-1111','cliente-1786558071993@t.com','1-2222-3333',NULL,'$2b$10$S5/aBPEfW9FuNSpIPMIsF.E8jGY0x8dOx/Vm6bUBQQFIbDBtCXipu',0,0,1,1,1,'2026-08-12 18:07:52','2026-08-12 18:07:52',NULL,1,NULL,1,0),(36,'Ana','Dos','8888-2222','cliente-1786558071993@t.com','1-2222-3333',NULL,'$2b$10$phw6cBSlWNsUk/GKYOGySu5uYmDVqsuBxV37aGcojWX8qQKjguUtm',0,0,1,1,1,'2026-08-12 18:07:52','2026-08-12 18:07:52',NULL,1,NULL,2,0),(37,'Ana','Uno','8888-1111','cliente-1786558348758@t.com','1-2222-3333',NULL,'$2b$10$WuyqP/mEwJgZUwedinY/DepPLUMYg38gmPK7QKoApuihKbZP82wom',0,0,1,1,1,'2026-08-12 18:12:28','2026-08-12 18:12:29',NULL,1,NULL,1,0),(38,'Ana','Dos','8888-2222','cliente-1786558348758@t.com','1-2222-3333',NULL,'$2b$10$hUPOgPeSMZX.0qD1wxx1e.OTzjgicFU8.0V6.R56gYCN5yGg8Fp5W',0,0,1,1,1,'2026-08-12 18:12:28','2026-08-12 18:12:29',NULL,1,NULL,2,0),(40,'Ana','Uno','8888-1111','cliente-1786563032083@t.com','1-2222-3333',NULL,'$2b$10$LYO49yE7SK6/c1Bqtk56ZOzXs7eOAn6eOmrcRv6am.SvtDn76ArQS',0,0,1,1,1,'2026-08-12 19:30:32','2026-08-12 19:30:32',NULL,1,NULL,1,0),(41,'Ana','Dos','8888-2222','cliente-1786563032083@t.com','1-2222-3333',NULL,'$2b$10$WH.FvMtHKr.dD4TE02ya0eoL0RELLN9sBHxJQeCsghXJT2snLfioO',0,0,1,1,1,'2026-08-12 19:30:32','2026-08-12 19:30:32',NULL,1,NULL,2,0),(44,'Ana','Uno','8888-1111','cliente-1786564589328@t.com','1-2222-3333',NULL,'$2b$10$mJ6lOjunDUGrthYTLXs4CuG9a2FwWVp2z/BJf5QjfUUF41BjASR2m',0,0,1,1,1,'2026-08-12 19:56:29','2026-08-12 19:56:29',NULL,1,NULL,1,0),(45,'Ana','Dos','8888-2222','cliente-1786564589328@t.com','1-2222-3333',NULL,'$2b$10$MHGBN9RF0d6gEDEA7gJJ6ec7tfGd9kZoKBB.XFrE81uJ3fZWEZRqW',0,0,1,1,1,'2026-08-12 19:56:29','2026-08-12 19:56:29',NULL,1,NULL,2,0),(46,'Ana','Uno','8888-1111','cliente-1786572350264@t.com','1-2222-3333',NULL,'$2b$10$.dt0dodyKrEsiLiWOtEuoOF9Z0vIH304L0ABaFzB5FIZ0DQDv9ZD6',0,0,1,1,1,'2026-08-12 22:05:50','2026-08-12 22:05:51',NULL,1,NULL,1,0),(47,'Ana','Dos','8888-2222','cliente-1786572350264@t.com','1-2222-3333',NULL,'$2b$10$60P2lVxGv3ucvd5r/agAw.5oUD2tIWelBFxz5MlyzRR.G3hI2tIm2',0,0,1,1,1,'2026-08-12 22:05:50','2026-08-12 22:05:51',NULL,1,NULL,2,0),(48,'Ana','Uno','8888-1111','cliente-1786572579853@t.com','1-2222-3333',NULL,'$2b$10$Pj9dcMm8Q1dMAqPW2OD54.tg72gtzc47w26hq23cqWjXoNU.B/FgW',0,0,1,1,1,'2026-08-12 22:09:39','2026-08-12 22:09:40',NULL,1,NULL,1,0),(49,'Ana','Dos','8888-2222','cliente-1786572579853@t.com','1-2222-3333',NULL,'$2b$10$hBFbZpfkaAdT4oyWiSVBZubabH6iGeJdwtTQv33rYV12U4NjjWK4m',0,0,1,1,1,'2026-08-12 22:09:40','2026-08-12 22:09:40',NULL,1,NULL,2,0),(54,'Ana','Uno','8888-1111','cliente-1786578529261@t.com','1-2222-3333',NULL,'$2b$10$rldY1ceXNkONHMykq6F.X.u4GrA6SMqTXkaf7kI42REd4RRpRAS2G',0,0,1,1,1,'2026-08-12 23:48:49','2026-08-12 23:48:49',NULL,1,NULL,1,0),(55,'Ana','Dos','8888-2222','cliente-1786578529261@t.com','1-2222-3333',NULL,'$2b$10$5CWt2X1CKOgxd3MDb4e1rO9ctr/gXJx8KTZbad9dQzojigtHwzE4W',0,0,1,1,1,'2026-08-12 23:48:49','2026-08-12 23:48:49',NULL,1,NULL,2,0);
 /*!40000 ALTER TABLE `clientes` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -155,6 +155,7 @@ CREATE TABLE `configuracion` (
   `tenant_id` int NOT NULL,
   `tipos_vehiculo` json DEFAULT NULL COMMENT 'Tipos que atiende el taller, ej. ["moto","auto"]',
   `color_primario` varchar(7) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Color de marca del taller en hex (#rrggbb). NULL = por defecto',
+  `arranque_oculto` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`tenant_id`,`id`),
   KEY `idx_configuracion_tenant` (`tenant_id`),
   CONSTRAINT `fk_configuracion_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
@@ -167,7 +168,7 @@ CREATE TABLE `configuracion` (
 
 LOCK TABLES `configuracion` WRITE;
 /*!40000 ALTER TABLE `configuracion` DISABLE KEYS */;
-INSERT INTO `configuracion` (`id`, `nombre_taller`, `telefono`, `email`, `direccion`, `logo`, `max_citas_hora`, `dias_anticipacion`, `duracion_cita_min`, `horarios`, `notif_estado`, `notif_recordatorio`, `notif_cotizacion`, `notif_email_entrega`, `updated_at`, `cancelacion_horas_min`, `visitas_para_cortesia`, `zona_horaria_offset`, `garantia_dias`, `metodos_pago`, `tenant_id`, `tipos_vehiculo`, `color_primario`) VALUES (1,'MS Motos','','','',NULL,2,30,90,'[{\"dia\": 0, \"abre\": \"08:00\", \"activo\": 0, \"cierra\": \"13:00\"}, {\"dia\": 1, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 2, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 3, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 4, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 5, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 6, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"13:00\"}]',1,1,1,0,'2026-08-12 06:09:57',2,7,-6,30,NULL,1,'[\"moto\"]','#e11d48');
+INSERT INTO `configuracion` (`id`, `nombre_taller`, `telefono`, `email`, `direccion`, `logo`, `max_citas_hora`, `dias_anticipacion`, `duracion_cita_min`, `horarios`, `notif_estado`, `notif_recordatorio`, `notif_cotizacion`, `notif_email_entrega`, `updated_at`, `cancelacion_horas_min`, `visitas_para_cortesia`, `zona_horaria_offset`, `garantia_dias`, `metodos_pago`, `tenant_id`, `tipos_vehiculo`, `color_primario`, `arranque_oculto`) VALUES (1,'MS Motos','','','',NULL,2,30,90,'[{\"dia\": 0, \"abre\": \"08:00\", \"activo\": 0, \"cierra\": \"13:00\"}, {\"dia\": 1, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 2, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 3, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 4, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 5, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 6, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"13:00\"}]',1,1,1,0,'2026-08-12 06:09:57',2,7,-6,30,NULL,1,'[\"moto\"]','#e11d48',0);
 /*!40000 ALTER TABLE `configuracion` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -193,7 +194,7 @@ CREATE TABLE `contactos_demo` (
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_contactos_estado` (`estado`,`created_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -202,7 +203,6 @@ CREATE TABLE `contactos_demo` (
 
 LOCK TABLES `contactos_demo` WRITE;
 /*!40000 ALTER TABLE `contactos_demo` DISABLE KEYS */;
--- (sin filas: residuo de pruebas, ver db/README.md)
 /*!40000 ALTER TABLE `contactos_demo` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -228,7 +228,7 @@ CREATE TABLE `email_verify_codes` (
   KEY `idx_email_verify_codes_tenant` (`tenant_id`),
   CONSTRAINT `email_verify_codes_ibfk_1` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`),
   CONSTRAINT `fk_email_verify_codes_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=29 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=37 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -237,7 +237,7 @@ CREATE TABLE `email_verify_codes` (
 
 LOCK TABLES `email_verify_codes` WRITE;
 /*!40000 ALTER TABLE `email_verify_codes` DISABLE KEYS */;
--- (sin filas: residuo de pruebas, ver db/README.md)
+INSERT INTO `email_verify_codes` (`id`, `cliente_id`, `code_hash`, `expires_at`, `used`, `attempts`, `created_at`, `proposito`, `tenant_id`) VALUES (21,33,'$2b$10$FQGblzONyjkfhTb9WvpksuKUUuVUg95cnsAdvShCJbZ7crnXDmv3e','2026-08-12 12:06:02',0,0,'2026-08-12 17:56:02','registro',1),(22,34,'$2b$10$NSlpSv84jSxu.ts9vJJR.u3kwQUdBlITJN/6ON2TkRkRrIB7QJFD2','2026-08-12 12:06:02',0,0,'2026-08-12 17:56:02','registro',2),(23,35,'$2b$10$blZvmkInTqi7Xnwp5d4bke2bhMGzA2/vJ6t6CR0B5Yf6BB5.n8OXS','2026-08-12 12:17:52',0,0,'2026-08-12 18:07:52','registro',1),(24,36,'$2b$10$6FaH6R1QvBtSGbdjdhs0meQz.xEET1XdVYsac83rkvjEfg7zttEQm','2026-08-12 12:17:52',0,0,'2026-08-12 18:07:52','registro',2),(25,37,'$2b$10$S8XmNTizBbH3KFzbtSIwPe4qaMmiVk30D0aspmAriD0pQu0yJJxyW','2026-08-12 12:22:28',0,0,'2026-08-12 18:12:28','registro',1),(26,38,'$2b$10$irUwsY1tpbBuZH3thh1s3.pdKeBtGfLTAXE3napvL.Z5wwRoUhzKe','2026-08-12 12:22:29',0,0,'2026-08-12 18:12:29','registro',2),(27,40,'$2b$10$O6y9fAd7JGgszvOly.UIluYNQBey/MxA8fOeQiwvbUt9rv5o4c1Ou','2026-08-12 13:40:32',0,0,'2026-08-12 19:30:32','registro',1),(28,41,'$2b$10$RAYqIWE1gy8nvfOaq8nxZ.zVn.LGNFDgad7Gx1seASuniwTz2vhju','2026-08-12 13:40:32',0,0,'2026-08-12 19:30:32','registro',2),(29,44,'$2b$10$WrchX7x9CdiF8Ofz6lKVWuH2I7HRiI5AAto7ZBObhx2pGCrkmxZVe','2026-08-12 14:06:29',0,0,'2026-08-12 19:56:29','registro',1),(30,45,'$2b$10$MLekTDaV42efvttQHwU5wOJS9p1EIgYatNuU9/ST/7B7RpMEWQdlm','2026-08-12 14:06:29',0,0,'2026-08-12 19:56:29','registro',2),(31,46,'$2b$10$Bw5CQB3nRajnn/Z5NvBQQO4nsN6urnVB5mLpKZCVKxJB/dz7uBG9G','2026-08-12 16:15:50',0,0,'2026-08-12 22:05:50','registro',1),(32,47,'$2b$10$lny23i3LU.IBiIOZx4dc3.9VYDJQyh5nlO0F/GAnUMVpW5eAiJHk.','2026-08-12 16:15:50',0,0,'2026-08-12 22:05:50','registro',2),(33,48,'$2b$10$W0F4B/agb2gPevBthLQZjuT0m4iLzaR8tC3KBwwoj6YF3tGiS2.4W','2026-08-12 16:19:40',0,0,'2026-08-12 22:09:40','registro',1),(34,49,'$2b$10$.3bvHv2UASQk34HWCuQ53.pVV9JtIolX.ZRlMKfqYVfX3/qsk14hu','2026-08-12 16:19:40',0,0,'2026-08-12 22:09:40','registro',2),(35,54,'$2b$10$VjDM5DwYXKXcdAhDuv0S2e3AWIcP51b8FYD7CRVF9VUUi7824xD7C','2026-08-12 17:58:49',0,0,'2026-08-12 23:48:49','registro',1),(36,55,'$2b$10$2hM3cDEBpPFaX2q3a16TA.1Bq9.sppfpjjo2UrhMCmJbFIvVjtwpW','2026-08-12 17:58:49',0,0,'2026-08-12 23:48:49','registro',2);
 /*!40000 ALTER TABLE `email_verify_codes` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -356,8 +356,8 @@ CREATE TABLE `mensaje_lecturas` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `tenant_id` int NOT NULL,
   PRIMARY KEY (`mensaje_id`,`usuario_id`),
-  KEY `idx_ml_usuario` (`usuario_id`),
   KEY `idx_mensaje_lecturas_tenant` (`tenant_id`),
+  KEY `idx_ml_tenant_usuario` (`tenant_id`,`usuario_id`),
   CONSTRAINT `fk_mensaje_lecturas_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -396,10 +396,10 @@ CREATE TABLE `mensajes_internos` (
   KEY `idx_msg_destino` (`destino_id`),
   KEY `idx_msg_par` (`remitente_id`,`destino_id`,`created_at`),
   KEY `idx_msg_par_inv` (`destino_id`,`remitente_id`,`created_at`),
-  KEY `idx_msg_broadcast` (`tipo`,`destino_rol`,`created_at`),
-  KEY `idx_msg_sucursal` (`sucursal_id`),
   KEY `idx_msg_destino_created` (`destino_id`,`created_at`),
   KEY `idx_mensajes_internos_tenant` (`tenant_id`),
+  KEY `idx_msg_tenant_broadcast` (`tenant_id`,`tipo`,`destino_rol`,`created_at`),
+  KEY `idx_msg_tenant_sucursal` (`tenant_id`,`sucursal_id`),
   CONSTRAINT `fk_mensajes_internos_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
   CONSTRAINT `mensajes_internos_ibfk_1` FOREIGN KEY (`remitente_id`) REFERENCES `usuarios` (`id`),
   CONSTRAINT `mensajes_internos_ibfk_2` FOREIGN KEY (`destino_id`) REFERENCES `usuarios` (`id`)
@@ -632,7 +632,7 @@ CREATE TABLE `orden_tiempos` (
   KEY `idx_orden_tiempos_tenant` (`tenant_id`),
   CONSTRAINT `fk_orden_tiempos_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
   CONSTRAINT `orden_tiempos_ibfk_1` FOREIGN KEY (`orden_id`) REFERENCES `ordenes_trabajo` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -688,14 +688,15 @@ CREATE TABLE `ordenes_trabajo` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `tenant_id` int NOT NULL,
+  `es_ejemplo` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_ordenes_trabajo_tenant` (`tenant_id`,`numero_orden`),
-  KEY `moto_id` (`vehiculo_id`),
   KEY `cliente_id` (`cliente_id`),
   KEY `recepcionista_id` (`recepcionista_id`),
   KEY `tecnico_id` (`tecnico_id`),
   KEY `fk_ordenes_sucursal` (`sucursal_id`),
   KEY `idx_ordenes_trabajo_tenant` (`tenant_id`),
+  KEY `idx_ordenes_vehiculo` (`vehiculo_id`),
   CONSTRAINT `fk_ordenes_sucursal` FOREIGN KEY (`sucursal_id`) REFERENCES `sucursales` (`id`),
   CONSTRAINT `fk_ordenes_trabajo_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
   CONSTRAINT `ordenes_trabajo_ibfk_1` FOREIGN KEY (`vehiculo_id`) REFERENCES `vehiculos` (`id`),
@@ -703,7 +704,7 @@ CREATE TABLE `ordenes_trabajo` (
   CONSTRAINT `ordenes_trabajo_ibfk_3` FOREIGN KEY (`sucursal_id`) REFERENCES `sucursales` (`id`),
   CONSTRAINT `ordenes_trabajo_ibfk_4` FOREIGN KEY (`recepcionista_id`) REFERENCES `usuarios` (`id`),
   CONSTRAINT `ordenes_trabajo_ibfk_5` FOREIGN KEY (`tecnico_id`) REFERENCES `usuarios` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -766,7 +767,7 @@ CREATE TABLE `plataforma_admins` (
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_plataforma_email` (`email`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -865,7 +866,7 @@ CREATE TABLE `servicios` (
   UNIQUE KEY `uq_servicios_tenant` (`tenant_id`,`nombre`),
   KEY `idx_servicios_tenant` (`tenant_id`),
   CONSTRAINT `fk_servicios_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=789 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=986 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -898,7 +899,7 @@ CREATE TABLE `sucursales` (
   PRIMARY KEY (`id`),
   KEY `idx_sucursales_tenant` (`tenant_id`),
   CONSTRAINT `fk_sucursales_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=55 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=81 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -968,7 +969,7 @@ CREATE TABLE `tenants` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_tenant_slug` (`slug`),
   KEY `idx_tenants_estado` (`estado`)
-) ENGINE=InnoDB AUTO_INCREMENT=55 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=72 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -977,8 +978,41 @@ CREATE TABLE `tenants` (
 
 LOCK TABLES `tenants` WRITE;
 /*!40000 ALTER TABLE `tenants` DISABLE KEYS */;
-INSERT INTO `tenants` (`id`, `nombre`, `slug`, `plan`, `estado`, `created_at`, `updated_at`, `motivo_estado`, `trial_hasta`) VALUES (1,'MS Motors','ms-motors','pro','activo','2026-08-12 00:29:01','2026-08-12 00:29:01',NULL,NULL),(2,'Moto Zone','moto-zone','trial','activo','2026-08-12 01:46:08','2026-08-12 19:30:06',NULL,'2026-09-11');
+INSERT INTO `tenants` (`id`, `nombre`, `slug`, `plan`, `estado`, `created_at`, `updated_at`, `motivo_estado`, `trial_hasta`) VALUES (1,'MS Motors','ms-motors','pro','activo','2026-08-12 00:29:01','2026-08-12 00:29:01',NULL,NULL),(2,'Moto Zone','moto-zone','trial','activo','2026-08-12 01:46:08','2026-08-12 23:47:51',NULL,NULL);
 /*!40000 ALTER TABLE `tenants` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `usuario_verify_codes`
+--
+
+DROP TABLE IF EXISTS `usuario_verify_codes`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `usuario_verify_codes` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `tenant_id` int NOT NULL,
+  `usuario_id` int NOT NULL,
+  `code_hash` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `used` tinyint(1) NOT NULL DEFAULT '0',
+  `attempts` int NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_uvc_usuario` (`usuario_id`),
+  KEY `idx_uvc_tenant` (`tenant_id`),
+  CONSTRAINT `fk_uvc_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `fk_uvc_usuario` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `usuario_verify_codes`
+--
+
+LOCK TABLES `usuario_verify_codes` WRITE;
+/*!40000 ALTER TABLE `usuario_verify_codes` DISABLE KEYS */;
+/*!40000 ALTER TABLE `usuario_verify_codes` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -1007,6 +1041,7 @@ CREATE TABLE `usuarios` (
   `totp_backup` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `totp_ultimo_contador` bigint DEFAULT NULL,
   `tenant_id` int NOT NULL,
+  `email_verificado` tinyint(1) NOT NULL DEFAULT '1',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_usuarios_tenant` (`tenant_id`,`email`),
   KEY `fk_usuarios_sucursal` (`sucursal_id`),
@@ -1014,7 +1049,7 @@ CREATE TABLE `usuarios` (
   CONSTRAINT `fk_usuarios_sucursal` FOREIGN KEY (`sucursal_id`) REFERENCES `sucursales` (`id`),
   CONSTRAINT `fk_usuarios_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
   CONSTRAINT `usuarios_ibfk_1` FOREIGN KEY (`sucursal_id`) REFERENCES `sucursales` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=58 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=90 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1023,7 +1058,7 @@ CREATE TABLE `usuarios` (
 
 LOCK TABLES `usuarios` WRITE;
 /*!40000 ALTER TABLE `usuarios` DISABLE KEYS */;
-INSERT INTO `usuarios` (`id`, `nombre`, `email`, `password_hash`, `rol`, `telefono`, `especialidades`, `horario`, `sucursal_id`, `activo`, `created_at`, `updated_at`, `foto`, `totp_secret`, `totp_activado`, `totp_backup`, `totp_ultimo_contador`, `tenant_id`) VALUES (1,'Administrador','admin@taller.com','$2b$10$sFrG6pTctxPrAEbZ.9s6sOAwdddSVgyBTNz7bLW5sY3atgqrMT7h2','admin',NULL,NULL,NULL,NULL,1,'2026-08-11 23:48:53','2026-08-11 23:48:53',NULL,NULL,0,NULL,NULL,1),(2,'Recepción','recepcion@taller.com','$2b$10$zQQc0arTvE19uB5Dgq0.7.rtY4ENRhmtkYbzSwqkQLeZaPwZjhJz6','recepcion',NULL,NULL,NULL,NULL,1,'2026-08-11 23:48:53','2026-08-11 23:48:53',NULL,NULL,0,NULL,NULL,1),(5,'Admin Zone','admin@taller.com','$2b$10$k42ivd3qsBrA0YLrBdPq1ujvtCmJlPrTFmIXtWWlyIPNyQowhPj3e','admin',NULL,NULL,NULL,NULL,1,'2026-08-12 01:46:08','2026-08-12 01:46:30',NULL,NULL,0,NULL,NULL,2);
+INSERT INTO `usuarios` (`id`, `nombre`, `email`, `password_hash`, `rol`, `telefono`, `especialidades`, `horario`, `sucursal_id`, `activo`, `created_at`, `updated_at`, `foto`, `totp_secret`, `totp_activado`, `totp_backup`, `totp_ultimo_contador`, `tenant_id`, `email_verificado`) VALUES (1,'Administrador','admin@taller.com','$2b$10$sFrG6pTctxPrAEbZ.9s6sOAwdddSVgyBTNz7bLW5sY3atgqrMT7h2','admin',NULL,NULL,NULL,NULL,1,'2026-08-11 23:48:53','2026-08-11 23:48:53',NULL,NULL,0,NULL,NULL,1,1),(2,'Recepción','recepcion@taller.com','$2b$10$zQQc0arTvE19uB5Dgq0.7.rtY4ENRhmtkYbzSwqkQLeZaPwZjhJz6','recepcion',NULL,NULL,NULL,NULL,1,'2026-08-11 23:48:53','2026-08-11 23:48:53',NULL,NULL,0,NULL,NULL,1,1),(5,'Admin Zone','admin@taller.com','$2b$10$k42ivd3qsBrA0YLrBdPq1ujvtCmJlPrTFmIXtWWlyIPNyQowhPj3e','admin',NULL,NULL,NULL,NULL,1,'2026-08-12 01:46:08','2026-08-12 01:46:30',NULL,NULL,0,NULL,NULL,2,1);
 /*!40000 ALTER TABLE `usuarios` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1054,6 +1089,7 @@ CREATE TABLE `vehiculos` (
   `foto` mediumtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `tenant_id` int NOT NULL,
   `atributos` json DEFAULT NULL COMMENT 'Campos propios del tipo (ver utils/tipos-vehiculo.js)',
+  `es_ejemplo` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_vehiculos_tenant` (`tenant_id`,`placa_norm`),
   KEY `cliente_id` (`cliente_id`),
@@ -1061,7 +1097,7 @@ CREATE TABLE `vehiculos` (
   KEY `idx_vehiculos_tipo` (`tenant_id`,`tipo`),
   CONSTRAINT `fk_motos_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
   CONSTRAINT `vehiculos_ibfk_1` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=45 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=54 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1070,7 +1106,7 @@ CREATE TABLE `vehiculos` (
 
 LOCK TABLES `vehiculos` WRITE;
 /*!40000 ALTER TABLE `vehiculos` DISABLE KEYS */;
-INSERT INTO `vehiculos` (`id`, `cliente_id`, `tipo`, `marca`, `modelo`, `anio`, `placa`, `color`, `numero_motor`, `numero_chasis`, `kilometraje_actual`, `foto_url`, `activa`, `created_at`, `updated_at`, `foto`, `tenant_id`, `atributos`) VALUES (29,1,'moto','Honda','CB125',NULL,'ABC-123',NULL,NULL,NULL,0,NULL,1,'2026-08-12 17:22:00','2026-08-12 17:22:00',NULL,1,NULL),(30,2,'moto','Yamaha','FZ',NULL,'ABC-123',NULL,NULL,NULL,0,NULL,1,'2026-08-12 17:22:00','2026-08-12 17:22:00',NULL,2,NULL);
+INSERT INTO `vehiculos` (`id`, `cliente_id`, `tipo`, `marca`, `modelo`, `anio`, `placa`, `color`, `numero_motor`, `numero_chasis`, `kilometraje_actual`, `foto_url`, `activa`, `created_at`, `updated_at`, `foto`, `tenant_id`, `atributos`, `es_ejemplo`) VALUES (29,1,'moto','Honda','CB125',NULL,'ABC-123',NULL,NULL,NULL,0,NULL,1,'2026-08-12 17:22:00','2026-08-12 17:22:00',NULL,1,NULL,0),(30,2,'moto','Yamaha','FZ',NULL,'ABC-123',NULL,NULL,NULL,0,NULL,1,'2026-08-12 17:22:00','2026-08-12 17:22:00',NULL,2,NULL,0),(33,1,'moto','Honda','CB125',NULL,'A4B-465',NULL,NULL,NULL,0,NULL,1,'2026-08-12 17:56:00','2026-08-12 17:56:00',NULL,1,NULL,0),(34,2,'moto','Yamaha','FZ',NULL,'A4B-465',NULL,NULL,NULL,0,NULL,1,'2026-08-12 17:56:00','2026-08-12 17:56:00',NULL,2,NULL,0),(35,1,'moto','Honda','CB125',NULL,'A3B-570',NULL,NULL,NULL,0,NULL,1,'2026-08-12 18:12:27','2026-08-12 18:12:27',NULL,1,NULL,0),(36,2,'moto','Yamaha','FZ',NULL,'A3B-570',NULL,NULL,NULL,0,NULL,1,'2026-08-12 18:12:27','2026-08-12 18:12:27',NULL,2,NULL,0),(39,1,'moto','Honda','CB125',NULL,'A5B-375',NULL,NULL,NULL,0,NULL,1,'2026-08-12 19:30:13','2026-08-12 19:30:13',NULL,1,NULL,0),(40,2,'moto','Yamaha','FZ',NULL,'A5B-375',NULL,NULL,NULL,0,NULL,1,'2026-08-12 19:30:13','2026-08-12 19:30:13',NULL,2,NULL,0),(45,1,'moto','Honda','CB125',NULL,'A4B-422',NULL,NULL,NULL,0,NULL,1,'2026-08-12 22:17:28','2026-08-12 22:17:28',NULL,1,NULL,0),(46,2,'moto','Yamaha','FZ',NULL,'A4B-422',NULL,NULL,NULL,0,NULL,1,'2026-08-12 22:17:28','2026-08-12 22:17:28',NULL,2,NULL,0),(52,1,'moto','Honda','CB125',NULL,'A9B-481',NULL,NULL,NULL,0,NULL,1,'2026-08-12 23:48:41','2026-08-12 23:48:41',NULL,1,NULL,0),(53,2,'moto','Yamaha','FZ',NULL,'A9B-481',NULL,NULL,NULL,0,NULL,1,'2026-08-12 23:48:41','2026-08-12 23:48:41',NULL,2,NULL,0);
 /*!40000 ALTER TABLE `vehiculos` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1091,9 +1127,9 @@ CREATE TABLE `web_vitals` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `tenant_id` int NOT NULL,
   PRIMARY KEY (`id`),
-  KEY `idx_wv_metrica` (`metrica`,`created_at`),
-  KEY `idx_wv_ruta` (`ruta`),
   KEY `idx_web_vitals_tenant` (`tenant_id`),
+  KEY `idx_wv_tenant_metrica` (`tenant_id`,`metrica`,`created_at`),
+  KEY `idx_wv_tenant_ruta` (`tenant_id`,`ruta`),
   CONSTRAINT `fk_web_vitals_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -1120,4 +1156,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-08-12 13:34:11
+-- Dump completed on 2026-08-12 17:51:22

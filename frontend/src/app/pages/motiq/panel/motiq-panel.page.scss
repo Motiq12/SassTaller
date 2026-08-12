@@ -88,6 +88,196 @@
   ion-label { display: flex; align-items: center; gap: 0.4rem; }
 }
 
+// Lo que hay que hacer hoy. Son botones y no rótulos: si te dice que hay tres por
+// vencer, lo siguiente que querés es verlos, y obligarte a buscar la pestaña es
+// exactamente lo que hace que no los mires.
+.pendientes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+
+  .pendiente {
+    @extend %tarjeta;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.9rem;
+    border: 0;
+    font: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+
+    ion-icon { font-size: 1.15rem; color: var(--ion-color-medium, #92949c); }
+    strong { font-weight: 700; }
+
+    &.urgente {
+      background: color-mix(in srgb, var(--ion-color-warning, #ffc409) 16%, var(--ion-card-background, #fff));
+      ion-icon { color: var(--ion-color-warning-shade, #e0ac08); }
+    }
+  }
+}
+
+.explica {
+  margin: 0 0 0.9rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--ion-color-medium-shade, #808289);
+}
+
+.planes-resumen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.1rem;
+  margin: 0.9rem 0 0.4rem;
+  justify-content: center;
+  font-size: 0.9rem;
+  color: var(--ion-color-medium-shade, #808289);
+
+  .paga strong { color: var(--ion-color-success, #2dd36f); }
+}
+
+// Gráfico de altas por mes. A mano y sin librería: son seis barras, y sumar una
+// dependencia de gráficos por esto cargaría cien kilobytes en cada visita al panel.
+.bloque-grafico {
+  @extend %tarjeta;
+  padding: 1rem;
+  margin-top: 0.9rem;
+
+  h3 {
+    margin: 0 0 0.9rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  .grafico {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+    height: 130px;
+  }
+
+  .columna {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+    gap: 0.3rem;
+  }
+
+  .barra {
+    width: 100%;
+    max-width: 44px;
+    min-height: 3px;
+    border-radius: 6px 6px 2px 2px;
+    background: var(--ion-color-primary, #1e3a5f);
+  }
+
+  .valor { font-size: 0.8rem; font-weight: 700; }
+  .mes {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ion-color-medium, #92949c);
+  }
+}
+
+.sumar { margin-top: 1rem; }
+
+// ---- Ficha del taller ----
+.ficha {
+  .cabecera-ficha { margin-bottom: 0.75rem; }
+
+  .etiquetas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.4rem;
+  }
+
+  .tarjetas.chicas .cifra { font-size: 1.4rem; }
+
+  .sub-dato {
+    margin: 0.7rem 0 0;
+    font-size: 0.83rem;
+    text-align: center;
+    color: var(--ion-color-medium, #92949c);
+  }
+
+  .motivo {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0 0 0.9rem;
+    padding: 0.55rem 0.7rem;
+    border-radius: 8px;
+    background: rgba(235, 68, 90, 0.08);
+    color: var(--ion-color-danger-shade, #cf3c4f);
+    font-size: 0.87rem;
+  }
+
+  section {
+    @extend %tarjeta;
+    padding: 1rem;
+    margin-top: 0.75rem;
+
+    h3 {
+      margin: 0 0 0.7rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+  }
+
+  .datos {
+    margin: 0;
+    padding-left: 1.1rem;
+    line-height: 1.8;
+    font-size: 0.9rem;
+
+    a { color: var(--ion-color-primary, #3880ff); text-decoration: none; }
+  }
+
+  .persona {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-top: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+
+    &:first-of-type { border-top: 0; }
+
+    strong { display: block; font-size: 0.93rem; }
+    .slug { font-size: 0.8rem; }
+  }
+
+  .acciones-ficha ion-button { margin-bottom: 0.5rem; }
+
+  // Borrar vive en su propio recuadro y separado del resto: es lo único que no se
+  // puede deshacer y no debería compartir espacio con acciones reversibles.
+  .zona-peligro {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    border: 1px solid color-mix(in srgb, var(--ion-color-danger, #eb445a) 35%, transparent);
+    border-radius: 12px;
+
+    h4 {
+      margin: 0 0 0.4rem;
+      font-size: 0.92rem;
+      color: var(--ion-color-danger-shade, #cf3c4f);
+    }
+
+    p {
+      margin: 0 0 0.8rem;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      color: var(--ion-color-medium-shade, #808289);
+    }
+  }
+}
+
 .filtros {
   margin: 0.75rem 0 1rem;
 

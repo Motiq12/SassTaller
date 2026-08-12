@@ -38,9 +38,46 @@ export interface TallerDelPanel {
 }
 
 export interface ResumenPlataforma {
-  talleres: { total: number; activos: number; suspendidos: number; en_prueba: number; nuevos_30d: number };
+  talleres: { total: number; activos: number; suspendidos: number; en_prueba: number;
+              en_gratis?: number; en_pro?: number; nuevos_30d: number };
   uso: { usuarios: number; clientes: number; vehiculos: number; ordenes: number };
   contactos: { sin_atender: number };
+  // Altas por mes: un total acumulado no dice si el negocio crece o está plano.
+  altas: { mes: string; talleres: number }[];
+  // Los dos números por los que se llama a alguien.
+  alertas: { vencen_semana: number; inactivos: number };
+}
+
+// La ficha completa de un taller: lo que hay que tener delante cuando llama.
+export interface FichaTaller {
+  taller: TallerDelPanel & {
+    nombre_taller: string | null; telefono: string | null; email: string | null;
+    direccion: string | null; tipos_vehiculo: any; tiene_logo: number;
+    color_primario: string | null; dias_restantes: number | null;
+  };
+  usuarios: { id: number; nombre: string; email: string; rol: string; telefono: string | null;
+              activo: number; email_verificado: number; created_at: string }[];
+  sucursales: { id: number; nombre: string; direccion: string | null; telefono: string | null; activa: number }[];
+  uso: { clientes: number; vehiculos: number; ordenes: number; citas: number;
+         ultima_orden: string | null; ordenes_30d: number };
+}
+
+// A quién se le acaba la prueba. Trae el contacto del dueño porque el paso siguiente
+// después de mirar esta lista es escribirle.
+export interface Vencimiento {
+  id: number; nombre: string; slug: string; plan: string; trial_hasta: string;
+  dias_restantes: number; admin_nombre: string | null; admin_email: string | null;
+  admin_telefono: string | null; ordenes: number;
+}
+
+export interface TallerInactivo {
+  id: number; nombre: string; slug: string; plan: string; created_at: string;
+  ultima_orden: string | null; ordenes: number; admin_email: string | null;
+}
+
+export interface CuentaPlataforma {
+  id: number; nombre: string; email: string; activo: number;
+  ultimo_acceso: string | null; created_at: string;
 }
 
 // Lo que manda la landing cuando alguien pide una demo.
@@ -148,6 +185,46 @@ export class MotiqService {
 
   cambiarEstado(id: number, estado: string, motivo?: string): Observable<{ message: string }> {
     return this.http.patch<{ message: string }>(`${this.apiUrl}/motiq/talleres/${id}/estado`, { estado, motivo });
+  }
+
+  // --- Ficha, alertas y cuentas: lo que hasta ahora pedía una terminal ---
+
+  ficha(id: number): Observable<{ data: FichaTaller }> {
+    return this.http.get<{ data: FichaTaller }>(`${this.apiUrl}/motiq/talleres/${id}`);
+  }
+
+  vencimientos(dias = 7): Observable<{ data: Vencimiento[] }> {
+    return this.http.get<{ data: Vencimiento[] }>(`${this.apiUrl}/motiq/vencimientos?dias=${dias}`);
+  }
+
+  inactivos(dias = 30): Observable<{ data: TallerInactivo[] }> {
+    return this.http.get<{ data: TallerInactivo[] }>(`${this.apiUrl}/motiq/inactivos?dias=${dias}`);
+  }
+
+  cuentas(): Observable<{ data: CuentaPlataforma[] }> {
+    return this.http.get<{ data: CuentaPlataforma[] }>(`${this.apiUrl}/motiq/admins`);
+  }
+
+  crearCuenta(nombre: string, email: string): Observable<{ data: CuentaPlataforma & { password: string }; message: string }> {
+    return this.http.post<{ data: CuentaPlataforma & { password: string }; message: string }>(
+      `${this.apiUrl}/motiq/admins`, { nombre, email }
+    );
+  }
+
+  activarCuenta(id: number, activo: boolean): Observable<{ message: string }> {
+    return this.http.patch<{ message: string }>(`${this.apiUrl}/motiq/admins/${id}`, { activo });
+  }
+
+  cambiarPassword(actual: string, nueva: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/motiq/password`, { actual, nueva });
+  }
+
+  // Pide el identificador del taller como confirmación: es la única acción del
+  // producto que no se puede deshacer.
+  borrarTaller(id: number, confirmacion: string): Observable<{ message: string; filas: number }> {
+    return this.http.request<{ message: string; filas: number }>(
+      'delete', `${this.apiUrl}/motiq/talleres/${id}`, { body: { confirmacion } }
+    );
   }
 
   cambiarPlan(id: number, plan: string, trial_hasta?: string | null): Observable<{ message: string }> {

@@ -2,7 +2,10 @@ import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { AlertController } from '@ionic/angular';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
-import { ContactoDemo, MotiqService, ResumenPlataforma, TallerDelPanel } from '../../../services/motiq.service';
+import {
+  ContactoDemo, CuentaPlataforma, FichaTaller, MotiqService, ResumenPlataforma,
+  TallerDelPanel, TallerInactivo, Vencimiento,
+} from '../../../services/motiq.service';
 import { MarcaService } from '../../../services/marca.service';
 import { ToastService } from '../../../services/toast.service';
 import { PRODUCTO } from '../../../shared/producto';
@@ -27,10 +30,19 @@ export class MotiqPanelPage implements OnInit {
   talleres: TallerDelPanel[] = [];
   cargando = true;
 
-  // Dos bandejas: los que ya son clientes y los que preguntaron desde la landing.
-  vista: 'talleres' | 'contactos' = 'talleres';
+  // Secciones del panel. "Vencen" e "Inactivos" van separadas y no como un filtro más
+  // de la lista de talleres: son las dos listas de LLAMADAS, no de consulta. Metidas
+  // dentro de un filtro habría que acordarse de ir a buscarlas, y nadie se acuerda.
+  vista: 'resumen' | 'talleres' | 'vencen' | 'inactivos' | 'contactos' | 'cuentas' = 'resumen';
   contactos: ContactoDemo[] = [];
+  vencimientos: Vencimiento[] = [];
+  inactivos: TallerInactivo[] = [];
+  cuentas: CuentaPlataforma[] = [];
   readonly ESTADOS_CONTACTO = ['nuevo', 'contactado', 'cerrado', 'descartado'];
+
+  // Ficha del taller abierto (null = cerrada).
+  ficha: FichaTaller | null = null;
+  cargandoFicha = false;
 
   filtroEstado = '';
   busqueda = '';
@@ -67,6 +79,180 @@ export class MotiqPanelPage implements OnInit {
     });
     this.cargarContactos();
     this.cargarTalleres(ev);
+    this.motiq.vencimientos(14).subscribe({ next: (r) => (this.vencimientos = r.data), error: () => {} });
+    this.motiq.inactivos(30).subscribe({ next: (r) => (this.inactivos = r.data), error: () => {} });
+    this.motiq.cuentas().subscribe({ next: (r) => (this.cuentas = r.data), error: () => {} });
+  }
+
+  // Altura de cada barra del gráfico de altas, en porcentaje del mes más alto. Se
+  // calcula acá y no en la plantilla para no recorrer el arreglo en cada pintado.
+  get altasConAltura(): { mes: string; talleres: number; alto: number }[] {
+    const altas = this.resumen?.altas || [];
+    const techo = Math.max(1, ...altas.map(a => a.talleres));
+    return altas.map(a => ({ ...a, alto: Math.round((a.talleres / techo) * 100) }));
+  }
+
+  mesCorto(mes: string): string {
+    const M = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
+    return M[Number(String(mes).slice(5, 7)) - 1] || mes;
+  }
+
+  // --- Ficha del taller ---
+
+  abrirFicha(id: number) {
+    this.cargandoFicha = true;
+    this.ficha = null;
+    this.motiq.ficha(id).subscribe({
+      next: (r) => { this.ficha = r.data; this.cargandoFicha = false; },
+      error: () => { this.cargandoFicha = false; this.toast.error('No se pudo abrir la ficha'); },
+    });
+  }
+
+  cerrarFicha() { this.ficha = null; }
+
+  // --- Cuentas de la plataforma ---
+
+  async invitarCuenta() {
+    const a = await this.alerta.create({
+      header: 'Sumar a alguien al equipo',
+      message: 'Va a ver TODOS los talleres y podrá suspenderlos. No hay permisos parciales.',
+      inputs: [
+        { name: 'nombre', type: 'text', placeholder: 'Nombre' },
+        { name: 'email', type: 'email', placeholder: 'correo@motiq.cr' },
+      ],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Crear',
+          handler: (d) => {
+            const nombre = String(d.nombre || '').trim();
+            const email = String(d.email || '').trim();
+            if (!nombre || !email) { this.toast.error('Falta el nombre o el correo'); return false; }
+            this.motiq.crearCuenta(nombre, email).subscribe({
+              next: (r) => { this.mostrarPassword(r.data.email, r.data.password); this.cargar(); },
+              error: (e) => this.toast.error(e?.error?.error || 'No se pudo crear la cuenta'),
+            });
+            return true;
+          },
+        },
+      ],
+    });
+    await a.present();
+  }
+
+  // La contraseña se muestra en un diálogo que hay que cerrar a mano, no en un toast
+  // que se va solo: es la única vez que se ve, y perderla obliga a generar otra.
+  private async mostrarPassword(email: string, password: string) {
+    const a = await this.alerta.create({
+      header: 'Cuenta creada',
+      subHeader: email,
+      message: `Contraseña: ${password}\n\nCopiala ahora y pasásela por un canal privado. No se vuelve a mostrar.`,
+      buttons: ['Ya la copié'],
+      cssClass: 'alerta-password',
+    });
+    await a.present();
+  }
+
+  async cambiarActivo(c: CuentaPlataforma) {
+    const prender = !c.activo;
+    const a = await this.alerta.create({
+      header: prender ? `Activar a ${c.nombre}` : `Desactivar a ${c.nombre}`,
+      message: prender
+        ? 'Vuelve a poder entrar al panel con su contraseña de siempre.'
+        : 'Deja de poder entrar. Su cuenta no se borra, así que queda el registro de quién hizo qué.',
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: prender ? 'Activar' : 'Desactivar',
+          role: prender ? undefined : 'destructive',
+          handler: () => {
+            this.motiq.activarCuenta(c.id, prender).subscribe({
+              next: (r) => { this.toast.success(r.message); this.cargar(); },
+              error: (e) => this.toast.error(e?.error?.error || 'No se pudo cambiar'),
+            });
+            return true;
+          },
+        },
+      ],
+    });
+    await a.present();
+  }
+
+  async cambiarMiPassword() {
+    const a = await this.alerta.create({
+      header: 'Cambiar mi contraseña',
+      inputs: [
+        { name: 'actual', type: 'password', placeholder: 'Contraseña actual' },
+        { name: 'nueva', type: 'password', placeholder: 'Nueva (mínimo 12 caracteres)' },
+      ],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Cambiar',
+          handler: (d) => {
+            if (String(d.nueva || '').length < 12) {
+              this.toast.error('La nueva necesita al menos 12 caracteres');
+              return false;
+            }
+            this.motiq.cambiarPassword(String(d.actual || ''), String(d.nueva)).subscribe({
+              next: (r) => this.toast.success(r.message),
+              error: (e) => this.toast.error(e?.error?.error || 'No se pudo cambiar'),
+            });
+            return true;
+          },
+        },
+      ],
+    });
+    await a.present();
+  }
+
+  // --- Borrar un taller ---
+  //
+  // Pide escribir su identificador. No es burocracia: en una lista donde todas las
+  // filas se ven igual, es la única defensa contra tocar el botón en la equivocada.
+  async borrarTaller(t: { id: number; nombre: string; slug: string }) {
+    const a = await this.alerta.create({
+      header: `Borrar ${t.nombre}`,
+      message: `Se borra el taller y TODO lo suyo: sus clientes, sus vehículos y su historial de órdenes. No se puede deshacer.\n\nEscribí "${t.slug}" para confirmar.`,
+      inputs: [{ name: 'confirmacion', type: 'text', placeholder: t.slug }],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Borrar para siempre',
+          role: 'destructive',
+          handler: (d) => {
+            const escrito = String(d.confirmacion || '').trim();
+            if (escrito !== t.slug) {
+              this.toast.error('El identificador no coincide');
+              return false;   // deja el diálogo abierto en vez de perder lo escrito
+            }
+            this.motiq.borrarTaller(t.id, escrito).subscribe({
+              next: (r) => { this.toast.success(r.message); this.cerrarFicha(); this.cargar(); },
+              error: (e) => this.toast.error(e?.error?.error || 'No se pudo borrar'),
+            });
+            return true;
+          },
+        },
+      ],
+    });
+    await a.present();
+  }
+
+  // Cuántos días le quedan, en palabras. "vence en 3 días" se entiende de un vistazo;
+  // una fecha obliga a calcular.
+  cuantoFalta(dias: number | null): string {
+    if (dias == null) return '';
+    if (dias < 0) return `venció hace ${Math.abs(dias)} d`;
+    if (dias === 0) return 'vence hoy';
+    if (dias === 1) return 'vence mañana';
+    return `vence en ${dias} d`;
+  }
+
+  colorUrgencia(dias: number | null): string {
+    if (dias == null) return 'medium';
+    if (dias <= 0) return 'danger';
+    if (dias <= 3) return 'warning';
+    return 'medium';
   }
 
   cargarContactos() {
