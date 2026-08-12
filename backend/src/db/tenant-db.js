@@ -26,12 +26,25 @@ const TABLAS_CON_TENANT = new Set([
   'sucursales', 'tareas_mecanico', 'usuarios', 'web_vitals',
 ]);
 
-// Detecta las tablas nombradas en la consulta (FROM, JOIN, UPDATE, INSERT, DELETE).
-const RE_TABLAS = /\b(?:from|join|into|update)\s+`?([a-z_][a-z0-9_]*)`?/gi;
+// Detecta las tablas nombradas en la consulta junto con su alias, si tiene.
+// El alias importa: con varias tablas en juego hay que poder exigir el filtro de CADA
+// una, no solo que la palabra tenant_id aparezca en algún lado de la consulta.
+const RE_TABLAS = /\b(?:from|join|into|update)\s+`?([a-z_][a-z0-9_]*)`?(?:\s+(?:as\s+)?`?([a-z][a-z0-9_]*)`?)?/gi;
+
+// Palabras que siguen a una tabla y NO son un alias (si no, se toman por alias y el
+// filtro se exigiría sobre un nombre inventado).
+const NO_ALIAS = new Set([
+  'on', 'where', 'set', 'values', 'select', 'join', 'left', 'right', 'inner', 'outer',
+  'cross', 'group', 'order', 'limit', 'having', 'union', 'and', 'or', 'using', 'ignore',
+]);
 
 function tablasUsadas(sql) {
-  const encontradas = new Set();
-  for (const m of sql.matchAll(RE_TABLAS)) encontradas.add(m[1].toLowerCase());
+  const encontradas = [];
+  for (const m of sql.matchAll(RE_TABLAS)) {
+    const tabla = m[1].toLowerCase();
+    const posible = (m[2] || '').toLowerCase();
+    encontradas.push({ tabla, alias: posible && !NO_ALIAS.has(posible) ? posible : null });
+  }
   return encontradas;
 }
 
@@ -82,11 +95,23 @@ function expandir(sql, params, tenantId) {
 // menciona tenant_id, es casi seguro una fuga. Preferimos romper acá —en el primer
 // request de desarrollo— antes que servir datos de otro taller en producción.
 function exigirScope(sql) {
-  const tocadas = [...tablasUsadas(sql)].filter(t => TABLAS_CON_TENANT.has(t));
+  const tocadas = tablasUsadas(sql).filter(t => TABLAS_CON_TENANT.has(t.tabla));
   if (!tocadas.length) return;
-  if (/tenant_id/i.test(sql)) return;
+
+  // Se exige el filtro de CADA tabla, no solo que `tenant_id` aparezca suelto: una
+  // consulta con el JOIN scopeado pero la tabla principal sin filtrar devolvería
+  // igual las filas de todos los talleres, y una comprobación global la dejaría pasar.
+  const sinFiltrar = tocadas.filter(({ alias }) => {
+    if (alias) return !new RegExp(`\\b${alias}\\.tenant_id\\b`, 'i').test(sql);
+    // Sin alias solo puede haber una tabla en juego: alcanza con el tenant_id pelado
+    // (o cualificado, si el SQL lo escribe con el nombre de la tabla por delante).
+    return !/(?:^|[^.\w])tenant_id\b/i.test(sql);
+  });
+  if (!sinFiltrar.length) return;
+
+  const detalle = sinFiltrar.map(t => (t.alias ? `${t.tabla} (${t.alias})` : t.tabla)).join(', ');
   throw new Error(
-    `tenant-db: la consulta toca ${tocadas.join(', ')} sin filtrar por tenant_id. ` +
+    `tenant-db: la consulta toca ${detalle} sin filtrar por tenant_id. ` +
     'Agregá `tenant_id = @tenant`, o usá sinScope() si es intencional (ej. login).'
   );
 }
@@ -183,4 +208,7 @@ async function porCadaTenant(fn) {
   return resultados;
 }
 
-module.exports = { paraTenant, porCadaTenant, verificarListaContraEsquema, TABLAS_CON_TENANT };
+// `exigirScope` se exporta para que los tests auditen el SQL del repo con la MISMA
+// lógica que corre en producción. Con una copia en el test, las dos podrían divergir
+// y el test daría por buena una consulta que en runtime falla (o al revés).
+module.exports = { paraTenant, porCadaTenant, verificarListaContraEsquema, exigirScope, TABLAS_CON_TENANT };
