@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const tenant = require('./tenant');
 
 module.exports = function authMiddleware(req, res, next) {
   const header = req.headers['authorization'];
@@ -22,7 +23,10 @@ module.exports = function authMiddleware(req, res, next) {
       return res.status(403).json({ error: 'Falta completar la verificación en dos pasos' });
     }
     req.usuario = payload;
-    next();
+    // El scope por tenant se encadena acá y no ruta por ruta: si dependiera de que
+    // cada endpoint recuerde sumar el middleware, el olvido sería una fuga. Así,
+    // estar autenticado y tener `req.db` acotado al taller es la misma cosa.
+    return tenant(req, res, next);
   } catch {
     return res.status(401).json({ error: 'Token inválido o expirado' });
   }

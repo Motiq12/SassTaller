@@ -33,12 +33,12 @@ router.get('/', async (req, res) => {
                       t.nombre AS tecnico_nombre,
                       s.nombre AS sucursal_nombre
                FROM citas ci
-               JOIN clientes c ON ci.cliente_id = c.id
-               LEFT JOIN motos m ON ci.moto_id = m.id
-               LEFT JOIN usuarios u ON ci.usuario_id = u.id
-               LEFT JOIN usuarios t ON ci.tecnico_id = t.id
-               LEFT JOIN sucursales s ON s.id = ci.sucursal_id
-               WHERE 1=1`;
+               JOIN clientes c ON ci.cliente_id = c.id AND c.tenant_id = @tenant
+               LEFT JOIN motos m ON ci.moto_id = m.id AND m.tenant_id = @tenant
+               LEFT JOIN usuarios u ON ci.usuario_id = u.id AND u.tenant_id = @tenant
+               LEFT JOIN usuarios t ON ci.tecnico_id = t.id AND t.tenant_id = @tenant
+               LEFT JOIN sucursales s ON s.id = ci.sucursal_id AND s.tenant_id = @tenant
+               WHERE ci.tenant_id = @tenant`;
     const params = [];
     if (fecha) { sql += ' AND ci.fecha = ?'; params.push(fecha); }
     if (estado) { sql += ' AND ci.estado = ?'; params.push(estado); }
@@ -50,7 +50,7 @@ router.get('/', async (req, res) => {
       params.push(like, like, like, like);
     }
     sql += ` ORDER BY ci.fecha ASC, ci.hora ASC LIMIT ${MAX_LISTADO}`;
-    const [rows] = await pool.query(sql, params);
+    const [rows] = await req.db.query(sql, params);
     res.json({ data: rows });
   } catch (err) {
     fail(res, err);

@@ -30,12 +30,26 @@ const DUMMY_HASH = bcrypt.hashSync('timing-equalizer', 10);
 // La respuesta incluye `tipo` ('staff' | 'cliente') para que el front sepa a dónde mandar.
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, taller } = req.body;
     if (!email || !password) {
       return res.status(400).json({ error: 'Email y contraseña requeridos' });
     }
     if (!emailValido(email)) {
       return res.status(400).json({ error: 'El correo no tiene un formato válido' });
+    }
+
+    // Multi-tenant: el email ya no es único global, solo dentro de un taller. Si el
+    // front manda el taller (subdominio/slug), la búsqueda se acota a ese. Si no lo
+    // manda, se resuelve por el correo y solo se acepta si aparece en UNO solo;
+    // ante ambigüedad se le pide al usuario que elija, en vez de adivinar.
+    let tenantId = null;
+    if (taller) {
+      const [[t]] = await pool.query(
+        "SELECT id FROM tenants WHERE slug = ? AND estado = 'activo'",
+        [String(taller).trim().toLowerCase()]
+      );
+      if (!t) return res.status(404).json({ error: 'Taller no encontrado o inactivo' });
+      tenantId = t.id;
     }
 
     // Anti fuerza-bruta: limita intentos por correo (10/min, 60/hora).
@@ -44,35 +58,63 @@ router.post('/login', async (req, res) => {
       return res.status(429).json({ error: `Demasiados intentos. Esperá ${limite.retryAfter}s e intentá de nuevo.` });
     }
 
-    // 1) Personal del taller (usuarios)
-    const [[usuario]] = await pool.query(
-      'SELECT * FROM usuarios WHERE email = ? AND activo = 1',
-      [email]
+    // 1) Personal del taller (usuarios). Sin `taller` puede haber varios candidatos
+    // (mismo correo en talleres distintos), así que se resuelve por contraseña: se
+    // compara contra todos y se acepta si coincide en UNO. Desambiguar recién
+    // después de validar evita revelar en qué talleres existe un correo.
+    const [candidatos] = await pool.query(
+      tenantId
+        ? 'SELECT * FROM usuarios WHERE email = ? AND activo = 1 AND tenant_id = ?'
+        : 'SELECT * FROM usuarios WHERE email = ? AND activo = 1',
+      tenantId ? [email, tenantId] : [email]
     );
-    if (usuario && (await bcrypt.compare(password, usuario.password_hash))) {
+    const validos = [];
+    for (const c of candidatos) {
+      if (await bcrypt.compare(password, c.password_hash)) validos.push(c);
+    }
+    if (validos.length > 1) {
+      // La contraseña ya se validó, así que listar los talleres no filtra nada nuevo.
+      const [talleres] = await pool.query(
+        `SELECT id, nombre, slug FROM tenants WHERE id IN (${validos.map(() => '?').join(',')})`,
+        validos.map(v => v.tenant_id)
+      );
+      return res.status(409).json({ error: 'Ese correo está en varios talleres. Elegí uno.', talleres });
+    }
+    const usuario = validos[0];
+    if (usuario) {
       // Con verificación en dos pasos activa, la contraseña sola no abre sesión:
       // se devuelve un token parcial que solo sirve para canjear el código.
       if (usuario.totp_activado) {
         return res.json({ data: { requiere_2fa: true, tipo: 'staff', token_parcial: firmarParcial(usuario.id) } });
       }
-      const payload = { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol };
+      const payload = {
+        id: usuario.id, nombre: usuario.nombre, email: usuario.email,
+        rol: usuario.rol, tenant_id: usuario.tenant_id,
+      };
       return res.json({ data: { token: firmar(payload), tipo: 'staff', usuario: payload } });
     }
 
     // 2) Cliente del portal (clientes con contraseña definida)
     const [[cliente]] = await pool.query(
-      'SELECT * FROM clientes WHERE email = ? AND activo = 1 AND password_hash IS NOT NULL',
-      [email]
+      tenantId
+        ? 'SELECT * FROM clientes WHERE email = ? AND activo = 1 AND password_hash IS NOT NULL AND tenant_id = ?'
+        : 'SELECT * FROM clientes WHERE email = ? AND activo = 1 AND password_hash IS NOT NULL',
+      tenantId ? [email, tenantId] : [email]
     );
     if (cliente && (await bcrypt.compare(password, cliente.password_hash))) {
-      const payload = { id: cliente.id, tipo: 'cliente', nombre: cliente.nombre, apellido: cliente.apellido };
+      const payload = {
+        id: cliente.id, tipo: 'cliente', nombre: cliente.nombre,
+        apellido: cliente.apellido, tenant_id: cliente.tenant_id,
+      };
       // La foto va en la respuesta (para el header), NO en el token (lo mantiene liviano).
       return res.json({ data: { token: firmar(payload), tipo: 'cliente', cliente: { ...payload, foto: cliente.foto || null } } });
     }
 
     // Anti-enumeración: si el correo no existía en ninguna tabla, no se ejecutó
     // ningún bcrypt.compare; corré uno señuelo para no delatar la cuenta por timing.
-    if (!usuario && !cliente) {
+    // Se mira `candidatos` (existencia del correo) y no `usuario` (contraseña válida):
+    // con la contraseña equivocada ya se corrió un bcrypt real y no hace falta otro.
+    if (!candidatos.length && !cliente) {
       await bcrypt.compare(password, DUMMY_HASH);
     }
     return res.status(401).json({ error: 'Credenciales incorrectas' });

@@ -277,8 +277,6 @@ async function ensureSchema() {
     // una conversación se busca como A→B y como B→A.
     await crearIndiceSiFalta('mensajes_internos', 'idx_msg_par', '(remitente_id, destino_id, created_at)');
     await crearIndiceSiFalta('mensajes_internos', 'idx_msg_par_inv', '(destino_id, remitente_id, created_at)');
-    // Los avisos (broadcast) se filtran por rol y se ordenan por fecha.
-    await crearIndiceSiFalta('mensajes_internos', 'idx_msg_broadcast', '(tipo, destino_rol, created_at)');
 
     // Placa única a nivel de base (no solo en la app). Columna generada normalizada
     // (sin espacios/guiones, mayúsculas) + índice único. Se guarda cada paso por
@@ -527,6 +525,11 @@ async function ensureSchema() {
     await addColumnIfMissing('mensajes_internos', 'foto', 'MEDIUMTEXT NULL');
     await addColumnIfMissing('mensajes_internos', 'orden_id', 'INT NULL');
     await addColumnIfMissing('mensajes_internos', 'tipo', "VARCHAR(20) NOT NULL DEFAULT 'directo'");
+    // Los avisos (broadcast) se filtran por rol y se ordenan por fecha. El índice va
+    // aquí y no junto a los demás de mensajería porque necesita que `tipo` ya exista:
+    // en una base nueva se creaba antes que la columna y abortaba el resto de la
+    // migración (en bases ya migradas el error no aparecía).
+    await crearIndiceSiFalta('mensajes_internos', 'idx_msg_broadcast', '(tipo, destino_rol, created_at)');
 
     // Mensajería interna v3: sucursal (para filtrar por sede) y lectura POR USUARIO.
     // Antes `leido` era global por mensaje: al abrir la bandeja se marcaba leído para

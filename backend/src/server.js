@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const { testConnection } = require('./db/pool');
 const { ensureSchema } = require('./db/auto-migrate');
+const { verificarListaContraEsquema } = require('./db/tenant-db');
 const { iniciarJobs } = require('./jobs/scheduler');
 const { apiLimiter, authLimiter, adminLimiter } = require('./middleware/rate-limit');
 
@@ -188,6 +189,10 @@ const correrJobs = bajoCluster ? process.env.JOBS === '1' : true;
 (async () => {
   await testConnection();
   if (!bajoCluster) await ensureSchema();
+  // Después de migrar: avisa si alguna tabla con tenant_id quedó fuera de la lista
+  // del guard (o al revés). Sin esto, una tabla nueva pasaría sin filtro por tenant
+  // y el guard la dejaría entrar sin quejarse.
+  await verificarListaContraEsquema();
   // Tareas de fondo (recordatorios de cita, no-show). Después de migrar, para que
   // las columnas que usan (recordatorio_enviado, no_show) ya existan.
   // Solo un proceso las programa: si no, cada cliente recibiría un correo por worker.
