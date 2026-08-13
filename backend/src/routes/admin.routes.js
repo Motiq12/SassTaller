@@ -664,18 +664,39 @@ router.put('/configuracion', async (req, res) => {
     // borra — si mañana pasa a Pro, su logo sigue ahí.
     const marcaPropia = puedeMarcaPropia(req.db.tenantId);
 
+    // INSERT ... ON DUPLICATE KEY UPDATE y no un UPDATE liso: un taller sin fila
+    // (creado a mano, o de una instalación vieja) hacía que el UPDATE no tocara
+    // NINGUNA fila —sin avisar, MySQL no lo trata como error— y esta pantalla se
+    // quedaba guardando en el vacío para siempre, cliqueo tras cliqueo. Así, si la
+    // fila falta, esta misma llamada la crea; si ya existe, la actualiza como antes.
     await req.db.query(
-      // WHERE lleva el taller: sin él esto escribía sobre la fila id=1 de TODOS los
-      // talleres, porque la clave de configuracion es (tenant_id, id).
-      `UPDATE configuracion SET
-         nombre_taller = ?, telefono = ?, email = ?, direccion = ?,
-         ${marcaPropia ? 'logo = ?, color_primario = ?,' : ''}
-         max_citas_hora = ?, dias_anticipacion = ?, duracion_cita_min = ?, cancelacion_horas_min = ?,
-         garantia_dias = ?,
-         ${horarios ? 'horarios = ?,' : ''}
-         ${metodosJson ? 'metodos_pago = ?,' : ''}
-         notif_estado = ?, notif_recordatorio = ?, notif_cotizacion = ?, notif_email_entrega = ?
-       WHERE id = 1 AND tenant_id = @tenant`,
+      `INSERT INTO configuracion
+         (tenant_id, id, nombre_taller, telefono, email, direccion,
+          ${marcaPropia ? 'logo, color_primario,' : ''}
+          max_citas_hora, dias_anticipacion, duracion_cita_min, cancelacion_horas_min,
+          garantia_dias,
+          ${horarios ? 'horarios,' : ''}
+          ${metodosJson ? 'metodos_pago,' : ''}
+          notif_estado, notif_recordatorio, notif_cotizacion, notif_email_entrega)
+       VALUES
+         (@tenant, 1, ?, ?, ?, ?,
+          ${marcaPropia ? '?, ?,' : ''}
+          ?, ?, ?, ?,
+          ?,
+          ${horarios ? '?,' : ''}
+          ${metodosJson ? '?,' : ''}
+          ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         nombre_taller = VALUES(nombre_taller), telefono = VALUES(telefono),
+         email = VALUES(email), direccion = VALUES(direccion),
+         ${marcaPropia ? 'logo = VALUES(logo), color_primario = VALUES(color_primario),' : ''}
+         max_citas_hora = VALUES(max_citas_hora), dias_anticipacion = VALUES(dias_anticipacion),
+         duracion_cita_min = VALUES(duracion_cita_min), cancelacion_horas_min = VALUES(cancelacion_horas_min),
+         garantia_dias = VALUES(garantia_dias),
+         ${horarios ? 'horarios = VALUES(horarios),' : ''}
+         ${metodosJson ? 'metodos_pago = VALUES(metodos_pago),' : ''}
+         notif_estado = VALUES(notif_estado), notif_recordatorio = VALUES(notif_recordatorio),
+         notif_cotizacion = VALUES(notif_cotizacion), notif_email_entrega = VALUES(notif_email_entrega)`,
       [
         // Sin nombre se deja el del propio taller, no uno inventado: poner acá el
         // nombre de otro taller fue justamente el problema que estamos corrigiendo.
