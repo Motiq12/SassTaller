@@ -281,27 +281,27 @@
         Quién puede entrar acá. No hay permisos parciales: quien tiene cuenta ve todos los
         talleres y puede suspenderlos.
       </p>
-      <div class="taller" *ngFor="let c of cuentas">
-        <div class="cabecera">
-          <div class="quien-es">
-            <h2>{{ c.nombre }}</h2>
-            <span class="slug">{{ c.email }}</span>
-          </div>
-          <ion-badge [color]="c.activo ? 'success' : 'medium'">{{ c.activo ? 'activa' : 'desactivada' }}</ion-badge>
-        </div>
-        <div class="pie">
-          <span class="desde">
+      <!-- Nombre, correo y últ. acceso a la izquierda; estado y acción juntos a la
+           derecha, en una sola fila. Antes la insignia quedaba arriba y el botón
+           abajo, en dos filas separadas por una línea, cuando son parte de la misma
+           decisión ("¿esta cuenta puede entrar?") y tienen que leerse juntos. -->
+      <div class="cuenta" *ngFor="let c of cuentas">
+        <div class="cuenta-info">
+          <h2>{{ c.nombre }}</h2>
+          <span class="slug">{{ c.email }}</span>
+          <span class="meta">
             {{ c.ultimo_acceso ? ('Último acceso ' + (c.ultimo_acceso | date: 'medium')) : 'Nunca entró' }}
           </span>
-          <div class="acciones">
-            <ion-button size="small" fill="clear" *ngIf="admin?.id === c.id" (click)="cambiarMiPassword()">
-              Cambiar mi contraseña
-            </ion-button>
-            <ion-button size="small" fill="outline" *ngIf="admin?.id !== c.id"
-                        [color]="c.activo ? 'danger' : 'success'" (click)="cambiarActivo(c)">
-              {{ c.activo ? 'Desactivar' : 'Activar' }}
-            </ion-button>
-          </div>
+        </div>
+        <div class="cuenta-acciones">
+          <ion-badge [color]="c.activo ? 'success' : 'medium'">{{ c.activo ? 'activa' : 'desactivada' }}</ion-badge>
+          <ion-button size="small" fill="clear" *ngIf="admin?.id === c.id" (click)="cambiarMiPassword()">
+            Cambiar mi contraseña
+          </ion-button>
+          <ion-button size="small" fill="outline" *ngIf="admin?.id !== c.id"
+                      [color]="c.activo ? 'danger' : 'success'" (click)="cambiarActivo(c)">
+            {{ c.activo ? 'Desactivar' : 'Activar' }}
+          </ion-button>
         </div>
       </div>
       <ion-button expand="block" fill="outline" class="sumar" (click)="invitarCuenta()">

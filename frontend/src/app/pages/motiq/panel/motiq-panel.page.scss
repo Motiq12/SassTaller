@@ -301,6 +301,38 @@
   }
 }
 
+// ---- Cuentas del equipo ----
+.cuenta {
+  @extend %tarjeta;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.cuenta-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+
+  h2 { margin: 0; font-size: 1.05rem; font-weight: 600; }
+  .slug { font-size: 0.85rem; color: var(--ion-color-medium, #92949c); }
+  .meta { font-size: 0.78rem; color: var(--ion-color-medium, #92949c); }
+}
+
+// Estado y acción, uno al lado del otro: son la misma decisión ("¿puede entrar
+// esta cuenta?") y se leen juntos, no en dos filas separadas por una línea.
+.cuenta-acciones {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
 .sumar { margin-top: 1rem; }
 
 // ---- Ficha del taller ----

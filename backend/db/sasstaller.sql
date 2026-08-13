@@ -434,7 +434,7 @@ CREATE TABLE `motiq_bitacora` (
   PRIMARY KEY (`id`),
   KEY `idx_bitacora_admin` (`admin_id`,`created_at`),
   KEY `idx_bitacora_fecha` (`created_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=28 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -955,7 +955,7 @@ CREATE TABLE `servicios` (
   UNIQUE KEY `uq_servicios_tenant` (`tenant_id`,`nombre`),
   KEY `idx_servicios_tenant` (`tenant_id`),
   CONSTRAINT `fk_servicios_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1065 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1076 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -988,7 +988,7 @@ CREATE TABLE `sucursales` (
   PRIMARY KEY (`id`),
   KEY `idx_sucursales_tenant` (`tenant_id`),
   CONSTRAINT `fk_sucursales_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=91 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=92 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1058,7 +1058,7 @@ CREATE TABLE `tenants` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_tenant_slug` (`slug`),
   KEY `idx_tenants_estado` (`estado`)
-) ENGINE=InnoDB AUTO_INCREMENT=79 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=80 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1067,7 +1067,7 @@ CREATE TABLE `tenants` (
 
 LOCK TABLES `tenants` WRITE;
 /*!40000 ALTER TABLE `tenants` DISABLE KEYS */;
-INSERT INTO `tenants` (`id`, `nombre`, `slug`, `plan`, `estado`, `created_at`, `updated_at`, `motivo_estado`, `trial_hasta`) VALUES (1,'MS Motors','ms-motors','pro','activo','2026-08-12 00:29:01','2026-08-12 00:29:01',NULL,NULL),(2,'Moto Zone','moto-zone','trial','activo','2026-08-12 01:46:08','2026-08-13 00:41:36',NULL,NULL);
+INSERT INTO `tenants` (`id`, `nombre`, `slug`, `plan`, `estado`, `created_at`, `updated_at`, `motivo_estado`, `trial_hasta`) VALUES (1,'MS Motors','ms-motors','pro','activo','2026-08-12 00:29:01','2026-08-12 00:29:01',NULL,NULL),(2,'Moto Zone','moto-zone','trial','activo','2026-08-12 01:46:08','2026-08-13 01:03:02',NULL,NULL);
 /*!40000 ALTER TABLE `tenants` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1092,7 +1092,7 @@ CREATE TABLE `usuario_verify_codes` (
   KEY `idx_uvc_tenant` (`tenant_id`),
   CONSTRAINT `fk_uvc_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
   CONSTRAINT `fk_uvc_usuario` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=25 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=26 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1138,7 +1138,7 @@ CREATE TABLE `usuarios` (
   CONSTRAINT `fk_usuarios_sucursal` FOREIGN KEY (`sucursal_id`) REFERENCES `sucursales` (`id`),
   CONSTRAINT `fk_usuarios_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
   CONSTRAINT `usuarios_ibfk_1` FOREIGN KEY (`sucursal_id`) REFERENCES `sucursales` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=102 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=103 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1245,4 +1245,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-08-12 18:41:52
+-- Dump completed on 2026-08-12 19:03:18
