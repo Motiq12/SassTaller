@@ -22,6 +22,7 @@ const { TABLAS_CON_TENANT } = require('../db/tenant-db');
 const { anotar } = require('../utils/bitacora');
 
 const ESTADOS = ['activo', 'suspendido', 'cancelado'];
+const TIPOS_AVISO = ['info', 'mantenimiento', 'urgente'];
 
 // POST /api/motiq/login — sesión de administración de la plataforma.
 router.post('/login', async (req, res) => {
@@ -707,6 +708,75 @@ router.patch('/admins/:id', async (req, res) => {
     res.json({ message: 'Cuenta actualizada' });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Ya hay otra cuenta con ese correo' });
+    fail(res, err);
+  }
+});
+
+// ───────────── Avisos hacia los talleres ─────────────
+// Una franja arriba de la pantalla del PERSONAL de cada taller (admin/recepción/
+// mecánico) — mantenimiento programado, una función nueva, lo que Motiq necesite
+// avisar. No es mensajería interna de un taller hacia su propia gente (esa va
+// scopeada por tenant_id, ver mensajeria.routes.js); esto lo escribe Motiq y lo lee
+// cualquier taller. La lectura vive en routes/avisos.routes.js, del lado del staff.
+
+// GET /api/motiq/avisos — el historial completo, para administrarlos.
+router.get('/avisos', async (req, res) => {
+  try {
+    const [filas] = await pool.query(
+      `SELECT id, mensaje, tipo, activo, admin_email, created_at, updated_at
+         FROM avisos_plataforma ORDER BY created_at DESC LIMIT 100`
+    );
+    res.json({ data: filas });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// POST /api/motiq/avisos — publica uno nuevo. Nace activo.
+router.post('/avisos', async (req, res) => {
+  try {
+    const mensaje = String(req.body?.mensaje || '').trim();
+    if (!mensaje) return res.status(400).json({ error: 'Falta el mensaje' });
+    const tipo = TIPOS_AVISO.includes(req.body?.tipo) ? req.body.tipo : 'info';
+
+    const [r] = await pool.query(
+      `INSERT INTO avisos_plataforma (mensaje, tipo, admin_id, admin_email) VALUES (?, ?, ?, ?)`,
+      [mensaje.slice(0, 500), tipo, req.plataforma?.id || null, req.plataforma?.email || null]
+    );
+    anotar(req.plataforma, 'creo_aviso', { detalle: mensaje.slice(0, 100) });
+    res.status(201).json({ data: { id: r.insertId }, message: 'Aviso publicado' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// PATCH /api/motiq/avisos/:id — editar el texto/tipo, o apagarlo/reactivarlo.
+router.patch('/avisos/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const sets = [];
+    const params = [];
+
+    if (req.body?.mensaje !== undefined) {
+      const mensaje = String(req.body.mensaje).trim();
+      if (!mensaje) return res.status(400).json({ error: 'El mensaje no puede quedar vacío' });
+      sets.push('mensaje = ?'); params.push(mensaje.slice(0, 500));
+    }
+    if (req.body?.tipo !== undefined) {
+      if (!TIPOS_AVISO.includes(req.body.tipo)) return res.status(400).json({ error: `Tipo inválido (${TIPOS_AVISO.join(', ')})` });
+      sets.push('tipo = ?'); params.push(req.body.tipo);
+    }
+    if (req.body?.activo !== undefined) {
+      sets.push('activo = ?'); params.push(req.body.activo ? 1 : 0);
+    }
+    if (!sets.length) return res.status(400).json({ error: 'Nada para actualizar' });
+
+    params.push(id);
+    const [r] = await pool.query(`UPDATE avisos_plataforma SET ${sets.join(', ')} WHERE id = ?`, params);
+    if (!r.affectedRows) return res.status(404).json({ error: 'Aviso no encontrado' });
+    anotar(req.plataforma, 'edito_aviso', { detalle: `#${id}` });
+    res.json({ message: 'Aviso actualizado' });
+  } catch (err) {
     fail(res, err);
   }
 });

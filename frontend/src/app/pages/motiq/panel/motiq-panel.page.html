@@ -54,6 +54,9 @@
       <button type="button" class="nav-item" [class.on]="vista === 'planes'" (click)="irA('planes')">
         <ion-icon name="pricetag-outline"></ion-icon> Planes
       </button>
+      <button type="button" class="nav-item" [class.on]="vista === 'avisos'" (click)="irA('avisos')">
+        <ion-icon name="megaphone-outline"></ion-icon> Avisos
+      </button>
       <button type="button" class="nav-item" [class.on]="vista === 'cuentas'" (click)="irA('cuentas')">
         <ion-icon name="people-outline"></ion-icon> Equipo
       </button>
@@ -424,6 +427,48 @@
             <ion-button type="submit">Guardar</ion-button>
           </div>
         </form>
+      </div>
+    </ng-container>
+
+    <!-- ===== Avisos hacia los talleres ===== -->
+    <ng-container *ngIf="vista === 'avisos'">
+      <div class="explica-linea">
+        <p class="explica">
+          Se ven como una franja arriba de la pantalla de todo el personal de los
+          talleres (admin, recepción, mecánico). Cada quien la cierra una vez y no la
+          vuelve a ver, aunque siga activa — un aviso nuevo sí se le muestra.
+        </p>
+        <ion-button size="small" (click)="nuevoAviso()">
+          <ion-icon slot="start" name="add-outline"></ion-icon> Publicar
+        </ion-button>
+      </div>
+
+      <div class="vacio" *ngIf="!avisos.length">
+        <ion-icon name="megaphone-outline"></ion-icon>
+        <p>Todavía no publicaste ningún aviso.</p>
+      </div>
+
+      <div class="taller" *ngFor="let av of avisos">
+        <div class="cabecera">
+          <div class="quien-es">
+            <p class="mensaje-aviso">{{ av.mensaje }}</p>
+          </div>
+          <div class="etiquetas-estado">
+            <ion-badge [color]="colorTipoAviso(av.tipo)">{{ rotuloTipoAviso(av.tipo) }}</ion-badge>
+            <ion-badge [color]="av.activo ? 'success' : 'medium'">{{ av.activo ? 'activo' : 'apagado' }}</ion-badge>
+          </div>
+        </div>
+        <div class="pie">
+          <span class="desde">
+            {{ av.admin_email }} · {{ av.created_at | date: 'medium' }}
+          </span>
+          <div class="acciones">
+            <ion-button size="small" fill="clear" (click)="editarAviso(av)">Editar</ion-button>
+            <ion-button size="small" fill="outline" [color]="av.activo ? 'medium' : 'success'" (click)="alternarAviso(av)">
+              {{ av.activo ? 'Apagar' : 'Reactivar' }}
+            </ion-button>
+          </div>
+        </div>
       </div>
     </ng-container>
 

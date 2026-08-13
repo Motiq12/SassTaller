@@ -1,4 +1,20 @@
-<ion-app>
+<ion-app [class.con-aviso-sistema]="!!avisoVisible">
+  <!-- Aviso de Motiq hacia el personal del taller (admin/recepción/mecánico). Arriba
+       de todo, y no en cada shell por separado: así vale para cualquier pantalla sin
+       tener que engancharlo en admin-shell, recepcion-tabs, mecanico-tabs y tabs a la
+       vez. Se cierra una vez y no vuelve — un aviso nuevo sí se le muestra.
+
+       La clase en <ion-app> corre ion-router-outlet hacia abajo (ver global.scss):
+       sin eso, la franja queda flotando ENCIMA del contenido y tapa el logo de la
+       barra lateral de cada shell en vez de empujarlo. -->
+  <div [class]="claseAviso()" *ngIf="avisoVisible" role="status" aria-live="polite">
+    <ion-icon [name]="iconoAviso()"></ion-icon>
+    <span [title]="avisoVisible.mensaje">{{ avisoVisible.mensaje }}</span>
+    <button type="button" (click)="cerrarAviso()" aria-label="Cerrar aviso">
+      <ion-icon name="close-outline"></ion-icon>
+    </button>
+  </div>
+
   <!-- Banner global de sin conexión -->
   <div class="net-banner" *ngIf="!enLinea" role="status" aria-live="polite">
     <ion-icon name="cloud-offline-outline"></ion-icon>

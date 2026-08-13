@@ -893,6 +893,15 @@ $sb-ancho: 240px;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
 
+  // Texto de un aviso: no es un título como el nombre de un taller, así que no
+  // lleva el mismo peso que h2 — pero tampoco es tan chico como el resto.
+  .mensaje-aviso {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
   .motivo {
     display: flex;
     align-items: center;

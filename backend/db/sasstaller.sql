@@ -16,6 +16,36 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
+-- Table structure for table `avisos_plataforma`
+--
+
+DROP TABLE IF EXISTS `avisos_plataforma`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `avisos_plataforma` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `mensaje` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `tipo` enum('info','mantenimiento','urgente') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'info',
+  `activo` tinyint(1) NOT NULL DEFAULT '1',
+  `admin_id` int DEFAULT NULL,
+  `admin_email` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_avisos_activo` (`activo`,`created_at`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `avisos_plataforma`
+--
+
+LOCK TABLES `avisos_plataforma` WRITE;
+/*!40000 ALTER TABLE `avisos_plataforma` DISABLE KEYS */;
+/*!40000 ALTER TABLE `avisos_plataforma` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `citas`
 --
 
@@ -434,7 +464,7 @@ CREATE TABLE `motiq_bitacora` (
   PRIMARY KEY (`id`),
   KEY `idx_bitacora_admin` (`admin_id`,`created_at`),
   KEY `idx_bitacora_fecha` (`created_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=62 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=70 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -443,6 +473,7 @@ CREATE TABLE `motiq_bitacora` (
 
 LOCK TABLES `motiq_bitacora` WRITE;
 /*!40000 ALTER TABLE `motiq_bitacora` DISABLE KEYS */;
+INSERT INTO `motiq_bitacora` (`id`, `admin_id`, `admin_email`, `accion`, `tenant_id`, `tenant_slug`, `detalle`, `created_at`) VALUES (62,1,'jefry@motiq.cr','edito_cuenta',NULL,NULL,'su perfil: nombre, correo','2026-08-13 02:23:40');
 /*!40000 ALTER TABLE `motiq_bitacora` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -885,7 +916,7 @@ CREATE TABLE `plataforma_admins` (
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_plataforma_email` (`email`)
-) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -984,7 +1015,7 @@ CREATE TABLE `servicios` (
   UNIQUE KEY `uq_servicios_tenant` (`tenant_id`,`nombre`),
   KEY `idx_servicios_tenant` (`tenant_id`),
   CONSTRAINT `fk_servicios_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1149 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1150 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1096,7 +1127,7 @@ CREATE TABLE `tenants` (
 
 LOCK TABLES `tenants` WRITE;
 /*!40000 ALTER TABLE `tenants` DISABLE KEYS */;
-INSERT INTO `tenants` (`id`, `nombre`, `slug`, `plan`, `estado`, `created_at`, `updated_at`, `motivo_estado`, `trial_hasta`) VALUES (1,'MS Motors','ms-motors','pro','activo','2026-08-12 00:29:01','2026-08-12 00:29:01',NULL,NULL),(2,'Moto Zone','moto-zone','trial','activo','2026-08-12 01:46:08','2026-08-13 02:14:33',NULL,NULL);
+INSERT INTO `tenants` (`id`, `nombre`, `slug`, `plan`, `estado`, `created_at`, `updated_at`, `motivo_estado`, `trial_hasta`) VALUES (1,'MS Motors','ms-motors','pro','activo','2026-08-12 00:29:01','2026-08-12 00:29:01',NULL,NULL),(2,'Moto Zone','moto-zone','trial','activo','2026-08-12 01:46:08','2026-08-13 04:08:18',NULL,NULL);
 /*!40000 ALTER TABLE `tenants` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1274,4 +1305,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-08-12 20:16:23
+-- Dump completed on 2026-08-12 22:08:41

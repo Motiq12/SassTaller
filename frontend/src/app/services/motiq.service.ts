@@ -118,6 +118,13 @@ export interface PlanConfig {
   updated_at: string;
 }
 
+// Un aviso de Motiq hacia el personal de los talleres (franja arriba de su
+// pantalla) — mantenimiento, una función nueva, lo que haga falta avisar.
+export interface AvisoPlataforma {
+  id: number; mensaje: string; tipo: 'info' | 'mantenimiento' | 'urgente';
+  activo: number; admin_email: string | null; created_at: string; updated_at: string;
+}
+
 // Lo que manda la landing cuando alguien pide una demo.
 export interface PedidoDemo {
   nombre: string;
@@ -307,6 +314,20 @@ export class MotiqService {
     marca_propia: boolean; reportes_dias: number | null;
   }): Observable<{ message: string }> {
     return this.http.patch<{ message: string }>(`${this.apiUrl}/motiq/planes/${plan}`, datos);
+  }
+
+  // --- Avisos hacia los talleres ---
+
+  avisos(): Observable<{ data: AvisoPlataforma[] }> {
+    return this.http.get<{ data: AvisoPlataforma[] }>(`${this.apiUrl}/motiq/avisos`);
+  }
+
+  crearAviso(mensaje: string, tipo: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/motiq/avisos`, { mensaje, tipo });
+  }
+
+  actualizarAviso(id: number, datos: { mensaje?: string; tipo?: string; activo?: boolean }): Observable<{ message: string }> {
+    return this.http.patch<{ message: string }>(`${this.apiUrl}/motiq/avisos/${id}`, datos);
   }
 
   cambiarPassword(actual: string, nueva: string): Observable<{ message: string }> {

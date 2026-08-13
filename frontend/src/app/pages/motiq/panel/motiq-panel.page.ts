@@ -3,8 +3,8 @@ import { Router } from '@angular/router';
 import { AlertController } from '@ionic/angular';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 import {
-  ContactoDemo, CuentaPlataforma, FichaTaller, MiEspacio, MotiqService, Pendiente,
-  PlanConfig, ResumenPlataforma, TallerDelPanel, TallerInactivo, Vencimiento,
+  AvisoPlataforma, ContactoDemo, CuentaPlataforma, FichaTaller, MiEspacio, MotiqService,
+  Pendiente, PlanConfig, ResumenPlataforma, TallerDelPanel, TallerInactivo, Vencimiento,
 } from '../../../services/motiq.service';
 import { MarcaService } from '../../../services/marca.service';
 import { ToastService } from '../../../services/toast.service';
@@ -36,7 +36,7 @@ export class MotiqPanelPage implements OnInit {
   // Arranca en "Mi espacio" y no en el resumen: los dos administran todo el SaaS, así
   // que los datos son los mismos para ambos — lo primero que cada uno tiene que ver al
   // entrar es lo SUYO, no el total compartido.
-  vista: 'espacio' | 'resumen' | 'talleres' | 'vencen' | 'inactivos' | 'contactos' | 'cuentas' | 'planes' = 'espacio';
+  vista: 'espacio' | 'resumen' | 'talleres' | 'vencen' | 'inactivos' | 'contactos' | 'cuentas' | 'planes' | 'avisos' = 'espacio';
   espacio: MiEspacio | null = null;
   contactos: ContactoDemo[] = [];
   vencimientos: Vencimiento[] = [];
@@ -51,6 +51,9 @@ export class MotiqPanelPage implements OnInit {
     precio_mensual: number | null; limite_usuarios: number | null; limite_sucursales: number | null;
     marca_propia: boolean; reportes_dias: number | null;
   } = { precio_mensual: 0, limite_usuarios: null, limite_sucursales: null, marca_propia: false, reportes_dias: null };
+
+  // --- Avisos hacia los talleres ---
+  avisos: AvisoPlataforma[] = [];
 
   // Ficha del taller abierto (null = cerrada).
   ficha: FichaTaller | null = null;
@@ -167,7 +170,12 @@ export class MotiqPanelPage implements OnInit {
     this.motiq.inactivos(30).subscribe({ next: (r) => (this.inactivos = r.data), error: () => {} });
     this.motiq.cuentas().subscribe({ next: (r) => (this.cuentas = r.data), error: () => {} });
     this.motiq.planes().subscribe({ next: (r) => (this.planes = r.data), error: () => {} });
+    this.cargarAvisos();
     this.cargarEspacio();
+  }
+
+  cargarAvisos() {
+    this.motiq.avisos().subscribe({ next: (r) => (this.avisos = r.data), error: () => {} });
   }
 
   cargarEspacio() {
@@ -253,6 +261,8 @@ export class MotiqPanelPage implements OnInit {
       creo_cuenta: 'creó una cuenta de plataforma',
       edito_cuenta: 'editó una cuenta de plataforma',
       edito_plan: 'editó un plan',
+      creo_aviso: 'publicó un aviso',
+      edito_aviso: 'editó un aviso',
       atendio_contacto: 'atendió un contacto',
     };
     const base = textos[l.accion] || l.accion;
@@ -264,7 +274,8 @@ export class MotiqPanelPage implements OnInit {
       suspendio: 'pause-circle-outline', reactivo: 'play-circle-outline',
       cambio_plan: 'swap-horizontal-outline', borro: 'trash-outline',
       creo_cuenta: 'person-add-outline', edito_cuenta: 'person-outline',
-      edito_plan: 'pricetag-outline', atendio_contacto: 'mail-open-outline',
+      edito_plan: 'pricetag-outline', creo_aviso: 'megaphone-outline',
+      edito_aviso: 'megaphone-outline', atendio_contacto: 'mail-open-outline',
     }[accion] || 'ellipse-outline';
   }
 
@@ -343,6 +354,80 @@ export class MotiqPanelPage implements OnInit {
     this.motiq.actualizarPlan(plan, datos).subscribe({
       next: (r) => { this.toast.success(r.message); this.editandoPlan = null; this.cargar(); },
       error: (e) => this.toast.error(e?.error?.error || 'No se pudo guardar'),
+    });
+  }
+
+  // --- Avisos hacia los talleres ---
+
+  rotuloTipoAviso(t: string): string {
+    return { info: 'Informativo', mantenimiento: 'Mantenimiento', urgente: 'Urgente' }[t] || t;
+  }
+
+  colorTipoAviso(t: string): string {
+    return { info: 'medium', mantenimiento: 'warning', urgente: 'danger' }[t] || 'medium';
+  }
+
+  async nuevoAviso() {
+    const a = await this.alerta.create({
+      header: 'Publicar un aviso',
+      message: 'Se ve como una franja arriba de la pantalla de TODO el personal de los talleres (admin, recepción, mecánico). No lo ven los clientes.',
+      inputs: [
+        { name: 'mensaje', type: 'textarea', placeholder: 'Ej: El domingo de 2am a 4am va a haber mantenimiento programado.', attributes: { maxlength: 500 } },
+        { name: 'tipo', type: 'radio', label: 'Informativo', value: 'info', checked: true },
+        { name: 'tipo', type: 'radio', label: 'Mantenimiento (franja amarilla)', value: 'mantenimiento' },
+        { name: 'tipo', type: 'radio', label: 'Urgente (franja roja)', value: 'urgente' },
+      ],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Publicar',
+          handler: (d) => {
+            const mensaje = String(d.mensaje || '').trim();
+            if (!mensaje) { this.toast.error('Escribí el mensaje'); return false; }
+            this.motiq.crearAviso(mensaje, d.tipo || 'info').subscribe({
+              next: (r) => { this.toast.success(r.message); this.cargarAvisos(); },
+              error: (e) => this.toast.error(e?.error?.error || 'No se pudo publicar'),
+            });
+            return true;
+          },
+        },
+      ],
+    });
+    await a.present();
+  }
+
+  async editarAviso(av: AvisoPlataforma) {
+    const a = await this.alerta.create({
+      header: 'Editar aviso',
+      inputs: [
+        { name: 'mensaje', type: 'textarea', value: av.mensaje, attributes: { maxlength: 500 } },
+        { name: 'tipo', type: 'radio', label: 'Informativo', value: 'info', checked: av.tipo === 'info' },
+        { name: 'tipo', type: 'radio', label: 'Mantenimiento (franja amarilla)', value: 'mantenimiento', checked: av.tipo === 'mantenimiento' },
+        { name: 'tipo', type: 'radio', label: 'Urgente (franja roja)', value: 'urgente', checked: av.tipo === 'urgente' },
+      ],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Guardar',
+          handler: (d) => {
+            const mensaje = String(d.mensaje || '').trim();
+            if (!mensaje) { this.toast.error('Escribí el mensaje'); return false; }
+            this.motiq.actualizarAviso(av.id, { mensaje, tipo: d.tipo }).subscribe({
+              next: (r) => { this.toast.success(r.message); this.cargarAvisos(); },
+              error: (e) => this.toast.error(e?.error?.error || 'No se pudo actualizar'),
+            });
+            return true;
+          },
+        },
+      ],
+    });
+    await a.present();
+  }
+
+  alternarAviso(av: AvisoPlataforma) {
+    this.motiq.actualizarAviso(av.id, { activo: !av.activo }).subscribe({
+      next: (r) => { this.toast.success(r.message); this.cargarAvisos(); },
+      error: (e) => this.toast.error(e?.error?.error || 'No se pudo cambiar'),
     });
   }
 

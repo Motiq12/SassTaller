@@ -685,6 +685,26 @@ async function ensureSchema() {
          ('pro',    0, NULL, NULL, 1, NULL)`
     ));
 
+    // Avisos de la plataforma hacia el personal de los talleres (migración 010):
+    // mantenimiento programado, una función nueva, lo que sea que Motiq necesite
+    // avisar. NO es mensajeria_internos — esa es de un taller hacia su propia gente
+    // y va scopeada por tenant_id (ver backend/src/routes/mensajeria.routes.js); esta
+    // tabla es deliberadamente global y sin tenant_id: la escribe Motiq, la lee
+    // cualquier taller.
+    await tryStep('tabla avisos_plataforma', () => pool.query(
+      `CREATE TABLE IF NOT EXISTS avisos_plataforma (
+         id          INT AUTO_INCREMENT PRIMARY KEY,
+         mensaje     VARCHAR(500) NOT NULL,
+         tipo        ENUM('info','mantenimiento','urgente') NOT NULL DEFAULT 'info',
+         activo      TINYINT(1) NOT NULL DEFAULT 1,
+         admin_id    INT NULL,
+         admin_email VARCHAR(150) NULL,
+         created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+         updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+         INDEX idx_avisos_activo (activo, created_at)
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+    ));
+
     // Quien pide una demo desde la landing. Tampoco lleva tenant_id: todavía no es
     // un taller del sistema, es alguien de afuera preguntando.
     await tryStep('tabla contactos_demo', () => pool.query(
