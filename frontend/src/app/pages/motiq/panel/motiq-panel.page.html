@@ -82,8 +82,11 @@
 
   <div class="contenido">
     <!-- Lo que hay que hacer HOY. Va arriba de todo y solo aparece cuando hay algo:
-         una fila permanente en cero se vuelve parte del decorado y deja de leerse. -->
-    <div class="pendientes" *ngIf="resumen">
+         una fila permanente en cero se vuelve parte del decorado y deja de leerse.
+         Solo en las dos pantallas de panorama general: en las de trabajo puntual
+         (Talleres, Vencen, Inactivos, Contactos, Equipo, Planes) sobraba — quien ya
+         está parado en "Inactivos" no necesita el mismo aviso repetido arriba. -->
+    <div class="pendientes" *ngIf="resumen && (vista === 'espacio' || vista === 'resumen')">
       <button type="button" class="pendiente urgente"
               *ngIf="resumen.alertas?.vencen_semana"
               (click)="irA('vencen')">
