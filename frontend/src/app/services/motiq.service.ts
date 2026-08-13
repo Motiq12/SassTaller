@@ -44,8 +44,8 @@ export interface ResumenPlataforma {
   contactos: { sin_atender: number };
   // Altas por mes: un total acumulado no dice si el negocio crece o está plano.
   altas: { mes: string; talleres: number }[];
-  // Los dos números por los que se llama a alguien.
-  alertas: { vencen_semana: number; inactivos: number };
+  // Los números por los que se llama, o se entra a revisar, a alguien.
+  alertas: { vencen_semana: number; inactivos: number; reportes_nuevos: number };
 }
 
 // La ficha completa de un taller: lo que hay que tener delante cuando llama.
@@ -124,6 +124,17 @@ export interface AvisoPlataforma {
   id: number; mensaje: string; tipo: 'info' | 'mantenimiento' | 'urgente';
   activo: number; vence_el: string | null;
   admin_email: string | null; created_at: string; updated_at: string;
+}
+
+// "Algo no funciona" — del personal de un taller hacia Motiq. Al revés de
+// AvisoPlataforma (Motiq hacia el personal).
+export interface ReporteFalla {
+  id: number;
+  tenant_id: number | null; tenant_nombre: string | null; tenant_slug: string | null;
+  usuario_nombre: string | null; usuario_email: string | null; usuario_rol: string | null;
+  descripcion: string; pantalla: string | null;
+  estado: 'nuevo' | 'revisando' | 'resuelto' | 'descartado';
+  nota_interna: string | null; created_at: string;
 }
 
 // Lo que manda la landing cuando alguien pide una demo.
@@ -329,6 +340,18 @@ export class MotiqService {
 
   actualizarAviso(id: number, datos: { mensaje?: string; tipo?: string; vence_el?: string | null; activo?: boolean }): Observable<{ message: string }> {
     return this.http.patch<{ message: string }>(`${this.apiUrl}/motiq/avisos/${id}`, datos);
+  }
+
+  // --- Reportes de falla ---
+
+  reportes(estado = ''): Observable<{ data: ReporteFalla[] }> {
+    return this.http.get<{ data: ReporteFalla[] }>(
+      `${this.apiUrl}/motiq/reportes${estado ? `?estado=${encodeURIComponent(estado)}` : ''}`
+    );
+  }
+
+  actualizarReporte(id: number, estado: string, nota_interna?: string): Observable<{ message: string }> {
+    return this.http.patch<{ message: string }>(`${this.apiUrl}/motiq/reportes/${id}`, { estado, nota_interna });
   }
 
   cambiarPassword(actual: string, nueva: string): Observable<{ message: string }> {

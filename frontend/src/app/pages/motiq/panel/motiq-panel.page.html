@@ -50,6 +50,12 @@
         <span class="nav-badge" *ngIf="resumen?.contactos?.sin_atender">{{ resumen?.contactos?.sin_atender }}</span>
       </button>
 
+      <div class="sb-section">Soporte</div>
+      <button type="button" class="nav-item" [class.on]="vista === 'reportes'" (click)="irA('reportes')">
+        <ion-icon name="bug-outline"></ion-icon> Reportes
+        <span class="nav-badge urgente" *ngIf="resumen?.alertas?.reportes_nuevos">{{ resumen?.alertas?.reportes_nuevos }}</span>
+      </button>
+
       <div class="sb-section">Configuración</div>
       <button type="button" class="nav-item" [class.on]="vista === 'planes'" (click)="irA('planes')">
         <ion-icon name="pricetag-outline"></ion-icon> Planes
@@ -90,6 +96,12 @@
          (Talleres, Vencen, Inactivos, Contactos, Equipo, Planes) sobraba — quien ya
          está parado en "Inactivos" no necesita el mismo aviso repetido arriba. -->
     <div class="pendientes" *ngIf="resumen && (vista === 'espacio' || vista === 'resumen')">
+      <button type="button" class="pendiente urgente"
+              *ngIf="resumen.alertas?.reportes_nuevos"
+              (click)="irA('reportes')">
+        <ion-icon name="bug-outline"></ion-icon>
+        <span><strong>{{ resumen.alertas.reportes_nuevos }}</strong> reportes sin ver</span>
+      </button>
       <button type="button" class="pendiente urgente"
               *ngIf="resumen.alertas?.vencen_semana"
               (click)="irA('vencen')">
@@ -544,6 +556,44 @@
             <ion-button size="small" *ngIf="c.estado !== 'cerrado'" (click)="crearTaller(c)">
               Crear taller
             </ion-button>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- ===== Reportes de falla ===== -->
+    <ng-container *ngIf="vista === 'reportes'">
+      <p class="explica">
+        Lo que el personal de los talleres reporta desde su propio panel cuando algo
+        no funciona — con el taller, quién fue y en qué pantalla estaba.
+      </p>
+      <div class="vacio" *ngIf="!reportes.length">
+        <ion-icon name="bug-outline"></ion-icon>
+        <p>Nadie reportó ninguna falla todavía.</p>
+      </div>
+
+      <div class="taller" *ngFor="let r of reportes">
+        <div class="cabecera">
+          <div class="quien-es">
+            <h2>{{ r.tenant_nombre || 'Taller borrado' }}</h2>
+            <span class="slug">{{ r.tenant_slug }}</span>
+          </div>
+          <ion-badge [color]="colorEstadoReporte(r.estado)">{{ rotuloEstadoReporte(r.estado) }}</ion-badge>
+        </div>
+
+        <div class="numeros">
+          <span *ngIf="r.usuario_nombre">{{ r.usuario_nombre }} ({{ r.usuario_rol }})</span>
+          <span *ngIf="r.usuario_email"><a [href]="'mailto:' + r.usuario_email">{{ r.usuario_email }}</a></span>
+          <span *ngIf="r.pantalla" class="slug">{{ r.pantalla }}</span>
+        </div>
+
+        <p class="motivo neutro">{{ r.descripcion }}</p>
+        <p class="motivo neutro" *ngIf="r.nota_interna"><strong>Nota:</strong> {{ r.nota_interna }}</p>
+
+        <div class="pie">
+          <span class="desde">{{ r.created_at | date: 'medium' }}</span>
+          <div class="acciones">
+            <ion-button size="small" fill="outline" (click)="atenderReporte(r)">Atender</ion-button>
           </div>
         </div>
       </div>

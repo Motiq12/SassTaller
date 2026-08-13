@@ -228,6 +228,49 @@ router.post('/contactos/:id/taller', async (req, res) => {
   }
 });
 
+// ───────────── Reportes de falla ─────────────
+// Lo que el personal de un taller manda desde su panel cuando algo no funciona (ver
+// routes/reportes.routes.js, del lado del staff). Al revés de los avisos: esto entra
+// a Motiq en vez de salir de Motiq.
+const ESTADOS_REPORTE = ['nuevo', 'revisando', 'resuelto', 'descartado'];
+
+// GET /api/motiq/reportes?estado= — la bandeja de fallas reportadas.
+router.get('/reportes', async (req, res) => {
+  try {
+    const where = ESTADOS_REPORTE.includes(req.query.estado) ? 'WHERE estado = ?' : '';
+    const [filas] = await pool.query(
+      `SELECT id, tenant_id, tenant_nombre, tenant_slug, usuario_nombre, usuario_email, usuario_rol,
+              descripcion, pantalla, estado, nota_interna, created_at
+         FROM reportes_falla ${where}
+        ORDER BY estado = 'nuevo' DESC, created_at DESC
+        LIMIT 200`,
+      where ? [req.query.estado] : []
+    );
+    res.json({ data: filas });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// PATCH /api/motiq/reportes/:id — mover en el embudo y anotar qué se hizo.
+router.patch('/reportes/:id', async (req, res) => {
+  try {
+    const { estado, nota_interna } = req.body;
+    if (!ESTADOS_REPORTE.includes(estado)) {
+      return res.status(400).json({ error: `Estado inválido (${ESTADOS_REPORTE.join(', ')})` });
+    }
+    const [r] = await pool.query(
+      'UPDATE reportes_falla SET estado = ?, nota_interna = ? WHERE id = ?',
+      [estado, String(nota_interna || '').trim().slice(0, 500) || null, req.params.id]
+    );
+    if (!r.affectedRows) return res.status(404).json({ error: 'Reporte no encontrado' });
+    anotar(req.plataforma, 'atendio_reporte', { detalle: `#${req.params.id}: ${estado}` });
+    res.json({ message: 'Reporte actualizado' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
 // GET /api/motiq/resumen — el estado del negocio de un vistazo.
 router.get('/resumen', async (req, res) => {
   try {
@@ -274,7 +317,8 @@ router.get('/resumen', async (req, res) => {
            WHERE t.estado = 'activo'
              AND NOT EXISTS (SELECT 1 FROM ordenes_trabajo o
                               WHERE o.tenant_id = t.id
-                                AND o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY))) AS inactivos`
+                                AND o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY))) AS inactivos,
+         (SELECT COUNT(*) FROM reportes_falla WHERE estado = 'nuevo') AS reportes_nuevos`
     );
 
     res.json({ data: { talleres: t, uso, contactos: c, altas, alertas } });

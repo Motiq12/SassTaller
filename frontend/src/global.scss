@@ -1290,6 +1290,21 @@ ion-app.con-aviso-sistema ion-router-outlet {
   top: #{$aviso-alto};
 }
 
+/* Botón global "reportar un problema": discreto hasta que hace falta, para no
+   competir con los FAB de acción principal (nueva orden, nueva cita) que ya viven
+   abajo a la derecha en varias pantallas — por eso este va a la izquierda. */
+.reportar-falla {
+  position: fixed; left: 14px; bottom: 14px; z-index: 9998;
+  width: 42px; height: 42px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(31, 41, 55, 0.82); color: #fff;
+  border: 0; cursor: pointer; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  opacity: 0.5; transition: opacity 0.15s, transform 0.15s;
+
+  ion-icon { font-size: 19px; display: block; }
+  &:hover, &:focus-visible { opacity: 1; transform: scale(1.06); }
+}
+
 /* Banner global "sin conexión". */
 .net-banner {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 10000;

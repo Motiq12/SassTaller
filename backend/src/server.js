@@ -132,6 +132,7 @@ app.use('/api/auth',      require('./routes/auth.routes'));
 app.use('/api/onboarding', require('./routes/onboarding.routes'));
 app.use('/api/motiq',     require('./routes/motiq.routes'));
 app.use('/api/avisos',    require('./routes/avisos.routes'));
+app.use('/api/reportes',  require('./routes/reportes.routes'));
 app.use('/api/marca',     require('./routes/marca.routes'));
 app.use('/api/clientes',  require('./routes/clientes.routes'));
 app.use('/api/vehiculos', require('./routes/vehiculos.routes'));

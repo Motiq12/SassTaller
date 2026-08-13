@@ -4,7 +4,7 @@ import { AlertController } from '@ionic/angular';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 import {
   AvisoPlataforma, ContactoDemo, CuentaPlataforma, FichaTaller, MiEspacio, MotiqService,
-  Pendiente, PlanConfig, ResumenPlataforma, TallerDelPanel, TallerInactivo, Vencimiento,
+  Pendiente, PlanConfig, ReporteFalla, ResumenPlataforma, TallerDelPanel, TallerInactivo, Vencimiento,
 } from '../../../services/motiq.service';
 import { MarcaService } from '../../../services/marca.service';
 import { ToastService } from '../../../services/toast.service';
@@ -36,13 +36,17 @@ export class MotiqPanelPage implements OnInit {
   // Arranca en "Mi espacio" y no en el resumen: los dos administran todo el SaaS, así
   // que los datos son los mismos para ambos — lo primero que cada uno tiene que ver al
   // entrar es lo SUYO, no el total compartido.
-  vista: 'espacio' | 'resumen' | 'talleres' | 'vencen' | 'inactivos' | 'contactos' | 'cuentas' | 'planes' | 'avisos' = 'espacio';
+  vista: 'espacio' | 'resumen' | 'talleres' | 'vencen' | 'inactivos' | 'contactos' | 'cuentas' | 'planes' | 'avisos' | 'reportes' = 'espacio';
   espacio: MiEspacio | null = null;
   contactos: ContactoDemo[] = [];
   vencimientos: Vencimiento[] = [];
   inactivos: TallerInactivo[] = [];
   cuentas: CuentaPlataforma[] = [];
   readonly ESTADOS_CONTACTO = ['nuevo', 'contactado', 'cerrado', 'descartado'];
+
+  // --- Reportes de falla ---
+  reportes: ReporteFalla[] = [];
+  readonly ESTADOS_REPORTE = ['nuevo', 'revisando', 'resuelto', 'descartado'];
 
   // --- Planes: precio y límites, editables desde acá ---
   planes: PlanConfig[] = [];
@@ -181,11 +185,16 @@ export class MotiqPanelPage implements OnInit {
     this.motiq.cuentas().subscribe({ next: (r) => (this.cuentas = r.data), error: () => {} });
     this.motiq.planes().subscribe({ next: (r) => (this.planes = r.data), error: () => {} });
     this.cargarAvisos();
+    this.cargarReportes();
     this.cargarEspacio();
   }
 
   cargarAvisos() {
     this.motiq.avisos().subscribe({ next: (r) => (this.avisos = r.data), error: () => {} });
+  }
+
+  cargarReportes() {
+    this.motiq.reportes().subscribe({ next: (r) => (this.reportes = r.data), error: () => {} });
   }
 
   cargarEspacio() {
@@ -274,6 +283,7 @@ export class MotiqPanelPage implements OnInit {
       creo_aviso: 'publicó un aviso',
       edito_aviso: 'editó un aviso',
       atendio_contacto: 'atendió un contacto',
+      atendio_reporte: 'atendió un reporte de falla',
     };
     const base = textos[l.accion] || l.accion;
     return l.detalle ? `${base} — ${l.detalle}` : base;
@@ -286,6 +296,7 @@ export class MotiqPanelPage implements OnInit {
       creo_cuenta: 'person-add-outline', edito_cuenta: 'person-outline',
       edito_plan: 'pricetag-outline', creo_aviso: 'megaphone-outline',
       edito_aviso: 'megaphone-outline', atendio_contacto: 'mail-open-outline',
+      atendio_reporte: 'bug-outline',
     }[accion] || 'ellipse-outline';
   }
 
@@ -777,6 +788,44 @@ export class MotiqPanelPage implements OnInit {
 
   colorContacto(e: string): string {
     return { nuevo: 'warning', contactado: 'primary', cerrado: 'success', descartado: 'medium' }[e] || 'medium';
+  }
+
+  // --- Reportes de falla ---
+
+  rotuloEstadoReporte(e: string): string {
+    return { nuevo: 'Sin ver', revisando: 'Revisando', resuelto: 'Resuelto', descartado: 'Descartado' }[e] || e;
+  }
+
+  colorEstadoReporte(e: string): string {
+    return { nuevo: 'warning', revisando: 'primary', resuelto: 'success', descartado: 'medium' }[e] || 'medium';
+  }
+
+  async atenderReporte(r: ReporteFalla) {
+    const a = await this.alerta.create({
+      header: r.tenant_nombre || 'Reporte',
+      subHeader: r.usuario_nombre || undefined,
+      message: r.descripcion,
+      inputs: [
+        ...this.ESTADOS_REPORTE.map((e) => ({
+          type: 'radio' as const, label: this.rotuloEstadoReporte(e), value: e, checked: r.estado === e,
+        })),
+      ],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Guardar',
+          handler: (estado: string) => {
+            if (!estado || estado === r.estado) return true;
+            this.motiq.actualizarReporte(r.id, estado, r.nota_interna || '').subscribe({
+              next: () => { this.toast.success('Reporte actualizado'); this.cargar(); },
+              error: (e) => this.toast.error(e?.error?.error || 'No se pudo actualizar'),
+            });
+            return true;
+          },
+        },
+      ],
+    });
+    await a.present();
   }
 
   // El servidor siempre entrega ORDER BY created_at DESC (más nuevo primero), así que

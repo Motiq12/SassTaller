@@ -708,6 +708,32 @@ async function ensureSchema() {
     // migración 011: instalaciones que ya tenían avisos_plataforma sin vence_el.
     await addColumnIfMissing('avisos_plataforma', 'vence_el', 'DATETIME NULL');
 
+    // Fallas que reporta el PERSONAL de un taller hacia Motiq (migración 012) — al
+    // revés de avisos_plataforma, que va de Motiq hacia los talleres. tenant_id NO
+    // lleva clave foránea, mismo motivo que motiq_bitacora: si el taller se da de
+    // baja, el reporte tiene que sobrevivir, y por eso se guarda también una foto del
+    // nombre y el slug (tenant_nombre/tenant_slug) en vez de depender de un JOIN que
+    // dejaría de encontrar la fila.
+    await tryStep('tabla reportes_falla', () => pool.query(
+      `CREATE TABLE IF NOT EXISTS reportes_falla (
+         id             INT AUTO_INCREMENT PRIMARY KEY,
+         tenant_id      INT NULL,
+         tenant_nombre  VARCHAR(150) NULL,
+         tenant_slug    VARCHAR(120) NULL,
+         usuario_id     INT NULL,
+         usuario_nombre VARCHAR(120) NULL,
+         usuario_email  VARCHAR(150) NULL,
+         usuario_rol    VARCHAR(20) NULL,
+         descripcion    TEXT NOT NULL,
+         pantalla       VARCHAR(200) NULL,
+         estado         ENUM('nuevo','revisando','resuelto','descartado') NOT NULL DEFAULT 'nuevo',
+         nota_interna   VARCHAR(500) NULL,
+         created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+         updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+         INDEX idx_reportes_estado (estado, created_at)
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+    ));
+
     // Quien pide una demo desde la landing. Tampoco lleva tenant_id: todavía no es
     // un taller del sistema, es alguien de afuera preguntando.
     await tryStep('tabla contactos_demo', () => pool.query(

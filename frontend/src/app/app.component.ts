@@ -1,10 +1,12 @@
 import { Component, NgZone, OnDestroy, OnInit } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
+import { AlertController, ToastController } from '@ionic/angular';
 import { filter, take } from 'rxjs/operators';
 import { AccesibilidadService } from './services/accesibilidad.service';
 import { MarcaService } from './services/marca.service';
 import { AuthService } from './services/auth.service';
 import { AvisoActivo, AvisoSistemaService } from './services/aviso-sistema.service';
+import { ReporteFallaService } from './services/reporte-falla.service';
 import { iniciarWebVitals } from './shared/web-vitals.util';
 
 declare global {
@@ -32,6 +34,10 @@ export class AppComponent implements OnInit, OnDestroy {
   private timerAviso: ReturnType<typeof setInterval> | null = null;
   private readonly AVISO_CADA_MS = 3 * 60 * 1000;
 
+  // El botón de "reportar un problema" es la otra mitad de la pareja con el aviso:
+  // mismo público (staff), sentido contrario (taller → Motiq en vez de Motiq → taller).
+  esStaff = false;
+
   // Inyectar AccesibilidadService aplica la preferencia de tamaño de texto al arrancar.
   constructor(
     private zone: NgZone,
@@ -40,6 +46,9 @@ export class AppComponent implements OnInit, OnDestroy {
     private marca: MarcaService,
     private auth: AuthService,
     private avisoSistema: AvisoSistemaService,
+    private reporteFalla: ReporteFallaService,
+    private alerta: AlertController,
+    private toastCtrl: ToastController,
   ) {
     window.addEventListener('online', () => this.zone.run(() => (this.enLinea = true)));
     window.addEventListener('offline', () => this.zone.run(() => (this.enLinea = false)));
@@ -69,11 +78,13 @@ export class AppComponent implements OnInit, OnDestroy {
       // del portal ni de nadie sin sesión: sin sesión de staff no hay ni token válido
       // para pedirlo (el endpoint usa el mismo middleware `auth` de siempre).
       if (u && this.auth.tieneRol('admin', 'recepcion', 'tecnico')) {
+        this.esStaff = true;
         this.consultarAviso();
         if (!this.timerAviso) {
           this.timerAviso = setInterval(() => this.consultarAviso(), this.AVISO_CADA_MS);
         }
       } else {
+        this.esStaff = false;
         this.avisoVisible = null;
         if (this.timerAviso) { clearInterval(this.timerAviso); this.timerAviso = null; }
       }
@@ -118,5 +129,38 @@ export class AppComponent implements OnInit, OnDestroy {
   iconoAviso(): string {
     const iconos: Record<string, string> = { mantenimiento: 'construct-outline', urgente: 'warning-outline' };
     return iconos[this.avisoVisible?.tipo || ''] || 'megaphone-outline';
+  }
+
+  // "Algo no funciona" hacia Motiq. Global (no en cada shell de rol) por la misma
+  // razón que el aviso: vale desde cualquier pantalla del personal sin tener que
+  // engancharlo en admin-shell, recepcion-tabs, mecanico-tabs y tabs por separado.
+  async reportarProblema() {
+    const a = await this.alerta.create({
+      header: 'Reportar un problema',
+      message: 'Contanos qué pasó. Le llega directo a Motiq con tu taller y tu nombre — no hace falta escribir por otro lado.',
+      inputs: [
+        {
+          name: 'descripcion', type: 'textarea',
+          placeholder: 'Ej: Al guardar una orden no aparece en la lista.',
+          attributes: { maxlength: 2000 },
+        },
+      ],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Enviar',
+          handler: (d) => {
+            const descripcion = String(d.descripcion || '').trim();
+            if (!descripcion) return false;
+            this.reporteFalla.enviar(descripcion, this.router.url).subscribe({
+              next: async (r) => (await this.toastCtrl.create({ message: r.message, duration: 3500, color: 'success', position: 'bottom' })).present(),
+              error: async (e) => (await this.toastCtrl.create({ message: e?.error?.error || 'No se pudo enviar', duration: 3500, color: 'danger', position: 'bottom' })).present(),
+            });
+            return true;
+          },
+        },
+      ],
+    });
+    await a.present();
   }
 }

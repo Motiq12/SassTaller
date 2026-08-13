@@ -34,7 +34,7 @@ CREATE TABLE `avisos_plataforma` (
   `vence_el` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_avisos_activo` (`activo`,`created_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -465,7 +465,7 @@ CREATE TABLE `motiq_bitacora` (
   PRIMARY KEY (`id`),
   KEY `idx_bitacora_admin` (`admin_id`,`created_at`),
   KEY `idx_bitacora_fecha` (`created_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=84 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=88 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -917,7 +917,7 @@ CREATE TABLE `plataforma_admins` (
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_plataforma_email` (`email`)
-) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -998,6 +998,42 @@ LOCK TABLES `recompensas_canjeadas` WRITE;
 UNLOCK TABLES;
 
 --
+-- Table structure for table `reportes_falla`
+--
+
+DROP TABLE IF EXISTS `reportes_falla`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `reportes_falla` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `tenant_id` int DEFAULT NULL,
+  `tenant_nombre` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `tenant_slug` varchar(120) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `usuario_id` int DEFAULT NULL,
+  `usuario_nombre` varchar(120) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `usuario_email` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `usuario_rol` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `descripcion` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `pantalla` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `estado` enum('nuevo','revisando','resuelto','descartado') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'nuevo',
+  `nota_interna` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_reportes_estado` (`estado`,`created_at`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `reportes_falla`
+--
+
+LOCK TABLES `reportes_falla` WRITE;
+/*!40000 ALTER TABLE `reportes_falla` DISABLE KEYS */;
+/*!40000 ALTER TABLE `reportes_falla` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `servicios`
 --
 
@@ -1016,7 +1052,7 @@ CREATE TABLE `servicios` (
   UNIQUE KEY `uq_servicios_tenant` (`tenant_id`,`nombre`),
   KEY `idx_servicios_tenant` (`tenant_id`),
   CONSTRAINT `fk_servicios_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1153 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1154 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1128,7 +1164,7 @@ CREATE TABLE `tenants` (
 
 LOCK TABLES `tenants` WRITE;
 /*!40000 ALTER TABLE `tenants` DISABLE KEYS */;
-INSERT INTO `tenants` (`id`, `nombre`, `slug`, `plan`, `estado`, `created_at`, `updated_at`, `motivo_estado`, `trial_hasta`) VALUES (1,'MS Motors','ms-motors','pro','activo','2026-08-12 00:29:01','2026-08-12 00:29:01',NULL,NULL),(2,'Moto Zone','moto-zone','trial','activo','2026-08-12 01:46:08','2026-08-13 04:49:17',NULL,NULL);
+INSERT INTO `tenants` (`id`, `nombre`, `slug`, `plan`, `estado`, `created_at`, `updated_at`, `motivo_estado`, `trial_hasta`) VALUES (1,'MS Motors','ms-motors','pro','activo','2026-08-12 00:29:01','2026-08-12 00:29:01',NULL,NULL),(2,'Moto Zone','moto-zone','trial','activo','2026-08-12 01:46:08','2026-08-13 05:08:22',NULL,NULL);
 /*!40000 ALTER TABLE `tenants` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1306,4 +1342,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-08-12 22:49:41
+-- Dump completed on 2026-08-12 23:09:10

@@ -21,5 +21,13 @@
     Sin conexión — mostrando datos guardados
   </div>
 
+  <!-- "Algo no funciona" hacia Motiq — la otra mitad de la pareja con el aviso de
+       arriba. Abajo a la izquierda y no a la derecha (donde ya viven los FAB de
+       "nueva orden"/"nueva cita" de otras pantallas) para no superponerse. -->
+  <button type="button" class="reportar-falla" *ngIf="esStaff" (click)="reportarProblema()"
+          aria-label="Reportar un problema" title="Reportar un problema">
+    <ion-icon name="bug-outline"></ion-icon>
+  </button>
+
   <ion-router-outlet></ion-router-outlet>
 </ion-app>
