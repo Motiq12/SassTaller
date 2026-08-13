@@ -34,7 +34,7 @@ CREATE TABLE `avisos_plataforma` (
   `vence_el` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_avisos_activo` (`activo`,`created_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -199,7 +199,7 @@ CREATE TABLE `configuracion` (
 
 LOCK TABLES `configuracion` WRITE;
 /*!40000 ALTER TABLE `configuracion` DISABLE KEYS */;
-INSERT INTO `configuracion` (`id`, `nombre_taller`, `telefono`, `email`, `direccion`, `logo`, `max_citas_hora`, `dias_anticipacion`, `duracion_cita_min`, `horarios`, `notif_estado`, `notif_recordatorio`, `notif_cotizacion`, `notif_email_entrega`, `updated_at`, `cancelacion_horas_min`, `visitas_para_cortesia`, `zona_horaria_offset`, `garantia_dias`, `metodos_pago`, `tenant_id`, `tipos_vehiculo`, `color_primario`, `arranque_oculto`) VALUES (1,'MS Motos','','','',NULL,2,30,90,'[{\"dia\": 0, \"abre\": \"08:00\", \"activo\": 0, \"cierra\": \"13:00\"}, {\"dia\": 1, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 2, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 3, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 4, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 5, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 6, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"13:00\"}]',1,1,1,0,'2026-08-12 06:09:57',2,7,-6,30,NULL,1,'[\"moto\"]','#e11d48',0);
+INSERT INTO `configuracion` (`id`, `nombre_taller`, `telefono`, `email`, `direccion`, `logo`, `max_citas_hora`, `dias_anticipacion`, `duracion_cita_min`, `horarios`, `notif_estado`, `notif_recordatorio`, `notif_cotizacion`, `notif_email_entrega`, `updated_at`, `cancelacion_horas_min`, `visitas_para_cortesia`, `zona_horaria_offset`, `garantia_dias`, `metodos_pago`, `tenant_id`, `tipos_vehiculo`, `color_primario`, `arranque_oculto`) VALUES (1,'MS Motos',NULL,NULL,NULL,NULL,2,30,90,'[{\"dia\": 1, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 2, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 3, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 4, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 5, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 6, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"13:00\"}, {\"dia\": 0, \"abre\": \"08:00\", \"activo\": 0, \"cierra\": \"13:00\"}]',1,1,1,0,'2026-08-13 06:06:55',2,7,-6,30,'[{\"valor\": \"efectivo\", \"etiqueta\": \"Efectivo\"}, {\"valor\": \"sinpe\", \"etiqueta\": \"SINPE Móvil\"}, {\"valor\": \"tarjeta\", \"etiqueta\": \"Tarjeta\"}, {\"valor\": \"transferencia\", \"etiqueta\": \"Transferencia\"}]',1,'[\"moto\"]','#e11d48',0),(1,'Moto Zone',NULL,NULL,NULL,NULL,2,30,90,'[{\"dia\": 1, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 2, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 3, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 4, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 5, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"17:00\"}, {\"dia\": 6, \"abre\": \"08:00\", \"activo\": 1, \"cierra\": \"13:00\"}, {\"dia\": 0, \"abre\": \"08:00\", \"activo\": 0, \"cierra\": \"13:00\"}]',1,1,1,0,'2026-08-13 06:17:13',2,7,-6,30,'[{\"valor\": \"efectivo\", \"etiqueta\": \"Efectivo\"}, {\"valor\": \"sinpe\", \"etiqueta\": \"SINPE Móvil\"}, {\"valor\": \"tarjeta\", \"etiqueta\": \"Tarjeta\"}, {\"valor\": \"transferencia\", \"etiqueta\": \"Transferencia\"}]',2,'[\"moto\"]',NULL,0);
 /*!40000 ALTER TABLE `configuracion` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -465,7 +465,7 @@ CREATE TABLE `motiq_bitacora` (
   PRIMARY KEY (`id`),
   KEY `idx_bitacora_admin` (`admin_id`,`created_at`),
   KEY `idx_bitacora_fecha` (`created_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=88 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=92 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -917,7 +917,7 @@ CREATE TABLE `plataforma_admins` (
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_plataforma_email` (`email`)
-) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1052,7 +1052,7 @@ CREATE TABLE `servicios` (
   UNIQUE KEY `uq_servicios_tenant` (`tenant_id`,`nombre`),
   KEY `idx_servicios_tenant` (`tenant_id`),
   CONSTRAINT `fk_servicios_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1154 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1155 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1164,7 +1164,7 @@ CREATE TABLE `tenants` (
 
 LOCK TABLES `tenants` WRITE;
 /*!40000 ALTER TABLE `tenants` DISABLE KEYS */;
-INSERT INTO `tenants` (`id`, `nombre`, `slug`, `plan`, `estado`, `created_at`, `updated_at`, `motivo_estado`, `trial_hasta`) VALUES (1,'MS Motors','ms-motors','pro','activo','2026-08-12 00:29:01','2026-08-12 00:29:01',NULL,NULL),(2,'Moto Zone','moto-zone','trial','activo','2026-08-12 01:46:08','2026-08-13 05:08:22',NULL,NULL);
+INSERT INTO `tenants` (`id`, `nombre`, `slug`, `plan`, `estado`, `created_at`, `updated_at`, `motivo_estado`, `trial_hasta`) VALUES (1,'MS Motors','ms-motors','pro','activo','2026-08-12 00:29:01','2026-08-13 06:05:46',NULL,NULL),(2,'Moto Zone','moto-zone','trial','activo','2026-08-12 01:46:08','2026-08-13 06:02:44',NULL,NULL);
 /*!40000 ALTER TABLE `tenants` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1342,4 +1342,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-08-12 23:09:10
+-- Dump completed on 2026-08-13  0:18:07
