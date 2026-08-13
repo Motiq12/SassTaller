@@ -22,8 +22,10 @@
   </div>
 
   <!-- "Algo no funciona" hacia Motiq — la otra mitad de la pareja con el aviso de
-       arriba. Abajo a la izquierda y no a la derecha (donde ya viven los FAB de
-       "nueva orden"/"nueva cita" de otras pantallas) para no superponerse. -->
+       arriba. Abajo a la derecha, por encima de donde vive un FAB normal (ver
+       .reportar-falla en global.scss): a la izquierda tapaba el pie de sesión de la
+       barra lateral fija de admin-shell y compañía, y a la misma altura que un FAB
+       existente se hubiera superpuesto con "nueva orden"/"nueva cita". -->
   <button type="button" class="reportar-falla" *ngIf="esStaff" (click)="reportarProblema()"
           aria-label="Reportar un problema" title="Reportar un problema">
     <ion-icon name="bug-outline"></ion-icon>

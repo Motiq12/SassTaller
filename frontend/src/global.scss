@@ -1290,11 +1290,13 @@ ion-app.con-aviso-sistema ion-router-outlet {
   top: #{$aviso-alto};
 }
 
-/* Botón global "reportar un problema": discreto hasta que hace falta, para no
-   competir con los FAB de acción principal (nueva orden, nueva cita) que ya viven
-   abajo a la derecha en varias pantallas — por eso este va a la izquierda. */
+/* Botón global "reportar un problema": discreto hasta que hace falta.
+   Abajo a la izquierda quedaba tapado por la barra lateral fija del panel del
+   taller (admin-shell y compañía ya ocupan esa esquina con el pie de sesión), así
+   que va a la derecha — y más arriba de donde vive un FAB normal (56px + margen),
+   para apilarse arriba del botón de "nueva orden"/"nueva cita" en vez de pisarlo. */
 .reportar-falla {
-  position: fixed; left: 14px; bottom: 14px; z-index: 9998;
+  position: fixed; right: 16px; bottom: 84px; z-index: 9998;
   width: 42px; height: 42px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   background: rgba(31, 41, 55, 0.82); color: #fff;
