@@ -52,6 +52,10 @@ export class MotiqPanelPage implements OnInit {
   busqueda = '';
   private escribiendo$ = new Subject<string>();
 
+  // El menú es un panel fijo en escritorio y un cajón que se desliza en teléfono —
+  // en ese ancho no hay lugar para dejarlo siempre abierto sin tapar el contenido.
+  menuAbierto = false;
+
   // Espejo de PLANES en backend/src/utils/limites.js, que es la única fuente de
   // verdad. Si acá aparece uno que allá no existe, el backend responde 400; y si
   // falta uno, desde el panel no se puede mover un taller a ese plan — que es lo que
@@ -67,6 +71,20 @@ export class MotiqPanelPage implements OnInit {
   ) {}
 
   get admin() { return this.motiq.admin; }
+
+  get iniciales(): string {
+    const p = (this.admin?.nombre || '').trim().split(/\s+/);
+    return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || 'M';
+  }
+
+  // Cambia de sección y cierra el cajón en teléfono; en escritorio no hace nada
+  // porque ahí el menú no se cierra solo.
+  irA(v: typeof this.vista) {
+    this.vista = v;
+    this.menuAbierto = false;
+  }
+
+  alternarMenu() { this.menuAbierto = !this.menuAbierto; }
 
   ngOnInit() {
     this.marca.limpiar();   // este panel es de Motiq, no de ningún taller

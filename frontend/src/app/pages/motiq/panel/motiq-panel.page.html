@@ -1,22 +1,75 @@
-<ion-header class="ion-no-border">
-  <ion-toolbar class="barra-motiq">
-    <ion-title>
-      <img [src]="producto.logo" [alt]="producto.nombre" class="iso" />
-      <span>{{ producto.nombre }}</span>
-    </ion-title>
-    <ion-buttons slot="end">
-      <span class="quien" *ngIf="admin">{{ admin.nombre }}</span>
-      <ion-button (click)="salir()" aria-label="Cerrar sesión">
-        <ion-icon slot="icon-only" name="log-out-outline"></ion-icon>
-      </ion-button>
-    </ion-buttons>
-  </ion-toolbar>
-</ion-header>
-
 <ion-content class="fondo-motiq">
   <ion-refresher slot="fixed" (ionRefresh)="cargar($event)">
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
+
+  <!-- Menú: panel fijo en escritorio, cajón deslizante en teléfono. Va fuera del
+       flujo normal (position: fixed) para que no se mueva con el scroll del
+       contenido — si estuviera dentro, desplazarse por "Mi espacio" se llevaría
+       el menú puesto. -->
+  <aside class="motiq-sidebar" [class.abierto]="menuAbierto">
+    <div class="sb-logo">
+      <img [src]="producto.logo" [alt]="producto.nombre" />
+      <div>
+        <strong>{{ producto.nombre }}</strong>
+        <span>Panel de la plataforma</span>
+      </div>
+    </div>
+
+    <nav class="sb-nav">
+      <div class="sb-section">Principal</div>
+      <button type="button" class="nav-item" [class.on]="vista === 'espacio'" (click)="irA('espacio')">
+        <ion-icon name="home-outline"></ion-icon> Mi espacio
+        <span class="nav-badge" *ngIf="pendientesAbiertos.length">{{ pendientesAbiertos.length }}</span>
+      </button>
+      <button type="button" class="nav-item" [class.on]="vista === 'resumen'" (click)="irA('resumen')">
+        <ion-icon name="grid-outline"></ion-icon> Resumen
+      </button>
+
+      <div class="sb-section">Talleres</div>
+      <button type="button" class="nav-item" [class.on]="vista === 'talleres'" (click)="irA('talleres')">
+        <ion-icon name="business-outline"></ion-icon> Talleres
+      </button>
+      <button type="button" class="nav-item" [class.on]="vista === 'vencen'" (click)="irA('vencen')">
+        <ion-icon name="alarm-outline"></ion-icon> Vencen
+        <span class="nav-badge urgente" *ngIf="resumen?.alertas?.vencen_semana">{{ resumen?.alertas?.vencen_semana }}</span>
+      </button>
+      <button type="button" class="nav-item" [class.on]="vista === 'inactivos'" (click)="irA('inactivos')">
+        <ion-icon name="moon-outline"></ion-icon> Inactivos
+      </button>
+
+      <div class="sb-section">Ventas</div>
+      <button type="button" class="nav-item" [class.on]="vista === 'contactos'" (click)="irA('contactos')">
+        <ion-icon name="mail-unread-outline"></ion-icon> Contactos
+        <span class="nav-badge" *ngIf="resumen?.contactos?.sin_atender">{{ resumen?.contactos?.sin_atender }}</span>
+      </button>
+
+      <div class="sb-section">Equipo</div>
+      <button type="button" class="nav-item" [class.on]="vista === 'cuentas'" (click)="irA('cuentas')">
+        <ion-icon name="people-outline"></ion-icon> Equipo
+      </button>
+    </nav>
+
+    <div class="sb-user">
+      <div class="sb-av">{{ iniciales }}</div>
+      <div class="sb-info" *ngIf="admin"><strong>{{ admin.nombre }}</strong><span>Administrador de Motiq</span></div>
+      <button type="button" class="sb-logout" (click)="salir()" aria-label="Cerrar sesión">
+        <ion-icon name="log-out-outline"></ion-icon>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Solo en teléfono: toca afuera del cajón para cerrarlo. -->
+  <div class="sb-backdrop" *ngIf="menuAbierto" (click)="menuAbierto = false"></div>
+
+  <!-- Solo en teléfono: ahí no hay lugar para un menú siempre visible. -->
+  <div class="topbar-movil">
+    <button type="button" class="btn-menu" (click)="alternarMenu()" aria-label="Abrir menú">
+      <ion-icon name="menu-outline"></ion-icon>
+    </button>
+    <img [src]="producto.logo" [alt]="producto.nombre" />
+    <span>{{ producto.nombre }}</span>
+  </div>
 
   <div class="contenido">
     <!-- Lo que hay que hacer HOY. Va arriba de todo y solo aparece cuando hay algo:
@@ -24,51 +77,23 @@
     <div class="pendientes" *ngIf="resumen">
       <button type="button" class="pendiente urgente"
               *ngIf="resumen.alertas?.vencen_semana"
-              (click)="vista = 'vencen'">
+              (click)="irA('vencen')">
         <ion-icon name="alarm-outline"></ion-icon>
         <span><strong>{{ resumen.alertas.vencen_semana }}</strong> vencen esta semana</span>
       </button>
       <button type="button" class="pendiente"
               *ngIf="resumen.contactos?.sin_atender"
-              (click)="vista = 'contactos'">
+              (click)="irA('contactos')">
         <ion-icon name="mail-unread-outline"></ion-icon>
         <span><strong>{{ resumen.contactos.sin_atender }}</strong> sin responder</span>
       </button>
       <button type="button" class="pendiente"
               *ngIf="resumen.alertas?.inactivos"
-              (click)="vista = 'inactivos'">
+              (click)="irA('inactivos')">
         <ion-icon name="moon-outline"></ion-icon>
         <span><strong>{{ resumen.alertas.inactivos }}</strong> sin actividad</span>
       </button>
     </div>
-
-    <!-- Qué sección se está mirando -->
-    <ion-segment class="vistas" [(ngModel)]="vista" scrollable>
-      <ion-segment-button value="espacio">
-        <ion-label>
-          Mi espacio
-          <ion-badge color="primary" *ngIf="pendientesAbiertos.length">{{ pendientesAbiertos.length }}</ion-badge>
-        </ion-label>
-      </ion-segment-button>
-      <ion-segment-button value="resumen"><ion-label>Resumen</ion-label></ion-segment-button>
-      <ion-segment-button value="talleres"><ion-label>Talleres</ion-label></ion-segment-button>
-      <ion-segment-button value="vencen">
-        <ion-label>
-          Vencen
-          <ion-badge color="warning" *ngIf="resumen?.alertas?.vencen_semana">{{ resumen?.alertas?.vencen_semana }}</ion-badge>
-        </ion-label>
-      </ion-segment-button>
-      <ion-segment-button value="inactivos"><ion-label>Inactivos</ion-label></ion-segment-button>
-      <ion-segment-button value="contactos">
-        <ion-label>
-          Contactos
-          <ion-badge color="warning" *ngIf="resumen?.contactos?.sin_atender">
-            {{ resumen?.contactos?.sin_atender }}
-          </ion-badge>
-        </ion-label>
-      </ion-segment-button>
-      <ion-segment-button value="cuentas"><ion-label>Equipo</ion-label></ion-segment-button>
-    </ion-segment>
 
     <!-- ===== Mi espacio =====
          Los datos del SaaS son compartidos: los dos ven todos los talleres. Lo de acá
