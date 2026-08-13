@@ -104,8 +104,11 @@ export class AdminService {
   getConfig(): Observable<{ data: any }> {
     return this.http.get<{ data: any }>(`${this.url}/configuracion`);
   }
-  updateConfig(payload: any): Observable<{ data: any; message: string }> {
-    return this.http.put<{ data: any; message: string }>(`${this.url}/configuracion`, payload);
+  // `aviso` viene presente cuando el plan no incluye marca propia y se mandó logo o
+  // color: el backend igual guarda el resto y lo dice acá, en vez de aplicar el
+  // cambio en silencio.
+  updateConfig(payload: any): Observable<{ data: any; message: string; aviso?: string | null }> {
+    return this.http.put<{ data: any; message: string; aviso?: string | null }>(`${this.url}/configuracion`, payload);
   }
   updateCuenta(payload: { nombre: string; email: string }): Observable<{ data: any; message: string }> {
     return this.http.put<{ data: any; message: string }>(`${this.url}/cuenta`, payload);

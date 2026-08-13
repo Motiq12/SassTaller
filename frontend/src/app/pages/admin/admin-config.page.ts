@@ -134,7 +134,14 @@ export class AdminConfigPage implements OnInit, OnDestroy {
         // Se reaplica ya: el color tiene que quedar fijado sin recargar la app.
         this.marcaSvc.get().subscribe();
         this.guardando = false;
-        this.aviso('Configuración guardada');
+        // Si el plan no incluye marca propia, el logo/color que se acaba de elegir NO
+        // se guardó (el backend los dejó fuera del UPDATE a propósito) — sin mostrar
+        // este aviso, el toast de éxito de abajo decía "Configuración guardada" igual,
+        // y quien lo probó no tenía forma de saber por qué su logo no se veía.
+        // Más tiempo en pantalla que el toast normal: es más largo y hay que leerlo,
+        // no solo notar que pasó algo.
+        if (r.aviso) this.aviso(r.aviso, 'warning', 4000);
+        else this.aviso('Configuración guardada');
       },
       error: (e) => { this.guardando = false; this.aviso(e.error?.error || 'No se pudo guardar', 'danger'); },
     });
@@ -161,8 +168,8 @@ export class AdminConfigPage implements OnInit, OnDestroy {
 
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
 
-  private async aviso(message: string, color = 'success') {
-    const t = await this.toast.create({ message, duration: 1800, color });
+  private async aviso(message: string, color = 'success', duration = 1800) {
+    const t = await this.toast.create({ message, duration, color });
     await t.present();
   }
   /** Aplica el color mientras se elige, para verlo antes de guardar. */
