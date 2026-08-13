@@ -4,6 +4,7 @@ import { Subject, interval } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { MensajeriaService } from '../../services/mensajeria.service';
+import { MarcaService } from '../../services/marca.service';
 
 @Component({
   standalone: false,
@@ -14,7 +15,7 @@ export class RecepcionTabsPage implements OnInit, OnDestroy {
   noLeidos = 0;
   private destroy$ = new Subject<void>();
 
-  constructor(private auth: AuthService, private router: Router, private msj: MensajeriaService) {}
+  constructor(private auth: AuthService, private router: Router, private msj: MensajeriaService, public marca: MarcaService) {}
 
   ngOnInit() {
     this.consultarNoLeidos();

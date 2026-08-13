@@ -3,7 +3,10 @@
     <ion-content class="admin-dark sidebar-content">
       <div class="sb-logo">
         <app-marca-logo [tamano]="44"></app-marca-logo>
-        <span>Mecánico</span>
+        <div class="sb-logo-txt">
+          <strong>{{ (marca.marca$ | async)?.nombre_taller }}</strong>
+          <span>Mecánico</span>
+        </div>
       </div>
 
       <ion-menu-toggle auto-hide="false">

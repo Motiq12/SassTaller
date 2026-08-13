@@ -4,6 +4,7 @@ import { Subject, interval } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { MensajeriaService } from '../../services/mensajeria.service';
+import { MarcaService } from '../../services/marca.service';
 
 @Component({
   standalone: false,
@@ -14,7 +15,7 @@ export class AdminShellPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   noLeidos = 0;
 
-  constructor(private auth: AuthService, private msj: MensajeriaService, private router: Router) {}
+  constructor(private auth: AuthService, private msj: MensajeriaService, private router: Router, public marca: MarcaService) {}
 
   get nombre(): string { return this.auth.getUsuario()?.nombre || 'Administrador'; }
   get rolLabel(): string { return 'Administrador'; }
