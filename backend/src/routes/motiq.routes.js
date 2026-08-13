@@ -719,11 +719,37 @@ router.patch('/admins/:id', async (req, res) => {
 // scopeada por tenant_id, ver mensajeria.routes.js); esto lo escribe Motiq y lo lee
 // cualquier taller. La lectura vive en routes/avisos.routes.js, del lado del staff.
 
+// El navegador manda la hora de vencimiento ya convertida a UTC (new Date(...).
+// toISOString()), así que acá alcanza con volver a parsearla — sin este paso el
+// front tendría que mandar un string con una zona horaria que el server tiene que
+// adivinar. `undefined` = no la mandó (dejar como está); `null`/'' = vaciarla.
+//
+// Se devuelve como STRING ya formateado en UTC ("YYYY-MM-DD HH:MM:SS") y no como
+// objeto Date: mysql2 serializa un Date según la zona horaria del PROCESO de Node
+// (no la de MySQL), así que en una máquina que no corre en UTC —como cualquier
+// entorno de desarrollo— el valor guardado queda corrido varias horas. Un string ya
+// formateado no sufre esa segunda conversión.
+function fechaOVacio(v) {
+  if (v === null || v === '') return { ok: true, valor: null };
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return { ok: false, valor: null };
+  return { ok: true, valor: d.toISOString().slice(0, 19).replace('T', ' ') };
+}
+
 // GET /api/motiq/avisos — el historial completo, para administrarlos.
+//
+// vence_el se pide con DATE_FORMAT(...'Z') y no se deja como columna cruda: mysql2
+// devuelve un DATETIME como objeto Date interpretando el valor guardado en la zona
+// horaria LOCAL DEL PROCESO, y acá se guardó como UTC (ver fechaOVacio) — sin este
+// formateo explícito, el valor le llega al front corrido esa misma cantidad de horas
+// una SEGUNDA vez. Mismo motivo por el que estado-tenant.js pide trial_hasta con
+// DATE_FORMAT en vez de dejar que el driver lo convierta solo.
 router.get('/avisos', async (req, res) => {
   try {
     const [filas] = await pool.query(
-      `SELECT id, mensaje, tipo, activo, admin_email, created_at, updated_at
+      `SELECT id, mensaje, tipo, activo,
+              DATE_FORMAT(vence_el, '%Y-%m-%dT%H:%i:%s.000Z') AS vence_el,
+              admin_email, created_at, updated_at
          FROM avisos_plataforma ORDER BY created_at DESC LIMIT 100`
     );
     res.json({ data: filas });
@@ -739,9 +765,12 @@ router.post('/avisos', async (req, res) => {
     if (!mensaje) return res.status(400).json({ error: 'Falta el mensaje' });
     const tipo = TIPOS_AVISO.includes(req.body?.tipo) ? req.body.tipo : 'info';
 
+    const vence = fechaOVacio(req.body?.vence_el);
+    if (!vence.ok) return res.status(400).json({ error: 'La fecha de vencimiento no es válida' });
+
     const [r] = await pool.query(
-      `INSERT INTO avisos_plataforma (mensaje, tipo, admin_id, admin_email) VALUES (?, ?, ?, ?)`,
-      [mensaje.slice(0, 500), tipo, req.plataforma?.id || null, req.plataforma?.email || null]
+      `INSERT INTO avisos_plataforma (mensaje, tipo, vence_el, admin_id, admin_email) VALUES (?, ?, ?, ?, ?)`,
+      [mensaje.slice(0, 500), tipo, vence.valor, req.plataforma?.id || null, req.plataforma?.email || null]
     );
     anotar(req.plataforma, 'creo_aviso', { detalle: mensaje.slice(0, 100) });
     res.status(201).json({ data: { id: r.insertId }, message: 'Aviso publicado' });
@@ -750,7 +779,7 @@ router.post('/avisos', async (req, res) => {
   }
 });
 
-// PATCH /api/motiq/avisos/:id — editar el texto/tipo, o apagarlo/reactivarlo.
+// PATCH /api/motiq/avisos/:id — editar el texto/tipo/vencimiento, o apagarlo/reactivarlo.
 router.patch('/avisos/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -765,6 +794,11 @@ router.patch('/avisos/:id', async (req, res) => {
     if (req.body?.tipo !== undefined) {
       if (!TIPOS_AVISO.includes(req.body.tipo)) return res.status(400).json({ error: `Tipo inválido (${TIPOS_AVISO.join(', ')})` });
       sets.push('tipo = ?'); params.push(req.body.tipo);
+    }
+    if (req.body?.vence_el !== undefined) {
+      const vence = fechaOVacio(req.body.vence_el);
+      if (!vence.ok) return res.status(400).json({ error: 'La fecha de vencimiento no es válida' });
+      sets.push('vence_el = ?'); params.push(vence.valor);
     }
     if (req.body?.activo !== undefined) {
       sets.push('activo = ?'); params.push(req.body.activo ? 1 : 0);

@@ -122,7 +122,8 @@ export interface PlanConfig {
 // pantalla) — mantenimiento, una función nueva, lo que haga falta avisar.
 export interface AvisoPlataforma {
   id: number; mensaje: string; tipo: 'info' | 'mantenimiento' | 'urgente';
-  activo: number; admin_email: string | null; created_at: string; updated_at: string;
+  activo: number; vence_el: string | null;
+  admin_email: string | null; created_at: string; updated_at: string;
 }
 
 // Lo que manda la landing cuando alguien pide una demo.
@@ -322,11 +323,11 @@ export class MotiqService {
     return this.http.get<{ data: AvisoPlataforma[] }>(`${this.apiUrl}/motiq/avisos`);
   }
 
-  crearAviso(mensaje: string, tipo: string): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.apiUrl}/motiq/avisos`, { mensaje, tipo });
+  crearAviso(mensaje: string, tipo: string, vence_el: string | null = null): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/motiq/avisos`, { mensaje, tipo, vence_el });
   }
 
-  actualizarAviso(id: number, datos: { mensaje?: string; tipo?: string; activo?: boolean }): Observable<{ message: string }> {
+  actualizarAviso(id: number, datos: { mensaje?: string; tipo?: string; vence_el?: string | null; activo?: boolean }): Observable<{ message: string }> {
     return this.http.patch<{ message: string }>(`${this.apiUrl}/motiq/avisos/${id}`, datos);
   }
 

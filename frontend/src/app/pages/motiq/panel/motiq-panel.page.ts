@@ -60,7 +60,10 @@ export class MotiqPanelPage implements OnInit {
   // sin texto en las pruebas) — cambiarPlan() funciona porque ahí son solo radios,
   // sin mezclar tipos. El mismo patrón que ya usa "Planes" evita el problema de raíz.
   avisoEnEdicion: number | 'nuevo' | null = null;
-  formAviso: { mensaje: string; tipo: string } = { mensaje: '', tipo: 'info' };
+  // vence_el es el string crudo de un <input type="datetime-local"> ('' = no vence
+  // solo), en la hora LOCAL de quien lo está llenando — se convierte a UTC recién al
+  // guardar (ver guardarAviso).
+  formAviso: { mensaje: string; tipo: string; vence_el: string } = { mensaje: '', tipo: 'info', vence_el: '' };
 
   // Ficha del taller abierto (null = cerrada).
   ficha: FichaTaller | null = null;
@@ -376,12 +379,12 @@ export class MotiqPanelPage implements OnInit {
 
   nuevoAviso() {
     this.avisoEnEdicion = 'nuevo';
-    this.formAviso = { mensaje: '', tipo: 'info' };
+    this.formAviso = { mensaje: '', tipo: 'info', vence_el: '' };
   }
 
   editarAviso(av: AvisoPlataforma) {
     this.avisoEnEdicion = av.id;
-    this.formAviso = { mensaje: av.mensaje, tipo: av.tipo };
+    this.formAviso = { mensaje: av.mensaje, tipo: av.tipo, vence_el: this.aDatetimeLocal(av.vence_el) };
   }
 
   cancelarEdicionAviso() {
@@ -392,14 +395,19 @@ export class MotiqPanelPage implements OnInit {
     const mensaje = this.formAviso.mensaje.trim();
     if (!mensaje) { this.toast.error('Escribí el mensaje'); return; }
     const tipo = this.formAviso.tipo;
+    // El <input> entrega la hora LOCAL de quien lo llena, sin zona horaria (ej.
+    // "2026-08-17T02:00"). new Date(...) la interpreta como hora local del navegador
+    // y toISOString() la pasa a UTC — así el servidor no tiene que adivinar en qué
+    // huso horaria estaba parado quien publicó el aviso.
+    const vence_el = this.formAviso.vence_el ? new Date(this.formAviso.vence_el).toISOString() : null;
 
     if (this.avisoEnEdicion === 'nuevo') {
-      this.motiq.crearAviso(mensaje, tipo).subscribe({
+      this.motiq.crearAviso(mensaje, tipo, vence_el).subscribe({
         next: (r) => { this.toast.success(r.message); this.avisoEnEdicion = null; this.cargarAvisos(); },
         error: (e) => this.toast.error(e?.error?.error || 'No se pudo publicar'),
       });
     } else if (typeof this.avisoEnEdicion === 'number') {
-      this.motiq.actualizarAviso(this.avisoEnEdicion, { mensaje, tipo }).subscribe({
+      this.motiq.actualizarAviso(this.avisoEnEdicion, { mensaje, tipo, vence_el }).subscribe({
         next: (r) => { this.toast.success(r.message); this.avisoEnEdicion = null; this.cargarAvisos(); },
         error: (e) => this.toast.error(e?.error?.error || 'No se pudo guardar'),
       });
@@ -411,6 +419,24 @@ export class MotiqPanelPage implements OnInit {
       next: (r) => { this.toast.success(r.message); this.cargarAvisos(); },
       error: (e) => this.toast.error(e?.error?.error || 'No se pudo cambiar'),
     });
+  }
+
+  // El valor que trae un aviso ya guardado (UTC, formato ISO) al formato que espera
+  // <input type="datetime-local"> ("YYYY-MM-DDTHH:mm", en hora LOCAL del navegador).
+  private aDatetimeLocal(iso: string | null): string {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  // Estado real de un aviso: además de "apagado" (lo apagaron a mano) hace falta
+  // distinguir "vencido" (le llegó la hora sola) de "activo" — los tres se ven
+  // distinto en la lista aunque solo el primero se guarde tal cual en la base.
+  estadoAviso(av: AvisoPlataforma): { texto: string; color: string } {
+    if (!av.activo) return { texto: 'apagado', color: 'medium' };
+    if (av.vence_el && new Date(av.vence_el).getTime() <= Date.now()) return { texto: 'vencido', color: 'medium' };
+    return { texto: 'activo', color: 'success' };
   }
 
   // --- Perfiles: el propio y el de un compañero, sin distinción ---

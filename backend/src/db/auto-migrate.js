@@ -697,6 +697,7 @@ async function ensureSchema() {
          mensaje     VARCHAR(500) NOT NULL,
          tipo        ENUM('info','mantenimiento','urgente') NOT NULL DEFAULT 'info',
          activo      TINYINT(1) NOT NULL DEFAULT 1,
+         vence_el    DATETIME NULL,
          admin_id    INT NULL,
          admin_email VARCHAR(150) NULL,
          created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -704,6 +705,8 @@ async function ensureSchema() {
          INDEX idx_avisos_activo (activo, created_at)
        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
     ));
+    // migración 011: instalaciones que ya tenían avisos_plataforma sin vence_el.
+    await addColumnIfMissing('avisos_plataforma', 'vence_el', 'DATETIME NULL');
 
     // Quien pide una demo desde la landing. Tampoco lleva tenant_id: todavía no es
     // un taller del sistema, es alguien de afuera preguntando.

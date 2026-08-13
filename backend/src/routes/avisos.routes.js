@@ -9,11 +9,16 @@ const auth = require('../middleware/auth');
 
 // GET /api/avisos/activo — el aviso vigente más reciente, para la franja que se ve
 // arriba de la pantalla en todo el lado del personal. `null` si no hay ninguno.
+// "Vigente" = activo Y (sin vencimiento O todavía no venció) — UTC_TIMESTAMP() y no
+// NOW(): así la comparación no depende de en qué zona horaria quede configurada la
+// sesión de MySQL, siempre que el valor guardado también esté en UTC (ver
+// motiq.routes.js, fechaOVacio).
 router.get('/activo', auth, async (req, res) => {
   try {
     const [[fila]] = await pool.query(
       `SELECT id, mensaje, tipo, created_at FROM avisos_plataforma
-        WHERE activo = 1 ORDER BY created_at DESC LIMIT 1`
+        WHERE activo = 1 AND (vence_el IS NULL OR vence_el > UTC_TIMESTAMP())
+        ORDER BY created_at DESC LIMIT 1`
     );
     res.json({ data: fila || null });
   } catch (err) {

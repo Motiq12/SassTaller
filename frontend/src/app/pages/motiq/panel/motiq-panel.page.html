@@ -456,6 +456,10 @@
                           placeholder="Ej: El domingo de 2am a 4am va a haber mantenimiento programado.">
             </ion-textarea>
           </ion-item>
+          <ion-item lines="none">
+            <ion-label position="stacked">Vence el (vacío = no vence solo, hay que apagarlo a mano)</ion-label>
+            <ion-input type="datetime-local" [(ngModel)]="formAviso.vence_el" name="vence_el"></ion-input>
+          </ion-item>
           <ion-radio-group [(ngModel)]="formAviso.tipo" name="tipo">
             <ion-item lines="none">
               <ion-radio slot="start" value="info"></ion-radio>
@@ -489,12 +493,13 @@
           </div>
           <div class="etiquetas-estado">
             <ion-badge [color]="colorTipoAviso(av.tipo)">{{ rotuloTipoAviso(av.tipo) }}</ion-badge>
-            <ion-badge [color]="av.activo ? 'success' : 'medium'">{{ av.activo ? 'activo' : 'apagado' }}</ion-badge>
+            <ion-badge [color]="estadoAviso(av).color">{{ estadoAviso(av).texto }}</ion-badge>
           </div>
         </div>
         <div class="pie">
           <span class="desde">
             {{ av.admin_email }} · {{ av.created_at | date: 'medium' }}
+            <ng-container *ngIf="av.vence_el"> · vence {{ av.vence_el | date: 'medium' }}</ng-container>
           </span>
           <div class="acciones">
             <ion-button size="small" fill="clear" (click)="editarAviso(av)">Editar</ion-button>
