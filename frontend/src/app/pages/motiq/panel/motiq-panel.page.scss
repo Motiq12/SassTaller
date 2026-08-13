@@ -370,7 +370,20 @@
     .slug { font-size: 0.8rem; }
   }
 
-  .acciones-ficha ion-button { margin-bottom: 0.5rem; }
+  // En fila y pegados a la derecha: eran botones a todo el ancho apilados uno debajo
+  // del otro, que para cuatro acciones reversibles ocupaba media pantalla sin
+  // necesidad. Envuelven si no entran, en vez de achicarse hasta ilegibles.
+  .acciones-ficha {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+
+    ion-button {
+      margin: 0;
+      --border-radius: 10px;
+    }
+  }
 
   // Borrar vive en su propio recuadro y separado del resto: es lo único que no se
   // puede deshacer y no debería compartir espacio con acciones reversibles.

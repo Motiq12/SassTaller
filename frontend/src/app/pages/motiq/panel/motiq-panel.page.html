@@ -510,19 +510,19 @@
 
           <!-- Acciones -->
           <section class="acciones-ficha">
-            <ion-button expand="block" [fill]="sigo(f.taller.id) ? 'solid' : 'outline'"
+            <ion-button [fill]="sigo(f.taller.id) ? 'solid' : 'outline'"
                         (click)="alternarSeguido($any(f.taller))">
               <ion-icon slot="start" [name]="sigo(f.taller.id) ? 'star' : 'star-outline'"></ion-icon>
               {{ sigo(f.taller.id) ? 'Lo seguís de cerca' : 'Seguir de cerca' }}
             </ion-button>
-            <ion-button expand="block" fill="outline" (click)="cambiarPlan($any(f.taller))">
+            <ion-button fill="outline" (click)="cambiarPlan($any(f.taller))">
               Cambiar plan (hoy: {{ rotuloPlan(f.taller.plan) }})
             </ion-button>
-            <ion-button expand="block" fill="outline" color="success"
+            <ion-button fill="outline" color="success"
                         *ngIf="f.taller.estado !== 'activo'" (click)="reactivar($any(f.taller))">
               Reactivar
             </ion-button>
-            <ion-button expand="block" fill="outline" color="danger"
+            <ion-button fill="outline" color="danger"
                         *ngIf="f.taller.estado === 'activo'" (click)="suspender($any(f.taller))">
               Suspender
             </ion-button>
