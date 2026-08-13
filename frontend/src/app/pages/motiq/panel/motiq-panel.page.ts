@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, ElementRef, HostListener, OnInit, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { AlertController } from '@ionic/angular';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
@@ -49,12 +49,26 @@ export class MotiqPanelPage implements OnInit {
   cargandoFicha = false;
 
   filtroEstado = '';
+  filtroPlan = '';
+  orden: 'recientes' | 'antiguos' | 'nombre' | 'plan' = 'recientes';
   busqueda = '';
   private escribiendo$ = new Subject<string>();
 
   // El menú es un panel fijo en escritorio y un cajón que se desliza en teléfono —
   // en ese ancho no hay lugar para dejarlo siempre abierto sin tapar el contenido.
   menuAbierto = false;
+
+  // Buscador global (Ctrl+K): saltar a un taller por nombre sin importar en qué
+  // sección se esté parado, sin pasar por la lista de "Talleres" y sus filtros.
+  buscadorGlobalAbierto = false;
+  buscandoGlobal = false;
+  resultadosGlobales: TallerDelPanel[] = [];
+  private buscarGlobal$ = new Subject<string>();
+  @ViewChild('inputBuscadorGlobal') inputBuscadorGlobal?: ElementRef<HTMLInputElement>;
+
+  // MRR estimado: se guarda solo en este navegador porque todavía no existe
+  // facturación real — es una calculadora, no un dato del negocio.
+  precioPro = Number(localStorage.getItem('motiq_precio_pro') || 0) || 0;
 
   // Espejo de PLANES en backend/src/utils/limites.js, que es la única fuente de
   // verdad. Si acá aparece uno que allá no existe, el backend responde 400; y si
@@ -86,12 +100,56 @@ export class MotiqPanelPage implements OnInit {
 
   alternarMenu() { this.menuAbierto = !this.menuAbierto; }
 
+  // Ctrl+K (o Cmd+K en Mac) abre el buscador desde cualquier sección; Esc lo cierra.
+  // Sin esto, saltar a un taller puntual obliga a ir a "Talleres" y filtrar a mano
+  // cada vez, aunque se sepa exactamente cuál se busca.
+  @HostListener('document:keydown', ['$event'])
+  atajoTeclado(ev: KeyboardEvent) {
+    if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'k') {
+      ev.preventDefault();
+      this.abrirBuscadorGlobal();
+    } else if (ev.key === 'Escape' && this.buscadorGlobalAbierto) {
+      this.cerrarBuscadorGlobal();
+    }
+  }
+
   ngOnInit() {
     this.marca.limpiar();   // este panel es de Motiq, no de ningún taller
     // Buscar en cada tecla dispararía una consulta por letra; se espera a que pare.
     this.escribiendo$.pipe(debounceTime(300), distinctUntilChanged())
       .subscribe(() => this.cargarTalleres());
+    this.buscarGlobal$.pipe(debounceTime(250), distinctUntilChanged()).subscribe((valor) => {
+      const q = valor.trim();
+      if (!q) { this.resultadosGlobales = []; this.buscandoGlobal = false; return; }
+      this.buscandoGlobal = true;
+      this.motiq.talleres({ q }).subscribe({
+        next: (r) => { this.resultadosGlobales = r.data.slice(0, 8); this.buscandoGlobal = false; },
+        error: () => { this.buscandoGlobal = false; },
+      });
+    });
     this.cargar();
+  }
+
+  abrirBuscadorGlobal() {
+    this.buscadorGlobalAbierto = true;
+    this.resultadosGlobales = [];
+    this.menuAbierto = false;
+    // El overlay todavía no está en el DOM en este mismo ciclo; sin el setTimeout
+    // el focus() llega antes de que exista el input y no hace nada.
+    setTimeout(() => this.inputBuscadorGlobal?.nativeElement.focus(), 30);
+  }
+
+  cerrarBuscadorGlobal() {
+    this.buscadorGlobalAbierto = false;
+  }
+
+  alBuscarGlobal(valor: string) {
+    this.buscarGlobal$.next(valor);
+  }
+
+  irAResultado(t: TallerDelPanel) {
+    this.cerrarBuscadorGlobal();
+    this.abrirFicha(t.id);
   }
 
   cargar(ev?: any) {
@@ -213,6 +271,115 @@ export class MotiqPanelPage implements OnInit {
   mesCorto(mes: string): string {
     const M = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
     return M[Number(String(mes).slice(5, 7)) - 1] || mes;
+  }
+
+  // --- MRR estimado y conversión ---
+  //
+  // No hay facturación real todavía, así que el precio del plan Pro se guarda en
+  // este navegador (localStorage) y no en el servidor: es una calculadora personal
+  // para tener una idea del negocio, no un dato que haya que sincronizar entre cuentas.
+
+  get mrrEstimado(): number {
+    return Number(this.resumen?.talleres.en_pro || 0) * this.precioPro;
+  }
+
+  // De los que ya terminaron la prueba y eligieron un plan (Pro o Gratis), cuántos
+  // se quedaron pagando. Los que todavía están en prueba no cuentan para este número:
+  // meterlos abajaría la tasa sin que hayan decidido nada todavía.
+  //
+  // MySQL entrega los SUM() del resumen como string y no como number: sumarlos con
+  // "+" sin convertir concatena texto ("1" + "0" = "10") en vez de sumar. De ahí el
+  // Number() explícito en los dos.
+  get tasaConversion(): number | null {
+    const pro = Number(this.resumen?.talleres.en_pro || 0);
+    const base = pro + Number(this.resumen?.talleres.en_gratis || 0);
+    return base ? Math.round((pro / base) * 100) : null;
+  }
+
+  formatoColones(monto: number): string {
+    return new Intl.NumberFormat('es-CR', { style: 'currency', currency: 'CRC', maximumFractionDigits: 0 }).format(monto);
+  }
+
+  async definirPrecioPro() {
+    const a = await this.alerta.create({
+      header: 'Precio del plan Pro',
+      message: 'Para calcular el MRR estimado. Se guarda solo en este navegador — todavía no es un dato de facturación real.',
+      inputs: [
+        { name: 'precio', type: 'number', placeholder: 'Colones por mes', value: this.precioPro || undefined, min: 0 },
+      ],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Guardar',
+          handler: (d) => {
+            const precio = Number(d.precio);
+            if (!precio || precio < 0) { this.toast.error('Ingresá un número mayor que cero'); return false; }
+            this.precioPro = precio;
+            localStorage.setItem('motiq_precio_pro', String(precio));
+            return true;
+          },
+        },
+      ],
+    });
+    await a.present();
+  }
+
+  // --- Salud del taller ---
+  //
+  // Un solo vistazo en vez de tener que cruzar "Vencen" e "Inactivos" mentalmente:
+  // combina si tiene actividad reciente con si le queda poco de prueba. Solo se
+  // muestra para talleres activos — uno suspendido o cancelado ya lo dice su propia
+  // insignia de estado, y mostrar las dos juntas sería ruido repetido.
+  salud(t: TallerDelPanel): { texto: string; color: string } {
+    if (!t.ordenes) return { texto: 'sin arrancar', color: 'danger' };
+    const dias = t.ultima_orden ? Math.floor((Date.now() - new Date(t.ultima_orden).getTime()) / 86400000) : null;
+    if (dias == null || dias > 60) return { texto: 'en riesgo', color: 'danger' };
+    if (dias > 30) return { texto: 'atención', color: 'warning' };
+    if (t.plan === 'trial' && t.trial_hasta) {
+      const restan = Math.floor((new Date(t.trial_hasta).getTime() - Date.now()) / 86400000);
+      if (restan <= 3) return { texto: 'prueba por vencer', color: 'warning' };
+    }
+    return { texto: 'saludable', color: 'success' };
+  }
+
+  // --- Exportar a CSV ---
+  //
+  // Para armar campañas de llamadas fuera del panel. Con BOM al inicio: sin él, Excel
+  // en Windows interpreta el archivo como Latin-1 y las tildes salen rotas.
+  private descargarCSV(filas: Record<string, any>[], nombreArchivo: string) {
+    if (!filas.length) { this.toast.error('No hay nada para exportar'); return; }
+    const columnas = Object.keys(filas[0]);
+    const escapar = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const csv = [columnas.join(','), ...filas.map((f) => columnas.map((c) => escapar(f[c])).join(','))].join('\r\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombreArchivo;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  private hoyISO(): string { return new Date().toISOString().slice(0, 10); }
+
+  exportarVencimientos() {
+    this.descargarCSV(
+      this.vencimientos.map((v) => ({
+        taller: v.nombre, identificador: v.slug, vence: v.trial_hasta, dias_restantes: v.dias_restantes,
+        admin: v.admin_nombre || '', email: v.admin_email || '', telefono: v.admin_telefono || '', ordenes: v.ordenes,
+      })),
+      `motiq-vencen-${this.hoyISO()}.csv`,
+    );
+  }
+
+  exportarInactivos() {
+    this.descargarCSV(
+      this.inactivos.map((i) => ({
+        taller: i.nombre, identificador: i.slug, plan: i.plan, registrado: i.created_at,
+        ultima_orden: i.ultima_orden || 'nunca', ordenes: i.ordenes, email: i.admin_email || '',
+      })),
+      `motiq-inactivos-${this.hoyISO()}.csv`,
+    );
   }
 
   // --- Ficha del taller ---
@@ -461,9 +628,22 @@ export class MotiqPanelPage implements OnInit {
     return { nuevo: 'warning', contactado: 'primary', cerrado: 'success', descartado: 'medium' }[e] || 'medium';
   }
 
+  // El servidor siempre entrega ORDER BY created_at DESC (más nuevo primero), así que
+  // "recientes" no necesita tocar nada y "antiguos" alcanza con invertir el arreglo:
+  // evita otro viaje al servidor solo para cambiar el orden de lo que ya se tiene.
+  get talleresOrdenados(): TallerDelPanel[] {
+    const copia = [...this.talleres];
+    switch (this.orden) {
+      case 'antiguos': return copia.reverse();
+      case 'nombre': return copia.sort((a, b) => a.nombre.localeCompare(b.nombre));
+      case 'plan': return copia.sort((a, b) => a.plan.localeCompare(b.plan));
+      default: return copia;
+    }
+  }
+
   cargarTalleres(ev?: any) {
     this.cargando = true;
-    this.motiq.talleres({ estado: this.filtroEstado, q: this.busqueda.trim() }).subscribe({
+    this.motiq.talleres({ estado: this.filtroEstado, plan: this.filtroPlan, q: this.busqueda.trim() }).subscribe({
       next: (r) => {
         this.talleres = r.data;
         this.cargando = false;

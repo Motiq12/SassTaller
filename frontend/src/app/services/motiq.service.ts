@@ -200,9 +200,10 @@ export class MotiqService {
     return this.http.get<{ data: ResumenPlataforma }>(`${this.apiUrl}/motiq/resumen`);
   }
 
-  talleres(filtros: { estado?: string; q?: string } = {}): Observable<{ data: TallerDelPanel[] }> {
+  talleres(filtros: { estado?: string; plan?: string; q?: string } = {}): Observable<{ data: TallerDelPanel[] }> {
     const params: string[] = [];
     if (filtros.estado) params.push(`estado=${encodeURIComponent(filtros.estado)}`);
+    if (filtros.plan) params.push(`plan=${encodeURIComponent(filtros.plan)}`);
     if (filtros.q) params.push(`q=${encodeURIComponent(filtros.q)}`);
     return this.http.get<{ data: TallerDelPanel[] }>(
       `${this.apiUrl}/motiq/talleres${params.length ? '?' + params.join('&') : ''}`

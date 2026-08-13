@@ -388,6 +388,7 @@ router.get('/talleres', async (req, res) => {
     const cond = [];
     const params = [];
     if (ESTADOS.includes(req.query.estado)) { cond.push('t.estado = ?'); params.push(req.query.estado); }
+    if (PLANES.includes(req.query.plan)) { cond.push('t.plan = ?'); params.push(req.query.plan); }
     if (req.query.q) {
       cond.push('(t.nombre LIKE ? OR t.slug LIKE ?)');
       params.push(`%${req.query.q}%`, `%${req.query.q}%`);

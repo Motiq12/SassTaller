@@ -16,6 +16,12 @@
       </div>
     </div>
 
+    <button type="button" class="sb-buscar" (click)="abrirBuscadorGlobal()">
+      <ion-icon name="search-outline"></ion-icon>
+      <span>Buscar un taller</span>
+      <span class="tecla">Ctrl K</span>
+    </button>
+
     <nav class="sb-nav">
       <div class="sb-section">Principal</div>
       <button type="button" class="nav-item" [class.on]="vista === 'espacio'" (click)="irA('espacio')">
@@ -206,6 +212,14 @@
           <span class="cifra">{{ resumen.talleres.nuevos_30d }}</span>
           <span class="rotulo">Nuevos (30 días)</span>
         </div>
+        <!-- Sin precio definido todavía no hay MRR real que mostrar: se pide antes
+             de inventar un número. Una vez definido, queda guardado en este navegador. -->
+        <button type="button" class="tarjeta clicable" (click)="definirPrecioPro()">
+          <span class="cifra paga">{{ precioPro ? formatoColones(mrrEstimado) : '—' }}</span>
+          <span class="rotulo">
+            MRR estimado <ion-icon name="pencil-outline"></ion-icon>
+          </span>
+        </button>
       </div>
 
       <!-- Reparto por plan: cuántos pagan y cuántos no. -->
@@ -213,6 +227,9 @@
         <span><strong>{{ resumen.talleres.en_prueba }}</strong> en prueba</span>
         <span><strong>{{ resumen.talleres.en_gratis || 0 }}</strong> en gratis</span>
         <span class="paga"><strong>{{ resumen.talleres.en_pro || 0 }}</strong> en Pro</span>
+        <span class="conversion" *ngIf="tasaConversion != null">
+          <strong>{{ tasaConversion }}%</strong> se queda pagando al terminar la prueba
+        </span>
       </div>
 
       <!-- Altas por mes. Un total acumulado no dice si el negocio crece o está plano. -->
@@ -237,7 +254,12 @@
 
     <!-- ===== Vencen ===== -->
     <ng-container *ngIf="vista === 'vencen'">
-      <p class="explica">A quién se le acaba la prueba. Al vencer no se corta el acceso: pasa al plan gratuito.</p>
+      <div class="explica-linea">
+        <p class="explica">A quién se le acaba la prueba. Al vencer no se corta el acceso: pasa al plan gratuito.</p>
+        <ion-button size="small" fill="outline" *ngIf="vencimientos.length" (click)="exportarVencimientos()">
+          <ion-icon slot="start" name="download-outline"></ion-icon> CSV
+        </ion-button>
+      </div>
       <div class="vacio" *ngIf="!vencimientos.length">
         <ion-icon name="checkmark-circle-outline"></ion-icon>
         <p>Nadie vence en las próximas dos semanas.</p>
@@ -268,10 +290,15 @@
 
     <!-- ===== Inactivos ===== -->
     <ng-container *ngIf="vista === 'inactivos'">
-      <p class="explica">
-        Talleres activos sin una orden en 30 días. Se separa quien nunca arrancó de quien
-        dejó de usarlo: son dos conversaciones distintas.
-      </p>
+      <div class="explica-linea">
+        <p class="explica">
+          Talleres activos sin una orden en 30 días. Se separa quien nunca arrancó de quien
+          dejó de usarlo: son dos conversaciones distintas.
+        </p>
+        <ion-button size="small" fill="outline" *ngIf="inactivos.length" (click)="exportarInactivos()">
+          <ion-icon slot="start" name="download-outline"></ion-icon> CSV
+        </ion-button>
+      </div>
       <div class="vacio" *ngIf="!inactivos.length">
         <ion-icon name="pulse-outline"></ion-icon>
         <p>Todos los talleres tuvieron actividad este mes.</p>
@@ -389,6 +416,20 @@
         <ion-segment-button value="suspendido"><ion-label>Suspendidos</ion-label></ion-segment-button>
         <ion-segment-button value="cancelado"><ion-label>Cancelados</ion-label></ion-segment-button>
       </ion-segment>
+      <div class="filtros-linea2">
+        <ion-segment [(ngModel)]="filtroPlan" (ionChange)="cargarTalleres()" scrollable>
+          <ion-segment-button value=""><ion-label>Todos los planes</ion-label></ion-segment-button>
+          <ion-segment-button value="trial"><ion-label>Prueba</ion-label></ion-segment-button>
+          <ion-segment-button value="gratis"><ion-label>Gratis</ion-label></ion-segment-button>
+          <ion-segment-button value="pro"><ion-label>Pro</ion-label></ion-segment-button>
+        </ion-segment>
+        <ion-select [(ngModel)]="orden" interface="popover" class="orden-select" aria-label="Ordenar por">
+          <ion-select-option value="recientes">Más recientes</ion-select-option>
+          <ion-select-option value="antiguos">Más antiguos</ion-select-option>
+          <ion-select-option value="nombre">Por nombre</ion-select-option>
+          <ion-select-option value="plan">Por plan</ion-select-option>
+        </ion-select>
+      </div>
     </div>
 
     <!-- Listado -->
@@ -398,13 +439,16 @@
       <p *ngIf="!busqueda && !filtroEstado">Todavía no hay talleres registrados.</p>
     </div>
 
-    <div class="taller" *ngFor="let t of talleres">
+    <div class="taller" *ngFor="let t of talleresOrdenados">
       <div class="cabecera">
         <div class="quien-es">
           <h2>{{ t.nombre }}</h2>
           <span class="slug">{{ t.slug }}</span>
         </div>
-        <ion-badge [color]="colorEstado(t.estado)">{{ t.estado }}</ion-badge>
+        <div class="etiquetas-estado">
+          <ion-badge [color]="colorEstado(t.estado)">{{ t.estado }}</ion-badge>
+          <ion-badge [color]="salud(t).color" *ngIf="t.estado === 'activo'">{{ salud(t).texto }}</ion-badge>
+        </div>
       </div>
 
       <p class="motivo" *ngIf="t.estado !== 'activo' && t.motivo_estado">
@@ -440,6 +484,33 @@
       <ion-spinner name="crescent"></ion-spinner>
     </div>
     </ng-container>
+  </div>
+
+  <!-- ===== Buscador global (Ctrl+K) =====
+       Saltar directo a un taller por nombre desde cualquier sección, sin pasar por
+       la lista de "Talleres" y sus filtros. -->
+  <div class="buscador-global" *ngIf="buscadorGlobalAbierto" (click)="cerrarBuscadorGlobal()">
+    <div class="bg-caja" (click)="$event.stopPropagation()">
+      <div class="bg-input">
+        <ion-icon name="search-outline"></ion-icon>
+        <input #inputBuscadorGlobal type="text" placeholder="Buscar un taller por nombre o identificador…"
+               (input)="alBuscarGlobal($any($event.target).value)" />
+        <button type="button" class="bg-cerrar" (click)="cerrarBuscadorGlobal()" aria-label="Cerrar">Esc</button>
+      </div>
+      <div class="bg-resultados">
+        <p class="bg-vacio" *ngIf="buscandoGlobal">Buscando…</p>
+        <button type="button" class="bg-fila" *ngFor="let t of resultadosGlobales" (click)="irAResultado(t)">
+          <div>
+            <strong>{{ t.nombre }}</strong>
+            <span class="slug">{{ t.slug }}</span>
+          </div>
+          <ion-badge [color]="colorEstado(t.estado)">{{ t.estado }}</ion-badge>
+        </button>
+        <p class="bg-vacio" *ngIf="!buscandoGlobal && !resultadosGlobales.length">
+          Escribí para buscar en todos los talleres.
+        </p>
+      </div>
+    </div>
   </div>
 
   <!-- ===== Ficha de un taller =====
