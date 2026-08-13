@@ -42,8 +42,14 @@ import { PRODUCTO } from './producto';
       border-radius: 8px;
       font-weight: 700;
       letter-spacing: .02em;
-      background: var(--ion-color-primary);
+      line-height: 1;
+      // Degradé y no un color plano: --ion-color-primary-shade ya sigue al color que
+      // elija cada taller (lo calcula MarcaService.pintarColor), así que esto no
+      // rompe con ningún color propio — solo le suma algo de relieve al que quedaba
+      // chato pegado al fondo oscuro del menú.
+      background: linear-gradient(135deg, var(--ion-color-primary), var(--ion-color-primary-shade));
       color: var(--ion-color-primary-contrast);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .12);
     }
   `],
 })
