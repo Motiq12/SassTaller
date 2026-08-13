@@ -4,7 +4,7 @@ import { AlertController } from '@ionic/angular';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 import {
   ContactoDemo, CuentaPlataforma, FichaTaller, MiEspacio, MotiqService, Pendiente,
-  ResumenPlataforma, TallerDelPanel, TallerInactivo, Vencimiento,
+  PlanConfig, ResumenPlataforma, TallerDelPanel, TallerInactivo, Vencimiento,
 } from '../../../services/motiq.service';
 import { MarcaService } from '../../../services/marca.service';
 import { ToastService } from '../../../services/toast.service';
@@ -36,13 +36,21 @@ export class MotiqPanelPage implements OnInit {
   // Arranca en "Mi espacio" y no en el resumen: los dos administran todo el SaaS, así
   // que los datos son los mismos para ambos — lo primero que cada uno tiene que ver al
   // entrar es lo SUYO, no el total compartido.
-  vista: 'espacio' | 'resumen' | 'talleres' | 'vencen' | 'inactivos' | 'contactos' | 'cuentas' = 'espacio';
+  vista: 'espacio' | 'resumen' | 'talleres' | 'vencen' | 'inactivos' | 'contactos' | 'cuentas' | 'planes' = 'espacio';
   espacio: MiEspacio | null = null;
   contactos: ContactoDemo[] = [];
   vencimientos: Vencimiento[] = [];
   inactivos: TallerInactivo[] = [];
   cuentas: CuentaPlataforma[] = [];
   readonly ESTADOS_CONTACTO = ['nuevo', 'contactado', 'cerrado', 'descartado'];
+
+  // --- Planes: precio y límites, editables desde acá ---
+  planes: PlanConfig[] = [];
+  editandoPlan: string | null = null;
+  formPlan: {
+    precio_mensual: number | null; limite_usuarios: number | null; limite_sucursales: number | null;
+    marca_propia: boolean; reportes_dias: number | null;
+  } = { precio_mensual: 0, limite_usuarios: null, limite_sucursales: null, marca_propia: false, reportes_dias: null };
 
   // Ficha del taller abierto (null = cerrada).
   ficha: FichaTaller | null = null;
@@ -65,10 +73,6 @@ export class MotiqPanelPage implements OnInit {
   resultadosGlobales: TallerDelPanel[] = [];
   private buscarGlobal$ = new Subject<string>();
   @ViewChild('inputBuscadorGlobal') inputBuscadorGlobal?: ElementRef<HTMLInputElement>;
-
-  // MRR estimado: se guarda solo en este navegador porque todavía no existe
-  // facturación real — es una calculadora, no un dato del negocio.
-  precioPro = Number(localStorage.getItem('motiq_precio_pro') || 0) || 0;
 
   // Espejo de PLANES en backend/src/utils/limites.js, que es la única fuente de
   // verdad. Si acá aparece uno que allá no existe, el backend responde 400; y si
@@ -162,6 +166,7 @@ export class MotiqPanelPage implements OnInit {
     this.motiq.vencimientos(14).subscribe({ next: (r) => (this.vencimientos = r.data), error: () => {} });
     this.motiq.inactivos(30).subscribe({ next: (r) => (this.inactivos = r.data), error: () => {} });
     this.motiq.cuentas().subscribe({ next: (r) => (this.cuentas = r.data), error: () => {} });
+    this.motiq.planes().subscribe({ next: (r) => (this.planes = r.data), error: () => {} });
     this.cargarEspacio();
   }
 
@@ -246,6 +251,8 @@ export class MotiqPanelPage implements OnInit {
       cambio_plan: `cambió el plan${donde}`,
       borro: `borró${donde}`,
       creo_cuenta: 'creó una cuenta de plataforma',
+      edito_cuenta: 'editó una cuenta de plataforma',
+      edito_plan: 'editó un plan',
       atendio_contacto: 'atendió un contacto',
     };
     const base = textos[l.accion] || l.accion;
@@ -256,7 +263,8 @@ export class MotiqPanelPage implements OnInit {
     return {
       suspendio: 'pause-circle-outline', reactivo: 'play-circle-outline',
       cambio_plan: 'swap-horizontal-outline', borro: 'trash-outline',
-      creo_cuenta: 'person-add-outline', atendio_contacto: 'mail-open-outline',
+      creo_cuenta: 'person-add-outline', edito_cuenta: 'person-outline',
+      edito_plan: 'pricetag-outline', atendio_contacto: 'mail-open-outline',
     }[accion] || 'ellipse-outline';
   }
 
@@ -274,13 +282,12 @@ export class MotiqPanelPage implements OnInit {
   }
 
   // --- MRR estimado y conversión ---
-  //
-  // No hay facturación real todavía, así que el precio del plan Pro se guarda en
-  // este navegador (localStorage) y no en el servidor: es una calculadora personal
-  // para tener una idea del negocio, no un dato que haya que sincronizar entre cuentas.
 
+  // El precio real del plan Pro (editable en "Planes"), no un valor guardado a mano
+  // por cada quien: los dos ven el mismo MRR porque parten del mismo precio.
   get mrrEstimado(): number {
-    return Number(this.resumen?.talleres.en_pro || 0) * this.precioPro;
+    const pro = this.planes.find((p) => p.plan === 'pro');
+    return (pro?.precio_mensual || 0) * Number(this.resumen?.talleres.en_pro || 0);
   }
 
   // De los que ya terminaron la prueba y eligieron un plan (Pro o Gratis), cuántos
@@ -300,22 +307,73 @@ export class MotiqPanelPage implements OnInit {
     return new Intl.NumberFormat('es-CR', { style: 'currency', currency: 'CRC', maximumFractionDigits: 0 }).format(monto);
   }
 
-  async definirPrecioPro() {
+  // --- Planes ---
+
+  rotuloLimite(valor: number | null, singular: string, plural: string): string {
+    if (valor == null) return `${plural} ilimitados`;
+    return valor === 1 ? `1 ${singular}` : `${valor} ${plural}`;
+  }
+
+  editarPlan(p: PlanConfig) {
+    this.editandoPlan = p.plan;
+    this.formPlan = {
+      precio_mensual: p.precio_mensual,
+      limite_usuarios: p.limite_usuarios,
+      limite_sucursales: p.limite_sucursales,
+      marca_propia: !!p.marca_propia,
+      reportes_dias: p.reportes_dias,
+    };
+  }
+
+  cancelarEdicionPlan() {
+    this.editandoPlan = null;
+  }
+
+  guardarPlan(plan: string) {
+    // Vacío = sin límite. El input de Ionic entrega '' y no null cuando se borra a
+    // mano, así que hay que tratar los dos casos igual.
+    const vacioEsNull = (v: number | null): number | null => (v === null || (v as any) === '' ? null : Number(v));
+    const datos = {
+      precio_mensual: Number(this.formPlan.precio_mensual) || 0,
+      limite_usuarios: vacioEsNull(this.formPlan.limite_usuarios),
+      limite_sucursales: vacioEsNull(this.formPlan.limite_sucursales),
+      marca_propia: !!this.formPlan.marca_propia,
+      reportes_dias: vacioEsNull(this.formPlan.reportes_dias),
+    };
+    this.motiq.actualizarPlan(plan, datos).subscribe({
+      next: (r) => { this.toast.success(r.message); this.editandoPlan = null; this.cargar(); },
+      error: (e) => this.toast.error(e?.error?.error || 'No se pudo guardar'),
+    });
+  }
+
+  // --- Perfiles: el propio y el de un compañero, sin distinción ---
+
+  async editarPerfil(c: CuentaPlataforma) {
+    const esMio = c.id === this.admin?.id;
     const a = await this.alerta.create({
-      header: 'Precio del plan Pro',
-      message: 'Para calcular el MRR estimado. Se guarda solo en este navegador — todavía no es un dato de facturación real.',
+      header: esMio ? 'Editar mi perfil' : `Editar a ${c.nombre}`,
       inputs: [
-        { name: 'precio', type: 'number', placeholder: 'Colones por mes', value: this.precioPro || undefined, min: 0 },
+        { name: 'nombre', type: 'text', value: c.nombre, placeholder: 'Nombre' },
+        { name: 'email', type: 'email', value: c.email, placeholder: 'correo@motiq.cr' },
       ],
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         {
           text: 'Guardar',
           handler: (d) => {
-            const precio = Number(d.precio);
-            if (!precio || precio < 0) { this.toast.error('Ingresá un número mayor que cero'); return false; }
-            this.precioPro = precio;
-            localStorage.setItem('motiq_precio_pro', String(precio));
+            const nombre = String(d.nombre || '').trim();
+            const email = String(d.email || '').trim();
+            if (!nombre || !email) { this.toast.error('Falta el nombre o el correo'); return false; }
+            this.motiq.editarCuenta(c.id, nombre, email).subscribe({
+              next: (r) => {
+                this.toast.success(r.message);
+                // Si me edité a mí mismo, la copia local del admin (saludo, pie de la
+                // barra lateral) queda vieja hasta el próximo login si no se actualiza acá.
+                if (esMio) this.motiq.actualizarAdminLocal({ nombre, email });
+                this.cargar();
+              },
+              error: (e) => this.toast.error(e?.error?.error || 'No se pudo actualizar'),
+            });
             return true;
           },
         },

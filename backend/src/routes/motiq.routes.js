@@ -14,7 +14,7 @@ const { fijarEstado, fijarPlan } = require('../utils/estado-tenant');
 // Los planes se declaran en utils/limites junto con lo que incluye cada uno: tener acá
 // una segunda lista sería la forma de que un día acepte un plan que no tiene límites
 // definidos, y ese taller quedaría sin topes sin que nadie lo decidiera.
-const { PLANES } = require('../utils/limites');
+const { PLANES, fijarLimites } = require('../utils/limites');
 const { crearTaller, normalizarSlug, motivoSlugInvalido } = require('../utils/onboarding');
 const { generarPassword } = require('../utils/password');
 const { ordenDeBorrado } = require('../utils/orden-borrado');
@@ -543,6 +543,66 @@ router.delete('/talleres/:id', async (req, res) => {
   }
 });
 
+// ───────────── Planes ─────────────
+// Antes vivían solo como constantes en utils/limites.js. Acá se pueden editar sin
+// tocar código ni redesplegar — el precio del plan Pro, sobre todo, es un dato que
+// va a cambiar más de una vez y no debería requerir un deploy cada vez que pase.
+
+// GET /api/motiq/planes — el precio y los límites de cada plan.
+router.get('/planes', async (req, res) => {
+  try {
+    const [filas] = await pool.query(
+      `SELECT plan, precio_mensual, limite_usuarios, limite_sucursales, marca_propia, reportes_dias, updated_at
+         FROM planes_config ORDER BY FIELD(plan, 'trial', 'gratis', 'pro')`
+    );
+    res.json({ data: filas });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// PATCH /api/motiq/planes/:plan — cambia lo que incluye un plan.
+//
+// Reemplaza la fila entera (no un PATCH parcial campo a campo): son cinco campos que
+// se editan juntos en una sola pantalla, y un parcial dejaría la duda de qué pasa con
+// los que no se mandan. `null` en los topes es explícito y significa "sin límite".
+router.patch('/planes/:plan', async (req, res) => {
+  try {
+    const plan = req.params.plan;
+    if (!PLANES.includes(plan)) return res.status(400).json({ error: `Plan inválido (${PLANES.join(', ')})` });
+
+    const numOrNull = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
+    const precio_mensual = Number(req.body?.precio_mensual) || 0;
+    const limite_usuarios = numOrNull(req.body?.limite_usuarios);
+    const limite_sucursales = numOrNull(req.body?.limite_sucursales);
+    const reportes_dias = numOrNull(req.body?.reportes_dias);
+    const marca_propia = req.body?.marca_propia ? 1 : 0;
+
+    if (precio_mensual < 0) return res.status(400).json({ error: 'El precio no puede ser negativo' });
+    for (const [nombre, v] of [['limite_usuarios', limite_usuarios], ['limite_sucursales', limite_sucursales], ['reportes_dias', reportes_dias]]) {
+      if (v !== null && (!Number.isInteger(v) || v < 0)) {
+        return res.status(400).json({ error: `${nombre} tiene que ser un entero mayor o igual a 0, o vacío para "sin límite"` });
+      }
+    }
+
+    await pool.query(
+      `INSERT INTO planes_config (plan, precio_mensual, limite_usuarios, limite_sucursales, marca_propia, reportes_dias)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE precio_mensual = VALUES(precio_mensual), limite_usuarios = VALUES(limite_usuarios),
+         limite_sucursales = VALUES(limite_sucursales), marca_propia = VALUES(marca_propia), reportes_dias = VALUES(reportes_dias)`,
+      [plan, precio_mensual, limite_usuarios, limite_sucursales, marca_propia, reportes_dias]
+    );
+
+    // Vale desde el request siguiente, en este proceso. A los otros workers del
+    // cluster les llega en el refresco periódico (ver utils/limites.js).
+    fijarLimites(plan, { precio_mensual, limite_usuarios, limite_sucursales, marca_propia, reportes_dias });
+    anotar(req.plataforma, 'edito_plan', { detalle: `${plan}: ₡${precio_mensual}/mes` });
+    res.json({ message: 'Plan actualizado' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
 // ───────────── Cuentas de la plataforma ─────────────
 // Hasta acá, crear una cuenta para un compañero era entrar por SSH a correr un script.
 // Eso está bien para arrancar y deja de estarlo apenas el equipo son dos personas.
@@ -591,29 +651,62 @@ router.post('/admins', async (req, res) => {
   }
 });
 
-// PATCH /api/motiq/admins/:id — activa o desactiva a alguien.
+// PATCH /api/motiq/admins/:id — activa/desactiva, o edita nombre y correo.
 //
-// Desactivar en vez de borrar: la fila queda para saber quién hizo qué, y el correo
-// sigue tomado (no se puede recrear la cuenta por accidente y creer que es la misma).
+// Sirve tanto para editar el propio perfil como el de un compañero: acá no hay
+// permisos parciales (misma regla que suspender un taller), así que cualquiera de
+// los dos puede corregir el nombre o el correo del otro. Desactivar en vez de borrar:
+// la fila queda para saber quién hizo qué, y el correo sigue tomado (no se puede
+// recrear la cuenta por accidente y creer que es la misma).
 router.patch('/admins/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const activo = req.body?.activo ? 1 : 0;
-    // Nadie se cierra a sí mismo la puerta: si el único admin activo se desactiva, no
-    // queda quién vuelva a entrar a reactivarlo y el panel se pierde hasta abrir la base.
-    if (id === req.plataforma?.id) {
-      return res.status(400).json({ error: 'No podés desactivar tu propia cuenta' });
+    const sets = [];
+    const params = [];
+    const detalles = [];
+
+    if (req.body?.nombre !== undefined) {
+      const nombre = String(req.body.nombre).trim();
+      if (!nombre) return res.status(400).json({ error: 'El nombre no puede quedar vacío' });
+      sets.push('nombre = ?'); params.push(nombre.slice(0, 120));
+      detalles.push('nombre');
     }
-    if (!activo) {
-      const [[{ n }]] = await pool.query(
-        'SELECT COUNT(*) AS n FROM plataforma_admins WHERE activo = 1 AND id <> ?', [id]
-      );
-      if (!n) return res.status(400).json({ error: 'Tiene que quedar al menos una cuenta activa' });
+
+    if (req.body?.email !== undefined) {
+      const email = String(req.body.email).trim().toLowerCase();
+      if (!emailValido(email)) return res.status(400).json({ error: 'El correo no parece válido' });
+      const [[existe]] = await pool.query('SELECT id FROM plataforma_admins WHERE email = ? AND id <> ?', [email, id]);
+      if (existe) return res.status(409).json({ error: 'Ya hay otra cuenta con ese correo' });
+      sets.push('email = ?'); params.push(email);
+      detalles.push('correo');
     }
-    const [r] = await pool.query('UPDATE plataforma_admins SET activo = ? WHERE id = ?', [activo, id]);
+
+    if (req.body?.activo !== undefined) {
+      const activo = req.body.activo ? 1 : 0;
+      // Nadie se cierra a sí mismo la puerta: si el único admin activo se desactiva, no
+      // queda quién vuelva a entrar a reactivarlo y el panel se pierde hasta abrir la base.
+      if (!activo && id === req.plataforma?.id) {
+        return res.status(400).json({ error: 'No podés desactivar tu propia cuenta' });
+      }
+      if (!activo) {
+        const [[{ n }]] = await pool.query(
+          'SELECT COUNT(*) AS n FROM plataforma_admins WHERE activo = 1 AND id <> ?', [id]
+        );
+        if (!n) return res.status(400).json({ error: 'Tiene que quedar al menos una cuenta activa' });
+      }
+      sets.push('activo = ?'); params.push(activo);
+      detalles.push(activo ? 'activada' : 'desactivada');
+    }
+
+    if (!sets.length) return res.status(400).json({ error: 'Nada para actualizar' });
+
+    params.push(id);
+    const [r] = await pool.query(`UPDATE plataforma_admins SET ${sets.join(', ')} WHERE id = ?`, params);
     if (!r.affectedRows) return res.status(404).json({ error: 'Cuenta no encontrada' });
-    res.json({ message: activo ? 'Cuenta activada' : 'Cuenta desactivada' });
+    anotar(req.plataforma, 'edito_cuenta', { detalle: `${id === req.plataforma?.id ? 'su perfil' : 'cuenta #' + id}: ${detalles.join(', ')}` });
+    res.json({ message: 'Cuenta actualizada' });
   } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Ya hay otra cuenta con ese correo' });
     fail(res, err);
   }
 });

@@ -50,7 +50,10 @@
         <span class="nav-badge" *ngIf="resumen?.contactos?.sin_atender">{{ resumen?.contactos?.sin_atender }}</span>
       </button>
 
-      <div class="sb-section">Equipo</div>
+      <div class="sb-section">Configuración</div>
+      <button type="button" class="nav-item" [class.on]="vista === 'planes'" (click)="irA('planes')">
+        <ion-icon name="pricetag-outline"></ion-icon> Planes
+      </button>
       <button type="button" class="nav-item" [class.on]="vista === 'cuentas'" (click)="irA('cuentas')">
         <ion-icon name="people-outline"></ion-icon> Equipo
       </button>
@@ -212,10 +215,10 @@
           <span class="cifra">{{ resumen.talleres.nuevos_30d }}</span>
           <span class="rotulo">Nuevos (30 días)</span>
         </div>
-        <!-- Sin precio definido todavía no hay MRR real que mostrar: se pide antes
-             de inventar un número. Una vez definido, queda guardado en este navegador. -->
-        <button type="button" class="tarjeta clicable" (click)="definirPrecioPro()">
-          <span class="cifra paga">{{ precioPro ? formatoColones(mrrEstimado) : '—' }}</span>
+        <!-- Sin precio definido en "Planes" todavía no hay MRR real que mostrar: se
+             pide antes de inventar un número. -->
+        <button type="button" class="tarjeta clicable" (click)="irA('planes')">
+          <span class="cifra paga">{{ mrrEstimado ? formatoColones(mrrEstimado) : '—' }}</span>
           <span class="rotulo">
             MRR estimado <ion-icon name="pencil-outline"></ion-icon>
           </span>
@@ -347,6 +350,7 @@
         </div>
         <div class="cuenta-acciones">
           <ion-badge [color]="c.activo ? 'success' : 'medium'">{{ c.activo ? 'activa' : 'desactivada' }}</ion-badge>
+          <ion-button size="small" fill="clear" (click)="editarPerfil(c)">Editar perfil</ion-button>
           <ion-button size="small" fill="clear" *ngIf="admin?.id === c.id" (click)="cambiarMiPassword()">
             Cambiar mi contraseña
           </ion-button>
@@ -360,6 +364,64 @@
         <ion-icon slot="start" name="person-add-outline"></ion-icon>
         Sumar a alguien al equipo
       </ion-button>
+    </ng-container>
+
+    <!-- ===== Planes ===== -->
+    <ng-container *ngIf="vista === 'planes'">
+      <p class="explica">
+        Lo que incluye cada plan. Los topes son de estructura (usuarios, sucursales, marca
+        propia) y nunca de operación — clientes, vehículos y órdenes no tienen límite en
+        ningún plan. Cambiar acá vale para los talleres que ya están en ese plan, no solo
+        para los nuevos.
+      </p>
+
+      <div class="plan-card" *ngFor="let p of planes">
+        <div class="plan-cabecera">
+          <h2>{{ rotuloPlan(p.plan) }}</h2>
+          <ion-button size="small" fill="clear" *ngIf="editandoPlan !== p.plan" (click)="editarPlan(p)">
+            <ion-icon slot="start" name="pencil-outline"></ion-icon> Editar
+          </ion-button>
+        </div>
+
+        <!-- Vista de lectura -->
+        <div class="plan-datos" *ngIf="editandoPlan !== p.plan">
+          <span class="precio">{{ p.precio_mensual ? formatoColones(p.precio_mensual) + ' / mes' : 'Sin precio definido' }}</span>
+          <span>{{ rotuloLimite(p.limite_usuarios, 'usuario', 'usuarios') }}</span>
+          <span>{{ rotuloLimite(p.limite_sucursales, 'sucursal', 'sucursales') }}</span>
+          <span>{{ p.marca_propia ? 'Incluye marca propia' : 'Sin marca propia' }}</span>
+          <span>{{ p.reportes_dias == null ? 'Reportes sin límite de historial' : 'Reportes de los últimos ' + p.reportes_dias + ' días' }}</span>
+        </div>
+
+        <!-- Edición -->
+        <form class="plan-form" *ngIf="editandoPlan === p.plan" (ngSubmit)="guardarPlan(p.plan)">
+          <ion-item lines="none">
+            <ion-label position="stacked">Precio mensual (₡)</ion-label>
+            <ion-input type="number" min="0" [(ngModel)]="formPlan.precio_mensual" name="precio_mensual"></ion-input>
+          </ion-item>
+          <div class="fila-form">
+            <ion-item lines="none">
+              <ion-label position="stacked">Usuarios (vacío = sin límite)</ion-label>
+              <ion-input type="number" min="0" [(ngModel)]="formPlan.limite_usuarios" name="limite_usuarios"></ion-input>
+            </ion-item>
+            <ion-item lines="none">
+              <ion-label position="stacked">Sucursales (vacío = sin límite)</ion-label>
+              <ion-input type="number" min="0" [(ngModel)]="formPlan.limite_sucursales" name="limite_sucursales"></ion-input>
+            </ion-item>
+          </div>
+          <ion-item lines="none">
+            <ion-label position="stacked">Reportes: días de historial (vacío = sin límite)</ion-label>
+            <ion-input type="number" min="0" [(ngModel)]="formPlan.reportes_dias" name="reportes_dias"></ion-input>
+          </ion-item>
+          <ion-item lines="none">
+            <ion-checkbox slot="start" [(ngModel)]="formPlan.marca_propia" name="marca_propia"></ion-checkbox>
+            <ion-label>Incluye marca propia</ion-label>
+          </ion-item>
+          <div class="acciones-plan">
+            <ion-button fill="clear" type="button" (click)="cancelarEdicionPlan()">Cancelar</ion-button>
+            <ion-button type="submit">Guardar</ion-button>
+          </div>
+        </form>
+      </div>
     </ng-container>
 
     <!-- ===== Contactos de la landing ===== -->

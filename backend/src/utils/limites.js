@@ -10,6 +10,7 @@
 // vuelve; uno que no puede agregar su tercer mecánico llama a preguntar cuánto cuesta.
 // Por eso acá no hay ni va a haber un tope de órdenes.
 const { fechaLocalISO } = require('./fecha');
+const { pool } = require('../db/pool');
 
 const PLANES = ['trial', 'gratis', 'pro'];
 
@@ -17,7 +18,10 @@ const PLANES = ['trial', 'gratis', 'pro'];
 const DIAS_TRIAL = 30;
 const DIAS_AVISO = 7;
 
-// `null` = sin límite.
+// `null` = sin límite. Son los valores DE FÁBRICA: lo que rige mientras nadie los
+// haya editado desde el panel de Motiq, y lo que sigue rigiendo si la tabla
+// planes_config no existe todavía (una base vieja) o está vacía. No se leen nunca
+// directo — limitesDe() de abajo es el único punto de lectura real.
 const LIMITES = {
   // La prueba es el producto completo. Capar el trial sería la forma más rápida de que
   // alguien concluya que el sistema no le sirve.
@@ -28,12 +32,66 @@ const LIMITES = {
   pro:    { usuarios: null, sucursales: null, marca_propia: true,  reportes_dias: null },
 };
 
+// Lo que el panel de Motiq editó, en memoria — igual que utils/estado-tenant.js hace
+// con el estado y el plan de cada taller, y por la misma razón: se consulta en cada
+// alta de usuario o sucursal, así que no puede costar un viaje a MySQL cada vez.
+//
+// Vacío hasta que algo llame a refrescarLimites() (server.js lo hace al arrancar). Un
+// test unitario que importe este módulo directo — como test/limites.test.js — nunca
+// hace esa llamada, así que para él `overrides` queda vacío para siempre y limitesDe()
+// se comporta exactamente como antes de que existiera planes_config: los valores de
+// fábrica de acá arriba, no los de ninguna base de datos.
+const overrides = new Map();   // plan -> { precio_mensual, limite_usuarios, limite_sucursales, marca_propia, reportes_dias }
+
 // Ante un plan que no reconocemos se cae al MÁS PERMISIVO, no al más restrictivo. Los
 // valores de `plan` solo los escribe nuestro propio panel, así que un valor raro es un
 // error nuestro: cobrarle el error al taller capándole la cuenta que paga es el peor de
 // los dos desenlaces posibles. Al revés, lo único que se pierde es un tope.
 function limitesDe(plan) {
-  return LIMITES[plan] || LIMITES.pro;
+  const base = LIMITES[plan] || LIMITES.pro;
+  const o = overrides.get(plan);
+  if (!o) return base;
+  return {
+    usuarios: o.limite_usuarios,
+    sucursales: o.limite_sucursales,
+    marca_propia: !!o.marca_propia,
+    reportes_dias: o.reportes_dias,
+  };
+}
+
+// El precio no es un límite (no toca estructura ni operación): es un dato de negocio
+// para el panel, así que vive aparte de limitesDe() y no se mezcla en su forma.
+function precioDe(plan) {
+  const o = overrides.get(plan);
+  return o ? Number(o.precio_mensual) || 0 : 0;
+}
+
+// Para que un cambio hecho desde el panel valga ya, sin esperar el refresco periódico
+// — igual que fijarEstado/fijarPlan en utils/estado-tenant.js.
+function fijarLimites(plan, datos) {
+  overrides.set(plan, { ...overrides.get(plan), ...datos });
+}
+
+async function refrescarLimites() {
+  const [filas] = await pool.query(
+    `SELECT plan, precio_mensual, limite_usuarios, limite_sucursales, marca_propia, reportes_dias FROM planes_config`
+  );
+  overrides.clear();
+  for (const f of filas) overrides.set(f.plan, f);
+  return overrides.size;
+}
+
+const CADA_MS = 30 * 1000;
+let timer = null;
+
+async function iniciarRefrescoLimites() {
+  await refrescarLimites();
+  if (timer) clearInterval(timer);
+  timer = setInterval(() => {
+    refrescarLimites().catch((err) => console.warn('⚠️  No se pudo refrescar los planes:', err.message));
+  }, CADA_MS);
+  timer.unref();
+  return timer;
 }
 
 // Días que le quedan de prueba. Negativo si ya venció, null si no aplica.
@@ -75,5 +133,6 @@ function mensajeTope(recurso, limite) {
 
 module.exports = {
   PLANES, DIAS_TRIAL, DIAS_AVISO, LIMITES,
-  limitesDe, diasRestantes, finDeTrial, mensajeTope,
+  limitesDe, precioDe, diasRestantes, finDeTrial, mensajeTope,
+  fijarLimites, refrescarLimites, iniciarRefrescoLimites,
 };

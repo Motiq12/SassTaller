@@ -9,6 +9,7 @@ const { ensureSchema } = require('./db/auto-migrate');
 const { verificarListaContraEsquema } = require('./db/tenant-db');
 const { iniciarJobs } = require('./jobs/scheduler');
 const { iniciarRefrescoEstados } = require('./utils/estado-tenant');
+const { iniciarRefrescoLimites } = require('./utils/limites');
 const { apiLimiter, authLimiter, adminLimiter } = require('./middleware/rate-limit');
 
 const app = express();
@@ -200,6 +201,11 @@ const correrJobs = bajoCluster ? process.env.JOBS === '1' : true;
   // lo consultan en cada request y no puede haber una ventana donde uno suspendido
   // trabaje porque la foto todavía no cargó.
   await iniciarRefrescoEstados();
+  // Los límites y el precio de cada plan, editables desde el panel de Motiq (ver
+  // utils/limites.js). Misma razón que el refresco de arriba: se consulta en cada
+  // alta de usuario o sucursal, y no puede haber una ventana donde un plan recién
+  // editado siga usando el valor viejo porque la foto todavía no cargó.
+  await iniciarRefrescoLimites();
   // Tareas de fondo (recordatorios de cita, no-show). Después de migrar, para que
   // las columnas que usan (recordatorio_enviado, no_show) ya existan.
   // Solo un proceso las programa: si no, cada cliente recibiría un correo por worker.

@@ -106,6 +106,18 @@ export interface CuentaPlataforma {
   ultimo_acceso: string | null; created_at: string;
 }
 
+// Lo que incluye cada plan. Antes vivía solo como constante en el backend
+// (utils/limites.js); acá se puede editar sin tocar código ni redesplegar.
+export interface PlanConfig {
+  plan: string;
+  precio_mensual: number;
+  limite_usuarios: number | null;
+  limite_sucursales: number | null;
+  marca_propia: number;
+  reportes_dias: number | null;
+  updated_at: string;
+}
+
 // Lo que manda la landing cuando alguien pide una demo.
 export interface PedidoDemo {
   nombre: string;
@@ -137,6 +149,16 @@ export class MotiqService {
 
   get admin(): AdminPlataforma | null {
     try { return JSON.parse(localStorage.getItem(ADMIN_KEY) || 'null'); } catch { return null; }
+  }
+
+  // El nombre y el correo del admin logueado viajan en el token/localStorage desde el
+  // login, y no se releen del servidor en cada request. Si edita su propio perfil, hay
+  // que actualizar esta copia local a mano — si no, el saludo y el pie de la barra
+  // lateral siguen mostrando el nombre viejo hasta el próximo login.
+  actualizarAdminLocal(datos: Partial<AdminPlataforma>): void {
+    const actual = this.admin;
+    if (!actual) return;
+    localStorage.setItem(ADMIN_KEY, JSON.stringify({ ...actual, ...datos }));
   }
 
   login(email: string, password: string): Observable<{ data: { token: string; admin: AdminPlataforma } }> {
@@ -266,6 +288,25 @@ export class MotiqService {
 
   activarCuenta(id: number, activo: boolean): Observable<{ message: string }> {
     return this.http.patch<{ message: string }>(`${this.apiUrl}/motiq/admins/${id}`, { activo });
+  }
+
+  // Editar el propio perfil o el de un compañero: acá no hay permisos parciales,
+  // igual que para suspender un taller.
+  editarCuenta(id: number, nombre: string, email: string): Observable<{ message: string }> {
+    return this.http.patch<{ message: string }>(`${this.apiUrl}/motiq/admins/${id}`, { nombre, email });
+  }
+
+  // --- Planes ---
+
+  planes(): Observable<{ data: PlanConfig[] }> {
+    return this.http.get<{ data: PlanConfig[] }>(`${this.apiUrl}/motiq/planes`);
+  }
+
+  actualizarPlan(plan: string, datos: {
+    precio_mensual: number; limite_usuarios: number | null; limite_sucursales: number | null;
+    marca_propia: boolean; reportes_dias: number | null;
+  }): Observable<{ message: string }> {
+    return this.http.patch<{ message: string }>(`${this.apiUrl}/motiq/planes/${plan}`, datos);
   }
 
   cambiarPassword(actual: string, nueva: string): Observable<{ message: string }> {

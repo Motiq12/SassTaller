@@ -658,6 +658,33 @@ async function ensureSchema() {
        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
     ));
 
+    // Los límites y el precio de cada plan (migración 009), editables desde el panel
+    // de Motiq. Antes vivían solo como constantes en utils/limites.js; esta tabla les
+    // da un valor que se puede cambiar sin tocar código ni redesplegar. utils/limites.js
+    // sigue siendo la fuente de verdad de la FORMA de un plan (qué campos tiene) — acá
+    // solo se guardan los valores, y si la tabla está vacía o no existe, ese archivo
+    // sigue funcionando con sus valores de siempre.
+    await tryStep('tabla planes_config', () => pool.query(
+      `CREATE TABLE IF NOT EXISTS planes_config (
+         plan              VARCHAR(20) PRIMARY KEY,
+         precio_mensual    INT NOT NULL DEFAULT 0,
+         limite_usuarios   INT NULL,
+         limite_sucursales INT NULL,
+         marca_propia      TINYINT(1) NOT NULL DEFAULT 0,
+         reportes_dias     INT NULL,
+         updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+    ));
+    // Semilla con los mismos valores que utils/limites.js trae de fábrica. INSERT IGNORE
+    // para que solo pegue la primera vez: una instalación donde alguien ya editó el
+    // precio del plan Pro no puede volver a "gratis" cada vez que el server reinicia.
+    await tryStep('semilla planes_config', () => pool.query(
+      `INSERT IGNORE INTO planes_config (plan, precio_mensual, limite_usuarios, limite_sucursales, marca_propia, reportes_dias) VALUES
+         ('trial',  0, NULL, NULL, 1, NULL),
+         ('gratis', 0, 2,    1,    0, 30),
+         ('pro',    0, NULL, NULL, 1, NULL)`
+    ));
+
     // Quien pide una demo desde la landing. Tampoco lleva tenant_id: todavía no es
     // un taller del sistema, es alguien de afuera preguntando.
     await tryStep('tabla contactos_demo', () => pool.query(

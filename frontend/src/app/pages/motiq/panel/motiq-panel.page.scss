@@ -675,6 +675,58 @@ $sb-ancho: 240px;
 
 .sumar { margin-top: 1rem; }
 
+// ---- Planes ----
+.plan-card {
+  @extend %tarjeta;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.plan-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+
+  h2 { margin: 0; font-size: 1.05rem; font-weight: 600; }
+}
+
+.plan-datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.1rem;
+  margin-top: 0.6rem;
+  font-size: 0.88rem;
+  color: var(--ion-color-medium-shade, #808289);
+
+  .precio { font-weight: 700; color: var(--ion-color-success, #2dd36f); }
+}
+
+.plan-form {
+  margin-top: 0.6rem;
+
+  ion-item {
+    --background: transparent;
+    --padding-start: 0;
+    --inner-padding-end: 0;
+  }
+
+  .fila-form {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+
+    ion-item { flex: 1; min-width: 160px; }
+  }
+}
+
+.acciones-plan {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
 // ---- Ficha del taller ----
 .ficha {
   .cabecera-ficha { margin-bottom: 0.75rem; }
