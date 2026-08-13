@@ -613,6 +613,51 @@ async function ensureSchema() {
     await addColumnIfMissing('tenants', 'trial_hasta', 'DATE NULL');
     await crearIndiceSiFalta('tenants', 'idx_tenants_estado', '(estado)');
 
+    // El espacio de trabajo de cada administrador de Motiq (migración 008). Los datos
+    // del SaaS son compartidos —los dos administran todo—, pero los pendientes, los
+    // talleres que cada uno sigue y lo que hizo cada uno son suyos.
+    await tryStep('tabla motiq_tareas', () => pool.query(
+      `CREATE TABLE IF NOT EXISTS motiq_tareas (
+         id         INT AUTO_INCREMENT PRIMARY KEY,
+         admin_id   INT NOT NULL,
+         texto      VARCHAR(300) NOT NULL,
+         tenant_id  INT NULL,
+         vence_el   DATE NULL,
+         hecha      TINYINT(1) NOT NULL DEFAULT 0,
+         hecha_en   DATETIME NULL,
+         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+         INDEX idx_tareas_admin (admin_id, hecha, vence_el),
+         FOREIGN KEY (admin_id) REFERENCES plataforma_admins(id) ON DELETE CASCADE
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+    ));
+    await tryStep('tabla motiq_seguidos', () => pool.query(
+      `CREATE TABLE IF NOT EXISTS motiq_seguidos (
+         admin_id   INT NOT NULL,
+         tenant_id  INT NOT NULL,
+         nota       VARCHAR(300) NULL,
+         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+         PRIMARY KEY (admin_id, tenant_id),
+         FOREIGN KEY (admin_id) REFERENCES plataforma_admins(id) ON DELETE CASCADE
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+    ));
+    // El tenant_id de la bitácora NO lleva clave foránea: cuando se borra un taller,
+    // su línea tiene que sobrevivir. Es justo la que hay que poder leer después.
+    await tryStep('tabla motiq_bitacora', () => pool.query(
+      `CREATE TABLE IF NOT EXISTS motiq_bitacora (
+         id          INT AUTO_INCREMENT PRIMARY KEY,
+         admin_id    INT NULL,
+         admin_email VARCHAR(150) NULL,
+         accion      VARCHAR(40) NOT NULL,
+         tenant_id   INT NULL,
+         tenant_slug VARCHAR(120) NULL,
+         detalle     VARCHAR(300) NULL,
+         created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+         INDEX idx_bitacora_admin (admin_id, created_at),
+         INDEX idx_bitacora_fecha (created_at)
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+    ));
+
     // Quien pide una demo desde la landing. Tampoco lleva tenant_id: todavía no es
     // un taller del sistema, es alguien de afuera preguntando.
     await tryStep('tabla contactos_demo', () => pool.query(

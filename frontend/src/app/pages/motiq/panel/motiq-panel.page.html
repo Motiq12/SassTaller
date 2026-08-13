@@ -44,6 +44,12 @@
 
     <!-- Qué sección se está mirando -->
     <ion-segment class="vistas" [(ngModel)]="vista" scrollable>
+      <ion-segment-button value="espacio">
+        <ion-label>
+          Mi espacio
+          <ion-badge color="primary" *ngIf="pendientesAbiertos.length">{{ pendientesAbiertos.length }}</ion-badge>
+        </ion-label>
+      </ion-segment-button>
       <ion-segment-button value="resumen"><ion-label>Resumen</ion-label></ion-segment-button>
       <ion-segment-button value="talleres"><ion-label>Talleres</ion-label></ion-segment-button>
       <ion-segment-button value="vencen">
@@ -63,6 +69,98 @@
       </ion-segment-button>
       <ion-segment-button value="cuentas"><ion-label>Equipo</ion-label></ion-segment-button>
     </ion-segment>
+
+    <!-- ===== Mi espacio =====
+         Los datos del SaaS son compartidos: los dos ven todos los talleres. Lo de acá
+         es de cada uno. Dos personas mirando la misma lista de pendientes terminan
+         llamando las dos al mismo taller, o ninguna. -->
+    <ng-container *ngIf="vista === 'espacio'">
+      <div class="saludo">
+        <h2>Hola, {{ admin?.nombre }}</h2>
+        <p>Tu espacio. Los talleres son de los dos; esto es tuyo.</p>
+      </div>
+
+      <!-- Mis pendientes -->
+      <section class="bloque-espacio">
+        <div class="titulo-bloque">
+          <h3>Mis pendientes</h3>
+          <ion-button size="small" fill="clear" (click)="anotar()">
+            <ion-icon slot="start" name="add-outline"></ion-icon> Anotar
+          </ion-button>
+        </div>
+
+        <p class="nada" *ngIf="!pendientesAbiertos.length && !pendientesHechos.length">
+          Nada anotado. Lo que apuntes acá no lo ve tu compañero.
+        </p>
+
+        <div class="pendiente-fila" *ngFor="let t of pendientesAbiertos">
+          <button type="button" class="casilla" (click)="tachar(t)" [attr.aria-label]="'Marcar hecho: ' + t.texto">
+            <ion-icon name="ellipse-outline"></ion-icon>
+          </button>
+          <div class="texto">
+            <span>{{ t.texto }}</span>
+            <span class="meta">
+              <ion-badge *ngIf="t.taller_slug" color="light">{{ t.taller_slug }}</ion-badge>
+              <ion-badge *ngIf="t.vence_el" [color]="colorUrgencia(t.dias)">{{ cuantoFalta(t.dias) }}</ion-badge>
+            </span>
+          </div>
+          <ion-button fill="clear" size="small" (click)="borrarPendiente(t)" aria-label="Borrar">
+            <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+          </ion-button>
+        </div>
+
+        <div class="pendiente-fila hecho" *ngFor="let t of pendientesHechos">
+          <button type="button" class="casilla" (click)="tachar(t)" [attr.aria-label]="'Reabrir: ' + t.texto">
+            <ion-icon name="checkmark-circle"></ion-icon>
+          </button>
+          <div class="texto"><span>{{ t.texto }}</span></div>
+        </div>
+      </section>
+
+      <!-- Talleres que sigo de cerca -->
+      <section class="bloque-espacio">
+        <h3>Sigo de cerca</h3>
+        <p class="nada" *ngIf="!espacio?.seguidos?.length">
+          Ninguno todavía. Abrí la ficha de un taller y tocá "Seguir" para tenerlo acá.
+        </p>
+        <div class="seguido" *ngFor="let s of espacio?.seguidos">
+          <div>
+            <strong>{{ s.nombre }}</strong>
+            <span class="slug">{{ s.slug }}</span>
+          </div>
+          <div class="etiquetas">
+            <ion-badge [color]="colorEstado(s.estado)" *ngIf="s.estado !== 'activo'">{{ s.estado }}</ion-badge>
+            <ion-badge [color]="colorUrgencia(s.dias_restantes)" *ngIf="s.dias_restantes != null">
+              {{ cuantoFalta(s.dias_restantes) }}
+            </ion-badge>
+            <ion-badge color="light">{{ s.ordenes }} órdenes</ion-badge>
+            <ion-button size="small" fill="clear" (click)="abrirFicha(s.id)">Ver</ion-button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Lo que hice -->
+      <section class="bloque-espacio">
+        <h3>Lo que hice</h3>
+        <p class="nada" *ngIf="!espacio?.actividad?.length">Todavía no hiciste nada por acá.</p>
+        <div class="linea" *ngFor="let l of espacio?.actividad">
+          <ion-icon [name]="iconoAccion(l.accion)"></ion-icon>
+          <span class="que">{{ rotuloAccion(l) }}</span>
+          <span class="cuando">{{ l.created_at | date: 'short' }}</span>
+        </div>
+      </section>
+
+      <!-- Lo que hizo el otro. No es control: es para no llamar dos veces al mismo
+           taller ni encontrarse un cliente suspendido sin saber por qué. -->
+      <section class="bloque-espacio" *ngIf="espacio?.equipo?.length">
+        <h3>Mientras tanto, tu equipo</h3>
+        <div class="linea" *ngFor="let l of espacio?.equipo">
+          <ion-icon [name]="iconoAccion(l.accion)"></ion-icon>
+          <span class="que"><strong>{{ l.admin_email }}</strong> {{ rotuloAccion(l) }}</span>
+          <span class="cuando">{{ l.created_at | date: 'short' }}</span>
+        </div>
+      </section>
+    </ng-container>
 
     <!-- ===== Resumen ===== -->
     <ng-container *ngIf="vista === 'resumen'">
@@ -412,6 +510,11 @@
 
           <!-- Acciones -->
           <section class="acciones-ficha">
+            <ion-button expand="block" [fill]="sigo(f.taller.id) ? 'solid' : 'outline'"
+                        (click)="alternarSeguido($any(f.taller))">
+              <ion-icon slot="start" [name]="sigo(f.taller.id) ? 'star' : 'star-outline'"></ion-icon>
+              {{ sigo(f.taller.id) ? 'Lo seguís de cerca' : 'Seguir de cerca' }}
+            </ion-button>
             <ion-button expand="block" fill="outline" (click)="cambiarPlan($any(f.taller))">
               Cambiar plan (hoy: {{ rotuloPlan(f.taller.plan) }})
             </ion-button>

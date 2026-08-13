@@ -75,6 +75,32 @@ export interface TallerInactivo {
   ultima_orden: string | null; ordenes: number; admin_email: string | null;
 }
 
+// Mi espacio de trabajo. Los datos del SaaS son compartidos —los dos administran
+// todo— pero la agenda de cada uno es suya.
+export interface Pendiente {
+  id: number; texto: string; tenant_id: number | null; vence_el: string | null;
+  hecha: number; created_at: string; taller_nombre: string | null;
+  taller_slug: string | null; dias: number | null;
+}
+
+export interface TallerSeguido {
+  id: number; nota: string | null; nombre: string; slug: string; plan: string;
+  estado: string; trial_hasta: string | null; dias_restantes: number | null;
+  ordenes: number; ultima_orden: string | null;
+}
+
+export interface LineaBitacora {
+  id: number; accion: string; tenant_id: number | null; tenant_slug: string | null;
+  detalle: string | null; created_at: string; admin_email?: string;
+}
+
+export interface MiEspacio {
+  tareas: Pendiente[];
+  seguidos: TallerSeguido[];
+  actividad: LineaBitacora[];
+  equipo: LineaBitacora[];
+}
+
 export interface CuentaPlataforma {
   id: number; nombre: string; email: string; activo: number;
   ultimo_acceso: string | null; created_at: string;
@@ -185,6 +211,32 @@ export class MotiqService {
 
   cambiarEstado(id: number, estado: string, motivo?: string): Observable<{ message: string }> {
     return this.http.patch<{ message: string }>(`${this.apiUrl}/motiq/talleres/${id}/estado`, { estado, motivo });
+  }
+
+  // --- Mi espacio de trabajo ---
+
+  espacio(): Observable<{ data: MiEspacio }> {
+    return this.http.get<{ data: MiEspacio }>(`${this.apiUrl}/motiq/espacio`);
+  }
+
+  anotarPendiente(texto: string, tenant_id?: number | null, vence_el?: string | null): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/motiq/tareas`, { texto, tenant_id, vence_el });
+  }
+
+  marcarPendiente(id: number, hecha: boolean): Observable<{ message: string }> {
+    return this.http.patch<{ message: string }>(`${this.apiUrl}/motiq/tareas/${id}`, { hecha });
+  }
+
+  borrarPendiente(id: number): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.apiUrl}/motiq/tareas/${id}`);
+  }
+
+  seguir(tenantId: number, nota?: string): Observable<{ message: string }> {
+    return this.http.put<{ message: string }>(`${this.apiUrl}/motiq/seguidos/${tenantId}`, { nota });
+  }
+
+  dejarDeSeguir(tenantId: number): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.apiUrl}/motiq/seguidos/${tenantId}`);
   }
 
   // --- Ficha, alertas y cuentas: lo que hasta ahora pedía una terminal ---

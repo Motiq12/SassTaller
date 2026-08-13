@@ -19,6 +19,7 @@ const { crearTaller, normalizarSlug, motivoSlugInvalido } = require('../utils/on
 const { generarPassword } = require('../utils/password');
 const { ordenDeBorrado } = require('../utils/orden-borrado');
 const { TABLAS_CON_TENANT } = require('../db/tenant-db');
+const { anotar } = require('../utils/bitacora');
 
 const ESTADOS = ['activo', 'suspendido', 'cancelado'];
 
@@ -146,6 +147,8 @@ router.patch('/contactos/:id', async (req, res) => {
       [estado, String(nota_interna || '').trim().slice(0, 500) || null, req.params.id]
     );
     if (!r.affectedRows) return res.status(404).json({ error: 'Contacto no encontrado' });
+    // Que el otro vea que este contacto ya lo atendió alguien, y no lo llame de nuevo.
+    anotar(req.plataforma, 'atendio_contacto', { detalle: `${estado}` });
     res.json({ message: 'Contacto actualizado' });
   } catch (err) {
     fail(res, err);
@@ -435,6 +438,12 @@ router.patch('/talleres/:id/estado', async (req, res) => {
     // que suspender valga desde el request siguiente; a los demás workers del
     // cluster les llega en el refresco periódico.
     fijarEstado(Number(req.params.id), estado);
+    // Suspender deja a un cliente sin poder trabajar: tiene que quedar quién lo hizo
+    // y por qué, en la base y no solo en la consola del servidor.
+    const [[t]] = await pool.query('SELECT slug FROM tenants WHERE id = ?', [req.params.id]);
+    anotar(req.plataforma, estado === 'activo' ? 'reactivo' : 'suspendio', {
+      tenantId: Number(req.params.id), slug: t?.slug, detalle: motivo || null,
+    });
     res.json({ message: estado === 'activo' ? 'Taller reactivado' : 'Taller suspendido' });
   } catch (err) {
     fail(res, err);
@@ -466,6 +475,10 @@ router.patch('/talleres/:id/plan', async (req, res) => {
     // así que pasar a Pro tiene que valer desde el request siguiente y no cuando toque
     // el refresco. A los otros workers del cluster les llega por ahí.
     fijarPlan(Number(req.params.id), plan, vence);
+    const [[t]] = await pool.query('SELECT slug FROM tenants WHERE id = ?', [req.params.id]);
+    anotar(req.plataforma, 'cambio_plan', {
+      tenantId: Number(req.params.id), slug: t?.slug, detalle: `a ${plan}`,
+    });
     res.json({ message: 'Plan actualizado' });
   } catch (err) {
     fail(res, err);
@@ -513,6 +526,9 @@ router.delete('/talleres/:id', async (req, res) => {
       // seguiría pasando los middlewares hasta el refresco. Marcarlo cancelado los
       // corta desde el request siguiente; el refresco lo saca del todo.
       fijarEstado(id, 'cancelado');
+      // La bitácora guarda el slug además del id justamente para este caso: el taller
+      // ya no existe, y esta línea es la única que queda diciendo qué pasó con él.
+      anotar(req.plataforma, 'borro', { tenantId: id, slug: taller.slug, detalle: `${filas} registros` });
       console.warn(`🗑  Motiq: ${req.plataforma?.email} borró el taller ${taller.slug} (${filas} filas)`);
       res.json({ message: `Se borró ${taller.nombre} y sus ${filas} registros`, filas });
     } catch (err) {
@@ -563,6 +579,7 @@ router.post('/admins', async (req, res) => {
       'INSERT INTO plataforma_admins (nombre, email, password_hash, activo) VALUES (?, ?, ?, 1)',
       [nombre, email, hash]
     );
+    anotar(req.plataforma, 'creo_cuenta', { detalle: email });
     console.warn(`👤 Motiq: ${req.plataforma?.email} creó la cuenta de plataforma ${email}`);
     res.status(201).json({
       data: { id: r.insertId, nombre, email, password },
@@ -595,6 +612,143 @@ router.patch('/admins/:id', async (req, res) => {
     const [r] = await pool.query('UPDATE plataforma_admins SET activo = ? WHERE id = ?', [activo, id]);
     if (!r.affectedRows) return res.status(404).json({ error: 'Cuenta no encontrada' });
     res.json({ message: activo ? 'Cuenta activada' : 'Cuenta desactivada' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// ───────────── Mi espacio de trabajo ─────────────
+// El SaaS es de los dos y los datos son compartidos: ambos ven todos los talleres.
+// Lo que no puede ser compartido es la agenda. Dos personas mirando la misma lista de
+// pendientes terminan llamando las dos al mismo taller, o ninguna, cada una suponiendo
+// que la otra ya lo hizo.
+
+// GET /api/motiq/espacio — todo lo mío de una sola vez.
+//
+// Va en un solo endpoint y no en tres: es la pantalla de inicio, y hacerle esperar
+// tres viajes seguidos al servidor a quien acaba de entrar se nota.
+router.get('/espacio', async (req, res) => {
+  try {
+    const yo = req.plataforma.id;
+
+    const [tareas] = await pool.query(
+      `SELECT t.id, t.texto, t.tenant_id, t.vence_el, t.hecha, t.created_at,
+              te.nombre AS taller_nombre, te.slug AS taller_slug,
+              DATEDIFF(t.vence_el, CURDATE()) AS dias
+         FROM motiq_tareas t
+         LEFT JOIN tenants te ON te.id = t.tenant_id
+        WHERE t.admin_id = ?
+          -- Las hechas de hace más de una semana se dejan de mostrar solas. Una lista
+          -- que solo crece deja de mirarse, y tachar algo tiene que sacarlo de encima.
+          AND (t.hecha = 0 OR t.hecha_en >= DATE_SUB(NOW(), INTERVAL 7 DAY))
+        ORDER BY t.hecha, t.vence_el IS NULL, t.vence_el, t.id DESC`,
+      [yo]
+    );
+
+    // Los talleres que sigo, con lo que necesito saber de un vistazo: si vencen, si
+    // están suspendidos y si se movieron.
+    const [seguidos] = await pool.query(
+      `SELECT s.tenant_id AS id, s.nota, t.nombre, t.slug, t.plan, t.estado, t.trial_hasta,
+              DATEDIFF(t.trial_hasta, CURDATE()) AS dias_restantes,
+              (SELECT COUNT(*) FROM ordenes_trabajo o WHERE o.tenant_id = t.id) AS ordenes,
+              (SELECT MAX(o.created_at) FROM ordenes_trabajo o WHERE o.tenant_id = t.id) AS ultima_orden
+         FROM motiq_seguidos s
+         JOIN tenants t ON t.id = s.tenant_id
+        WHERE s.admin_id = ?
+        ORDER BY t.nombre`,
+      [yo]
+    );
+
+    const [actividad] = await pool.query(
+      `SELECT id, accion, tenant_id, tenant_slug, detalle, created_at
+         FROM motiq_bitacora WHERE admin_id = ? ORDER BY created_at DESC LIMIT 15`,
+      [yo]
+    );
+
+    // Lo que hizo el OTRO, para no llamar dos veces al mismo taller ni sorprenderse de
+    // que un cliente aparezca suspendido sin saber por qué.
+    const [equipo] = await pool.query(
+      `SELECT id, admin_email, accion, tenant_slug, detalle, created_at
+         FROM motiq_bitacora WHERE admin_id <> ? ORDER BY created_at DESC LIMIT 10`,
+      [yo]
+    );
+
+    res.json({ data: { tareas, seguidos, actividad, equipo } });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// POST /api/motiq/tareas — anotar un pendiente.
+router.post('/tareas', async (req, res) => {
+  try {
+    const texto = String(req.body?.texto || '').trim();
+    if (!texto) return res.status(400).json({ error: '¿Qué hay que hacer?' });
+    const vence = String(req.body?.vence_el || '').trim() || null;
+    if (vence && !/^\d{4}-\d{2}-\d{2}$/.test(vence)) {
+      return res.status(400).json({ error: 'La fecha debe ser AAAA-MM-DD' });
+    }
+    const [r] = await pool.query(
+      'INSERT INTO motiq_tareas (admin_id, texto, tenant_id, vence_el) VALUES (?, ?, ?, ?)',
+      [req.plataforma.id, texto.slice(0, 300), Number(req.body?.tenant_id) || null, vence]
+    );
+    res.status(201).json({ data: { id: r.insertId }, message: 'Anotado' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// PATCH /api/motiq/tareas/:id — tacharla o volver a abrirla.
+//
+// El WHERE lleva el admin: sin él, cualquiera de los dos podría tachar los pendientes
+// del otro pasando un id a mano, y el espacio dejaría de ser de nadie.
+router.patch('/tareas/:id', async (req, res) => {
+  try {
+    const hecha = req.body?.hecha ? 1 : 0;
+    const [r] = await pool.query(
+      'UPDATE motiq_tareas SET hecha = ?, hecha_en = ? WHERE id = ? AND admin_id = ?',
+      [hecha, hecha ? new Date() : null, req.params.id, req.plataforma.id]
+    );
+    if (!r.affectedRows) return res.status(404).json({ error: 'Pendiente no encontrado' });
+    res.json({ message: hecha ? 'Listo' : 'Reabierto' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+router.delete('/tareas/:id', async (req, res) => {
+  try {
+    const [r] = await pool.query('DELETE FROM motiq_tareas WHERE id = ? AND admin_id = ?',
+      [req.params.id, req.plataforma.id]);
+    if (!r.affectedRows) return res.status(404).json({ error: 'Pendiente no encontrado' });
+    res.json({ message: 'Borrado' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// PUT /api/motiq/seguidos/:tenantId — seguir o dejar de seguir un taller.
+router.put('/seguidos/:tenantId', async (req, res) => {
+  try {
+    const tenantId = Number(req.params.tenantId);
+    const [[existe]] = await pool.query('SELECT id FROM tenants WHERE id = ?', [tenantId]);
+    if (!existe) return res.status(404).json({ error: 'Taller no encontrado' });
+    await pool.query(
+      `INSERT INTO motiq_seguidos (admin_id, tenant_id, nota) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE nota = VALUES(nota)`,
+      [req.plataforma.id, tenantId, String(req.body?.nota || '').trim().slice(0, 300) || null]
+    );
+    res.json({ message: 'Lo seguís de cerca' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+router.delete('/seguidos/:tenantId', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM motiq_seguidos WHERE admin_id = ? AND tenant_id = ?',
+      [req.plataforma.id, Number(req.params.tenantId)]);
+    res.json({ message: 'Dejaste de seguirlo' });
   } catch (err) {
     fail(res, err);
   }

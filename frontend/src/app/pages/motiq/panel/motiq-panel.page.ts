@@ -3,8 +3,8 @@ import { Router } from '@angular/router';
 import { AlertController } from '@ionic/angular';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 import {
-  ContactoDemo, CuentaPlataforma, FichaTaller, MotiqService, ResumenPlataforma,
-  TallerDelPanel, TallerInactivo, Vencimiento,
+  ContactoDemo, CuentaPlataforma, FichaTaller, MiEspacio, MotiqService, Pendiente,
+  ResumenPlataforma, TallerDelPanel, TallerInactivo, Vencimiento,
 } from '../../../services/motiq.service';
 import { MarcaService } from '../../../services/marca.service';
 import { ToastService } from '../../../services/toast.service';
@@ -33,7 +33,11 @@ export class MotiqPanelPage implements OnInit {
   // Secciones del panel. "Vencen" e "Inactivos" van separadas y no como un filtro más
   // de la lista de talleres: son las dos listas de LLAMADAS, no de consulta. Metidas
   // dentro de un filtro habría que acordarse de ir a buscarlas, y nadie se acuerda.
-  vista: 'resumen' | 'talleres' | 'vencen' | 'inactivos' | 'contactos' | 'cuentas' = 'resumen';
+  // Arranca en "Mi espacio" y no en el resumen: los dos administran todo el SaaS, así
+  // que los datos son los mismos para ambos — lo primero que cada uno tiene que ver al
+  // entrar es lo SUYO, no el total compartido.
+  vista: 'espacio' | 'resumen' | 'talleres' | 'vencen' | 'inactivos' | 'contactos' | 'cuentas' = 'espacio';
+  espacio: MiEspacio | null = null;
   contactos: ContactoDemo[] = [];
   vencimientos: Vencimiento[] = [];
   inactivos: TallerInactivo[] = [];
@@ -82,6 +86,102 @@ export class MotiqPanelPage implements OnInit {
     this.motiq.vencimientos(14).subscribe({ next: (r) => (this.vencimientos = r.data), error: () => {} });
     this.motiq.inactivos(30).subscribe({ next: (r) => (this.inactivos = r.data), error: () => {} });
     this.motiq.cuentas().subscribe({ next: (r) => (this.cuentas = r.data), error: () => {} });
+    this.cargarEspacio();
+  }
+
+  cargarEspacio() {
+    this.motiq.espacio().subscribe({
+      next: (r) => (this.espacio = r.data),
+      error: () => this.toast.error('No se pudo cargar tu espacio'),
+    });
+  }
+
+  // --- Mis pendientes ---
+
+  get pendientesAbiertos(): Pendiente[] {
+    return (this.espacio?.tareas || []).filter(t => !t.hecha);
+  }
+  get pendientesHechos(): Pendiente[] {
+    return (this.espacio?.tareas || []).filter(t => t.hecha);
+  }
+
+  async anotar() {
+    const a = await this.alerta.create({
+      header: 'Anotar un pendiente',
+      inputs: [
+        { name: 'texto', type: 'text', placeholder: '¿Qué hay que hacer?', attributes: { maxlength: 300 } },
+        { name: 'vence_el', type: 'date', label: 'Para cuándo (opcional)' },
+      ],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Anotar',
+          handler: (d) => {
+            const texto = String(d.texto || '').trim();
+            if (!texto) { this.toast.error('Escribí qué hay que hacer'); return false; }
+            this.motiq.anotarPendiente(texto, null, String(d.vence_el || '').slice(0, 10) || null).subscribe({
+              next: () => this.cargarEspacio(),
+              error: (e) => this.toast.error(e?.error?.error || 'No se pudo anotar'),
+            });
+            return true;
+          },
+        },
+      ],
+    });
+    await a.present();
+  }
+
+  tachar(t: Pendiente) {
+    this.motiq.marcarPendiente(t.id, !t.hecha).subscribe({
+      next: () => this.cargarEspacio(),
+      error: () => this.toast.error('No se pudo actualizar'),
+    });
+  }
+
+  borrarPendiente(t: Pendiente) {
+    this.motiq.borrarPendiente(t.id).subscribe({
+      next: () => this.cargarEspacio(),
+      error: () => this.toast.error('No se pudo borrar'),
+    });
+  }
+
+  // --- Talleres que sigo ---
+
+  sigo(id: number): boolean {
+    return (this.espacio?.seguidos || []).some(s => s.id === id);
+  }
+
+  alternarSeguido(t: { id: number; nombre: string }) {
+    const accion = this.sigo(t.id) ? this.motiq.dejarDeSeguir(t.id) : this.motiq.seguir(t.id);
+    accion.subscribe({
+      next: (r) => { this.toast.success(r.message); this.cargarEspacio(); },
+      error: () => this.toast.error('No se pudo cambiar'),
+    });
+  }
+
+  // Lo que dice cada línea de la bitácora, en castellano. Se arma acá y no se guarda
+  // ya escrito en la base: así se puede corregir la redacción sin reescribir el
+  // historial, que es justo lo que un registro de auditoría no debe permitir.
+  rotuloAccion(l: { accion: string; tenant_slug: string | null; detalle: string | null }): string {
+    const donde = l.tenant_slug ? ` a ${l.tenant_slug}` : '';
+    const textos: Record<string, string> = {
+      suspendio: `suspendió${donde}`,
+      reactivo: `reactivó${donde}`,
+      cambio_plan: `cambió el plan${donde}`,
+      borro: `borró${donde}`,
+      creo_cuenta: 'creó una cuenta de plataforma',
+      atendio_contacto: 'atendió un contacto',
+    };
+    const base = textos[l.accion] || l.accion;
+    return l.detalle ? `${base} — ${l.detalle}` : base;
+  }
+
+  iconoAccion(accion: string): string {
+    return {
+      suspendio: 'pause-circle-outline', reactivo: 'play-circle-outline',
+      cambio_plan: 'swap-horizontal-outline', borro: 'trash-outline',
+      creo_cuenta: 'person-add-outline', atendio_contacto: 'mail-open-outline',
+    }[accion] || 'ellipse-outline';
   }
 
   // Altura de cada barra del gráfico de altas, en porcentaje del mes más alto. Se

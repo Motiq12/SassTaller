@@ -118,6 +118,123 @@
   }
 }
 
+// ---- Mi espacio ----
+.saludo {
+  margin: 1rem 0 0.5rem;
+
+  h2 { margin: 0; font-size: 1.3rem; font-weight: 700; letter-spacing: -0.02em; }
+  p { margin: 0.2rem 0 0; font-size: 0.87rem; color: var(--ion-color-medium, #92949c); }
+}
+
+.bloque-espacio {
+  @extend %tarjeta;
+  padding: 1rem;
+  margin-top: 0.75rem;
+
+  h3 {
+    margin: 0 0 0.7rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  .titulo-bloque {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+
+    h3 { margin: 0; }
+    ion-button { --padding-end: 0; text-transform: none; }
+  }
+
+  .nada {
+    margin: 0.5rem 0 0;
+    font-size: 0.87rem;
+    line-height: 1.5;
+    color: var(--ion-color-medium, #92949c);
+  }
+}
+
+.pendiente-fila {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.55rem 0;
+  border-top: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+
+  &:first-of-type { border-top: 0; }
+
+  .casilla {
+    background: none;
+    border: 0;
+    padding: 0;
+    margin-top: 1px;
+    cursor: pointer;
+    color: var(--ion-color-medium, #92949c);
+
+    ion-icon { font-size: 1.3rem; }
+  }
+
+  .texto {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    font-size: 0.92rem;
+    line-height: 1.4;
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  // Tachado y apagado: sigue estando (por si se marcó por error) pero deja de competir
+  // por la atención con lo que falta hacer.
+  &.hecho {
+    opacity: 0.5;
+    .texto > span:first-child { text-decoration: line-through; }
+    .casilla { color: var(--ion-color-success, #2dd36f); }
+  }
+}
+
+.seguido {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.55rem 0;
+  border-top: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+
+  &:first-of-type { border-top: 0; }
+
+  strong { display: block; font-size: 0.93rem; }
+  .slug { font-size: 0.8rem; }
+  .etiquetas { display: flex; align-items: center; flex-wrap: wrap; gap: 0.3rem; }
+  ion-button { text-transform: none; }
+}
+
+.linea {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0;
+  font-size: 0.87rem;
+  border-top: 1px solid color-mix(in srgb, currentColor 8%, transparent);
+
+  &:first-of-type { border-top: 0; }
+
+  ion-icon { font-size: 1.05rem; color: var(--ion-color-medium, #92949c); flex-shrink: 0; }
+  .que { flex: 1; line-height: 1.4; }
+  .cuando {
+    font-size: 0.78rem;
+    color: var(--ion-color-medium, #92949c);
+    white-space: nowrap;
+  }
+}
+
 .explica {
   margin: 0 0 0.9rem;
   font-size: 0.88rem;
