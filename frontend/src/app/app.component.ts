@@ -73,22 +73,35 @@ export class AppComponent implements OnInit, OnDestroy {
     this.auth.usuario$.subscribe(u => {
       if (u) this.marca.get().subscribe();
       else this.marca.cargarPublica().subscribe();
-
-      // El aviso es del lado del personal (admin/recepción/mecánico), no del cliente
-      // del portal ni de nadie sin sesión: sin sesión de staff no hay ni token válido
-      // para pedirlo (el endpoint usa el mismo middleware `auth` de siempre).
-      if (u && this.auth.tieneRol('admin', 'recepcion', 'tecnico')) {
-        this.esStaff = true;
-        this.consultarAviso();
-        if (!this.timerAviso) {
-          this.timerAviso = setInterval(() => this.consultarAviso(), this.AVISO_CADA_MS);
-        }
-      } else {
-        this.esStaff = false;
-        this.avisoVisible = null;
-        if (this.timerAviso) { clearInterval(this.timerAviso); this.timerAviso = null; }
-      }
+      this.actualizarEsStaff();
     });
+
+    // Las tres sesiones (staff, cliente del portal, plataforma Motiq) son
+    // independientes A PROPÓSITO — se puede estar logueado como personal Y como
+    // Motiq en el mismo navegador a la vez. Por eso "hay sesión de staff" NO alcanza
+    // para decidir si se muestran el aviso y el botón de reportar: hace falta
+    // también fijarse en qué SECCIÓN se está parado ahora mismo. Sin este segundo
+    // chequeo, entrar a /motiq/panel con una sesión de taller abierta en el mismo
+    // navegador los seguía mostrando ahí, que es audiencia equivocada.
+    this.router.events.pipe(filter((e) => e instanceof NavigationEnd))
+      .subscribe(() => this.actualizarEsStaff());
+  }
+
+  private actualizarEsStaff() {
+    const enPanelDeStaff = !this.router.url.startsWith('/motiq') && !this.router.url.startsWith('/portal');
+    const nuevo = enPanelDeStaff && this.auth.tieneRol('admin', 'recepcion', 'tecnico');
+    if (nuevo === this.esStaff) return;
+    this.esStaff = nuevo;
+
+    if (nuevo) {
+      this.consultarAviso();
+      if (!this.timerAviso) {
+        this.timerAviso = setInterval(() => this.consultarAviso(), this.AVISO_CADA_MS);
+      }
+    } else {
+      this.avisoVisible = null;
+      if (this.timerAviso) { clearInterval(this.timerAviso); this.timerAviso = null; }
+    }
   }
 
   ngOnDestroy() {
