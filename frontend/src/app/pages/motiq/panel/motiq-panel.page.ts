@@ -54,6 +54,13 @@ export class MotiqPanelPage implements OnInit {
 
   // --- Avisos hacia los talleres ---
   avisos: AvisoPlataforma[] = [];
+  // 'nuevo' = formulario de publicar; un id = editando ese aviso; null = cerrado.
+  // Formulario en la página y no un ion-alert: un ion-alert que mezcla textarea con
+  // radios en este proyecto pierde el texto de las etiquetas de los radios (se vieron
+  // sin texto en las pruebas) — cambiarPlan() funciona porque ahí son solo radios,
+  // sin mezclar tipos. El mismo patrón que ya usa "Planes" evita el problema de raíz.
+  avisoEnEdicion: number | 'nuevo' | null = null;
+  formAviso: { mensaje: string; tipo: string } = { mensaje: '', tipo: 'info' };
 
   // Ficha del taller abierto (null = cerrada).
   ficha: FichaTaller | null = null;
@@ -367,61 +374,36 @@ export class MotiqPanelPage implements OnInit {
     return { info: 'medium', mantenimiento: 'warning', urgente: 'danger' }[t] || 'medium';
   }
 
-  async nuevoAviso() {
-    const a = await this.alerta.create({
-      header: 'Publicar un aviso',
-      message: 'Se ve como una franja arriba de la pantalla de TODO el personal de los talleres (admin, recepción, mecánico). No lo ven los clientes.',
-      inputs: [
-        { name: 'mensaje', type: 'textarea', placeholder: 'Ej: El domingo de 2am a 4am va a haber mantenimiento programado.', attributes: { maxlength: 500 } },
-        { name: 'tipo', type: 'radio', label: 'Informativo', value: 'info', checked: true },
-        { name: 'tipo', type: 'radio', label: 'Mantenimiento (franja amarilla)', value: 'mantenimiento' },
-        { name: 'tipo', type: 'radio', label: 'Urgente (franja roja)', value: 'urgente' },
-      ],
-      buttons: [
-        { text: 'Cancelar', role: 'cancel' },
-        {
-          text: 'Publicar',
-          handler: (d) => {
-            const mensaje = String(d.mensaje || '').trim();
-            if (!mensaje) { this.toast.error('Escribí el mensaje'); return false; }
-            this.motiq.crearAviso(mensaje, d.tipo || 'info').subscribe({
-              next: (r) => { this.toast.success(r.message); this.cargarAvisos(); },
-              error: (e) => this.toast.error(e?.error?.error || 'No se pudo publicar'),
-            });
-            return true;
-          },
-        },
-      ],
-    });
-    await a.present();
+  nuevoAviso() {
+    this.avisoEnEdicion = 'nuevo';
+    this.formAviso = { mensaje: '', tipo: 'info' };
   }
 
-  async editarAviso(av: AvisoPlataforma) {
-    const a = await this.alerta.create({
-      header: 'Editar aviso',
-      inputs: [
-        { name: 'mensaje', type: 'textarea', value: av.mensaje, attributes: { maxlength: 500 } },
-        { name: 'tipo', type: 'radio', label: 'Informativo', value: 'info', checked: av.tipo === 'info' },
-        { name: 'tipo', type: 'radio', label: 'Mantenimiento (franja amarilla)', value: 'mantenimiento', checked: av.tipo === 'mantenimiento' },
-        { name: 'tipo', type: 'radio', label: 'Urgente (franja roja)', value: 'urgente', checked: av.tipo === 'urgente' },
-      ],
-      buttons: [
-        { text: 'Cancelar', role: 'cancel' },
-        {
-          text: 'Guardar',
-          handler: (d) => {
-            const mensaje = String(d.mensaje || '').trim();
-            if (!mensaje) { this.toast.error('Escribí el mensaje'); return false; }
-            this.motiq.actualizarAviso(av.id, { mensaje, tipo: d.tipo }).subscribe({
-              next: (r) => { this.toast.success(r.message); this.cargarAvisos(); },
-              error: (e) => this.toast.error(e?.error?.error || 'No se pudo actualizar'),
-            });
-            return true;
-          },
-        },
-      ],
-    });
-    await a.present();
+  editarAviso(av: AvisoPlataforma) {
+    this.avisoEnEdicion = av.id;
+    this.formAviso = { mensaje: av.mensaje, tipo: av.tipo };
+  }
+
+  cancelarEdicionAviso() {
+    this.avisoEnEdicion = null;
+  }
+
+  guardarAviso() {
+    const mensaje = this.formAviso.mensaje.trim();
+    if (!mensaje) { this.toast.error('Escribí el mensaje'); return; }
+    const tipo = this.formAviso.tipo;
+
+    if (this.avisoEnEdicion === 'nuevo') {
+      this.motiq.crearAviso(mensaje, tipo).subscribe({
+        next: (r) => { this.toast.success(r.message); this.avisoEnEdicion = null; this.cargarAvisos(); },
+        error: (e) => this.toast.error(e?.error?.error || 'No se pudo publicar'),
+      });
+    } else if (typeof this.avisoEnEdicion === 'number') {
+      this.motiq.actualizarAviso(this.avisoEnEdicion, { mensaje, tipo }).subscribe({
+        next: (r) => { this.toast.success(r.message); this.avisoEnEdicion = null; this.cargarAvisos(); },
+        error: (e) => this.toast.error(e?.error?.error || 'No se pudo guardar'),
+      });
+    }
   }
 
   alternarAviso(av: AvisoPlataforma) {

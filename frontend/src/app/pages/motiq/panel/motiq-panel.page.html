@@ -438,12 +438,46 @@
           talleres (admin, recepción, mecánico). Cada quien la cierra una vez y no la
           vuelve a ver, aunque siga activa — un aviso nuevo sí se le muestra.
         </p>
-        <ion-button size="small" (click)="nuevoAviso()">
+        <ion-button size="small" *ngIf="avisoEnEdicion === null" (click)="nuevoAviso()">
           <ion-icon slot="start" name="add-outline"></ion-icon> Publicar
         </ion-button>
       </div>
 
-      <div class="vacio" *ngIf="!avisos.length">
+      <!-- Formulario: nuevo aviso o editar uno existente. En la página y no en un
+           ion-alert — ver la nota en el .ts sobre por qué. -->
+      <div class="plan-card" *ngIf="avisoEnEdicion !== null">
+        <div class="plan-cabecera">
+          <h2>{{ avisoEnEdicion === 'nuevo' ? 'Publicar un aviso' : 'Editar aviso' }}</h2>
+        </div>
+        <form class="plan-form" (ngSubmit)="guardarAviso()">
+          <ion-item lines="none">
+            <ion-label position="stacked">Mensaje</ion-label>
+            <ion-textarea [(ngModel)]="formAviso.mensaje" name="mensaje" rows="2" [maxlength]="500"
+                          placeholder="Ej: El domingo de 2am a 4am va a haber mantenimiento programado.">
+            </ion-textarea>
+          </ion-item>
+          <ion-radio-group [(ngModel)]="formAviso.tipo" name="tipo">
+            <ion-item lines="none">
+              <ion-radio slot="start" value="info"></ion-radio>
+              <ion-label>Informativo</ion-label>
+            </ion-item>
+            <ion-item lines="none">
+              <ion-radio slot="start" value="mantenimiento"></ion-radio>
+              <ion-label>Mantenimiento (franja amarilla)</ion-label>
+            </ion-item>
+            <ion-item lines="none">
+              <ion-radio slot="start" value="urgente"></ion-radio>
+              <ion-label>Urgente (franja roja)</ion-label>
+            </ion-item>
+          </ion-radio-group>
+          <div class="acciones-plan">
+            <ion-button fill="clear" type="button" (click)="cancelarEdicionAviso()">Cancelar</ion-button>
+            <ion-button type="submit">{{ avisoEnEdicion === 'nuevo' ? 'Publicar' : 'Guardar' }}</ion-button>
+          </div>
+        </form>
+      </div>
+
+      <div class="vacio" *ngIf="!avisos.length && avisoEnEdicion === null">
         <ion-icon name="megaphone-outline"></ion-icon>
         <p>Todavía no publicaste ningún aviso.</p>
       </div>
