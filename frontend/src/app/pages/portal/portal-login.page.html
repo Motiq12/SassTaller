@@ -4,8 +4,18 @@
       <div class="logo-wrapper">
         <app-marca-logo [tamano]="84"></app-marca-logo>
       </div>
+      <!-- El panel es IDENTIDAD y nada más: de quién es este sistema. La instrucción
+           de qué hacer se mudó a la columna del formulario, que es donde se hace. -->
       <h1>{{ marca.rotuloPublico }}</h1>
-      <p>Iniciá sesión para continuar</p>
+    </div>
+
+    <!-- Encabezado de la tarea. La columna del formulario arrancaba en frío, con el
+         campo "CORREO" y nada arriba: media pantalla vacía y ningún punto de entrada
+         para la vista. Acá además no se repite el panel, porque la izquierda ya no
+         dice qué hacer — dice de quién es. -->
+    <div class="acceso-intro" *ngIf="!paso2fa">
+      <h2>Iniciá sesión</h2>
+      <p>Entrá con el correo de tu cuenta.</p>
     </div>
 
     <!-- PASO 2: verificación en dos pasos (personal con 2FA activo) -->

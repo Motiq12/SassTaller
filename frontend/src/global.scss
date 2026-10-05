@@ -686,6 +686,47 @@ ion-toast {
     }
   }
 
+  // ---- Encabezado de la tarea, arriba del formulario ----
+  // Lo que ancla la columna. Sin esto arrancaba directo en el primer campo y la
+  // mitad superior quedaba vacía, que era buena parte de la sensación de pantalla
+  // desierta — y no se arregla con color, porque el problema era que no había nada.
+  .acceso-intro {
+    width: 100%;
+    max-width: 400px;
+    // El margen de abajo lo pone el encabezado, no la tarjeta: así la separación es
+    // la misma en teléfono y en escritorio, donde la tarjeta tiene margen 0.
+    margin: 0 auto 1.4rem;
+    animation: acceso-entrar .42s ease-out both;
+
+    + ion-card { margin-top: 0; }
+
+    // En teléfono la tarjeta queda con 16px de margen lateral (de Ionic) y este
+    // bloque no: el título arrancaba pegado al borde mientras los campos estaban
+    // adentro. Medido, no estimado. De 860px para arriba las dos columnas se centran
+    // en el mismo eje y el relleno sobra.
+    padding-inline: 16px;
+
+    h2 {
+      font-family: var(--font-display);
+      font-size: clamp(1.45rem, 2.1vw, 1.8rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin: 0 0 .4rem;
+      color: var(--ion-text-color, #111);
+    }
+
+    // Se deriva del texto mezclado con el lienzo en vez de un gris fijo: así la
+    // cuenta del contraste sale bien en los dos esquemas (ver los enlaces de abajo,
+    // donde un gris fijo daba 4.04:1 en claro).
+    p {
+      margin: 0;
+      font-size: 13.5px;
+      line-height: 1.55;
+      color: color-mix(in srgb, var(--ion-text-color, #111) 62%, var(--lienzo));
+    }
+  }
+
   // ---- Columna del formulario ----
   // La tarjeta deja de ser una tarjeta: sin sombra ni borde redondo enorme, es el
   // formulario y ya. Una caja flotante dentro de un panel que ya está separado es
@@ -838,6 +879,7 @@ ion-toast {
     .login-container > *:not(.login-header) { width: min(400px, 100%); }
 
     ion-card { margin-top: 0; }
+    .acceso-intro { padding-inline: 0; }
   }
 
   // En pantallas anchas el reparto fijo se rompe: con 40% para la marca, un monitor
