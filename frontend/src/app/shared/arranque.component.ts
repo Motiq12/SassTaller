@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AdminService } from '../services/admin.service';
 import { ToastService } from '../services/toast.service';
@@ -88,6 +88,10 @@ interface Pasos { marca: boolean; equipo: boolean; orden: boolean; portal: boole
   `],
 })
 export class ArranqueComponent implements OnInit {
+  private admin = inject(AdminService);
+  private router = inject(Router);
+  private toast = inject(ToastService);
+
   pasos: Pasos | null = null;
   completo = false;
   oculto = false;
@@ -102,8 +106,6 @@ export class ArranqueComponent implements OnInit {
     { clave: 'orden',  titulo: 'Registrá tu primera orden', ayuda: 'El siguiente vehículo que entre al taller.', accion: 'Crear',     ruta: '/nueva-orden' },
     { clave: 'portal', titulo: 'Dale el portal a un cliente', ayuda: 'Que vea el avance sin llamar por teléfono.', accion: 'Ver cómo', ruta: '/admin/portal' },
   ];
-
-  constructor(private admin: AdminService, private router: Router, private toast: ToastService) {}
 
   ngOnInit(): void { this.cargar(); }
 

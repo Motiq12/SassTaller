@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Capacitor } from '@capacitor/core';
 import { BehaviorSubject, Observable, of, tap, catchError, throwError } from 'rxjs';
@@ -27,6 +27,9 @@ const nativo = Capacitor.isNativePlatform();
 
 @Injectable({ providedIn: 'root' })
 export class PortalService {
+  private http = inject(HttpClient);
+  private taller = inject(TallerService);
+
   private url = `${environment.apiUrl}/portal`;
   // En nativo el token vive en el Keychain/Keystore (ver secure-store.util); acá solo
   // se cachea en memoria para lecturas síncronas (interceptor, guards). En web sigue
@@ -37,8 +40,6 @@ export class PortalService {
   // Contador de notificaciones no leídas (alimenta el badge de la campana).
   private noLeidasSubject = new BehaviorSubject<number>(0);
   noLeidas$ = this.noLeidasSubject.asObservable();
-
-  constructor(private http: HttpClient, private taller: TallerService) {}
 
   // Hidrata la sesión desde el Keychain/Keystore en plataforma nativa. Se llama desde
   // un APP_INITIALIZER (app.module.ts) para que termine ANTES de que arranquen los

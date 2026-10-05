@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -12,14 +12,16 @@ import { proximoServicio, ProximoServicio } from '../../shared/utils/mantenimien
   styleUrls: ['./portal-vehiculo-historial.page.scss'],
 })
 export class PortalVehiculoHistorialPage implements OnInit, OnDestroy {
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private portal = inject(PortalService);
+
   private destroy$ = new Subject<void>();
   vehiculo: any = null;
   servicios: any[] = [];
   cargando = true;
   totalGastado = 0;
-  proximo: ProximoServicio | null = null;   // próximo servicio recomendado (por tiempo)
-
-  constructor(private route: ActivatedRoute, private router: Router, private portal: PortalService) {}
+  proximo: ProximoServicio | null = null;
 
   ngOnInit() {
     const id = Number(this.route.snapshot.paramMap.get('id'));

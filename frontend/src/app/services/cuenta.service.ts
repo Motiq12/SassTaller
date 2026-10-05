@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, of, tap, map, catchError } from 'rxjs';
 import { environment } from '../../environments/environment';
@@ -35,6 +35,8 @@ const AVISAR_DESDE = 7;
 
 @Injectable({ providedIn: 'root' })
 export class CuentaService {
+  private http = inject(HttpClient);
+
   private cuentaSubject = new BehaviorSubject<Cuenta | null>(null);
   cuenta$ = this.cuentaSubject.asObservable();
 
@@ -43,8 +45,6 @@ export class CuentaService {
   // servicios distintos. null = todavía no se sabe.
   private correoSubject = new BehaviorSubject<boolean | null>(null);
   correoVerificado$ = this.correoSubject.asObservable();
-
-  constructor(private http: HttpClient) {}
 
   get actual(): Cuenta | null { return this.cuentaSubject.value; }
 

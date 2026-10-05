@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AlertController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -14,6 +14,13 @@ import { Cita } from '../../models/cita.model';
   styleUrls: ['./citas.page.scss'],
 })
 export class CitasPage implements OnInit, OnDestroy {
+  private citaSvc = inject(CitasService);
+  private dashSvc = inject(DashboardService);
+  auth = inject(AuthService);
+  private router = inject(Router);
+  private alert = inject(AlertController);
+  private toast = inject(ToastController);
+
   private destroy$ = new Subject<void>();
   citas: Cita[] = [];
   tecnicos: any[] = [];
@@ -39,15 +46,6 @@ export class CitasPage implements OnInit, OnDestroy {
   };
 
   busqueda = '';
-
-  constructor(
-    private citaSvc: CitasService,
-    private dashSvc: DashboardService,
-    public auth: AuthService,
-    private router: Router,
-    private alert: AlertController,
-    private toast: ToastController
-  ) {}
 
   get esAdmin(): boolean { return this.auth.tieneRol('admin'); }
 

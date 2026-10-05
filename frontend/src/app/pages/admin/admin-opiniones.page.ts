@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -12,6 +12,9 @@ import { fechaCorta } from '../../shared/utils/csv.util';
   styleUrls: ['./admin-opiniones.page.scss'],
 })
 export class AdminOpinionesPage implements OnInit, OnDestroy {
+  private admin = inject(AdminService);
+  private router = inject(Router);
+
   private destroy$ = new Subject<void>();
   opiniones: any[] = [];
   tecnicos: { id: number; nombre: string }[] = [];
@@ -22,8 +25,6 @@ export class AdminOpinionesPage implements OnInit, OnDestroy {
   // Filtros: estrella (null = todas) y mecánico (null = todos).
   filtroEstrella: number | null = null;
   filtroEmpleado: number | null = null;
-
-  constructor(private admin: AdminService, private router: Router) {}
 
   ngOnInit() { this.cargar(); }
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }

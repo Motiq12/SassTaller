@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
@@ -6,8 +6,9 @@ import { Orden, OrdenAvance, OrdenRepuesto, OrdenFoto, EstadoOrden } from '../mo
 
 @Injectable({ providedIn: 'root' })
 export class OrdenesService {
+  private http = inject(HttpClient);
+
   private url = `${environment.apiUrl}/ordenes`;
-  constructor(private http: HttpClient) {}
 
   getAll(params?: { estado?: string; tecnico_id?: number; fecha_desde?: string; fecha_hasta?: string }): Observable<{ data: Orden[] }> {
     return this.http.get<{ data: Orden[] }>(this.url, { params: params as any });

@@ -1,4 +1,4 @@
-import { Component, EventEmitter, OnDestroy, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, OnDestroy, OnInit, Output, inject } from '@angular/core';
 import { Subject, interval } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { MensajeriaService, ChatContacto } from '../../services/mensajeria.service';
@@ -13,6 +13,9 @@ import { AuthService } from '../../services/auth.service';
   styleUrls: ['./chat-contactos.component.scss'],
 })
 export class ChatContactosComponent implements OnInit, OnDestroy {
+  private msj = inject(MensajeriaService);
+  private auth = inject(AuthService);
+
   private destroy$ = new Subject<void>();
   @Output() abrir = new EventEmitter<ChatContacto>();
   @Output() abrirAvisos = new EventEmitter<void>();
@@ -26,8 +29,6 @@ export class ChatContactosComponent implements OnInit, OnDestroy {
   readonly rolLabel: Record<string, string> = {
     tecnico: 'Mecánico', recepcion: 'Recepción', admin: 'Dueño / Admin',
   };
-
-  constructor(private msj: MensajeriaService, private auth: AuthService) {}
 
   ngOnInit() {
     this.cargar();

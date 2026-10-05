@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { AuthService } from '../services/auth.service';
 import { CuentaService } from '../services/cuenta.service';
 import { ToastService } from '../services/toast.service';
@@ -68,16 +68,14 @@ import { ToastService } from '../services/toast.service';
   `],
 })
 export class CorreoAvisoComponent implements OnInit {
+  private auth = inject(AuthService);
+  private cuenta = inject(CuentaService);
+  private toast = inject(ToastService);
+
   verificado: boolean | null = null;
   pidiendoCodigo = false;
   codigo = '';
   trabajando = false;
-
-  constructor(
-    private auth: AuthService,
-    private cuenta: CuentaService,
-    private toast: ToastService,
-  ) {}
 
   ngOnInit(): void {
     this.cuenta.correoVerificado$.subscribe(v => { this.verificado = v; });

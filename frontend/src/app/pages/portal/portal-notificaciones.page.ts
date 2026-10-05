@@ -1,4 +1,4 @@
-import { Component, OnDestroy } from '@angular/core';
+import { Component, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -27,15 +27,13 @@ const META_TIPO: Record<string, { icon: string; tono: string }> = {
   styleUrls: ['./portal-notificaciones.page.scss'],
 })
 export class PortalNotificacionesPage implements OnDestroy {
+  private portal = inject(PortalService);
+  private router = inject(Router);
+  private toast = inject(ToastController);
+
   private destroy$ = new Subject<void>();
   notificaciones: any[] = [];
   cargando = true;
-
-  constructor(
-    private portal: PortalService,
-    private router: Router,
-    private toast: ToastController,
-  ) {}
 
   ionViewWillEnter() { this.cargar(); }
 

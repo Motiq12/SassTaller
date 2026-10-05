@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
@@ -17,9 +17,9 @@ export interface AvisoActivo {
 
 @Injectable({ providedIn: 'root' })
 export class AvisoSistemaService {
-  private apiUrl = environment.apiUrl;
+  private http = inject(HttpClient);
 
-  constructor(private http: HttpClient) {}
+  private apiUrl = environment.apiUrl;
 
   activo(): Observable<{ data: AvisoActivo | null }> {
     return this.http.get<{ data: AvisoActivo | null }>(`${this.apiUrl}/avisos/activo`);

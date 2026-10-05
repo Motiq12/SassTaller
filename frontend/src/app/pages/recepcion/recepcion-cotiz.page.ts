@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { ToastController, AlertController } from '@ionic/angular';
 import { forkJoin, Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -14,6 +14,10 @@ interface PiezaNueva { nombre: string; monto: number | null; }
   styleUrls: ['./recepcion-cotiz.page.scss'],
 })
 export class RecepcionCotizPage implements OnInit, OnDestroy {
+  private rec = inject(RecepcionService);
+  private toast = inject(ToastController);
+  private alert = inject(AlertController);
+
   private destroy$ = new Subject<void>();
   vista: 'pendiente' | 'enviada' = 'pendiente';
   cotizaciones: any[] = [];
@@ -36,8 +40,6 @@ export class RecepcionCotizPage implements OnInit, OnDestroy {
 
   readonly aprobLabel: Record<string, string> = { pendiente: 'Pendiente', aprobado: 'Aprobado', rechazado: 'Rechazado' };
   readonly aprobPill: Record<string, string> = { pendiente: 'amber', aprobado: 'green', rechazado: 'rose' };
-
-  constructor(private rec: RecepcionService, private toast: ToastController, private alert: AlertController) {}
 
   ngOnInit() { this.cargar(); }
   ionViewWillEnter() { this.cargar(); }

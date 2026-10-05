@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AlertController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -15,6 +15,11 @@ import { mesesDesde } from '../../shared/utils/mantenimiento.util';
   styleUrls: ['./portal-vehiculos.page.scss'],
 })
 export class PortalVehiculosPage implements OnInit, OnDestroy {
+  private portal = inject(PortalService);
+  private toast = inject(ToastController);
+  private alert = inject(AlertController);
+  private router = inject(Router);
+
   private destroy$ = new Subject<void>();
   vehiculos: any[] = [];
   cargando = true;
@@ -28,8 +33,6 @@ export class PortalVehiculosPage implements OnInit, OnDestroy {
   // Autocompletado de marca/modelo (catálogo local, no restrictivo).
   marcasSugeridas: string[] = [];
   modelosSugeridos: string[] = [];
-
-  constructor(private portal: PortalService, private toast: ToastController, private alert: AlertController, private router: Router) {}
 
   verHistorial(m: any) { this.router.navigate(['/portal/vehiculo', m.id, 'historial']); }
 

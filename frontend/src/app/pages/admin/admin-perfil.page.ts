@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -16,6 +16,13 @@ import { comprimirImagen } from '../../shared/utils/image.util';
   styleUrls: ['./admin-perfil.page.scss'],
 })
 export class AdminPerfilPage implements OnInit, OnDestroy {
+  private admin = inject(AdminService);
+  private dash = inject(DashboardService);
+  private auth = inject(AuthService);
+  a11y = inject(AccesibilidadService);
+  private router = inject(Router);
+  private toast = inject(ToastController);
+
   private destroy$ = new Subject<void>();
   perfil: any = null;
   resumen: any = null;
@@ -33,15 +40,6 @@ export class AdminPerfilPage implements OnInit, OnDestroy {
     { i: 1, etiqueta: 'A', nombre: 'Grande' },
     { i: 2, etiqueta: 'A', nombre: 'Muy grande' },
   ];
-
-  constructor(
-    private admin: AdminService,
-    private dash: DashboardService,
-    private auth: AuthService,
-    public a11y: AccesibilidadService,
-    private router: Router,
-    private toast: ToastController,
-  ) {}
 
   ngOnInit() { this.cargar(); }
   ionViewWillEnter() { this.cargar(); }

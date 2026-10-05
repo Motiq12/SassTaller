@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { AlertController, ToastController } from '@ionic/angular';
 import { PromosService, Promo } from '../../services/promos.service';
 import { Subject } from 'rxjs';
@@ -11,18 +11,16 @@ import { takeUntil } from 'rxjs/operators';
   styleUrls: ['./promos.page.scss'],
 })
 export class PromosPage implements OnInit, OnDestroy {
+  private promosSvc = inject(PromosService);
+  private alert = inject(AlertController);
+  private toast = inject(ToastController);
+
   private destroy$ = new Subject<void>();
   promos: Promo[] = [];
   cargando = true;
 
   mostrarForm = false;
   nueva: Promo = { titulo: '', descripcion: '', descuento: 0, activa: 1, imagen: null };
-
-  constructor(
-    private promosSvc: PromosService,
-    private alert: AlertController,
-    private toast: ToastController
-  ) {}
 
   ngOnInit() { this.cargar(); }
   ionViewWillEnter() { this.cargar(); }

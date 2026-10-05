@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -11,14 +11,15 @@ import { MecanicoService } from '../../services/mecanico.service';
   styleUrls: ['./mecanico-tareas.page.scss'],
 })
 export class MecanicoTareasPage implements OnInit, OnDestroy {
+  private mecanico = inject(MecanicoService);
+  private toast = inject(ToastController);
+
   private destroy$ = new Subject<void>();
   tareas: any[] = [];
   cargando = true;
   mostrarForm = false;
   guardando = false;
   nueva = { titulo: '', detalle: '', prioridad: 'normal' };
-
-  constructor(private mecanico: MecanicoService, private toast: ToastController) {}
 
   ngOnInit() { this.cargar(); }
   ionViewWillEnter() { this.cargar(); }

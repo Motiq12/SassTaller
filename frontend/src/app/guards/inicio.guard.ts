@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { CanActivate, Router, UrlTree } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { PortalService } from '../services/portal.service';
@@ -15,7 +15,9 @@ import { PortalService } from '../services/portal.service';
  */
 @Injectable({ providedIn: 'root' })
 export class InicioGuard implements CanActivate {
-  constructor(private auth: AuthService, private portal: PortalService, private router: Router) {}
+  private auth = inject(AuthService);
+  private portal = inject(PortalService);
+  private router = inject(Router);
 
   canActivate(): boolean | UrlTree {
     if (this.auth.isLoggedIn() && !this.auth.isTokenExpired()) return this.router.parseUrl('/tabs');

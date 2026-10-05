@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -14,6 +14,12 @@ import { ahoraTaller } from '../../shared/utils/fecha-cita.util';
   styleUrls: ['./portal-agendar.page.scss'],
 })
 export class PortalAgendarPage implements OnInit, OnDestroy {
+  private portal = inject(PortalService);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private loading = inject(LoadingController);
+  private toast = inject(ToastController);
+
   private destroy$ = new Subject<void>();
   servicios: string[] = [];
   readonly horas = HORAS;
@@ -27,15 +33,7 @@ export class PortalAgendarPage implements OnInit, OnDestroy {
   enviando = false;
   sugiriendo = false;
   msgHora = '';   // aviso transitorio al tocar una hora no disponible (llena o pasada)
-  editId: number | null = null;   // si está seteado, la pantalla edita esa cita
-
-  constructor(
-    private portal: PortalService,
-    private route: ActivatedRoute,
-    private router: Router,
-    private loading: LoadingController,
-    private toast: ToastController
-  ) {}
+  editId: number | null = null;
 
   // Prefill desde "Mi Garaje" (?vehiculo=&servicio=): se aplica una sola vez al cargar vehiculos.
   private prefill: { vehiculo?: number; servicio?: string } | null = null;

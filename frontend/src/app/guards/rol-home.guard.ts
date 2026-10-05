@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { ActivatedRouteSnapshot, CanActivate, Router, RouterStateSnapshot, UrlTree } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 
@@ -7,7 +7,8 @@ import { AuthService } from '../services/auth.service';
 // clientes, agenda) sigue accesible, pero ya no es el home del admin.
 @Injectable({ providedIn: 'root' })
 export class RolHomeGuard implements CanActivate {
-  constructor(private auth: AuthService, private router: Router) {}
+  private auth = inject(AuthService);
+  private router = inject(Router);
 
   canActivate(_route: ActivatedRouteSnapshot, state: RouterStateSnapshot): boolean | UrlTree {
     const rol = this.auth.getUsuario()?.rol;

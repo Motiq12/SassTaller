@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { MecanicoService } from '../../services/mecanico.service';
 
@@ -83,12 +83,13 @@ function haceTexto(fecha: string): string {
   `],
 })
 export class MecanicoActionsComponent implements OnInit {
+  private mecanico = inject(MecanicoService);
+  private router = inject(Router);
+
   alertas: any[] = [];
   noVistas = 0;
   private readonly KEY = 'mec_alertas_visto';
   hace = haceTexto;
-
-  constructor(private mecanico: MecanicoService, private router: Router) {}
 
   ngOnInit() { this.cargar(); }
 

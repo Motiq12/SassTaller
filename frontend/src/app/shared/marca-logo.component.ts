@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, inject } from '@angular/core';
 import { MarcaService } from '../services/marca.service';
 import { TallerService } from '../services/taller.service';
 import { PRODUCTO } from './producto';
@@ -54,14 +54,15 @@ import { PRODUCTO } from './producto';
   `],
 })
 export class MarcaLogoComponent {
+  marca = inject(MarcaService);
+  private taller = inject(TallerService);
+
   /** Lado en píxeles. Cuadrado a propósito: sirve igual para un isotipo o iniciales. */
   @Input() tamano = 36;
 
   // Si el archivo del logo no carga (todavía no lo subieron, ruta mal), se cae a
   // las iniciales en vez de dejar el ícono roto del navegador.
   falloImagen = false;
-
-  constructor(public marca: MarcaService, private taller: TallerService) {}
 
   get rotulo(): string { return this.marca.rotuloPublico; }
 

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { AlertController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -14,6 +14,11 @@ import { comprimirImagen } from '../../shared/utils/image.util';
   styleUrls: ['./garantias.page.scss'],
 })
 export class GarantiasPage implements OnInit, OnDestroy {
+  private garantiaSvc = inject(GarantiasService);
+  auth = inject(AuthService);
+  private alert = inject(AlertController);
+  private toast = inject(ToastController);
+
   private destroy$ = new Subject<void>();
   garantias: Garantia[] = [];
   cargando = true;
@@ -36,13 +41,6 @@ export class GarantiasPage implements OnInit, OnDestroy {
   ];
 
   readonly estadosTramite: EstadoGarantia[] = ['abierto', 'en_revision', 'aprobado', 'rechazado', 'resuelto'];
-
-  constructor(
-    private garantiaSvc: GarantiasService,
-    public auth: AuthService,
-    private alert: AlertController,
-    private toast: ToastController
-  ) {}
 
   ngOnInit() { this.cargar(); }
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }

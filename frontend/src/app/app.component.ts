@@ -1,4 +1,4 @@
-import { Component, NgZone, OnDestroy, OnInit } from '@angular/core';
+import { Component, NgZone, OnDestroy, OnInit, inject } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
 import { AlertController, ToastController } from '@ionic/angular';
 import { filter, take } from 'rxjs/operators';
@@ -20,6 +20,16 @@ declare global {
   standalone: false,
 })
 export class AppComponent implements OnInit, OnDestroy {
+  private zone = inject(NgZone);
+  private _a11y = inject(AccesibilidadService);
+  private router = inject(Router);
+  private marca = inject(MarcaService);
+  private auth = inject(AuthService);
+  private avisoSistema = inject(AvisoSistemaService);
+  private reporteFalla = inject(ReporteFallaService);
+  private alerta = inject(AlertController);
+  private toastCtrl = inject(ToastController);
+
   // Estado de conexión para el banner global "sin conexión".
   enLinea = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
@@ -39,17 +49,7 @@ export class AppComponent implements OnInit, OnDestroy {
   esStaff = false;
 
   // Inyectar AccesibilidadService aplica la preferencia de tamaño de texto al arrancar.
-  constructor(
-    private zone: NgZone,
-    private _a11y: AccesibilidadService,
-    private router: Router,
-    private marca: MarcaService,
-    private auth: AuthService,
-    private avisoSistema: AvisoSistemaService,
-    private reporteFalla: ReporteFallaService,
-    private alerta: AlertController,
-    private toastCtrl: ToastController,
-  ) {
+  constructor() {
     window.addEventListener('online', () => this.zone.run(() => (this.enLinea = true)));
     window.addEventListener('offline', () => this.zone.run(() => (this.enLinea = false)));
   }

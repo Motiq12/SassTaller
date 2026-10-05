@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { PortalService } from '../../services/portal.service';
 
 // Tour de bienvenida (3 pasos) que se muestra una sola vez POR CUENTA.
@@ -11,10 +11,10 @@ import { PortalService } from '../../services/portal.service';
   styleUrls: ['./portal-onboarding.component.scss'],
 })
 export class PortalOnboardingComponent implements OnInit {
+  private portal = inject(PortalService);
+
   visible = false;
   paso = 0;
-
-  constructor(private portal: PortalService) {}
 
   // Flag por cuenta: así un dispositivo ya usado muestra el tour a cada cuenta nueva
   // (antes era global y, visto una vez, no se mostraba a las cuentas siguientes).

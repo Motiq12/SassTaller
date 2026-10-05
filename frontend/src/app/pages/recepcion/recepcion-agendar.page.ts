@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -16,6 +16,11 @@ import { RecepcionService } from '../../services/recepcion.service';
   styleUrls: ['./recepcion-agendar.page.scss'],
 })
 export class RecepcionAgendarPage implements OnInit, OnDestroy {
+  private rec = inject(RecepcionService);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private toast = inject(ToastController);
+
   private destroy$ = new Subject<void>();
   modo: 'ahora' | 'agendar' = 'ahora';
 
@@ -43,13 +48,6 @@ export class RecepcionAgendarPage implements OnInit, OnDestroy {
     kilometraje_ingreso: null as number | null,
     prioridad: 'normal',
   };
-
-  constructor(
-    private rec: RecepcionService,
-    private route: ActivatedRoute,
-    private router: Router,
-    private toast: ToastController
-  ) {}
 
   ngOnInit() {
     // El dashboard abre este flujo en modo "ahora" (?modo=ahora) para walk-ins.

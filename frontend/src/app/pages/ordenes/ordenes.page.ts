@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -12,6 +12,10 @@ import { Orden, EstadoOrden } from '../../models/orden.model';
   styleUrls: ['./ordenes.page.scss'],
 })
 export class OrdenesPage implements OnInit, OnDestroy {
+  private ordenSvc = inject(OrdenesService);
+  auth = inject(AuthService);
+  private router = inject(Router);
+
   private destroy$ = new Subject<void>();
   ordenes: Orden[] = [];
   cargando = true;
@@ -28,8 +32,6 @@ export class OrdenesPage implements OnInit, OnDestroy {
     { valor: 'entregada', label: 'Entregada' },
     { valor: 'cancelada', label: 'Cancelada' },
   ];
-
-  constructor(private ordenSvc: OrdenesService, public auth: AuthService, private router: Router) {}
 
   get esAdmin(): boolean { return this.auth.tieneRol('admin'); }
 

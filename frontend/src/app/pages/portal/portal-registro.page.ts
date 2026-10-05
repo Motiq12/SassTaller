@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -14,6 +14,12 @@ import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../sha
   styleUrls: ['./portal-login.page.scss'],
 })
 export class PortalRegistroPage implements OnInit, AfterViewInit, OnDestroy {
+  private portal = inject(PortalService);
+  private router = inject(Router);
+  private route = inject(ActivatedRoute);
+  private loading = inject(LoadingController);
+  private toast = inject(ToastController);
+
   private destroy$ = new Subject<void>();
   nombre = '';
   apellido = '';
@@ -38,14 +44,6 @@ export class PortalRegistroPage implements OnInit, AfterViewInit, OnDestroy {
   reenviando = false;
   cooldown = 0;
   private timer?: any;
-
-  constructor(
-    private portal: PortalService,
-    private router: Router,
-    private route: ActivatedRoute,
-    private loading: LoadingController,
-    private toast: ToastController
-  ) {}
 
   // Si venís del login porque tu cuenta existe pero no está verificada
   // (?verificar=1&email=...), saltamos directo al paso 2 con un código fresco.

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Location } from '@angular/common';
 import { LoadingController, ToastController } from '@ionic/angular';
@@ -13,6 +13,13 @@ import { Vehiculo } from '../../models/vehiculo.model';
   styleUrls: ['./vehiculo-form.page.scss'],
 })
 export class VehiculoFormPage implements OnInit, OnDestroy {
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private location = inject(Location);
+  private motoSvc = inject(VehiculosService);
+  private loading = inject(LoadingController);
+  private toast = inject(ToastController);
+
   private destroy$ = new Subject<void>();
   esEdicion = false;
   motoId: number | null = null;
@@ -28,15 +35,6 @@ export class VehiculoFormPage implements OnInit, OnDestroy {
   get valido(): boolean {
     return !!(this.form.marca?.trim() && this.form.modelo?.trim());
   }
-
-  constructor(
-    private route: ActivatedRoute,
-    private router: Router,
-    private location: Location,
-    private motoSvc: VehiculosService,
-    private loading: LoadingController,
-    private toast: ToastController
-  ) {}
 
   ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id');

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { AdminService } from '../../services/admin.service';
@@ -20,6 +20,8 @@ interface DiaCal {
   styleUrls: ['./admin-calendario.page.scss'],
 })
 export class AdminCalendarioPage implements OnInit, OnDestroy {
+  private admin = inject(AdminService);
+
   private destroy$ = new Subject<void>();
   // Paleta de colores asignada por mecánico (cicla si hay más que colores).
   private readonly PALETA: Color[] = [
@@ -45,8 +47,6 @@ export class AdminCalendarioPage implements OnInit, OnDestroy {
   diaSel: DiaCal | null = null;
 
   private colorPorTec = new Map<number, Color>();
-
-  constructor(private admin: AdminService) {}
 
   ngOnInit() { this.cargar(); }
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }

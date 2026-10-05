@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import * as QRCode from 'qrcode';
 import { TallerService } from '../../services/taller.service';
 import { MarcaService } from '../../services/marca.service';
@@ -22,15 +22,13 @@ import { ToastService } from '../../services/toast.service';
   styleUrls: ['./admin-portal.page.scss'],
 })
 export class AdminPortalPage implements OnInit {
+  private taller = inject(TallerService);
+  private marca = inject(MarcaService);
+  private toast = inject(ToastService);
+
   enlace = '';
   qr: string | null = null;      // data URL del QR
   copiado: '' | 'enlace' | 'texto' = '';
-
-  constructor(
-    private taller: TallerService,
-    private marca: MarcaService,
-    private toast: ToastService,
-  ) {}
 
   ngOnInit(): void {
     this.enlace = this.armarEnlace();

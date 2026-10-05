@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
@@ -8,7 +8,7 @@ import { AuthService } from '../../services/auth.service';
   styleUrls: ['./tabs.page.scss'],
 })
 export class TabsPage {
-  constructor(private auth: AuthService) {}
+  private auth = inject(AuthService);
 
   get esAdmin(): boolean {
     return this.auth.getUsuario()?.rol === 'admin';

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { RecepcionService } from '../../services/recepcion.service';
@@ -14,6 +14,8 @@ import { abrirWhatsApp } from '../../shared/utils/whatsapp.util';
   styleUrls: ['./recepcion-mensajes.page.scss'],
 })
 export class RecepcionMensajesPage implements OnInit, OnDestroy {
+  private rec = inject(RecepcionService);
+
   private destroy$ = new Subject<void>();
 
   vista: 'mecanicos' | 'clientes' | 'taller' = 'mecanicos';
@@ -24,8 +26,6 @@ export class RecepcionMensajesPage implements OnInit, OnDestroy {
   // Chat interno (la lógica vive en los componentes compartidos).
   chatAbierto: ChatContacto | null = null;
   verAvisos = false;
-
-  constructor(private rec: RecepcionService) {}
 
   ngOnInit() { this.cargar(); }
   ionViewWillEnter() { this.cargar(); }

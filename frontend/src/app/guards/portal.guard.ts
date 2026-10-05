@@ -1,10 +1,11 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { CanActivate, Router } from '@angular/router';
 import { PortalService } from '../services/portal.service';
 
 @Injectable({ providedIn: 'root' })
 export class PortalGuard implements CanActivate {
-  constructor(private portal: PortalService, private router: Router) {}
+  private portal = inject(PortalService);
+  private router = inject(Router);
 
   canActivate(): boolean {
     if (this.portal.isLoggedIn() && !this.portal.isTokenExpired()) return true;

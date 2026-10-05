@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
@@ -13,8 +13,9 @@ export interface ResumenRecepcion {
 
 @Injectable({ providedIn: 'root' })
 export class RecepcionService {
+  private http = inject(HttpClient);
+
   private url = `${environment.apiUrl}/recepcion`;
-  constructor(private http: HttpClient) {}
 
   // Inicio
   getResumen(): Observable<{ data: ResumenRecepcion }> {

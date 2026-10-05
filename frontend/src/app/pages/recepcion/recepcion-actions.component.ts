@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { RecepcionService } from '../../services/recepcion.service';
 import { alertaIcono, alertaColor, alertaTexto, haceTexto } from '../../shared/recepcion-alertas';
@@ -79,6 +79,9 @@ import { alertaIcono, alertaColor, alertaTexto, haceTexto } from '../../shared/r
   `],
 })
 export class RecepcionActionsComponent implements OnInit {
+  private rec = inject(RecepcionService);
+  private router = inject(Router);
+
   alertas: any[] = [];
   noVistas = 0;
   private readonly KEY = 'rec_alertas_visto';
@@ -87,8 +90,6 @@ export class RecepcionActionsComponent implements OnInit {
   alertaColor = alertaColor;
   alertaTexto = alertaTexto;
   hace = haceTexto;
-
-  constructor(private rec: RecepcionService, private router: Router) {}
 
   ngOnInit() { this.cargar(); }
 

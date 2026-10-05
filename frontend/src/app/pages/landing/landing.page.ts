@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { MotiqService } from '../../services/motiq.service';
 import { MarcaService } from '../../services/marca.service';
@@ -28,6 +28,11 @@ import { PRODUCTO } from '../../shared/producto';
   standalone: false,
 })
 export class LandingPage implements OnInit {
+  private motiq = inject(MotiqService);
+  private marca = inject(MarcaService);
+  private toast = inject(ToastService);
+  private router = inject(Router);
+
   producto = PRODUCTO;
 
   // Formulario de "hablá con nosotros"
@@ -47,13 +52,6 @@ export class LandingPage implements OnInit {
     { valor: '100+', rotulo: 'Más de 100' },
     { valor: 'flota', rotulo: 'Manejamos flota propia' },
   ];
-
-  constructor(
-    private motiq: MotiqService,
-    private marca: MarcaService,
-    private toast: ToastService,
-    private router: Router,
-  ) {}
 
   ngOnInit() {
     // Puede quedar pintado el color de un taller de una sesión anterior en el mismo

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AlertController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -16,20 +16,18 @@ import { abrirWhatsApp } from '../../shared/utils/whatsapp.util';
   styleUrls: ['./cliente-detalle.page.scss'],
 })
 export class ClienteDetallePage implements OnInit, OnDestroy {
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private clienteSvc = inject(ClientesService);
+  private auth = inject(AuthService);
+  private alert = inject(AlertController);
+  private toast = inject(ToastController);
+
   private destroy$ = new Subject<void>();
   cliente: Cliente | null = null;
   vehiculos: Vehiculo[] = [];
   ordenes: Orden[] = [];
   cargando = true;
-
-  constructor(
-    private route: ActivatedRoute,
-    private router: Router,
-    private clienteSvc: ClientesService,
-    private auth: AuthService,
-    private alert: AlertController,
-    private toast: ToastController
-  ) {}
 
   // La lista de clientes vive en dos lugares según el rol: recepción tiene la suya
   // y el resto del personal la ve dentro de las pestañas. No existe un /clientes suelto.

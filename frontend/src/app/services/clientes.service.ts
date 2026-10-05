@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
@@ -8,8 +8,9 @@ import { Orden } from '../models/orden.model';
 
 @Injectable({ providedIn: 'root' })
 export class ClientesService {
+  private http = inject(HttpClient);
+
   private url = `${environment.apiUrl}/clientes`;
-  constructor(private http: HttpClient) {}
 
   getAll(q?: string): Observable<{ data: Cliente[] }> {
     const params: any = {};

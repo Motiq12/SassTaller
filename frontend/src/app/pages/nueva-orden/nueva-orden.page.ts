@@ -1,4 +1,4 @@
-import { Component, OnDestroy } from '@angular/core';
+import { Component, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AlertController, LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -15,6 +15,14 @@ import { Vehiculo } from '../../models/vehiculo.model';
   styleUrls: ['./nueva-orden.page.scss'],
 })
 export class NuevaOrdenPage implements OnDestroy {
+  private clienteSvc = inject(ClientesService);
+  private motoSvc = inject(VehiculosService);
+  private ordenSvc = inject(OrdenesService);
+  private router = inject(Router);
+  private loading = inject(LoadingController);
+  private toast = inject(ToastController);
+  private alert = inject(AlertController);
+
   private destroy$ = new Subject<void>();
   paso = 1; // 1=cliente, 2=vehiculo, 3=recepcion
 
@@ -38,16 +46,6 @@ export class NuevaOrdenPage implements OnDestroy {
     categoria: 'diagnostico',
     fecha_estimada_entrega: '',
   };
-
-  constructor(
-    private clienteSvc: ClientesService,
-    private motoSvc: VehiculosService,
-    private ordenSvc: OrdenesService,
-    private router: Router,
-    private loading: LoadingController,
-    private toast: ToastController,
-    private alert: AlertController
-  ) {}
 
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
 

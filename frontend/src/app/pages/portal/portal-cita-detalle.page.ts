@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ToastController, AlertController } from '@ionic/angular';
 import { MarcaService } from '../../services/marca.service';
@@ -14,6 +14,13 @@ import { FLUJO_CITA, ESTADO_CITA_LABEL } from '../../shared/utils/servicios.util
   styleUrls: ['./portal-cita-detalle.page.scss'],
 })
 export class PortalCitaDetallePage implements OnInit, OnDestroy {
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private portal = inject(PortalService);
+  private toast = inject(ToastController);
+  private alert = inject(AlertController);
+  marca = inject(MarcaService);
+
   private destroy$ = new Subject<void>();
   cita: any = null;
   orden: any = null;        // detalle de la orden vinculada (si hay)
@@ -31,15 +38,6 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
     { key: 'listo', label: 'Listo para entrega', icon: 'checkmark-done-outline' },
     { key: 'entregado', label: 'Entregado', icon: 'flag-outline' },
   ];
-
-  constructor(
-    private route: ActivatedRoute,
-    private router: Router,
-    private portal: PortalService,
-    private toast: ToastController,
-    private alert: AlertController,
-    public marca: MarcaService,
-  ) {}
 
   // Cada etapa con su posición relativa al estado actual (pasado | activo | futuro).
   get etapas(): { key: string; label: string; icon: string; estado: 'pasado' | 'activo' | 'futuro' }[] {

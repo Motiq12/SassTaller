@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AlertController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -13,6 +13,12 @@ import { AuthService } from '../../services/auth.service';
   styleUrls: ['./mecanico.page.scss'],
 })
 export class MecanicoPage implements OnInit, OnDestroy {
+  private mecanico = inject(MecanicoService);
+  private auth = inject(AuthService);
+  private router = inject(Router);
+  private alert = inject(AlertController);
+  private toast = inject(ToastController);
+
   private destroy$ = new Subject<void>();
   resumen?: ResumenMecanico;
   citas: any[] = [];
@@ -44,14 +50,6 @@ export class MecanicoPage implements OnInit, OnDestroy {
   // Caja de cotización de la orden vinculada.
   readonly cotizLabel: Record<string, string> = { aprobado: 'Aprobada', rechazado: 'Rechazada', pendiente: 'Pendiente' };
   readonly cotizPill: Record<string, string> = { aprobado: 'green', rechazado: 'rose', pendiente: 'amber' };
-
-  constructor(
-    private mecanico: MecanicoService,
-    private auth: AuthService,
-    private router: Router,
-    private alert: AlertController,
-    private toast: ToastController
-  ) {}
 
   ngOnInit() { this.cargar(); }
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }

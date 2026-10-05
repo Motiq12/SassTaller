@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { AlertController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -13,6 +13,10 @@ interface Servicio { id: number; nombre: string; activo: number; orden: number; 
   styleUrls: ['./admin-servicios.page.scss'],
 })
 export class AdminServiciosPage implements OnInit, OnDestroy {
+  private admin = inject(AdminService);
+  private toast = inject(ToastController);
+  private alert = inject(AlertController);
+
   private destroy$ = new Subject<void>();
   servicios: Servicio[] = [];
   cargando = true;
@@ -22,12 +26,6 @@ export class AdminServiciosPage implements OnInit, OnDestroy {
   modalAbierto = false;
   editandoId: number | null = null;
   nombre = '';
-
-  constructor(
-    private admin: AdminService,
-    private toast: ToastController,
-    private alert: AlertController,
-  ) {}
 
   ngOnInit() { this.cargar(); }
   ionViewWillEnter() { this.cargar(); }

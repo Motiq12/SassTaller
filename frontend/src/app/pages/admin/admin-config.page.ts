@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -14,6 +14,10 @@ interface HorarioVista { dia: number; label: string; abre: string; cierra: strin
   styleUrls: ['./admin-config.page.scss'],
 })
 export class AdminConfigPage implements OnInit, OnDestroy {
+  private admin = inject(AdminService);
+  private toast = inject(ToastController);
+  private marcaSvc = inject(MarcaService);
+
   private destroy$ = new Subject<void>();
   config: any = null;
   // Color en el formulario. Se separa de config.color_primario para poder
@@ -34,11 +38,6 @@ export class AdminConfigPage implements OnInit, OnDestroy {
     { dia: 1, l: 'Lunes' }, { dia: 2, l: 'Martes' }, { dia: 3, l: 'Miércoles' },
     { dia: 4, l: 'Jueves' }, { dia: 5, l: 'Viernes' }, { dia: 6, l: 'Sábado' }, { dia: 0, l: 'Domingo' },
   ];
-
-  constructor(
-    private admin: AdminService, private toast: ToastController,
-    private marcaSvc: MarcaService,
-  ) {}
 
   ngOnInit() {
     this.cargar();

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { Subject, interval } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -12,10 +12,13 @@ import { MarcaService } from '../../services/marca.service';
   templateUrl: './recepcion-tabs.page.html',
 })
 export class RecepcionTabsPage implements OnInit, OnDestroy {
+  private auth = inject(AuthService);
+  private router = inject(Router);
+  private msj = inject(MensajeriaService);
+  marca = inject(MarcaService);
+
   noLeidos = 0;
   private destroy$ = new Subject<void>();
-
-  constructor(private auth: AuthService, private router: Router, private msj: MensajeriaService, public marca: MarcaService) {}
 
   ngOnInit() {
     this.consultarNoLeidos();

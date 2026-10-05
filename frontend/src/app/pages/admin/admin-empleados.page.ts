@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { AlertController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -13,6 +13,11 @@ import { Usuario } from '../../models/usuario.model';
   styleUrls: ['./admin-empleados.page.scss'],
 })
 export class AdminEmpleadosPage implements OnInit, OnDestroy {
+  private svc = inject(UsuariosService);
+  private admin = inject(AdminService);
+  private toast = inject(ToastController);
+  private alert = inject(AlertController);
+
   private destroy$ = new Subject<void>();
   usuarios: Usuario[] = [];
   sucursales: any[] = [];
@@ -37,13 +42,6 @@ export class AdminEmpleadosPage implements OnInit, OnDestroy {
     rol: 'tecnico' as Usuario['rol'],
     sucursal_id: null as number | null,
   };
-
-  constructor(
-    private svc: UsuariosService,
-    private admin: AdminService,
-    private toast: ToastController,
-    private alert: AlertController,
-  ) {}
 
   ngOnInit() {
     this.cargar();

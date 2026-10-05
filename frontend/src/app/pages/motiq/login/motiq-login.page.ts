@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { MotiqService } from '../../../services/motiq.service';
 import { MarcaService } from '../../../services/marca.service';
@@ -15,13 +15,15 @@ import { PRODUCTO } from '../../../shared/producto';
   standalone: false,
 })
 export class MotiqLoginPage implements OnInit {
+  private motiq = inject(MotiqService);
+  private marca = inject(MarcaService);
+  private router = inject(Router);
+
   producto = PRODUCTO;
   email = '';
   password = '';
   cargando = false;
   error = '';
-
-  constructor(private motiq: MotiqService, private marca: MarcaService, private router: Router) {}
 
   ngOnInit() {
     // Si quedó pintado el color de un taller (de una sesión abierta en otra pestaña),

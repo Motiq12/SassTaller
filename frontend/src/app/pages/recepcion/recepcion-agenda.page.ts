@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -26,6 +26,10 @@ interface DiaCal {
   styleUrls: ['./recepcion-agenda.page.scss'],
 })
 export class RecepcionAgendaPage implements OnInit, OnDestroy {
+  private rec = inject(RecepcionService);
+  private router = inject(Router);
+  private toast = inject(ToastController);
+
   private destroy$ = new Subject<void>();
   readonly dows = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
   readonly diasLargos = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -49,8 +53,6 @@ export class RecepcionAgendaPage implements OnInit, OnDestroy {
 
   semanas: DiaCal[][] = [];
   diaSel: DiaCal | null = null;
-
-  constructor(private rec: RecepcionService, private router: Router, private toast: ToastController) {}
 
   ngOnInit() { this.cargar(); }
   ionViewWillEnter() { this.cargar(); }

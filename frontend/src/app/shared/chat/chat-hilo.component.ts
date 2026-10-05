@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnChanges, OnDestroy, OnInit, Optional, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, OnDestroy, OnInit, Output, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { IonContent, ToastController } from '@ionic/angular';
 import { Subject, interval } from 'rxjs';
@@ -16,6 +16,12 @@ import { abrirWhatsApp } from '../utils/whatsapp.util';
   styleUrls: ['./chat-hilo.component.scss'],
 })
 export class ChatHiloComponent implements OnInit, OnChanges, OnDestroy {
+  private msj = inject(MensajeriaService);
+  private auth = inject(AuthService);
+  private router = inject(Router);
+  private toast = inject(ToastController);
+  private content = inject(IonContent, { optional: true });
+
   private destroy$ = new Subject<void>();
   @Input() contacto: ChatContacto | null = null;
   @Input() modo: 'dm' | 'avisos' = 'dm';
@@ -44,14 +50,6 @@ export class ChatHiloComponent implements OnInit, OnChanges, OnDestroy {
     'Vehiculo lista para prueba',
     'Necesito ayuda con esta vehiculo',
   ];
-
-  constructor(
-    private msj: MensajeriaService,
-    private auth: AuthService,
-    private router: Router,
-    private toast: ToastController,
-    @Optional() private content: IonContent,
-  ) {}
 
   ngOnInit() {
     this.cargar();

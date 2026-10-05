@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -14,6 +14,10 @@ import { abrirWhatsApp } from '../../shared/utils/whatsapp.util';
   styleUrls: ['./recepcion-ordenes.page.scss'],
 })
 export class RecepcionOrdenesPage implements OnInit, OnDestroy {
+  private rec = inject(RecepcionService);
+  private router = inject(Router);
+  private toast = inject(ToastController);
+
   private destroy$ = new Subject<void>();
   vista: 'activas' | 'completadas' = 'activas';
   ordenes: any[] = [];
@@ -66,8 +70,6 @@ export class RecepcionOrdenesPage implements OnInit, OnDestroy {
     entregada: 'gris',
     cancelada: 'gris',
   };
-
-  constructor(private rec: RecepcionService, private router: Router, private toast: ToastController) {}
 
   ngOnInit() { this.cargar(); }
 

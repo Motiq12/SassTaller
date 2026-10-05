@@ -1,4 +1,4 @@
-import { Component, OnDestroy } from '@angular/core';
+import { Component, OnDestroy, inject } from '@angular/core';
 import { Router, NavigationEnd } from '@angular/router';
 import { Subject, filter, takeUntil } from 'rxjs';
 
@@ -17,12 +17,14 @@ import { Subject, filter, takeUntil } from 'rxjs';
   `,
 })
 export class AdminActionsComponent implements OnDestroy {
+  private router = inject(Router);
+
   fecha = this.hoyStr();
   mostrarNuevaCita = false;
   private destroy$ = new Subject<void>();
   private readonly rutasConCita = ['/admin/resumen', '/admin/citas', '/admin/calendario'];
 
-  constructor(private router: Router) {
+  constructor() {
     this.evaluar(this.router.url);
     this.router.events.pipe(
       filter((e): e is NavigationEnd => e instanceof NavigationEnd),

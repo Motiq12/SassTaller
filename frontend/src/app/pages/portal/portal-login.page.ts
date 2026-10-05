@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnInit, OnDestroy, ViewChild } from '@angular/core';
+import { Component, ElementRef, OnInit, OnDestroy, ViewChild, inject } from '@angular/core';
 import { MarcaService } from '../../services/marca.service';
 import { Router } from '@angular/router';
 import { LoadingController, ToastController } from '@ionic/angular';
@@ -17,6 +17,14 @@ import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../sha
   styleUrls: ['./portal-login.page.scss'],
 })
 export class PortalLoginPage implements OnInit, OnDestroy {
+  private portal = inject(PortalService);
+  private auth = inject(AuthService);
+  private bio = inject(BiometriaService);
+  private router = inject(Router);
+  private loading = inject(LoadingController);
+  private toast = inject(ToastController);
+  marca = inject(MarcaService);
+
   private destroy$ = new Subject<void>();
   email = '';
   password = '';
@@ -50,16 +58,6 @@ export class PortalLoginPage implements OnInit, OnDestroy {
   @ViewChild('tsBox') set tsBox(el: ElementRef<HTMLElement> | undefined) {
     if (el && !this.ts) montarTurnstile(el.nativeElement).then(w => (this.ts = w));
   }
-
-  constructor(
-    private portal: PortalService,
-    private auth: AuthService,
-    private bio: BiometriaService,
-    private router: Router,
-    private loading: LoadingController,
-    private toast: ToastController,
-    public marca: MarcaService
-  ) {}
 
   ngOnInit() {
     // Si ya hay una sesión activa, mandamos a la zona que corresponde.

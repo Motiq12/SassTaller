@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -19,6 +19,17 @@ import { Vehiculo } from '../../models/vehiculo.model';
   styleUrls: ['./cita-form.page.scss'],
 })
 export class CitaFormPage implements OnInit, OnDestroy {
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private citaSvc = inject(CitasService);
+  private clienteSvc = inject(ClientesService);
+  private motoSvc = inject(VehiculosService);
+  private dashSvc = inject(DashboardService);
+  private recepcionSvc = inject(RecepcionService);
+  auth = inject(AuthService);
+  private loading = inject(LoadingController);
+  private toast = inject(ToastController);
+
   private destroy$ = new Subject<void>();
   esEdicion = false;
   citaId: number | null = null;
@@ -36,19 +47,6 @@ export class CitaFormPage implements OnInit, OnDestroy {
   // no coincidía con ninguna del portal y quedaba fuera de la sugerencia de
   // mantenimiento (que busca por nombre exacto).
   tiposServicio: string[] = [];
-
-  constructor(
-    private route: ActivatedRoute,
-    private router: Router,
-    private citaSvc: CitasService,
-    private clienteSvc: ClientesService,
-    private motoSvc: VehiculosService,
-    private dashSvc: DashboardService,
-    private recepcionSvc: RecepcionService,
-    public auth: AuthService,
-    private loading: LoadingController,
-    private toast: ToastController
-  ) {}
 
   ngOnInit() {
     this.recepcionSvc.getServicios().pipe(takeUntil(this.destroy$)).subscribe({

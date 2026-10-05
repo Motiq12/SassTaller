@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Capacitor } from '@capacitor/core';
 import { Observable, shareReplay } from 'rxjs';
@@ -53,10 +53,12 @@ export interface TipoVehiculo {
  */
 @Injectable({ providedIn: 'root' })
 export class TallerService {
+  private http = inject(HttpClient);
+
   private apiUrl = environment.apiUrl;
   private guardado: string | null = null;
 
-  constructor(private http: HttpClient) {
+  constructor() {
     try { this.guardado = localStorage.getItem(TALLER_KEY); } catch { this.guardado = null; }
     this.tomarDeLaUrl();
   }

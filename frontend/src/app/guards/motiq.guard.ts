@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { CanActivate, Router } from '@angular/router';
 import { MotiqService } from '../services/motiq.service';
 
@@ -7,7 +7,8 @@ import { MotiqService } from '../services/motiq.service';
 // taller no abre este panel.
 @Injectable({ providedIn: 'root' })
 export class MotiqGuard implements CanActivate {
-  constructor(private motiq: MotiqService, private router: Router) {}
+  private motiq = inject(MotiqService);
+  private router = inject(Router);
 
   canActivate(): boolean {
     if (this.motiq.isLoggedIn()) return true;

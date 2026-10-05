@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { debounceTime, takeUntil } from 'rxjs/operators';
@@ -11,14 +11,15 @@ import { Cliente } from '../../models/cliente.model';
   styleUrls: ['./clientes.page.scss'],
 })
 export class ClientesPage implements OnInit, OnDestroy {
+  private clienteSvc = inject(ClientesService);
+  private router = inject(Router);
+
   clientes: Cliente[] = [];
   busqueda = '';
   cargando = true;
 
   private destroy$ = new Subject<void>();
   private buscar$ = new Subject<string>();
-
-  constructor(private clienteSvc: ClientesService, private router: Router) {}
 
   ngOnInit() {
     this.buscar$.pipe(debounceTime(400), takeUntil(this.destroy$)).subscribe(q => {

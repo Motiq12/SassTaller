@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 
 interface Seccion { titulo: string; parrafos: string[]; }
@@ -11,6 +11,8 @@ interface Documento { titulo: string; actualizado: string; secciones: Seccion[];
   styleUrls: ['./portal-legal.page.scss'],
 })
 export class PortalLegalPage implements OnInit {
+  private route = inject(ActivatedRoute);
+
   doc: Documento | null = null;
 
   // Plantilla base de textos legales para MS Motos. Revisar con asesoría legal
@@ -70,8 +72,6 @@ export class PortalLegalPage implements OnInit {
       ],
     },
   };
-
-  constructor(private route: ActivatedRoute) {}
 
   ngOnInit() {
     const key = this.route.snapshot.paramMap.get('doc') || 'terminos';

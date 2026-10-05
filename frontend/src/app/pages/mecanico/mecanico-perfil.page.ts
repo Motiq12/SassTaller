@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -15,6 +15,12 @@ import { comprimirImagen } from '../../shared/utils/image.util';
   styleUrls: ['./mecanico-perfil.page.scss'],
 })
 export class MecanicoPerfilPage implements OnInit, OnDestroy {
+  private mecanico = inject(MecanicoService);
+  private auth = inject(AuthService);
+  a11y = inject(AccesibilidadService);
+  private router = inject(Router);
+  private toast = inject(ToastController);
+
   private destroy$ = new Subject<void>();
   perfil: any = null;
   cuenta = { telefono: '', especialidades: '', horario: '' };
@@ -31,14 +37,6 @@ export class MecanicoPerfilPage implements OnInit, OnDestroy {
     { i: 1, etiqueta: 'A', nombre: 'Grande' },
     { i: 2, etiqueta: 'A', nombre: 'Muy grande' },
   ];
-
-  constructor(
-    private mecanico: MecanicoService,
-    private auth: AuthService,
-    public a11y: AccesibilidadService,
-    private router: Router,
-    private toast: ToastController,
-  ) {}
 
   ngOnInit() { this.cargar(); }
   ionViewWillEnter() { this.cargar(); }

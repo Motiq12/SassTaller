@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AlertController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -15,6 +15,13 @@ import { comprimirImagen } from '../../shared/utils/image.util';
   styleUrls: ['./portal-perfil.page.scss'],
 })
 export class PortalPerfilPage implements OnInit, OnDestroy {
+  portal = inject(PortalService);
+  a11y = inject(AccesibilidadService);
+  private bio = inject(BiometriaService);
+  private router = inject(Router);
+  private toast = inject(ToastController);
+  private alert = inject(AlertController);
+
   private destroy$ = new Subject<void>();
   perfil: any = null;
   cuenta = { nombre: '', apellido: '', telefono: '', email: '' };
@@ -43,15 +50,6 @@ export class PortalPerfilPage implements OnInit, OnDestroy {
   reenviandoCorreo = false;
   cooldown = 0;
   private timer: any = null;
-
-  constructor(
-    public portal: PortalService,
-    public a11y: AccesibilidadService,
-    private bio: BiometriaService,
-    private router: Router,
-    private toast: ToastController,
-    private alert: AlertController,
-  ) {}
 
   // Niveles de tamaño de texto (accesibilidad).
   readonly nivelesTexto = [

@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
@@ -12,12 +12,13 @@ import { abrirWhatsApp } from '../../shared/utils/whatsapp.util';
   styleUrls: ['./recepcion-clientes.page.scss'],
 })
 export class RecepcionClientesPage implements OnInit, OnDestroy {
+  private rec = inject(RecepcionService);
+  private router = inject(Router);
+
   private destroy$ = new Subject<void>();
   clientes: any[] = [];
   cargando = true;
   private busqueda$ = new Subject<string>();
-
-  constructor(private rec: RecepcionService, private router: Router) {}
 
   ngOnInit() {
     this.busqueda$.pipe(debounceTime(400), distinctUntilChanged(), takeUntil(this.destroy$)).subscribe(q => this.cargar(q));

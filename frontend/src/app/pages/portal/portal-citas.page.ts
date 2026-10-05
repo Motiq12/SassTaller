@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ToastController, AlertController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -14,6 +14,11 @@ import { badgeProximidad, BadgeProximidad, diasHastaCita } from '../../shared/ut
   styleUrls: ['./portal-citas.page.scss'],
 })
 export class PortalCitasPage implements OnInit, OnDestroy {
+  private portal = inject(PortalService);
+  private toast = inject(ToastController);
+  private alert = inject(AlertController);
+  private router = inject(Router);
+
   private destroy$ = new Subject<void>();
   citas: any[] = [];
   cargando = true;
@@ -29,8 +34,6 @@ export class PortalCitasPage implements OnInit, OnDestroy {
   readonly estadoLabel = ESTADO_CITA_LABEL;
   // Estados posibles de una cita pendiente (para los chips de filtro).
   readonly estadosPendiente = ['agendado', 'en_revision', 'en_mantenimiento', 'listo'];
-
-  constructor(private portal: PortalService, private toast: ToastController, private alert: AlertController, private router: Router) {}
 
   ngOnInit() { this.cargar(); }
   ionViewWillEnter() { this.cargar(); }

@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Capacitor } from '@capacitor/core';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
@@ -24,6 +24,9 @@ export interface LoginUnificadoResp {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+  private http = inject(HttpClient);
+  private taller = inject(TallerService);
+
   private apiUrl = environment.apiUrl;
   // En nativo el token vive en el Keychain/Keystore (ver secure-store.util); acá solo
   // se cachea en memoria para lecturas síncronas (interceptor, guards). En web sigue
@@ -32,8 +35,6 @@ export class AuthService {
   private usuarioSubject = new BehaviorSubject<Usuario | null>(nativo ? null : this.getUsuarioGuardadoWeb());
 
   usuario$ = this.usuarioSubject.asObservable();
-
-  constructor(private http: HttpClient, private taller: TallerService) {}
 
   // Hidrata la sesión desde el Keychain/Keystore en plataforma nativa. Se llama desde
   // un APP_INITIALIZER (app.module.ts) para que termine ANTES de que arranquen los

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { AdminService } from '../../services/admin.service';
@@ -13,6 +13,9 @@ import { descargarCSV } from '../../shared/utils/csv.util';
   styleUrls: ['./admin-reportes.page.scss'],
 })
 export class AdminReportesPage implements OnInit, OnDestroy {
+  private admin = inject(AdminService);
+  private usuarios = inject(UsuariosService);
+
   private destroy$ = new Subject<void>();
   data: any = null;
   cargando = true;
@@ -23,8 +26,6 @@ export class AdminReportesPage implements OnInit, OnDestroy {
   readonly periodos = [
     { v: 'mes', l: 'Este mes' }, { v: 'mes_pasado', l: 'Mes pasado' }, { v: 'anio', l: 'Este año' },
   ];
-
-  constructor(private admin: AdminService, private usuarios: UsuariosService) {}
 
   ngOnInit() {
     this.usuarios.getAll().pipe(takeUntil(this.destroy$)).subscribe({

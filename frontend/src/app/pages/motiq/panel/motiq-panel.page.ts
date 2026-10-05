@@ -1,4 +1,4 @@
-import { Component, ElementRef, HostListener, OnInit, ViewChild } from '@angular/core';
+import { Component, ElementRef, HostListener, OnInit, ViewChild, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AlertController } from '@ionic/angular';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
@@ -25,6 +25,12 @@ import { PRODUCTO } from '../../../shared/producto';
   standalone: false,
 })
 export class MotiqPanelPage implements OnInit {
+  private motiq = inject(MotiqService);
+  private marca = inject(MarcaService);
+  private alerta = inject(AlertController);
+  private toast = inject(ToastService);
+  private router = inject(Router);
+
   producto = PRODUCTO;
   resumen: ResumenPlataforma | null = null;
   talleres: TallerDelPanel[] = [];
@@ -96,14 +102,6 @@ export class MotiqPanelPage implements OnInit {
   // falta uno, desde el panel no se puede mover un taller a ese plan — que es lo que
   // pasaba con "gratis", justo el plan al que caen solos al vencer la prueba.
   readonly PLANES = ['trial', 'gratis', 'pro'];
-
-  constructor(
-    private motiq: MotiqService,
-    private marca: MarcaService,
-    private alerta: AlertController,
-    private toast: ToastService,
-    private router: Router,
-  ) {}
 
   get admin() { return this.motiq.admin; }
 

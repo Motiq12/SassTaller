@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CuentaService, Cuenta } from '../services/cuenta.service';
 
 /**
@@ -65,9 +65,9 @@ import { CuentaService, Cuenta } from '../services/cuenta.service';
   `],
 })
 export class CuentaFranjaComponent implements OnInit {
-  cuenta: Cuenta | null = null;
+  private cuentaSvc = inject(CuentaService);
 
-  constructor(private cuentaSvc: CuentaService) {}
+  cuenta: Cuenta | null = null;
 
   ngOnInit(): void {
     this.cuentaSvc.cuenta$.subscribe(c => { this.cuenta = c; });

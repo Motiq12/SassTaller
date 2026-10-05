@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -15,6 +15,12 @@ import { comprimirImagen } from '../../shared/utils/image.util';
   styleUrls: ['./recepcion-perfil.page.scss'],
 })
 export class RecepcionPerfilPage implements OnInit, OnDestroy {
+  private rec = inject(RecepcionService);
+  private auth = inject(AuthService);
+  a11y = inject(AccesibilidadService);
+  private router = inject(Router);
+  private toast = inject(ToastController);
+
   private destroy$ = new Subject<void>();
   perfil: any = null;
   cuenta = { nombre: '', email: '', telefono: '' };
@@ -30,14 +36,6 @@ export class RecepcionPerfilPage implements OnInit, OnDestroy {
     { i: 1, etiqueta: 'A', nombre: 'Grande' },
     { i: 2, etiqueta: 'A', nombre: 'Muy grande' },
   ];
-
-  constructor(
-    private rec: RecepcionService,
-    private auth: AuthService,
-    public a11y: AccesibilidadService,
-    private router: Router,
-    private toast: ToastController,
-  ) {}
 
   ngOnInit() { this.cargar(); }
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }

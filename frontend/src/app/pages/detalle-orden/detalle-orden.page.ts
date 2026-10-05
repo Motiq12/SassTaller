@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ActionSheetController, AlertController, LoadingController, ToastController } from '@ionic/angular';
 import { OrdenesService } from '../../services/ordenes.service';
@@ -22,6 +22,20 @@ import { takeUntil } from 'rxjs/operators';
   styleUrls: ['./detalle-orden.page.scss'],
 })
 export class DetalleOrdenPage implements OnInit, OnDestroy {
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private ordenSvc = inject(OrdenesService);
+  private usuarioSvc = inject(UsuariosService);
+  private rec = inject(RecepcionService);
+  private garantiaSvc = inject(GarantiasService);
+  private marcaSvc = inject(MarcaService);
+  auth = inject(AuthService);
+  private mecSvc = inject(MecanicoService);
+  private alert = inject(AlertController);
+  private loading = inject(LoadingController);
+  private toast = inject(ToastController);
+  private actionSheet = inject(ActionSheetController);
+
   private destroy$ = new Subject<void>();
   orden: Orden | null = null;
   avances: OrdenAvance[] = [];
@@ -114,22 +128,6 @@ export class DetalleOrdenPage implements OnInit, OnDestroy {
   nuevoMensaje = '';
   enviandoMensaje = false;
   miId = this.auth.getUsuario()?.id ?? null;
-
-  constructor(
-    private route: ActivatedRoute,
-    private router: Router,
-    private ordenSvc: OrdenesService,
-    private usuarioSvc: UsuariosService,
-    private rec: RecepcionService,
-    private garantiaSvc: GarantiasService,
-    private marcaSvc: MarcaService,
-    public auth: AuthService,
-    private mecSvc: MecanicoService,
-    private alert: AlertController,
-    private loading: LoadingController,
-    private toast: ToastController,
-    private actionSheet: ActionSheetController
-  ) {}
 
   ngOnInit() {
     // Precarga la garantía y las formas de pago que definió el taller. Antes la

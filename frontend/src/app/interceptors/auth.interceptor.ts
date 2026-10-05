@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpInterceptor, HttpRequest, HttpHandler, HttpEvent, HttpErrorResponse } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -9,12 +9,10 @@ import { MotiqService } from '../services/motiq.service';
 
 @Injectable()
 export class AuthInterceptor implements HttpInterceptor {
-  constructor(
-    private auth: AuthService,
-    private portal: PortalService,
-    private motiq: MotiqService,
-    private router: Router,
-  ) {}
+  private auth = inject(AuthService);
+  private portal = inject(PortalService);
+  private motiq = inject(MotiqService);
+  private router = inject(Router);
 
   intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     // Hay tres sesiones que pueden convivir en el mismo navegador y cada una tiene su

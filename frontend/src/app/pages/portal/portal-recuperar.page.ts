@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -14,6 +14,11 @@ import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../sha
   styleUrls: ['./portal-login.page.scss'],
 })
 export class PortalRecuperarPage implements AfterViewInit, OnDestroy {
+  private portal = inject(PortalService);
+  private router = inject(Router);
+  private loading = inject(LoadingController);
+  private toast = inject(ToastController);
+
   private destroy$ = new Subject<void>();
   paso: 1 | 2 = 1;
   email = '';
@@ -32,13 +37,6 @@ export class PortalRecuperarPage implements AfterViewInit, OnDestroy {
   mostrarCaptcha = turnstileHabilitado();
   @ViewChild('tsBox') tsBox?: ElementRef<HTMLElement>;
   private ts?: TurnstileWidget;
-
-  constructor(
-    private portal: PortalService,
-    private router: Router,
-    private loading: LoadingController,
-    private toast: ToastController
-  ) {}
 
   async ngAfterViewInit() {
     if (this.tsBox) this.ts = await montarTurnstile(this.tsBox.nativeElement);

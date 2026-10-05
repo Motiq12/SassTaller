@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { Location } from '@angular/common';
 import { Subject } from 'rxjs';
@@ -14,6 +14,11 @@ import { MarcaService, Marca } from '../../services/marca.service';
   styleUrls: ['./factura.page.scss'],
 })
 export class FacturaPage implements OnInit, OnDestroy {
+  private route = inject(ActivatedRoute);
+  private location = inject(Location);
+  private ordenSvc = inject(OrdenesService);
+  private marcaSvc = inject(MarcaService);
+
   private destroy$ = new Subject<void>();
   orden: Orden | null = null;
   repuestos: OrdenRepuesto[] = [];
@@ -21,13 +26,6 @@ export class FacturaPage implements OnInit, OnDestroy {
   // Identidad del taller: el logo y el nombre salen de la configuracion, no del
   // archivo que viene con la app. Sin esto, subir un logo nuevo no cambiaba la factura.
   marca: Marca | null = null;
-
-  constructor(
-    private route: ActivatedRoute,
-    private location: Location,
-    private ordenSvc: OrdenesService,
-    private marcaSvc: MarcaService
-  ) {}
 
   ngOnInit() {
     this.marcaSvc.get().pipe(takeUntil(this.destroy$)).subscribe(m => this.marca = m);

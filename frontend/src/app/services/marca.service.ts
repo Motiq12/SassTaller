@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, of } from 'rxjs';
 import { catchError, map, shareReplay, tap } from 'rxjs/operators';
@@ -40,6 +40,9 @@ const RESPALDO: Marca = {
 
 @Injectable({ providedIn: 'root' })
 export class MarcaService {
+  private http = inject(HttpClient);
+  private taller = inject(TallerService);
+
   private url = `${environment.apiUrl}/marca`;
   private cache$: Observable<Marca> | null = null;
 
@@ -48,8 +51,6 @@ export class MarcaService {
   // síncrona al renderizar, sin suscribirse.
   private actualSubject = new BehaviorSubject<Marca>(RESPALDO);
   marca$ = this.actualSubject.asObservable();
-
-  constructor(private http: HttpClient, private taller: TallerService) {}
 
   get actual(): Marca { return this.actualSubject.value; }
 

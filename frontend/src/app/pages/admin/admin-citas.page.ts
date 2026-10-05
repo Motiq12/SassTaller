@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AlertController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -16,6 +16,11 @@ import { descargarCSV, fechaCorta } from '../../shared/utils/csv.util';
   styleUrls: ['./admin-citas.page.scss'],
 })
 export class AdminCitasPage implements OnInit, OnDestroy {
+  private admin = inject(AdminService);
+  private ordenSvc = inject(OrdenesService);
+  private router = inject(Router);
+  private alert = inject(AlertController);
+
   private destroy$ = new Subject<void>();
   vista: 'ordenes' | 'citas' = 'ordenes';
   citas: any[] = [];
@@ -51,8 +56,6 @@ export class AdminCitasPage implements OnInit, OnDestroy {
   };
 
   ordenLabel(e: string): string { return ESTADO_CONFIG[e as EstadoOrden]?.label ?? e; }
-
-  constructor(private admin: AdminService, private ordenSvc: OrdenesService, private router: Router, private alert: AlertController) {}
 
   ngOnInit() { this.cargar(); this.cargarSucursales(); }
   ionViewWillEnter() { this.cargar(); }

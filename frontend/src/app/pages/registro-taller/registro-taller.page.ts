@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { Subject, debounceTime, switchMap, catchError, of } from 'rxjs';
 import { TallerService, TipoVehiculo } from '../../services/taller.service';
@@ -22,6 +22,11 @@ import { PRODUCTO } from '../../shared/producto';
   standalone: false,
 })
 export class RegistroTallerPage {
+  private taller = inject(TallerService);
+  private auth = inject(AuthService);
+  private router = inject(Router);
+  private toast = inject(ToastService);
+
   // Esta pantalla identifica al PRODUCTO, no a un taller: quien la abre todavía no
   // pertenece a ninguno.
   producto = PRODUCTO;
@@ -60,12 +65,7 @@ export class RegistroTallerPage {
   enviando = false;
   private slugCambiado = new Subject<string>();
 
-  constructor(
-    private taller: TallerService,
-    private auth: AuthService,
-    private router: Router,
-    private toast: ToastService,
-  ) {
+  constructor() {
     // Se espera a que deje de escribir antes de preguntar: sin esto, cada tecla
     // dispararía una consulta y las respuestas podrían llegar desordenadas.
     // switchMap además cancela la anterior, así que siempre gana la última.

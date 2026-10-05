@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AlertController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -14,6 +14,11 @@ import { badgeProximidad, BadgeProximidad } from '../../shared/utils/fecha-cita.
   styleUrls: ['./portal-inicio.page.scss'],
 })
 export class PortalInicioPage implements OnInit, OnDestroy {
+  portal = inject(PortalService);
+  private router = inject(Router);
+  private alert = inject(AlertController);
+  private toast = inject(ToastController);
+
   private destroy$ = new Subject<void>();
   resumen: any = null;
   presupuestos: any[] = [];      // órdenes esperando la aprobación del cliente
@@ -23,13 +28,6 @@ export class PortalInicioPage implements OnInit, OnDestroy {
   cargando = true;
   readonly estadoLabel = ESTADO_CITA_LABEL;
   readonly fechaHoy = new Date().toLocaleDateString('es-CR', { weekday: 'short', day: 'numeric', month: 'short' });
-
-  constructor(
-    public portal: PortalService,
-    private router: Router,
-    private alert: AlertController,
-    private toast: ToastController
-  ) {}
 
   ngOnInit() { this.cargar(); }
   ionViewWillEnter() { this.cargar(); }

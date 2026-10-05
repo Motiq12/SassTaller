@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { MarcaService } from '../../services/marca.service';
 import { Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
@@ -16,6 +16,13 @@ import { descargarCSV, fechaCorta } from '../../shared/utils/csv.util';
   styleUrls: ['./dashboard.page.scss'],
 })
 export class DashboardPage implements OnInit, OnDestroy {
+  auth = inject(AuthService);
+  private dashSvc = inject(DashboardService);
+  private ordenSvc = inject(OrdenesService);
+  private toast = inject(ToastController);
+  private router = inject(Router);
+  marca = inject(MarcaService);
+
   private destroy$ = new Subject<void>();
   resumen: any = null;
   tecnicos: any[] = [];
@@ -43,15 +50,6 @@ export class DashboardPage implements OnInit, OnDestroy {
   };
 
   exportando = false;
-
-  constructor(
-    public auth: AuthService,
-    private dashSvc: DashboardService,
-    private ordenSvc: OrdenesService,
-    private toast: ToastController,
-    private router: Router,
-    public marca: MarcaService
-  ) {}
 
   ngOnInit() {
     this.cargar();

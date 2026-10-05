@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -12,16 +12,14 @@ import { Orden } from '../../models/orden.model';
   styleUrls: ['./vehiculo-historial.page.scss'],
 })
 export class VehiculoHistorialPage implements OnInit, OnDestroy {
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private motoSvc = inject(VehiculosService);
+
   private destroy$ = new Subject<void>();
   vehiculo: Vehiculo | null = null;
   historial: Orden[] = [];
   cargando = true;
-
-  constructor(
-    private route: ActivatedRoute,
-    private router: Router,
-    private motoSvc: VehiculosService
-  ) {}
 
   ngOnInit() {
     const id = +(this.route.snapshot.paramMap.get('id') || 0);

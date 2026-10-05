@@ -1,13 +1,14 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class AdminService {
+  private http = inject(HttpClient);
+
   private url = `${environment.apiUrl}/admin`;
   private citasUrl = `${environment.apiUrl}/citas`;
-  constructor(private http: HttpClient) {}
 
   // Resumen ejecutivo (KPIs + top servicios + estado de citas + ingresos por servicio).
   getResumen(): Observable<{ data: any }> {

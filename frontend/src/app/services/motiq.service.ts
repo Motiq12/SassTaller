@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
@@ -157,12 +157,12 @@ export interface ContactoDemo extends PedidoDemo {
 
 @Injectable({ providedIn: 'root' })
 export class MotiqService {
+  private http = inject(HttpClient);
+
   private apiUrl = environment.apiUrl;
   // El panel es de escritorio y no se compila a la app nativa, así que acá alcanza
   // localStorage; no hace falta el Keychain como en AuthService.
   private token: string | null = localStorage.getItem(TOKEN_KEY);
-
-  constructor(private http: HttpClient) {}
 
   getToken(): string | null { return this.token; }
 

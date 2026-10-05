@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ToastController, ActionSheetController, AlertController } from '@ionic/angular';
 import { Subject, interval } from 'rxjs';
@@ -16,6 +16,13 @@ import { ahoraTaller } from '../../shared/utils/fecha-cita.util';
   styleUrls: ['./recepcion.page.scss'],
 })
 export class RecepcionPage implements OnInit, OnDestroy {
+  private rec = inject(RecepcionService);
+  private auth = inject(AuthService);
+  private router = inject(Router);
+  private toast = inject(ToastController);
+  private actionSheet = inject(ActionSheetController);
+  private alertCtrl = inject(AlertController);
+
   private destroy$ = new Subject<void>();
   resumen?: ResumenRecepcion;
   citas: any[] = [];
@@ -55,15 +62,6 @@ export class RecepcionPage implements OnInit, OnDestroy {
   sucursalFiltro: number | '' = '';
   // Modo "trabajar los sin confirmar": muestra solo las citas por venir sin confirmar.
   soloSinConfirmar = false;
-
-  constructor(
-    private rec: RecepcionService,
-    private auth: AuthService,
-    private router: Router,
-    private toast: ToastController,
-    private actionSheet: ActionSheetController,
-    private alertCtrl: AlertController
-  ) {}
 
   ngOnInit() {
     this.cargar();

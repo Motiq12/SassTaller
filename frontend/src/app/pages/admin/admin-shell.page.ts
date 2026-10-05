@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { Subject, interval } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -12,10 +12,13 @@ import { MarcaService } from '../../services/marca.service';
   templateUrl: './admin-shell.page.html',
 })
 export class AdminShellPage implements OnInit, OnDestroy {
+  private auth = inject(AuthService);
+  private msj = inject(MensajeriaService);
+  private router = inject(Router);
+  marca = inject(MarcaService);
+
   private destroy$ = new Subject<void>();
   noLeidos = 0;
-
-  constructor(private auth: AuthService, private msj: MensajeriaService, private router: Router, public marca: MarcaService) {}
 
   get nombre(): string { return this.auth.getUsuario()?.nombre || 'Administrador'; }
   get rolLabel(): string { return 'Administrador'; }

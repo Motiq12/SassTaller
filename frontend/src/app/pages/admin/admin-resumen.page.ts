@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -22,6 +22,14 @@ type Sem = 'rojo' | 'amarillo' | 'verde' | 'gris';
   styleUrls: ['./admin-resumen.page.scss'],
 })
 export class AdminResumenPage implements OnInit, OnDestroy {
+  private admin = inject(AdminService);
+  private dash = inject(DashboardService);
+  private ordenes = inject(OrdenesService);
+  private toast = inject(ToastController);
+  private router = inject(Router);
+  private marcaSvc = inject(MarcaService);
+  private cuentaSvc = inject(CuentaService);
+
   // Los pasos del arranque se completan en otras pantallas (config, empleados, nueva
   // orden). Ionic solo dispara ionViewWillEnter en la página ruteada, no en los hijos,
   // así que el refresco al volver acá lo tiene que empujar esta página.
@@ -55,16 +63,6 @@ export class AdminResumenPage implements OnInit, OnDestroy {
     recepcion: 'Recepción', diagnostico: 'Diagnóstico', esperando_aprobacion: 'Esperando aprobación',
     esperando_repuestos: 'Esperando repuestos', en_reparacion: 'En reparación', lista_entrega: 'Lista para entrega',
   };
-
-  constructor(
-    private admin: AdminService,
-    private dash: DashboardService,
-    private ordenes: OrdenesService,
-    private toast: ToastController,
-    private router: Router,
-    private marcaSvc: MarcaService,
-    private cuentaSvc: CuentaService,
-  ) {}
 
   ngOnInit() { this.cargar(); }
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }

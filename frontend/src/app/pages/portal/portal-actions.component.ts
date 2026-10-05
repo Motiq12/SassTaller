@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { PortalService } from '../../services/portal.service';
 
 // Acceso a "Mi Perfil" y "Notificaciones" desde el encabezado de cada pantalla del portal.
@@ -35,7 +35,7 @@ import { PortalService } from '../../services/portal.service';
   `],
 })
 export class PortalActionsComponent implements OnInit {
-  constructor(public portal: PortalService) {}
+  portal = inject(PortalService);
 
   // Cada vez que una pantalla con esta barra se monta, refresca el contador.
   ngOnInit() { this.portal.refrescarContador(); }
