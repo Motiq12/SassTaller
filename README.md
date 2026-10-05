@@ -45,7 +45,20 @@ seguimiento de su moto, aprobación de presupuestos y calificación.
 
 ## 1. Base de datos
 
-Creá la base y configurá `backend/.env` (copia de `backend/.env.example`):
+Con MySQL corriendo (en Laragon: **Start All**), importá la base del repo:
+
+```bash
+cd backend
+npm install
+npm run db:importar
+```
+
+Eso recrea la base `sasstaller` con el volcado `backend/db/sasstaller.sql`, que ya trae
+el esquema al día y dos talleres de prueba. **Si ya la tenías, la reemplaza**: la idea es
+que todos arranquen desde lo mismo. El detalle de qué trae está en
+[`backend/db/README.md`](backend/db/README.md).
+
+Después copiá `backend/.env.example` a `backend/.env` y completá los valores:
 
 ```
 PORT=3000
@@ -53,25 +66,27 @@ DB_HOST=localhost
 DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=
-DB_NAME=taller_motos
+DB_NAME=sasstaller
 CORS_ORIGIN=http://localhost:8100
-RESEND_API_KEY=          # opcional; sin key, los códigos se imprimen en consola
+JWT_SECRET=                # obligatorio; en producción el server aborta si falta
+RESEND_API_KEY=            # opcional; sin key, los códigos se imprimen en consola
 ```
 
-Cargá el esquema y los usuarios semilla:
+Las cuentas vienen en el volcado (ver `backend/db/README.md`); el `.env` no está en el
+repo porque lleva el `JWT_SECRET`, así que pedíselo a quien te pasó el proyecto.
+
+Para entrar al panel de la plataforma necesitás crear tu propia cuenta, porque esas no
+vienen en el volcado a propósito:
 
 ```bash
-cd backend
-node src/db/migrate.js
+npm run motiq:admin -- "Tu nombre" vos@motiq.cr
 ```
 
-Crea las tablas (`backend/schema.sql`) y dos cuentas de prueba:
-
-- **admin@taller.com** / `Admin2024!` (rol admin)
-- **recepcion@taller.com** / `Recep2024!` (rol recepción)
-
-> La API además corre **migraciones idempotentes** (`ensureSchema`) en cada arranque,
-> así que el esquema se mantiene al día solo en cada deploy.
+> **Sobre las migraciones.** La API corre migraciones idempotentes (`ensureSchema`) en
+> cada arranque, así que el esquema se mantiene al día solo en cada deploy. Los archivos
+> de `backend/migrations/` son el registro de cómo se llegó hasta acá: **no los ejecuta
+> ningún script** y el volcado ya los tiene aplicados. Solo hacen falta para entender un
+> cambio o para migrar a mano una base vieja.
 
 ---
 
@@ -79,15 +94,14 @@ Crea las tablas (`backend/schema.sql`) y dos cuentas de prueba:
 
 ```bash
 cd backend
-npm install
-npm run dev        # recarga automática (nodemon)
+npm run dev        # recarga automática (nodemon), un solo proceso
 # o
-npm start
+npm start          # multiproceso (cluster), como en producción
 npm test           # tests unitarios
 ```
 
-API en **http://localhost:3000**, montada bajo `/api` (auth, clientes, motos, citas,
-ordenes, recepcion, mecanico, admin, garantias, promos, portal…).
+API en **http://localhost:3000**, montada bajo `/api` (auth, clientes, vehiculos, citas,
+ordenes, recepcion, mecanico, admin, garantias, promos, portal, motiq…).
 
 ---
 

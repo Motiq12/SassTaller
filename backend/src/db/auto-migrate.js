@@ -521,8 +521,8 @@ async function ensureSchema() {
       )
     );
 
-    // Columna sucursal_id (sin FK aquí, igual que citas.tecnico_id/orden_id; las FK van
-    // solo en schema.sql para instalación limpia). NULL en usuarios = "atiende ambas".
+    // Columna sucursal_id, sin FK (igual que citas.tecnico_id/orden_id): las claves
+    // foráneas vienen en el volcado de backend/db/. NULL en usuarios = "atiende ambas".
     await addColumnIfMissing('citas', 'sucursal_id', 'INT NULL');
     await addColumnIfMissing('ordenes_trabajo', 'sucursal_id', 'INT NULL');
     await addColumnIfMissing('usuarios', 'sucursal_id', 'INT NULL');
