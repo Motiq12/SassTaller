@@ -34,11 +34,17 @@
 // Chrome pinta de amarillo lo que autocompleta. Se tapa con el fondo del campo —
 // que ahora sigue al tema, no un gris fijo: con el negro de antes, en modo claro
 // el correo autocompletado aparecía en un recuadro oscuro en medio del formulario.
+//
+// El relleno tiene que ser el MISMO que calcula .login-content para el campo (ver
+// global.scss): si acá quedara --ion-item-background, el campo autocompletado saldría
+// de otro color que el de al lado, y justo el del correo, que es el que más se
+// autocompleta. El respaldo es para las pantallas que no son las de acceso.
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 40px var(--ion-item-background, #fff) inset !important;
+  -webkit-box-shadow: 0 0 0 40px
+    color-mix(in srgb, var(--ion-text-color, #000) 7%, var(--lienzo, var(--ion-item-background, #fff))) inset !important;
   -webkit-text-fill-color: var(--ion-text-color, #111) !important;
   caret-color: var(--ion-text-color, #111);
   transition: background-color 5000s ease-in-out 0s;
@@ -60,23 +66,27 @@ input:-webkit-autofill:active {
   z-index: 1;
   cursor: pointer;
 
-  &:hover, &:active { color: var(--ion-color-primary); }
+  &:hover, &:active { color: var(--acento-texto, var(--ion-color-primary)); }
 
   // CTA secundario: "Crear una cuenta". Es la acción que sigue en importancia al
   // botón de ingresar, así que se separa del resto en vez de ser un enlace más.
   &.strong {
-    color: var(--ion-color-primary);
+    color: var(--acento-texto, var(--ion-color-primary));
     font-weight: 700;
     font-size: 14px;
-    text-decoration-color: color-mix(in srgb, var(--ion-color-primary) 45%, transparent);
+    text-decoration-color: color-mix(in srgb, var(--acento-texto, var(--ion-color-primary)) 45%, transparent);
     text-underline-offset: 5px;
     margin-top: 22px;
   }
   // Links secundarios (olvidé contraseña / registrar un taller)
+  // Enlaces secundarios (olvidé contraseña / registrar un taller). El gris del
+  // tema daba 4.04:1 sobre el lienzo claro, por debajo del 4.5:1 que pide WCAG para
+  // texto chico. Se deriva del color de texto mezclado con el lienzo, así que la
+  // cuenta sale bien en los dos modos sin un gris fijo para cada uno.
   &.sub {
     margin-top: 10px;
     font-size: 12px;
-    color: var(--ion-color-medium, #9ca3af);
+    color: color-mix(in srgb, var(--ion-text-color, #111) 62%, var(--lienzo, transparent));
   }
   // Reenviar deshabilitado durante el cooldown
   &.disabled {

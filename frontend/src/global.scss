@@ -529,7 +529,46 @@ ion-toast {
 }
 
 .login-content {
-  --background: var(--ion-background-color, #fff);
+  // Cuánto ocupa el panel de marca. Va como variable porque el relleno de la otra
+  // columna tiene que seguirlo: si se escriben los dos a mano, se desincronizan.
+  --panel-marca: 40%;
+
+  // El lienzo del formulario se TIÑE con el color del taller en vez de ser el negro
+  // (o el blanco) pelado del tema. No se percibe como color, se percibe como que las
+  // dos mitades son del mismo lugar. Sin esto, el panel de marca y el formulario
+  // parecen dos pantallas distintas pegadas, que es de donde venía buena parte de la
+  // sensación de apagado.
+  //
+  // Se calcula con color-mix sobre el fondo del tema, así que sale solo en claro y
+  // en oscuro, y con el color que haya elegido CADA taller — no hay ningún hex acá.
+  //
+  // Hay DOS cosas que cambian entre temas, no una, y por no ver la segunda este
+  // tinte no se notaba en absoluto:
+  //
+  //   1. El porcentaje. Sobre blanco un 7% ya se lee; sobre negro no.
+  //   2. La BASE sobre la que se mezcla. Y acá está el detalle que importa: el color
+  //      de marca de un taller suele ser oscuro (el del sistema es #1e3a5f), así que
+  //      mezclarlo contra el #0a0a0a del tema da #0f151d — oscuro mezclado con
+  //      oscuro sigue siendo oscuro. Teñir el matiz no alcanza si nadie sube la
+  //      luminancia. En oscuro se parte de un gris levantado, no del fondo del tema.
+  //
+  // Con eso el panel del formulario deja de ser un agujero negro y pasa a ser una
+  // superficie, que es lo que hace que se lea como la otra mitad de la pantalla.
+  --base-lienzo: var(--ion-background-color, #fff);
+  --tinte-lienzo: 7%;
+  --lienzo: color-mix(in srgb, var(--ion-color-primary) var(--tinte-lienzo), var(--base-lienzo));
+  --background: var(--lienzo);
+
+  // El color de marca sirve como RELLENO de un botón (el texto encima es blanco o
+  // negro según haga falta), pero no siempre sirve como COLOR DE TEXTO. El del
+  // sistema es #1e3a5f: sobre el lienzo oscuro da 1.47:1 de contraste, cuando el
+  // mínimo legible es 4.5:1. El enlace "Crear una cuenta" —que es la segunda acción
+  // más importante de la pantalla— quedaba prácticamente invisible en modo oscuro.
+  //
+  // Se usa el color de marca solo donde contrasta, y en oscuro se aclara mezclándolo
+  // con blanco. Sigue siendo el color del taller, solo que a una luminancia que se
+  // puede leer, y la cuenta sale bien con cualquier color que elija cualquier taller.
+  --acento-texto: var(--ion-color-primary);
 
   .login-container {
     // El ancho va explícito: dentro del contenedor de scroll de ion-content este div
@@ -570,14 +609,30 @@ ion-toast {
     }
 
     // Capa 2: el color del taller por encima.
+    //
+    // Antes era un velo parejo al 93%: a esa opacidad la foto es un rumor y el panel
+    // queda como un rectángulo de color liso. Se pagaba el costo de cargar una
+    // fotografía sin recibir nada a cambio.
+    //
+    // Ahora el velo es DIRECCIONAL. Denso donde va el texto (la banda izquierda,
+    // que es donde caen el logo y el título con el layout de escritorio) y mucho más
+    // abierto hacia el borde derecho, donde no hay nada que leer y la foto puede
+    // verse. El taller se reconoce igual por el color, pero el panel vuelve a tener
+    // materia: se ven las herramientas, el banco, el piso.
+    //
+    // El ángulo sigue al layout, no al gusto: el texto está a la izquierda, así que
+    // la opacidad cae hacia la derecha y nunca al revés.
     &::after {
       content: '';
       position: absolute;
       inset: 0;
-      background: linear-gradient(155deg,
-        color-mix(in srgb, var(--ion-color-primary) 93%, transparent) 0%,
-        color-mix(in srgb, var(--ion-color-primary) 88%, transparent) 100%);
+      background: linear-gradient(107deg,
+        color-mix(in srgb, var(--ion-color-primary) 94%, transparent) 0%,
+        color-mix(in srgb, var(--ion-color-primary) 88%, transparent) 38%,
+        color-mix(in srgb, var(--ion-color-primary) 66%, transparent) 72%,
+        color-mix(in srgb, var(--ion-color-primary) 52%, transparent) 100%);
     }
+
 
     // Capa 3: el contenido, por encima de las dos anteriores.
     > * {
@@ -603,22 +658,31 @@ ion-toast {
       img { width: 56px; height: 56px; object-fit: contain; }
     }
 
+    // El nombre del taller es lo único que esta mitad tiene para decir, y estaba
+    // puesto al tamaño de un título de tarjeta. En una columna que ocupa media
+    // pantalla eso no se lee como marca, se lee como un texto suelto. El tope del
+    // clamp sube bastante; el piso se queda donde estaba porque en teléfono el panel
+    // es una banda angosta y ahí sí competiría con el formulario.
     h1 {
       font-family: var(--font-display);
-      font-size: clamp(1.7rem, 4vw, 2.15rem);
+      font-size: clamp(1.7rem, 3.4vw, 3.1rem);
       font-weight: 800;
-      margin: 0 0 .45rem;
-      letter-spacing: -0.035em;
+      margin: 0 0 .6rem;
+      letter-spacing: -0.04em;
+      line-height: 1.04;
       color: #fff;
+      // Despega el nombre de la fotografía sin recuadro ni franja de color.
+      text-shadow: 0 2px 18px rgba(0, 0, 0, .35);
     }
 
     p {
       font-size: 11px;
-      color: rgba(255, 255, 255, .78);
+      color: rgba(255, 255, 255, .82);
       margin: 0;
       text-transform: uppercase;
       letter-spacing: 0.18em;
       font-weight: 700;
+      text-shadow: 0 1px 10px rgba(0, 0, 0, .3);
     }
   }
 
@@ -655,7 +719,13 @@ ion-toast {
     }
 
     ion-item {
-      --background: var(--ion-item-background, #fff);
+      // El campo se separa del lienzo por luminancia, no por el borde. Antes el
+      // relleno era #171717 contra un fondo #0a0a0a: trece puntos de diferencia, que
+      // a simple vista es ninguno — los campos no se leían como campos sino como
+      // rectángulos dibujados en el vacío. Se levanta mezclando blanco (en oscuro) o
+      // tinta (en claro) sobre el lienzo ya teñido, así que el campo queda emparentado
+      // con la marca en vez de ser un gris ajeno.
+      --background: color-mix(in srgb, var(--ion-text-color, #000) 7%, var(--lienzo));
       --border-color: transparent;
       --highlight-color-focused: var(--ion-color-primary);
       --padding-start: 14px;
@@ -664,13 +734,16 @@ ion-toast {
       margin-bottom: .6rem;
       border: 1px solid color-mix(in srgb, var(--ion-text-color, #000) 14%, transparent);
       border-radius: 12px;
-      transition: border-color .15s ease, box-shadow .15s ease;
+      transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
 
       // El foco se ve en el campo entero, no en una rayita de abajo: en un login con
-      // dos campos hay que saber de un vistazo en cuál se está escribiendo.
+      // dos campos hay que saber de un vistazo en cuál se está escribiendo. Además
+      // el relleno sube un escalón: el campo activo es el único que se aclara, así
+      // que la mirada va sola sin depender solo del anillo de color.
       &:focus-within {
+        --background: color-mix(in srgb, var(--ion-text-color, #000) 11%, var(--lienzo));
         border-color: var(--ion-color-primary);
-        box-shadow: 0 0 0 3px color-mix(in srgb, var(--ion-color-primary) 18%, transparent);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--ion-color-primary) 22%, transparent);
       }
 
       ion-label {
@@ -688,15 +761,27 @@ ion-toast {
     }
 
     // CTA principal (Ingresar / Crear cuenta / Enviar código)
+    //
+    // Es el único elemento de la columna que lleva el color lleno, así que tiene que
+    // pesar: sube a 54px y a peso 700. Sin gradiente ni glow a propósito — el
+    // DESIGN.md los prohíbe y además, con el color variable de cada taller, un
+    // gradiente se vería bien con unos hues y sucio con otros.
     ion-button[expand="block"] {
-      margin-top: 1rem;
-      height: 50px;
+      margin-top: 1.15rem;
+      height: 54px;
       --background: var(--ion-color-primary);
       --background-activated: var(--ion-color-primary-shade);
+      --background-hover: var(--ion-color-primary-shade);
       --border-radius: 12px;
-      --box-shadow: 0 6px 18px color-mix(in srgb, var(--ion-color-primary) 30%, transparent);
-      font-weight: 600;
+      --box-shadow: 0 8px 22px color-mix(in srgb, var(--ion-color-primary) 34%, transparent);
+      font-weight: 700;
       letter-spacing: 0;
+      transition: transform .18s cubic-bezier(.22, 1, .36, 1), opacity .18s ease;
+
+      // Hundir al presionar, no rebotar: el gesto tiene que sentirse físico y
+      // terminar donde empezó (ver DESIGN.md, "feedback táctil scale(0.97)").
+      &:active { transform: scale(.985); }
+      &.button-disabled { opacity: .45; --box-shadow: none; }
     }
 
     // Botón "ojo" para ver/ocultar la contraseña dentro del campo
@@ -726,7 +811,7 @@ ion-toast {
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      padding: 2.5rem 2.5rem 2.5rem calc(40% + 2.5rem);
+      padding: 2.5rem 2.5rem 2.5rem calc(var(--panel-marca) + 2.5rem);
     }
 
     .login-header {
@@ -734,7 +819,7 @@ ion-toast {
       top: 0;
       bottom: 0;
       left: 0;
-      width: 40%;
+      width: var(--panel-marca);
       min-width: 320px;
       margin: 0;
       display: flex;
@@ -742,6 +827,10 @@ ion-toast {
       justify-content: center;
       text-align: left;
       padding: 3.5rem 3rem;
+      // Remate del canto contra el formulario: una luz del color del taller, sin
+      // línea dura. A pantalla completa un borde de 1px se lee como una costura.
+      box-shadow: 1px 0 0 color-mix(in srgb, var(--ion-color-primary) 55%, transparent),
+                  18px 0 50px -24px rgba(0, 0, 0, .55);
 
       .logo-wrapper { margin-inline: 0; }
     }
@@ -749,6 +838,32 @@ ion-toast {
     .login-container > *:not(.login-header) { width: min(400px, 100%); }
 
     ion-card { margin-top: 0; }
+  }
+
+  // En pantallas anchas el reparto fijo se rompe: con 40% para la marca, un monitor
+  // de 1600px deja casi mil píxeles para un formulario de 400. El formulario no
+  // queda centrado en una columna, queda perdido en un descampado — que es de donde
+  // salía la mitad de la sensación de pantalla vacía.
+  //
+  // Se corrige moviendo la frontera, no estirando el formulario: un campo de texto
+  // de 600px de ancho es peor de usar, porque el ojo tiene que recorrerlo entero
+  // para volver al principio. La marca se queda con el espacio que sobra, que es
+  // para lo que sirve: es la mitad que puede llenar con una fotografía.
+  @media (min-width: 1280px) {
+    --panel-marca: 46%;
+    .login-header { padding: 4rem 4rem; }
+  }
+
+  @media (min-width: 1700px) {
+    --panel-marca: 50%;
+  }
+
+  // Ver la nota de --base-lienzo: en oscuro cambian la base y el porcentaje.
+  @media (prefers-color-scheme: dark) {
+    --base-lienzo: #161616;
+    --tinte-lienzo: 20%;
+    // Ver la nota de --acento-texto: el color de marca aclarado hasta que se lea.
+    --acento-texto: color-mix(in srgb, var(--ion-color-primary) 45%, #fff);
   }
 }
 
