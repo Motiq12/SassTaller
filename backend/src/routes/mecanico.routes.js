@@ -1,5 +1,4 @@
 const router = require('express').Router();
-const bcrypt = require('bcrypt');
 // Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
 const { fail } = require('../utils/responder');
 const auth = require('../middleware/auth');
@@ -7,10 +6,11 @@ const requireRol = require('../middleware/roles');
 const { notificarCambioEstado } = require('../utils/notificaciones');
 const { TRANSICIONES_CITA, transicionPermitida } = require('../utils/transiciones');
 const { LEIDO_POR_MI, VISTO_POR_OTRO, marcarLeidos } = require('../utils/mensajes');
-const { fotoValida } = require('../utils/validar');
 
 // Panel del mecánico: opera sobre SUS citas asignadas. Accesible a técnico o superior.
 router.use(auth, requireRol('tecnico'));
+// Foto y contraseña propias: el mismo tramo que monta el panel de recepción.
+router.use(require('./perfil-propio.routes'));
 
 const ESTADOS = ['agendado', 'en_revision', 'en_mantenimiento', 'listo', 'entregado', 'cancelado'];
 const EN_PROCESO = ['en_revision', 'en_mantenimiento'];
@@ -445,32 +445,6 @@ router.get('/alertas', async (req, res) => {
   }
 });
 
-router.put('/perfil/foto', async (req, res) => {
-  try {
-    const { foto } = req.body;
-    if (!fotoValida(foto)) return res.status(400).json({ error: 'Imagen inválida' });
-    await req.db.query('UPDATE usuarios SET foto = ? WHERE tenant_id = @tenant AND id = ?', [foto || null, req.usuario.id]);
-    res.json({ data: { foto: foto || null }, message: foto ? 'Foto actualizada' : 'Foto eliminada' });
-  } catch (err) {
-    fail(res, err);
-  }
-});
-
-router.put('/perfil/password', async (req, res) => {
-  try {
-    const { actual, nueva } = req.body;
-    if (!actual || !nueva) return res.status(400).json({ error: 'Contraseña actual y nueva son requeridas' });
-    if (String(nueva).length < 8) return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres' });
-    const [[u]] = await req.db.query('SELECT password_hash FROM usuarios WHERE tenant_id = @tenant AND id = ?', [req.usuario.id]);
-    if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
-    const ok = await bcrypt.compare(String(actual), u.password_hash);
-    if (!ok) return res.status(400).json({ error: 'La contraseña actual no es correcta' });
-    const hash = await bcrypt.hash(String(nueva), 10);
-    await req.db.query('UPDATE usuarios SET password_hash = ? WHERE tenant_id = @tenant AND id = ?', [hash, req.usuario.id]);
-    res.json({ message: 'Contraseña actualizada' });
-  } catch (err) {
-    fail(res, err);
-  }
-});
+// La foto y la contraseña propias las sirve el tramo compartido (montado arriba).
 
 module.exports = router;

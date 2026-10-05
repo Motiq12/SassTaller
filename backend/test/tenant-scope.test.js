@@ -20,6 +20,7 @@ const YA_MIGRADOS = [
   'portal.routes.js',
   'ordenes.routes.js',
   'mecanico.routes.js',
+  'perfil-propio.routes.js',
   'admin.routes.js',
   'usuarios.routes.js',
   'dashboard.routes.js',

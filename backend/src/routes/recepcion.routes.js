@@ -1,5 +1,4 @@
 const router = require('express').Router();
-const bcrypt = require('bcrypt');
 // Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
 const { fail } = require('../utils/responder');
 const auth = require('../middleware/auth');
@@ -16,6 +15,8 @@ const { fotoValida } = require('../utils/validar');
 // Panel de recepción: intermediaria entre cliente y mecánico.
 // Accesible a recepción y superiores.
 router.use(auth, requireRol('recepcion'));
+// Foto y contraseña propias: el mismo tramo que monta el panel del mecánico.
+router.use(require('./perfil-propio.routes'));
 
 // Estados de la orden que NO se consideran activos.
 const ORDEN_CERRADA = ['entregada', 'cancelada'];
@@ -726,34 +727,7 @@ router.put('/perfil', async (req, res) => {
   }
 });
 
-// Foto de perfil (data URL base64) o null para quitarla.
-router.put('/perfil/foto', async (req, res) => {
-  try {
-    const { foto } = req.body;
-    if (!fotoValida(foto)) return res.status(400).json({ error: 'Imagen inválida' });
-    await req.db.query('UPDATE usuarios SET foto = ? WHERE id = ? AND tenant_id = @tenant', [foto || null, req.usuario.id]);
-    res.json({ data: { foto: foto || null }, message: foto ? 'Foto actualizada' : 'Foto eliminada' });
-  } catch (err) {
-    fail(res, err);
-  }
-});
-
-router.put('/perfil/password', async (req, res) => {
-  try {
-    const { actual, nueva } = req.body;
-    if (!actual || !nueva) return res.status(400).json({ error: 'Contraseña actual y nueva son requeridas' });
-    if (String(nueva).length < 8) return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres' });
-    const [[u]] = await req.db.query('SELECT password_hash FROM usuarios WHERE id = ? AND tenant_id = @tenant', [req.usuario.id]);
-    if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
-    const ok = await bcrypt.compare(String(actual), u.password_hash);
-    if (!ok) return res.status(400).json({ error: 'La contraseña actual no es correcta' });
-    const hash = await bcrypt.hash(String(nueva), 10);
-    await req.db.query('UPDATE usuarios SET password_hash = ? WHERE id = ? AND tenant_id = @tenant', [hash, req.usuario.id]);
-    res.json({ message: 'Contraseña actualizada' });
-  } catch (err) {
-    fail(res, err);
-  }
-});
+// La foto y la contraseña propias las sirve el tramo compartido (montado arriba).
 
 // Disponibilidad de horas para una fecha (agendar manual). Reusa la config del
 // taller: mismas horas/cupos que ve el cliente en el portal. El cupo se cuenta por
