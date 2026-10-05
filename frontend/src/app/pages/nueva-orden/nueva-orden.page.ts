@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 import { AlertController, LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -14,7 +14,7 @@ import { Vehiculo } from '../../models/vehiculo.model';
   templateUrl: './nueva-orden.page.html',
   styleUrls: ['./nueva-orden.page.scss'],
 })
-export class NuevaOrdenPage implements OnInit, OnDestroy {
+export class NuevaOrdenPage implements OnDestroy {
   private destroy$ = new Subject<void>();
   paso = 1; // 1=cliente, 2=vehiculo, 3=recepcion
 
@@ -49,7 +49,6 @@ export class NuevaOrdenPage implements OnInit, OnDestroy {
     private alert: AlertController
   ) {}
 
-  ngOnInit() {}
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
 
   buscarClientes() {
