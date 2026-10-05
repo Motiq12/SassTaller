@@ -9,7 +9,7 @@
 // perdida no puede romperle la pantalla a nadie.
 
 import { onLCP, onCLS, onINP, onFCP, onTTFB, type Metric } from 'web-vitals';
-import { environment } from '../../environments/environment';
+import { environment } from '../../../environments/environment';
 
 // En la app nativa el origen es capacitor://localhost y las rutas relativas no
 // resuelven; se usa la URL absoluta que ya conoce el resto de la app.

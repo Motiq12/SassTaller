@@ -4,8 +4,8 @@ import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PortalService } from '../../services/portal.service';
-import { emailValido } from '../../utils/validar';
-import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../shared/turnstile.util';
+import { emailValido } from '../../shared/utils/validar.util';
+import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../shared/utils/turnstile.util';
 
 @Component({
   standalone: false,

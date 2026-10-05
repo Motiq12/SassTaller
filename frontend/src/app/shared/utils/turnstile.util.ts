@@ -4,7 +4,7 @@
 // siempre — el token viaja vacío y el backend (que también degrada sin secret) lo omite.
 
 import { Capacitor } from '@capacitor/core';
-import { environment } from '../../environments/environment';
+import { environment } from '../../../environments/environment';
 
 const SITE_KEY: string = (environment as any).turnstileSiteKey || '';
 const SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js';

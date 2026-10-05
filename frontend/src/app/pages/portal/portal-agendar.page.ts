@@ -4,8 +4,8 @@ import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PortalService } from '../../services/portal.service';
-import { HORAS } from '../../utils/servicios';
-import { ahoraTaller } from '../../utils/fecha-cita';
+import { HORAS } from '../../shared/utils/servicios.util';
+import { ahoraTaller } from '../../shared/utils/fecha-cita.util';
 
 @Component({
   standalone: false,

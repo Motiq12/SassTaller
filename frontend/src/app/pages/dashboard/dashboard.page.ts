@@ -8,7 +8,7 @@ import { AuthService } from '../../services/auth.service';
 import { DashboardService } from '../../services/dashboard.service';
 import { OrdenesService } from '../../services/ordenes.service';
 import { ESTADO_CONFIG, EstadoOrden } from '../../models/orden.model';
-import { descargarCSV, fechaCorta } from '../../shared/csv.util';
+import { descargarCSV, fechaCorta } from '../../shared/utils/csv.util';
 
 @Component({ standalone: false,
   selector: 'app-dashboard',

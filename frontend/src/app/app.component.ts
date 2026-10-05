@@ -7,7 +7,7 @@ import { MarcaService } from './services/marca.service';
 import { AuthService } from './services/auth.service';
 import { AvisoActivo, AvisoSistemaService } from './services/aviso-sistema.service';
 import { ReporteFallaService } from './services/reporte-falla.service';
-import { iniciarWebVitals } from './shared/web-vitals.util';
+import { iniciarWebVitals } from './shared/utils/web-vitals.util';
 
 declare global {
   interface Window { __hideBootSplash?: () => void; }

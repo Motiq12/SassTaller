@@ -3,7 +3,7 @@ import { ToastController, AlertController } from '@ionic/angular';
 import { forkJoin, Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { RecepcionService } from '../../services/recepcion.service';
-import { abrirWhatsApp } from '../../shared/whatsapp.util';
+import { abrirWhatsApp } from '../../shared/utils/whatsapp.util';
 
 interface PiezaNueva { nombre: string; monto: number | null; }
 

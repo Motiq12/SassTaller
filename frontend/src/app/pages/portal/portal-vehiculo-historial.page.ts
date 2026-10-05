@@ -3,7 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PortalService } from '../../services/portal.service';
-import { proximoServicio, ProximoServicio } from '../../utils/mantenimiento';
+import { proximoServicio, ProximoServicio } from '../../shared/utils/mantenimiento.util';
 
 @Component({
   standalone: false,

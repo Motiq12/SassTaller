@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 import { RecepcionService } from '../../services/recepcion.service';
-import { abrirWhatsApp } from '../../shared/whatsapp.util';
+import { abrirWhatsApp } from '../../shared/utils/whatsapp.util';
 
 @Component({
   standalone: false,

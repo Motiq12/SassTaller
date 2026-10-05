@@ -8,7 +8,7 @@ import { AuthService } from '../../services/auth.service';
 import { Cliente } from '../../models/cliente.model';
 import { Vehiculo } from '../../models/vehiculo.model';
 import { Orden } from '../../models/orden.model';
-import { abrirWhatsApp } from '../../shared/whatsapp.util';
+import { abrirWhatsApp } from '../../shared/utils/whatsapp.util';
 
 @Component({ standalone: false,
   selector: 'app-cliente-detalle',

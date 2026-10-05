@@ -4,8 +4,8 @@ import { ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { RecepcionService } from '../../services/recepcion.service';
-import { abrirWhatsApp, mensajeCita } from '../../shared/whatsapp.util';
-import { hoyCR } from '../../utils/fecha-cita';
+import { abrirWhatsApp, mensajeCita } from '../../shared/utils/whatsapp.util';
+import { hoyCR } from '../../shared/utils/fecha-cita.util';
 
 // Celda del calendario mensual. `fecha` vacía = celda de relleno (fuera del mes).
 interface DiaCal {

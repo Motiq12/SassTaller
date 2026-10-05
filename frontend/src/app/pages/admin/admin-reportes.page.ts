@@ -4,7 +4,7 @@ import { takeUntil } from 'rxjs/operators';
 import { AdminService } from '../../services/admin.service';
 import { UsuariosService } from '../../services/usuarios.service';
 import { Usuario } from '../../models/usuario.model';
-import { descargarCSV } from '../../shared/csv.util';
+import { descargarCSV } from '../../shared/utils/csv.util';
 
 @Component({
   standalone: false,

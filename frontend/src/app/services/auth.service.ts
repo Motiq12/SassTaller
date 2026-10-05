@@ -4,7 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { Usuario, LoginResponse } from '../models/usuario.model';
-import { secureGet, secureSet, secureRemove } from '../shared/secure-store.util';
+import { secureGet, secureSet, secureRemove } from '../shared/utils/secure-store.util';
 import { TallerService } from './taller.service';
 
 const TOKEN_KEY = 'tallerms_token';

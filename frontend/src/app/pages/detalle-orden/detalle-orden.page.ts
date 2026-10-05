@@ -11,8 +11,8 @@ import { MecanicoService } from '../../services/mecanico.service';
 import { Orden, OrdenAvance, OrdenRepuesto, OrdenChecklist, OrdenFoto, EstadoOrden, ESTADO_CONFIG } from '../../models/orden.model';
 import { Garantia, EstadoGarantia, ESTADO_GARANTIA_CONFIG } from '../../models/garantia.model';
 import { Usuario } from '../../models/usuario.model';
-import { comprimirImagen } from '../../shared/image.util';
-import { WA_MENSAJES, mensajeSugerido, abrirWhatsApp, WaContexto } from '../../shared/whatsapp.util';
+import { comprimirImagen } from '../../shared/utils/image.util';
+import { WA_MENSAJES, mensajeSugerido, abrirWhatsApp, WaContexto } from '../../shared/utils/whatsapp.util';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 
@@ -451,7 +451,7 @@ export class DetalleOrdenPage implements OnInit, OnDestroy {
 
     this.subiendoFoto = true;
     try {
-      const dataUrl = await comprimirImagen(file);
+      const dataUrl = await comprimirImagen(file, { maxLado: 1024, calidad: 0.7 });
       this.ordenSvc.addFoto(this.orden!.id!, { url: dataUrl, tipo: this.tipoFoto }).pipe(takeUntil(this.destroy$)).subscribe({
         next: res => {
           this.fotos.push(res.data);

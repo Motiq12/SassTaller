@@ -5,7 +5,7 @@ import { takeUntil } from 'rxjs/operators';
 import { GarantiasService } from '../../services/garantias.service';
 import { AuthService } from '../../services/auth.service';
 import { Garantia, EstadoGarantia, ESTADO_GARANTIA_CONFIG } from '../../models/garantia.model';
-import { comprimirImagen } from '../../shared/image.util';
+import { comprimirImagen } from '../../shared/utils/image.util';
 
 @Component({
   standalone: false,
@@ -106,7 +106,7 @@ export class GarantiasPage implements OnInit, OnDestroy {
     }
     this.subiendoFoto = true;
     try {
-      const dataUrl = await comprimirImagen(file);
+      const dataUrl = await comprimirImagen(file, { maxLado: 1024, calidad: 0.7 });
       this.garantiaSvc.addFoto(this.seleccionada!.id!, { url: dataUrl }).pipe(takeUntil(this.destroy$)).subscribe({
         next: res => {
           this.seleccionada!.fotos = [...(this.seleccionada!.fotos || []), res.data];

@@ -6,7 +6,7 @@ import { takeUntil } from 'rxjs/operators';
 import { MecanicoService } from '../../services/mecanico.service';
 import { AuthService } from '../../services/auth.service';
 import { AccesibilidadService } from '../../services/accesibilidad.service';
-import { comprimirImagen } from '../../shared/image.util';
+import { comprimirImagen } from '../../shared/utils/image.util';
 
 @Component({
   standalone: false,
@@ -97,7 +97,7 @@ export class MecanicoPerfilPage implements OnInit, OnDestroy {
     if (!file) return;
     this.subiendoFoto = true;
     try {
-      const dataUrl = await comprimirImagen(file, 400, 0.8);
+      const dataUrl = await comprimirImagen(file, { maxLado: 400, calidad: 0.8 });
       this.mecanico.updateFoto(dataUrl).pipe(takeUntil(this.destroy$)).subscribe({
         next: r => {
           this.perfil = { ...this.perfil, foto: r.data.foto };

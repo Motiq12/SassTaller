@@ -4,8 +4,8 @@ import { ToastController, AlertController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PortalService } from '../../services/portal.service';
-import { FLUJO_CITA, ESTADO_CITA_LABEL } from '../../utils/servicios';
-import { badgeProximidad, BadgeProximidad, diasHastaCita } from '../../utils/fecha-cita';
+import { FLUJO_CITA, ESTADO_CITA_LABEL } from '../../shared/utils/servicios.util';
+import { badgeProximidad, BadgeProximidad, diasHastaCita } from '../../shared/utils/fecha-cita.util';
 
 @Component({
   standalone: false,

@@ -5,9 +5,9 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { AdminService } from '../../services/admin.service';
 import { OrdenesService } from '../../services/ordenes.service';
-import { ESTADO_CITA_LABEL } from '../../utils/servicios';
+import { ESTADO_CITA_LABEL } from '../../shared/utils/servicios.util';
 import { ESTADO_CONFIG, EstadoOrden } from '../../models/orden.model';
-import { descargarCSV, fechaCorta } from '../../shared/csv.util';
+import { descargarCSV, fechaCorta } from '../../shared/utils/csv.util';
 
 @Component({
   standalone: false,

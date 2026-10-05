@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { AdminService } from '../../services/admin.service';
-import { fechaCorta } from '../../shared/csv.util';
+import { fechaCorta } from '../../shared/utils/csv.util';
 
 @Component({
   standalone: false,

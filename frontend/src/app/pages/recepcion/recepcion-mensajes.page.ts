@@ -3,7 +3,7 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { RecepcionService } from '../../services/recepcion.service';
 import { ChatContacto } from '../../services/mensajeria.service';
-import { abrirWhatsApp } from '../../shared/whatsapp.util';
+import { abrirWhatsApp } from '../../shared/utils/whatsapp.util';
 
 // Mensajes de recepción. Tabs: avances de mecánicos, notificaciones a clientes,
 // y "Equipo" = chat interno 1:1 (componentes compartidos app-chat-*).

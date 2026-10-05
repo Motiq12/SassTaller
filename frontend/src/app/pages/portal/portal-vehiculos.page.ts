@@ -4,9 +4,9 @@ import { AlertController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PortalService } from '../../services/portal.service';
-import { MARCAS_MOTO, modelosDeMarca } from '../../utils/vehiculos-catalogo';
-import { comprimirImagen } from '../../utils/imagen';
-import { mesesDesde } from '../../utils/mantenimiento';
+import { MARCAS_MOTO, modelosDeMarca } from '../../shared/utils/vehiculos-catalogo.util';
+import { comprimirImagen } from '../../shared/utils/image.util';
+import { mesesDesde } from '../../shared/utils/mantenimiento.util';
 
 @Component({
   standalone: false,

@@ -6,7 +6,7 @@ import { takeUntil } from 'rxjs/operators';
 import { PortalService } from '../../services/portal.service';
 import { AccesibilidadService } from '../../services/accesibilidad.service';
 import { BiometriaService } from '../../services/biometria.service';
-import { comprimirImagen } from '../../utils/imagen';
+import { comprimirImagen } from '../../shared/utils/image.util';
 
 @Component({
   standalone: false,

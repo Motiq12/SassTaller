@@ -2,7 +2,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { MecanicoService } from '../../services/mecanico.service';
-import { hoyCR } from '../../utils/fecha-cita';
+import { hoyCR } from '../../shared/utils/fecha-cita.util';
 
 interface DiaCal {
   fecha: string;

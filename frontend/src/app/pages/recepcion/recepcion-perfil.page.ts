@@ -6,7 +6,7 @@ import { takeUntil } from 'rxjs/operators';
 import { RecepcionService } from '../../services/recepcion.service';
 import { AuthService } from '../../services/auth.service';
 import { AccesibilidadService } from '../../services/accesibilidad.service';
-import { comprimirImagen } from '../../shared/image.util';
+import { comprimirImagen } from '../../shared/utils/image.util';
 
 @Component({
   standalone: false,
@@ -84,7 +84,7 @@ export class RecepcionPerfilPage implements OnInit, OnDestroy {
     if (!file) return;
     this.subiendoFoto = true;
     try {
-      const dataUrl = await comprimirImagen(file, 400, 0.8);
+      const dataUrl = await comprimirImagen(file, { maxLado: 400, calidad: 0.8 });
       this.rec.updateMiFoto(dataUrl).pipe(takeUntil(this.destroy$)).subscribe({
         next: r => {
           this.perfil = { ...this.perfil, foto: r.data.foto };

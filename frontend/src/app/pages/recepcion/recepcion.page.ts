@@ -5,9 +5,9 @@ import { Subject, interval } from 'rxjs';
 import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 import { RecepcionService, ResumenRecepcion } from '../../services/recepcion.service';
 import { AuthService } from '../../services/auth.service';
-import { abrirWhatsApp, mensajeCita } from '../../shared/whatsapp.util';
+import { abrirWhatsApp, mensajeCita } from '../../shared/utils/whatsapp.util';
 import { alertaIcono, alertaColor, alertaTexto, haceTexto } from '../../shared/recepcion-alertas';
-import { ahoraTaller } from '../../utils/fecha-cita';
+import { ahoraTaller } from '../../shared/utils/fecha-cita.util';
 
 @Component({
   standalone: false,

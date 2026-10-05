@@ -4,8 +4,8 @@ import { ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { RecepcionService } from '../../services/recepcion.service';
-import { comprimirImagen } from '../../shared/image.util';
-import { abrirWhatsApp } from '../../shared/whatsapp.util';
+import { comprimirImagen } from '../../shared/utils/image.util';
+import { abrirWhatsApp } from '../../shared/utils/whatsapp.util';
 
 @Component({
   standalone: false,
@@ -192,7 +192,7 @@ export class RecepcionOrdenesPage implements OnInit, OnDestroy {
       if (!file) return;
       this.subiendo.add(o.id);
       try {
-        const url = await comprimirImagen(file);
+        const url = await comprimirImagen(file, { maxLado: 1024, calidad: 0.7 });
         this.rec.subirFoto(o.id, { url, tipo: 'avance' }).pipe(takeUntil(this.destroy$)).subscribe({
           next: r => {
             this.fotos[o.id] = [...(this.fotos[o.id] || []), r.data];

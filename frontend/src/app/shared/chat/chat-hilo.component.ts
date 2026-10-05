@@ -5,7 +5,7 @@ import { Subject, interval } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { MensajeriaService, ChatContacto } from '../../services/mensajeria.service';
 import { AuthService } from '../../services/auth.service';
-import { abrirWhatsApp } from '../whatsapp.util';
+import { abrirWhatsApp } from '../utils/whatsapp.util';
 
 // Hilo de conversación 1:1 (o feed de Avisos del taller con modo="avisos").
 // Burbujas, separadores por día, acuse ✓/✓✓, foto y chip de orden. Lo usan los 3 roles.
