@@ -60,7 +60,9 @@ export class FacturaPage implements OnInit, OnDestroy {
   imprimir() { window.print(); }
   volver() { this.location.back(); }
 
-  get logo(): string { return this.marcaSvc.logoParaDocumento(this.marca); }
+  // null cuando el taller no cargó logo: la factura sale sin imagen, no con la de
+  // otro taller. La plantilla oculta el <img> en ese caso.
+  get logo(): string | null { return this.marcaSvc.logoParaDocumento(this.marca); }
   get nombreTaller(): string { return this.marca?.nombre_taller || 'MS Motos'; }
   get emisor(): string { return this.auth.getUsuario()?.nombre || ''; }
 }

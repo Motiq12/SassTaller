@@ -1,5 +1,9 @@
 const jwt = require('jsonwebtoken');
 const { estadoDeSesion, sesionVigente, sidAbierto } = require('../utils/sesiones');
+// El scope por taller se encadena acá y no ruta por ruta: si dependiera de que cada
+// endpoint se acuerde de sumarlo, el olvido sería una fuga. Así, estar autenticado y
+// tener req.db acotado al taller son la misma cosa.
+const tenant = require('./tenant');
 
 // Lo único que puede pedir el rol `contenido`: la administración del sitio web,
 // su sesión (/auth/me, verificación en dos pasos) y la marca del taller (logo y
@@ -53,6 +57,6 @@ module.exports = function authMiddleware(req, res, next) {
   return estadoDeSesion(req.usuario.id).then(async (estado) => {
     if (estado !== undefined && !sesionVigente(req.usuario, estado)) return cerrada();
     if (req.usuario.sid && (await sidAbierto(req.usuario.sid)) === false) return cerrada();
-    next();
+    return tenant(req, res, next);
   });
 };

@@ -307,7 +307,10 @@ export class AdminResumenPage implements OnInit, OnDestroy {
     // Logo y nombre del taller configurados, no los del archivo que trae la app.
     const contenido = kpis + operativo + estadoCitas + topServicios + ingresosPorServicio + tecnicosHTML;
     this.marcaSvc.get().pipe(takeUntil(this.destroy$)).subscribe(m => {
-      generarPDF('Resumen Ejecutivo', contenido, this.marcaSvc.logoParaDocumento(m), m.nombre_taller)
+      // logoParaDocumento devuelve null si el taller no cargó logo, y generarPDF
+      // espera undefined para "sin logo". Antes caía a un archivo de la app, que
+      // era el logo de OTRO taller estampado en el documento de un tercero.
+      generarPDF('Resumen Ejecutivo', contenido, this.marcaSvc.logoParaDocumento(m) ?? undefined, m.nombre_taller)
         .then(() => this.aviso('PDF generado'));
     });
   }

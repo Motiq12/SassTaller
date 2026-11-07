@@ -133,6 +133,14 @@ app.use('/api/admin', adminLimiter);
 app.use('/api', require('./middleware/ocultar-al-mecanico'));
 
 app.use('/api/auth',      require('./routes/auth.routes'));
+
+// Las rutas propias del SaaS, que MS Motos no tenía. Van juntas y arriba para que
+// se vea de un vistazo qué pertenece a la plataforma y qué al taller.
+app.use('/api/motiq',      require('./routes/motiq.routes'));       // panel de la plataforma
+app.use('/api/onboarding', require('./routes/onboarding.routes'));  // alta de un taller nuevo
+app.use('/api/avisos',     require('./routes/avisos.routes'));      // avisos de Motiq a los talleres
+app.use('/api/reportes',   require('./routes/reportes.routes'));    // reportes de falla hacia la plataforma
+app.use('/api/vehiculos',  require('./routes/vehiculos.routes'));   // reemplaza a /api/motos
 app.use('/api/marca',     require('./routes/marca.routes'));
 app.use('/api/clientes',  require('./routes/clientes.routes'));
 app.use('/api/motos',     require('./routes/motos.routes'));

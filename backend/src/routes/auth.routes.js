@@ -31,7 +31,8 @@ function anotarIngreso(usuarioId) {
 // Abre la sesión del personal: la anota con su dispositivo (Mi perfil → Sesiones) y
 // firma el token con ese `sid`. Si no se pudo anotar, firma sin sid y entra igual.
 async function sesionStaff(usuario, req) {
-  const payload = { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol };
+  // tenant_id va en el token: es de donde lo saca middleware/tenant para acotar req.db.
+  const payload = { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol, tenant_id: usuario.tenant_id };
   const sid = nuevoSid();
   const token = firmar({ ...payload, sid });
   const ok = await abrirSesion(usuario.id, req, jwt.decode(token).exp, sid);
@@ -98,7 +99,7 @@ router.post('/login', async (req, res) => {
       [email]
     );
     if (cliente && (await bcrypt.compare(password, cliente.password_hash))) {
-      const payload = { id: cliente.id, tipo: 'cliente', nombre: cliente.nombre, apellido: cliente.apellido };
+      const payload = { id: cliente.id, tipo: 'cliente', nombre: cliente.nombre, apellido: cliente.apellido, tenant_id: cliente.tenant_id };
       // La foto va en la respuesta (para el header), NO en el token (lo mantiene liviano).
       return res.json({ data: { token: firmar(payload), tipo: 'cliente', cliente: { ...payload, foto: cliente.foto || null } } });
     }

@@ -24,7 +24,7 @@
     <!-- Encabezado -->
     <div class="fac-header">
       <div class="fac-marca">
-        <img [src]="logo" [alt]="nombreTaller" style="height:64px;width:auto" />
+        <img *ngIf="logo" [src]="logo" [alt]="nombreTaller" style="height:64px;width:auto" />
         <p>Motos · Repuestos · Taller</p>
         <p class="fac-legal" *ngIf="marca?.razon_social || marca?.cedula_juridica">
           <strong *ngIf="marca?.razon_social">{{ marca?.razon_social }}</strong>
