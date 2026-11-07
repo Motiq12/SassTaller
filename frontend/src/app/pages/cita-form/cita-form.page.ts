@@ -5,7 +5,7 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { CitasService } from '../../services/citas.service';
 import { ClientesService } from '../../services/clientes.service';
-import { MotosService } from '../../services/motos.service';
+import { VehiculosService } from '../../services/vehiculos.service';
 import { DashboardService } from '../../services/dashboard.service';
 import { RecepcionService } from '../../services/recepcion.service';
 import { AuthService } from '../../services/auth.service';
@@ -48,7 +48,7 @@ export class CitaFormPage implements OnInit, OnDestroy {
     private router: Router,
     private citaSvc: CitasService,
     private clienteSvc: ClientesService,
-    private motoSvc: MotosService,
+    private motoSvc: VehiculosService,
     private dashSvc: DashboardService,
     private recepcionSvc: RecepcionService,
     public auth: AuthService,

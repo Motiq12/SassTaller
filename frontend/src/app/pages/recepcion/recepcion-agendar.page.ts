@@ -5,7 +5,7 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { RecepcionService } from '../../services/recepcion.service';
 import { ClientesService } from '../../services/clientes.service';
-import { MotosService } from '../../services/motos.service';
+import { VehiculosService } from '../../services/vehiculos.service';
 import { AuthService } from '../../services/auth.service';
 import { DURACIONES_CITA, OPCIONES_TIEMPO } from '../../shared/duraciones';
 import { enPanel, rutaPanel } from '../../shared/ruta-panel';
@@ -84,7 +84,7 @@ export class RecepcionAgendarPage implements OnInit, OnDestroy {
     private router: Router,
     private toast: ToastController,
     private clientesSvc: ClientesService,
-    private motosSvc: MotosService,
+    private motosSvc: VehiculosService,
     private auth: AuthService,
   ) {}
 

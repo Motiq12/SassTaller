@@ -5,7 +5,7 @@ import { AlertController, LoadingController, ToastController } from '@ionic/angu
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { ClientesService } from '../../services/clientes.service';
-import { MotosService } from '../../services/motos.service';
+import { VehiculosService } from '../../services/vehiculos.service';
 import { OrdenesService } from '../../services/ordenes.service';
 import { AuthService } from '../../services/auth.service';
 import { Cliente } from '../../models/cliente.model';
@@ -43,7 +43,7 @@ export class NuevaOrdenPage implements OnInit, OnDestroy {
 
   constructor(
     private clienteSvc: ClientesService,
-    private motoSvc: MotosService,
+    private motoSvc: VehiculosService,
     private ordenSvc: OrdenesService,
     private router: Router,
     private route: ActivatedRoute,

@@ -143,7 +143,6 @@ app.use('/api/reportes',   require('./routes/reportes.routes'));    // reportes 
 app.use('/api/vehiculos',  require('./routes/vehiculos.routes'));   // reemplaza a /api/motos
 app.use('/api/marca',     require('./routes/marca.routes'));
 app.use('/api/clientes',  require('./routes/clientes.routes'));
-app.use('/api/motos',     require('./routes/motos.routes'));
 app.use('/api/ordenes',   require('./routes/ordenes.routes'));
 app.use('/api/citas',     require('./routes/citas.routes'));
 app.use('/api/usuarios',  require('./routes/usuarios.routes'));

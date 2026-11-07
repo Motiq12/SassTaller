@@ -8,7 +8,7 @@ import { GarantiasService } from '../../services/garantias.service';
 import { MarcaService } from '../../services/marca.service';
 import { AuthService } from '../../services/auth.service';
 import { MecanicoService } from '../../services/mecanico.service';
-import { MotosService } from '../../services/motos.service';
+import { VehiculosService } from '../../services/vehiculos.service';
 import { EntregaService } from '../../services/entrega.service';
 import { Moto } from '../../models/moto.model';
 import {
@@ -171,7 +171,7 @@ export class DetalleOrdenPage implements OnInit, OnDestroy {
     private marcaSvc: MarcaService,
     public auth: AuthService,
     private mecSvc: MecanicoService,
-    private motoSvc: MotosService,
+    private motoSvc: VehiculosService,
     private entrega: EntregaService,
     private alert: AlertController,
     private toast: ToastController,

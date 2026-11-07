@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { ActionSheetController, AlertController, ToastController } from '@ionic/angular';
 import { firstValueFrom } from 'rxjs';
 import { RecepcionService } from './recepcion.service';
-import { MotosService } from './motos.service';
+import { VehiculosService } from './vehiculos.service';
 
 // Abrir la orden de trabajo de una cita, con el mismo paso a paso en recepción
 // (Inicio → citas de hoy) y en administración (Gestión de citas → Citas):
@@ -28,7 +28,7 @@ export interface OrdenCreada { orden_id: number; numero_orden: string; }
 export class OrdenDesdeCitaService {
   constructor(
     private rec: RecepcionService,
-    private motos: MotosService,
+    private motos: VehiculosService,
     private alert: AlertController,
     private sheet: ActionSheetController,
     private toast: ToastController,

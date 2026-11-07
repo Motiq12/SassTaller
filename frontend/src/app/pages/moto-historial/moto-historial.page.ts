@@ -3,7 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { enPanel, rutaPanel } from '../../shared/ruta-panel';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { MotosService } from '../../services/motos.service';
+import { VehiculosService } from '../../services/vehiculos.service';
 import { AuthService } from '../../services/auth.service';
 import { Moto } from '../../models/moto.model';
 import { Orden } from '../../models/orden.model';
@@ -24,7 +24,7 @@ export class MotoHistorialPage implements OnInit, OnDestroy {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private motoSvc: MotosService,
+    private motoSvc: VehiculosService,
     private auth: AuthService,
   ) {}
 

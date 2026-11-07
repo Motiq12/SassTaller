@@ -4,7 +4,7 @@ import { Location } from '@angular/common';
 import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { MotosService } from '../../services/motos.service';
+import { VehiculosService } from '../../services/vehiculos.service';
 import { Moto } from '../../models/moto.model';
 
 @Component({ standalone: false,
@@ -33,7 +33,7 @@ export class MotoFormPage implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     private location: Location,
-    private motoSvc: MotosService,
+    private motoSvc: VehiculosService,
     private loading: LoadingController,
     private toast: ToastController
   ) {}
