@@ -1,3 +1,6 @@
+// Las 12 pantallas de administración del sitio web (admin-web-*) no se trajeron
+// desde MS Motos: en este SaaS no hay sitio web por taller. Sus imports, rutas y
+// declaraciones se quitaron de acá; el resto del panel queda igual.
 import { NgModule } from '@angular/core';
 import { SharedModule } from '../../shared/shared.module';
 import { AdminPageRoutingModule } from './admin-routing.module';
@@ -16,18 +19,6 @@ import { AdminServiciosPage } from './admin-servicios.page';
 import { AdminMensajesPage } from './admin-mensajes.page';
 import { AdminPerfilPage } from './admin-perfil.page';
 import { AdminActionsComponent } from './admin-actions.component';
-import { AdminWebCatalogoPage } from './admin-web-catalogo.page';
-import { AdminWebPromoPage } from './admin-web-promo.page';
-import { AdminWebPublicarPage } from './admin-web-publicar.page';
-import { AdminWebConsultasPage } from './admin-web-consultas.page';
-import { AdminWebResenasPage } from './admin-web-resenas.page';
-import { AdminWebInicioPage } from './admin-web-inicio.page';
-import { AdminWebNegocioPage } from './admin-web-negocio.page';
-import { AdminWebGaleriaPage } from './admin-web-galeria.page';
-import { AdminWebOfertasPage } from './admin-web-ofertas.page';
-import { AdminWebFaqPage } from './admin-web-faq.page';
-import { AdminWebNosotrosPage } from './admin-web-nosotros.page';
-import { AdminWebServiciosPage } from './admin-web-servicios.page';
 
 @NgModule({
   imports: [SharedModule, AdminPageRoutingModule],
@@ -47,18 +38,6 @@ import { AdminWebServiciosPage } from './admin-web-servicios.page';
     AdminMensajesPage,
     AdminPerfilPage,
     AdminActionsComponent,
-    AdminWebCatalogoPage,
-    AdminWebPromoPage,
-    AdminWebPublicarPage,
-    AdminWebConsultasPage,
-    AdminWebResenasPage,
-    AdminWebInicioPage,
-    AdminWebNegocioPage,
-    AdminWebGaleriaPage,
-    AdminWebOfertasPage,
-    AdminWebFaqPage,
-    AdminWebNosotrosPage,
-    AdminWebServiciosPage,
   ],
 })
 export class AdminPageModule {}

@@ -7,7 +7,6 @@ const path = require('path');
 const fs = require('fs');
 const { testConnection } = require('./db/pool');
 const { ensureSchema } = require('./db/auto-migrate');
-const { sincronizarSitioWeb } = require('./utils/sitio-estado');
 const { iniciarJobs } = require('./jobs/scheduler');
 const { apiLimiter, authLimiter, adminLimiter } = require('./middleware/rate-limit');
 
@@ -108,12 +107,7 @@ const ORIGENES_PERMITIDOS = new Set([
   'http://localhost:8100',  // ionic serve en desarrollo
   ...(process.env.CORS_ORIGIN || '').split(',').map((s) => s.trim()).filter(Boolean),
 ]);
-// /api/sitio es lo que usa el sitio web público, que vive en otro dominio (y
-// mientras no tenga uno propio, en cualquiera): contenido publicado, fotos y el
-// formulario de consultas. Son públicos y no usan sesión, así que se abren a
-// cualquier origen; el resto de la API sigue con la lista de arriba.
 app.use(cors((req, cb) => {
-  if (req.path.startsWith('/api/sitio/')) return cb(null, { origin: '*' });
   // Sin header Origin (same-origin, curl, healthcheck) se permite sin emitir CORS.
   cb(null, { origin: (origin, cb2) => cb2(null, !origin || ORIGENES_PERMITIDOS.has(origin)) });
 }));
@@ -154,8 +148,6 @@ app.use('/api/recepcion', require('./routes/recepcion.routes'));
 app.use('/api/mensajeria', require('./routes/mensajeria.routes'));
 app.use('/api/admin',     require('./routes/admin.routes'));
 app.use('/api/metricas',  require('./routes/metricas.routes'));
-app.use('/api/web',       require('./routes/web.routes'));    // administración del sitio web
-app.use('/api/sitio',     require('./routes/sitio.routes'));  // lo publicado, para el build del sitio
 app.use('/api/monitor',   require('./routes/monitor.routes')); // el vigilante de n8n (clave propia)
 
 // Una dirección de la API que no existe responde 404 en JSON. Sin esto caía en la
@@ -215,7 +207,5 @@ const correrJobs = bajoCluster ? process.env.JOBS === '1' : true;
   // las columnas que usan (recordatorio_enviado, no_show) ya existan.
   // Solo un proceso las programa: si no, cada cliente recibiría un correo por worker.
   if (correrJobs) iniciarJobs();
-  // ¿Cambió SITIO_WEB_ACTIVO desde el último arranque? Un solo proceso lo revisa.
-  if (correrJobs) sincronizarSitioWeb().catch((err) => console.error('Sitio web:', err.message));
   app.listen(PORT, () => console.log(`🚀 Servidor en http://localhost:${PORT}${bajoCluster ? ` (worker ${process.pid}${correrJobs ? ', con jobs' : ''})` : ''}`));
 })();

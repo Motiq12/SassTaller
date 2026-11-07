@@ -1,3 +1,6 @@
+// Las 12 pantallas de administración del sitio web (admin-web-*) no se trajeron
+// desde MS Motos: en este SaaS no hay sitio web por taller. Sus imports, rutas y
+// declaraciones se quitaron de acá; el resto del panel queda igual.
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { AdminShellPage } from './admin-shell.page';
@@ -14,18 +17,6 @@ import { AdminConfigPage } from './admin-config.page';
 import { AdminServiciosPage } from './admin-servicios.page';
 import { AdminMensajesPage } from './admin-mensajes.page';
 import { AdminPerfilPage } from './admin-perfil.page';
-import { AdminWebCatalogoPage } from './admin-web-catalogo.page';
-import { AdminWebPromoPage } from './admin-web-promo.page';
-import { AdminWebPublicarPage } from './admin-web-publicar.page';
-import { AdminWebConsultasPage } from './admin-web-consultas.page';
-import { AdminWebResenasPage } from './admin-web-resenas.page';
-import { AdminWebInicioPage } from './admin-web-inicio.page';
-import { AdminWebNegocioPage } from './admin-web-negocio.page';
-import { AdminWebGaleriaPage } from './admin-web-galeria.page';
-import { AdminWebOfertasPage } from './admin-web-ofertas.page';
-import { AdminWebFaqPage } from './admin-web-faq.page';
-import { AdminWebNosotrosPage } from './admin-web-nosotros.page';
-import { AdminWebServiciosPage } from './admin-web-servicios.page';
 import { PanelAdminGuard } from '../../guards/panel-admin.guard';
 
 const routes: Routes = [
@@ -71,18 +62,6 @@ const routes: Routes = [
       { path: 'garantias', loadChildren: () => import('../garantias/garantias.module').then(m => m.GarantiasPageModule) },
       // Sitio web (msmotors-web): catálogo, promoción y publicar.
       { path: 'web', redirectTo: 'web/inicio', pathMatch: 'full' },
-      { path: 'web/inicio', component: AdminWebInicioPage },
-      { path: 'web/negocio', component: AdminWebNegocioPage },
-      { path: 'web/catalogo', component: AdminWebCatalogoPage },
-      { path: 'web/promo', component: AdminWebPromoPage },
-      { path: 'web/publicar', component: AdminWebPublicarPage },
-      { path: 'web/consultas', component: AdminWebConsultasPage },
-      { path: 'web/galeria', component: AdminWebGaleriaPage },
-      { path: 'web/ofertas', component: AdminWebOfertasPage },
-      { path: 'web/resenas', component: AdminWebResenasPage },
-      { path: 'web/preguntas', component: AdminWebFaqPage },
-      { path: 'web/nosotros', component: AdminWebNosotrosPage },
-      { path: 'web/servicios', component: AdminWebServiciosPage },
     ],
   },
 ];
