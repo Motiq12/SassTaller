@@ -50,7 +50,7 @@ async function ensureSchema() {
     // Fotos del portal (data URL base64, igual que orden_fotos/promos): avatar del
     // cliente y foto de cada moto. MEDIUMTEXT aguanta imágenes comprimidas (~16 MB máx).
     await addColumnIfMissing('clientes', 'foto', 'MEDIUMTEXT NULL');
-    await addColumnIfMissing('motos', 'foto', 'MEDIUMTEXT NULL');
+    await addColumnIfMissing('vehiculos', 'foto', 'MEDIUMTEXT NULL');
 
     // Preferencias de notificación por cliente (el cliente decide si quiere recibirlas).
     // notif_avances: avisos de cambio de estado de sus servicios (aplicado hoy).
@@ -294,15 +294,9 @@ async function ensureSchema() {
     // (sin espacios/guiones, mayúsculas) + índice único. Se guarda cada paso por
     // separado para que, si hay placas duplicadas heredadas, el índice falle sin
     // abortar el resto de la migración (la validación de la app sigue cubriendo).
-    await tryStep('motos.placa_norm', () =>
-      addColumnIfMissing(
-        'motos', 'placa_norm',
-        "VARCHAR(32) AS (UPPER(REPLACE(REPLACE(placa,' ',''),'-',''))) STORED"
-      )
-    );
-    await tryStep('uq_motos_placa_norm', () =>
-      crearIndiceSiFalta('motos', 'uq_motos_placa_norm', '(placa_norm)', { unico: true })
-    );
+    // placa_norm y su índice único los aplica la capa del SaaS (auto-migrate-saas),
+    // y allá el índice es (tenant_id, placa_norm). Acá era global, que en multi-taller
+    // está mal: dos talleres distintos pueden tener la misma placa y es correcto.
 
     // Panel del mecánico v2: perfil profesional (lo edita el propio técnico).
     await addColumnIfMissing('usuarios', 'telefono', 'VARCHAR(20) NULL');
@@ -789,9 +783,9 @@ async function citasParaOrdenesSinCita() {
   const offset = Number(cfg?.zona_horaria_offset) || -6;
   const local = `DATE_ADD('1970-01-01 00:00:00', INTERVAL (UNIX_TIMESTAMP(o.fecha_ingreso) + ${offset * 3600}) SECOND)`;
   const [r] = await pool.query(`
-    INSERT INTO citas (cliente_id, moto_id, usuario_id, tecnico_id, sucursal_id, fecha, hora, motivo, tipo_servicio,
+    INSERT INTO citas (cliente_id, vehiculo_id, usuario_id, tecnico_id, sucursal_id, fecha, hora, motivo, tipo_servicio,
                        estado, monto, fecha_inicio, fecha_listo, fecha_fin, hora_llegada, orden_id, creada_por_orden)
-    SELECT o.cliente_id, o.moto_id, o.recepcionista_id, o.tecnico_id, o.sucursal_id,
+    SELECT o.cliente_id, o.vehiculo_id, o.recepcionista_id, o.tecnico_id, o.sucursal_id,
            DATE(${local}), TIME(${local}), o.problema_reportado, NULL,
            CASE o.estado WHEN 'recepcion' THEN 'en_revision' WHEN 'diagnostico' THEN 'en_revision'
              WHEN 'esperando_aprobacion' THEN 'en_revision' WHEN 'esperando_repuestos' THEN 'en_revision'
@@ -1064,4 +1058,19 @@ async function addFkIfMissing(tabla, fkName, columna, refTabla, refColumna) {
   }
 }
 
-module.exports = { ensureSchema };
+// Las tres capas, en el único orden que funciona:
+//   1. ensureSchema (arriba)    — el esquema de UN taller, tal como lo dejó MS Motos.
+//   2. aplicarMultiTenant       — lo convierte en multi-taller: tenants, vehiculos, tenant_id.
+//   3. ensureSchemaSaaS         — encima, lo propio del SaaS: las tablas de Motiq.
+//
+// Invertir 2 y 3 no anda: la capa del SaaS da por hecho que tenant_id ya está.
+const { aplicarMultiTenant } = require('./multi-tenant');
+const { ensureSchemaSaaS } = require('./auto-migrate-saas');
+
+async function ensureSchemaCompleto() {
+  await ensureSchema();
+  await aplicarMultiTenant();
+  await ensureSchemaSaaS();
+}
+
+module.exports = { ensureSchema: ensureSchemaCompleto, ensureSchemaSoloTaller: ensureSchema };
