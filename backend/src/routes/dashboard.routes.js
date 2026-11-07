@@ -13,19 +13,19 @@ router.get('/resumen', async (req, res) => {
     // Hoy, la semana y el mes del taller, no los de la base (utils/sql-fechas.js).
     const off = (await getConfig()).zona_horaria_offset;
     const [[{ motos_activas }]] = await req.db.query(
-      "SELECT COUNT(*) AS motos_activas FROM ordenes_trabajo WHERE estado NOT IN ('entregada','cancelada')"
+      "SELECT COUNT(*) AS motos_activas FROM ordenes_trabajo WHERE tenant_id = @tenant AND estado NOT IN ('entregada','cancelada')"
     );
     const [[{ motos_atrasadas }]] = await req.db.query(
-      `SELECT COUNT(*) AS motos_atrasadas FROM ordenes_trabajo WHERE estado NOT IN ('entregada','cancelada') AND fecha_estimada_entrega < ${hoySQL(off)}`
+      `SELECT COUNT(*) AS motos_atrasadas FROM ordenes_trabajo WHERE tenant_id = @tenant AND estado NOT IN ('entregada','cancelada') AND fecha_estimada_entrega < ${hoySQL(off)}`
     );
     const [[{ facturacion_hoy }]] = await req.db.query(
-      `SELECT COALESCE(SUM(costo_mano_obra + costo_repuestos - descuento), 0) AS facturacion_hoy FROM ordenes_trabajo WHERE ${enPeriodo('fecha_entrega_real', 'hoy', { momento: true, offset: off })} AND estado = 'entregada'`
+      `SELECT COALESCE(SUM(costo_mano_obra + costo_repuestos - descuento), 0) AS facturacion_hoy FROM ordenes_trabajo WHERE tenant_id = @tenant AND ${enPeriodo('fecha_entrega_real', 'hoy', { momento: true, offset: off })} AND estado = 'entregada'`
     );
     const [[{ facturacion_semana }]] = await req.db.query(
-      `SELECT COALESCE(SUM(costo_mano_obra + costo_repuestos - descuento), 0) AS facturacion_semana FROM ordenes_trabajo WHERE estado = 'entregada' AND ${enPeriodo('fecha_entrega_real', 'semana', { momento: true, offset: off })}`
+      `SELECT COALESCE(SUM(costo_mano_obra + costo_repuestos - descuento), 0) AS facturacion_semana FROM ordenes_trabajo WHERE tenant_id = @tenant AND estado = 'entregada' AND ${enPeriodo('fecha_entrega_real', 'semana', { momento: true, offset: off })}`
     );
     const [[{ facturacion_mes }]] = await req.db.query(
-      `SELECT COALESCE(SUM(costo_mano_obra + costo_repuestos - descuento), 0) AS facturacion_mes FROM ordenes_trabajo WHERE estado = 'entregada' AND ${enPeriodo('fecha_entrega_real', 'mes', { momento: true, offset: off })}`
+      `SELECT COALESCE(SUM(costo_mano_obra + costo_repuestos - descuento), 0) AS facturacion_mes FROM ordenes_trabajo WHERE tenant_id = @tenant AND estado = 'entregada' AND ${enPeriodo('fecha_entrega_real', 'mes', { momento: true, offset: off })}`
     );
     // Facturación TOTAL del mes = órdenes + citas, sin doble conteo (una orden ligada
     // a una cita cuenta por la cita). Mismo criterio que el PDF / admin resumen.
@@ -35,7 +35,7 @@ router.get('/resumen', async (req, res) => {
             WHERE estado='entregado' AND ${enPeriodo('fecha_fin', 'mes', { momento: true, offset: off })})
        + (SELECT COALESCE(SUM(costo_mano_obra + costo_repuestos - descuento),0) FROM ordenes_trabajo
             WHERE estado='entregada' AND ${enPeriodo('fecha_entrega_real', 'mes', { momento: true, offset: off })}
-              AND id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL)) AS facturacion_mes_total`
+              AND id NOT IN (SELECT orden_id FROM citas WHERE tenant_id = @tenant AND orden_id IS NOT NULL)) AS facturacion_mes_total`
     );
     const [[{ ticket_promedio }]] = await req.db.query(
       "SELECT COALESCE(AVG(costo_mano_obra + costo_repuestos - descuento), 0) AS ticket_promedio FROM ordenes_trabajo WHERE tenant_id = @tenant AND estado = 'entregada'"
@@ -46,13 +46,13 @@ router.get('/resumen', async (req, res) => {
     // Ingresos por citas (lo que cobra el mecánico al entregar una cita).
     // Es un canal de facturación distinto al de las órdenes de trabajo.
     const [[{ ingresos_citas_hoy }]] = await req.db.query(
-      `SELECT COALESCE(SUM(monto), 0) AS ingresos_citas_hoy FROM citas WHERE estado = 'entregado' AND ${enPeriodo('fecha_fin', 'hoy', { momento: true, offset: off })}`
+      `SELECT COALESCE(SUM(monto), 0) AS ingresos_citas_hoy FROM citas WHERE tenant_id = @tenant AND estado = 'entregado' AND ${enPeriodo('fecha_fin', 'hoy', { momento: true, offset: off })}`
     );
     const [[{ ingresos_citas_mes }]] = await req.db.query(
-      `SELECT COALESCE(SUM(monto), 0) AS ingresos_citas_mes FROM citas WHERE estado = 'entregado' AND ${enPeriodo('fecha_fin', 'mes', { momento: true, offset: off })}`
+      `SELECT COALESCE(SUM(monto), 0) AS ingresos_citas_mes FROM citas WHERE tenant_id = @tenant AND estado = 'entregado' AND ${enPeriodo('fecha_fin', 'mes', { momento: true, offset: off })}`
     );
     const [[{ citas_entregadas_mes }]] = await req.db.query(
-      `SELECT COUNT(*) AS citas_entregadas_mes FROM citas WHERE estado = 'entregado' AND ${enPeriodo('fecha_fin', 'mes', { momento: true, offset: off })}`
+      `SELECT COUNT(*) AS citas_entregadas_mes FROM citas WHERE tenant_id = @tenant AND estado = 'entregado' AND ${enPeriodo('fecha_fin', 'mes', { momento: true, offset: off })}`
     );
     const [[{ repuestos_pendientes }]] = await req.db.query(
       "SELECT COUNT(*) AS repuestos_pendientes FROM orden_repuestos r JOIN ordenes_trabajo o ON o.id = r.orden_id AND o.tenant_id = @tenant WHERE r.tenant_id = @tenant AND r.estado IN ('pendiente','pedido_especial') AND o.estado NOT IN ('entregada','cancelada')"
@@ -69,7 +69,7 @@ router.get('/resumen', async (req, res) => {
          UNION ALL
          SELECT o.calificacion FROM ordenes_trabajo o
            WHERE o.tenant_id = @tenant AND o.calificacion IS NOT NULL AND o.calificacion > 0
-             AND o.id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL AND tenant_id = @tenant)
+             AND o.id NOT IN (SELECT orden_id FROM citas WHERE tenant_id = @tenant AND orden_id IS NOT NULL AND tenant_id = @tenant)
        ) x`
     );
     const [[conversion]] = await req.db.query(

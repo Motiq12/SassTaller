@@ -107,7 +107,7 @@ router.get('/resumen', async (req, res) => {
     // El mes del taller, no el de la base (utils/sql-fechas.js).
     const off = (await getConfig()).zona_horaria_offset;
     const [[{ total_citas }]] = await req.db.query(
-      `SELECT COUNT(*) AS total_citas FROM citas WHERE ${enPeriodo('fecha', 'mes', { offset: off })}`
+      `SELECT COUNT(*) AS total_citas FROM citas WHERE tenant_id = @tenant AND ${enPeriodo('fecha', 'mes', { offset: off })}`
     );
     const [[{ citas_pendientes }]] = await req.db.query(
       "SELECT COUNT(*) AS citas_pendientes FROM citas WHERE tenant_id = @tenant AND estado NOT IN ('entregado','cancelado')"
@@ -116,15 +116,15 @@ router.get('/resumen', async (req, res) => {
     const [[{ ingresos_mes }]] = await req.db.query(
       `SELECT
          (SELECT COALESCE(SUM(monto),0) FROM citas
-            WHERE estado='entregado' AND ${enPeriodo('fecha_fin', 'mes', { momento: true, offset: off })})
+            WHERE tenant_id = @tenant AND estado='entregado' AND ${enPeriodo('fecha_fin', 'mes', { momento: true, offset: off })})
        + (SELECT COALESCE(SUM(costo_mano_obra+costo_repuestos-descuento),0) FROM ordenes_trabajo
-            WHERE estado='entregada' AND ${enPeriodo('fecha_entrega_real', 'mes', { momento: true, offset: off })}
-              AND id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL)) AS ingresos_mes`
+            WHERE tenant_id = @tenant AND estado='entregada' AND ${enPeriodo('fecha_entrega_real', 'mes', { momento: true, offset: off })}
+              AND id NOT IN (SELECT orden_id FROM citas WHERE tenant_id = @tenant AND orden_id IS NOT NULL)) AS ingresos_mes`
     );
     // Tasa de éxito del mes: entregadas / (entregadas + canceladas).
     const [[exito]] = await req.db.query(
       `SELECT COALESCE(SUM(estado='entregado'),0) AS entregadas, COALESCE(SUM(estado='cancelado'),0) AS canceladas
-       FROM citas WHERE ${enPeriodo('fecha', 'mes', { offset: off })}`
+       FROM citas WHERE tenant_id = @tenant AND ${enPeriodo('fecha', 'mes', { offset: off })}`
     );
     const cerradas = Number(exito.entregadas) + Number(exito.canceladas);
     const tasa_exito = cerradas ? Math.round((Number(exito.entregadas) / cerradas) * 100) : 0;
@@ -133,7 +133,7 @@ router.get('/resumen', async (req, res) => {
     // cada uno (cita_servicios). La que no tiene ninguno va como "Sin especificar".
     const [top_servicios] = await req.db.query(
       `SELECT COALESCE(cs.servicio,'Sin especificar') AS servicio, COUNT(*) AS total
-       FROM citas ci LEFT JOIN cita_servicios cs ON cs.cita_id = ci.id
+       FROM citas ci LEFT JOIN cita_servicios cs ON cs.cita_id = ci.id AND cs.tenant_id = @tenant
        WHERE ${enPeriodo('ci.fecha', 'mes', { offset: off })}
        GROUP BY servicio ORDER BY total DESC LIMIT 5`
     );
@@ -145,14 +145,14 @@ router.get('/resumen', async (req, res) => {
          COALESCE(SUM(estado='entregado'),0) AS completadas,
          COALESCE(SUM(estado='cancelado'),0) AS canceladas,
          COUNT(*) AS total
-       FROM citas WHERE ${enPeriodo('fecha', 'mes', { offset: off })}`
+       FROM citas WHERE tenant_id = @tenant AND ${enPeriodo('fecha', 'mes', { offset: off })}`
     );
 
     const [ingresos_por_servicio] = await req.db.query(
       `SELECT COALESCE(tipo_servicio,'Sin especificar') AS servicio,
               COUNT(*) AS citas, COALESCE(SUM(monto),0) AS ingreso, COALESCE(AVG(monto),0) AS promedio
        FROM citas
-       WHERE estado='entregado' AND ${enPeriodo('fecha_fin', 'mes', { momento: true, offset: off })}
+       WHERE tenant_id = @tenant AND estado='entregado' AND ${enPeriodo('fecha_fin', 'mes', { momento: true, offset: off })}
        GROUP BY servicio ORDER BY ingreso DESC`
     );
 
@@ -509,7 +509,7 @@ router.post('/servicios', async (req, res) => {
     if (!textoDentroDeLimite(nombre, MAX_SERVICIO)) {
       return invalido(res, 'nombre', `El nombre no puede pasar de ${MAX_SERVICIO} caracteres`);
     }
-    const [[dup]] = await req.db.query('SELECT id FROM servicios WHERE nombre = ?', [nombre]);
+    const [[dup]] = await req.db.query('SELECT id FROM servicios WHERE tenant_id = @tenant AND nombre = ?', [nombre]);
     if (dup) return invalido(res, 'nombre', 'Ya existe un servicio con ese nombre', 409);
 
     const [[max]] = await req.db.query('SELECT COALESCE(MAX(orden), 0) AS m FROM servicios WHERE tenant_id = @tenant');
@@ -531,7 +531,7 @@ router.put('/servicios/:id', async (req, res) => {
     }
     const [[existe]] = await req.db.query('SELECT id FROM servicios WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     if (!existe) return res.status(404).json({ error: 'Servicio no encontrado' });
-    const [[dup]] = await req.db.query('SELECT id FROM servicios WHERE nombre = ? AND id <> ?', [nombre, req.params.id]);
+    const [[dup]] = await req.db.query('SELECT id FROM servicios WHERE tenant_id = @tenant AND nombre = ? AND id <> ?', [nombre, req.params.id]);
     if (dup) return invalido(res, 'nombre', 'Ya existe un servicio con ese nombre', 409);
 
     const activo = req.body.activo === undefined ? undefined : (req.body.activo ? 1 : 0);
@@ -572,7 +572,7 @@ router.delete('/servicios/:id', async (req, res) => {
 
     const [[uso]] = await req.db.query(
       `SELECT COUNT(*) AS n FROM citas ci
-       WHERE ci.tipo_servicio = ? OR EXISTS (SELECT 1 FROM cita_servicios cs WHERE cs.cita_id = ci.id AND cs.servicio = ?)`,
+       WHERE ci.tipo_servicio = ? OR EXISTS (SELECT 1 FROM cita_servicios cs WHERE cs.tenant_id = @tenant AND cs.cita_id = ci.id AND cs.servicio = ?)`,
       [s.nombre, s.nombre]
     );
     if (uso.n > 0) {
@@ -757,7 +757,7 @@ router.post('/correo/prueba', async (req, res) => {
     if (Date.now() - antes < 60 * 1000) {
       return res.status(429).json({ error: 'Esperá un minuto antes de mandar otra prueba' });
     }
-    const [[u]] = await req.db.query('SELECT nombre, email FROM usuarios WHERE id = ?', [req.usuario.id]);
+    const [[u]] = await req.db.query('SELECT nombre, email FROM usuarios WHERE tenant_id = @tenant AND id = ?', [req.usuario.id]);
     if (!u || !u.email) return res.status(400).json({ error: 'Tu usuario no tiene correo' });
     ultimaPrueba.set(req.usuario.id, Date.now());
     if (!process.env.RESEND_API_KEY) {
@@ -783,7 +783,7 @@ router.get('/respaldos', async (req, res) => {
     const [registro] = await req.db.query(
       `SELECT r.id, r.origen, r.ok, r.clave, r.bytes, r.tablas, r.filas, r.segundos, r.cifrado, r.error, r.created_at,
               u.nombre AS usuario_nombre
-       FROM respaldos_registro r LEFT JOIN usuarios u ON u.id = r.usuario_id
+       FROM respaldos_registro r LEFT JOIN usuarios u ON u.id = r.usuario_id AND u.tenant_id = @tenant
        ORDER BY r.id DESC LIMIT 30`
     );
     let guardados = null;
@@ -863,7 +863,7 @@ router.post('/seguridad/cerrar', async (req, res) => {
       const id = Number(req.body?.usuario_id);
       if (!id) return invalido(res, 'usuario_id', 'Elegí a quién');
       if (id === req.usuario.id) return invalido(res, 'usuario_id', 'Para cerrar tu propia sesión, salí desde el menú');
-      const [[u]] = await req.db.query('SELECT id FROM usuarios WHERE id = ?', [id]);
+      const [[u]] = await req.db.query('SELECT id FROM usuarios WHERE tenant_id = @tenant AND id = ?', [id]);
       if (!u) return res.status(404).json({ error: 'Empleado no encontrado' });
       ids = [id];
     }
@@ -888,9 +888,9 @@ router.put('/cuenta', async (req, res) => {
     if (!nombre || !nombre.trim() || !email || !email.trim()) {
       return res.status(400).json({ error: 'Nombre y correo son requeridos' });
     }
-    await req.db.query('UPDATE usuarios SET nombre = ?, email = ? WHERE id = ?', [nombre.trim(), email.trim(), req.usuario.id]);
+    await req.db.query('UPDATE usuarios SET nombre = ?, email = ? WHERE tenant_id = @tenant AND id = ?', [nombre.trim(), email.trim(), req.usuario.id]);
     anotar(req.usuario.id, 'cuenta');
-    const [[u]] = await req.db.query('SELECT id, nombre, email, rol FROM usuarios WHERE id = ?', [req.usuario.id]);
+    const [[u]] = await req.db.query('SELECT id, nombre, email, rol FROM usuarios WHERE tenant_id = @tenant AND id = ?', [req.usuario.id]);
     res.json({ data: u, message: 'Cuenta actualizada' });
   } catch (err) {
     fail(res, err);
@@ -902,14 +902,14 @@ router.put('/cuenta/password', async (req, res) => {
   try {
     const { actual, nueva } = req.body;
     if (!actual || !nueva) return res.status(400).json({ error: 'Contraseña actual y nueva son requeridas' });
-    const [[u]] = await req.db.query('SELECT password_hash, email, nombre FROM usuarios WHERE id = ?', [req.usuario.id]);
+    const [[u]] = await req.db.query('SELECT password_hash, email, nombre FROM usuarios WHERE tenant_id = @tenant AND id = ?', [req.usuario.id]);
     if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
     const malaClave = problemaDeContrasena(nueva, politica(await getConfig()), u);
     if (malaClave) return invalido(res, 'nueva', malaClave);
     const ok = await bcrypt.compare(String(actual), u.password_hash);
     if (!ok) return invalido(res, 'actual', 'La contraseña actual no es correcta');
     const hash = await bcrypt.hash(String(nueva), 10);
-    await req.db.query('UPDATE usuarios SET password_hash = ? WHERE id = ?', [hash, req.usuario.id]);
+    await req.db.query('UPDATE usuarios SET password_hash = ? WHERE tenant_id = @tenant AND id = ?', [hash, req.usuario.id]);
     anotar(req.usuario.id, 'contrasena');
     res.json({ message: 'Contraseña actualizada' });
   } catch (err) {
@@ -921,7 +921,7 @@ router.put('/cuenta/foto', async (req, res) => {
   try {
     const { foto } = req.body;
     if (!fotoValida(foto)) return res.status(400).json({ error: 'Imagen inválida' });
-    await req.db.query('UPDATE usuarios SET foto = ? WHERE id = ?', [foto || null, req.usuario.id]);
+    await req.db.query('UPDATE usuarios SET foto = ? WHERE tenant_id = @tenant AND id = ?', [foto || null, req.usuario.id]);
     if (foto) anotar(req.usuario.id, 'foto');
     res.json({ data: { foto: foto || null }, message: foto ? 'Foto actualizada' : 'Foto eliminada' });
   } catch (err) {
@@ -965,7 +965,7 @@ router.put('/sucursales/:id', async (req, res) => {
     const nombre = (req.body.nombre || '').trim();
     if (!nombre) return invalido(res, 'nombre', 'Falta el nombre de la sucursal');
     const [result] = await req.db.query(
-      'UPDATE sucursales SET nombre = ?, direccion = ?, telefono = ? WHERE id = ?',
+      'UPDATE sucursales SET nombre = ?, direccion = ?, telefono = ? WHERE tenant_id = @tenant AND id = ?',
       [nombre, (req.body.direccion || '').trim() || null, (req.body.telefono || '').trim() || null, req.params.id]
     );
     if (!result.affectedRows) return res.status(404).json({ error: 'Sucursal no encontrada' });
@@ -1010,7 +1010,7 @@ function leerPermisos(r) {
 
 async function cargarRol(id) {
   const [[r]] = await req.db.query(
-    'SELECT id, clave, nombre, base, descripcion, permisos, de_fabrica FROM roles WHERE id = ?',
+    'SELECT id, clave, nombre, base, descripcion, permisos, de_fabrica FROM roles WHERE tenant_id = @tenant AND id = ?',
     [id]
   );
   return r ? { ...r, permisos: leerPermisos(r) } : null;
@@ -1059,9 +1059,9 @@ router.post('/roles', async (req, res) => {
   try {
     const v = validarRolPropio(req.body);
     if (v.error) return invalido(res, v.campo, v.error);
-    const [[{ n }]] = await req.db.query('SELECT COUNT(*) AS n FROM roles WHERE de_fabrica = 0');
+    const [[{ n }]] = await req.db.query('SELECT COUNT(*) AS n FROM roles WHERE tenant_id = @tenant AND de_fabrica = 0');
     if (n >= MAX_ROLES_PROPIOS) return res.status(400).json({ error: `Se pueden tener hasta ${MAX_ROLES_PROPIOS} roles propios` });
-    const [[repetido]] = await req.db.query('SELECT id FROM roles WHERE LOWER(nombre) = LOWER(?)', [v.datos.nombre]);
+    const [[repetido]] = await req.db.query('SELECT id FROM roles WHERE tenant_id = @tenant AND LOWER(nombre) = LOWER(?)', [v.datos.nombre]);
     if (repetido) return invalido(res, 'nombre', 'Ya hay un rol con ese nombre');
     const [r] = await req.db.query(
       'INSERT INTO roles (clave, nombre, base, descripcion, permisos, de_fabrica) VALUES (NULL, ?, ?, ?, ?, 0)',
@@ -1088,11 +1088,11 @@ router.put('/roles/:id', async (req, res) => {
     const v = validarRolPropio(cuerpo, { baseFija: rol.base });
     if (v.error) return invalido(res, v.campo, v.error);
     if (!rol.de_fabrica) {
-      const [[repetido]] = await req.db.query('SELECT id FROM roles WHERE LOWER(nombre) = LOWER(?) AND id <> ?', [v.datos.nombre, rol.id]);
+      const [[repetido]] = await req.db.query('SELECT id FROM roles WHERE tenant_id = @tenant AND LOWER(nombre) = LOWER(?) AND id <> ?', [v.datos.nombre, rol.id]);
       if (repetido) return invalido(res, 'nombre', 'Ya hay un rol con ese nombre');
     }
     await req.db.query(
-      'UPDATE roles SET nombre = ?, descripcion = ?, permisos = ? WHERE id = ?',
+      'UPDATE roles SET nombre = ?, descripcion = ?, permisos = ? WHERE tenant_id = @tenant AND id = ?',
       [v.datos.nombre, v.datos.descripcion, JSON.stringify(v.datos.permisos), rol.id]
     );
     registrarEvento('rol_editado', { ip: req.ip, actorId: req.usuario.id, detalle: `Cambió las casillas de «${v.datos.nombre}»` });
@@ -1112,7 +1112,7 @@ router.post('/roles/:id/restablecer', async (req, res) => {
     if (!rol.de_fabrica || !original || !FABRICA_EDITABLE.includes(rol.clave)) {
       return res.status(409).json({ error: 'Solo se restablecen los roles de fábrica que se pueden editar' });
     }
-    await req.db.query('UPDATE roles SET permisos = ? WHERE id = ?', [JSON.stringify(original.permisos), rol.id]);
+    await req.db.query('UPDATE roles SET permisos = ? WHERE tenant_id = @tenant AND id = ?', [JSON.stringify(original.permisos), rol.id]);
     registrarEvento('rol_editado', { ip: req.ip, actorId: req.usuario.id, detalle: `Volvió «${rol.nombre}» a las casillas de fábrica` });
     res.json({ data: await cargarRol(rol.id), message: `${rol.nombre} volvió a sus casillas de fábrica` });
   } catch (err) {
@@ -1127,7 +1127,7 @@ router.delete('/roles/:id', async (req, res) => {
     const rol = await cargarRol(req.params.id);
     if (!rol) return res.status(404).json({ error: 'Rol no encontrado' });
     if (rol.de_fabrica) return res.status(409).json({ error: 'Los roles de fábrica no se pueden eliminar' });
-    const [[{ n }]] = await req.db.query('SELECT COUNT(*) AS n FROM usuarios WHERE rol_id = ? AND activo = 1', [rol.id]);
+    const [[{ n }]] = await req.db.query('SELECT COUNT(*) AS n FROM usuarios WHERE tenant_id = @tenant AND rol_id = ? AND activo = 1', [rol.id]);
     if (n) {
       return res.status(409).json({
         error: n === 1
@@ -1135,8 +1135,8 @@ router.delete('/roles/:id', async (req, res) => {
           : `${n} empleados tienen este rol. Pasalos a otro rol en Gestión de empleados antes de eliminarlo.`,
       });
     }
-    await req.db.query('UPDATE usuarios SET rol_id = NULL WHERE rol_id = ?', [rol.id]);
-    await req.db.query('DELETE FROM roles WHERE id = ? AND de_fabrica = 0', [rol.id]);
+    await req.db.query('UPDATE usuarios SET rol_id = NULL WHERE tenant_id = @tenant AND rol_id = ?', [rol.id]);
+    await req.db.query('DELETE FROM roles WHERE tenant_id = @tenant AND id = ? AND de_fabrica = 0', [rol.id]);
     registrarEvento('rol_editado', { ip: req.ip, actorId: req.usuario.id, detalle: `Eliminó el rol «${rol.nombre}»` });
     res.json({ message: `Rol «${rol.nombre}» eliminado` });
   } catch (err) {
@@ -1157,7 +1157,7 @@ const HORA_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 // Citas (no canceladas) que caen dentro de un bloqueo.
 async function citasDentroDeBloqueo(b, config) {
   let sql = `SELECT id, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora, duracion_horas
-             FROM citas WHERE fecha BETWEEN ? AND ? AND estado <> 'cancelado'`;
+             FROM citas WHERE tenant_id = @tenant AND fecha BETWEEN ? AND ? AND estado <> 'cancelado'`;
   const params = [b.fecha_desde, b.fecha_hasta];
   if (b.sucursal_id) { sql += ' AND sucursal_id = ?'; params.push(b.sucursal_id); }
   const [citas] = await req.db.query(sql, params);
@@ -1174,8 +1174,8 @@ const SELECT_BLOQUEOS = `
          TIME_FORMAT(b.hora_desde, '%H:%i') AS hora_desde, TIME_FORMAT(b.hora_hasta, '%H:%i') AS hora_hasta,
          b.motivo, u.nombre AS creado_por_nombre, b.created_at
   FROM bloqueos_horario b
-  LEFT JOIN sucursales s ON s.id = b.sucursal_id
-  LEFT JOIN usuarios u ON u.id = b.creado_por`;
+  LEFT JOIN sucursales s ON s.id = b.sucursal_id AND s.tenant_id = @tenant
+  LEFT JOIN usuarios u ON u.id = b.creado_por AND u.tenant_id = @tenant`;
 
 // GET /api/admin/bloqueos — los que todavía no terminaron, del más próximo al más lejano.
 router.get('/bloqueos', async (req, res) => {
@@ -1216,7 +1216,7 @@ router.post('/bloqueos', async (req, res) => {
     }
     let sucursalId = null;
     if (b.sucursal_id) {
-      const [[s]] = await req.db.query('SELECT id FROM sucursales WHERE id = ?', [b.sucursal_id]);
+      const [[s]] = await req.db.query('SELECT id FROM sucursales WHERE tenant_id = @tenant AND id = ?', [b.sucursal_id]);
       if (!s) return invalido(res, 'sucursal_id', 'Sucursal no válida');
       sucursalId = s.id;
     }
@@ -1248,7 +1248,7 @@ router.get('/feriados', async (req, res) => {
     const hoy = fechaLocalISO(config.zona_horaria_offset);
     const [rows] = await req.db.query(
       `SELECT f.id, f.mes, f.dia, f.nombre, f.sucursal_id, s.nombre AS sucursal_nombre
-       FROM feriados f LEFT JOIN sucursales s ON s.id = f.sucursal_id ORDER BY f.mes, f.dia`
+       FROM feriados f LEFT JOIN sucursales s ON s.id = f.sucursal_id ORDER BY f.mes, f.dia AND s.tenant_id = @tenant`
     );
     for (const f of rows) {
       f.proxima = proximaFecha(f.mes, f.dia, hoy);
@@ -1309,7 +1309,7 @@ router.post('/feriados', async (req, res) => {
 // DELETE /api/admin/feriados/:id — deja de bloquearse (desde este año).
 router.delete('/feriados/:id', async (req, res) => {
   try {
-    const [r] = await req.db.query('DELETE FROM feriados WHERE id = ?', [req.params.id]);
+    const [r] = await req.db.query('DELETE FROM feriados WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     if (!r.affectedRows) return res.status(404).json({ error: 'Feriado no encontrado' });
     res.json({ message: 'Feriado quitado: ese día se vuelve a ofrecer' });
   } catch (err) {
@@ -1320,7 +1320,7 @@ router.delete('/feriados/:id', async (req, res) => {
 // DELETE /api/admin/bloqueos/:id — quita el bloqueo (esas horas se vuelven a ofrecer).
 router.delete('/bloqueos/:id', async (req, res) => {
   try {
-    const [r] = await req.db.query('DELETE FROM bloqueos_horario WHERE id = ?', [req.params.id]);
+    const [r] = await req.db.query('DELETE FROM bloqueos_horario WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     if (!r.affectedRows) return res.status(404).json({ error: 'Bloqueo no encontrado' });
     res.json({ message: 'Bloqueo quitado' });
   } catch (err) {

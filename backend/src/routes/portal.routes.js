@@ -85,7 +85,7 @@ router.post('/login', async (req, res) => {
     if (faltante(res, req.body, [['email', 'el correo'], ['password', 'la contraseña']])) return;
     if (!emailValido(email)) return invalido(res, 'email', 'El correo no tiene un formato válido');
     const [[cliente]] = await req.db.query(
-      'SELECT * FROM clientes WHERE email = ? AND activo = 1',
+      'SELECT * FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1',
       [email]
     );
     if (!cliente || !cliente.password_hash) {
@@ -168,7 +168,7 @@ router.get('/google/config', (req, res) => {
 // estaba y da el correo por verificado (Google ya lo verificó).
 async function entrarConGoogle(res, cliente, g) {
   if (!cliente.google_sub) {
-    await req.db.query('UPDATE clientes SET google_sub = ?, email_verificado = 1 WHERE id = ?', [g.sub, cliente.id]);
+    await req.db.query('UPDATE clientes SET google_sub = ?, email_verificado = 1 WHERE tenant_id = @tenant AND id = ?', [g.sub, cliente.id]);
   }
   const { payload, token } = tokenCliente(cliente);
   res.json({ data: { token, cliente: { ...payload, foto: cliente.foto || null } } });
@@ -177,9 +177,9 @@ async function entrarConGoogle(res, cliente, g) {
 // Busca la cuenta del cliente: primero por la cuenta de Google, después por el correo.
 // Si el correo ya está unido a OTRA cuenta de Google, no se toca.
 async function clienteDeGoogle(g) {
-  const [[porSub]] = await req.db.query('SELECT * FROM clientes WHERE google_sub = ? AND activo = 1', [g.sub]);
+  const [[porSub]] = await req.db.query('SELECT * FROM clientes WHERE tenant_id = @tenant AND google_sub = ? AND activo = 1', [g.sub]);
   if (porSub) return { cliente: porSub };
-  const [[porCorreo]] = await req.db.query('SELECT * FROM clientes WHERE email = ? AND activo = 1 ORDER BY id LIMIT 1', [g.email]);
+  const [[porCorreo]] = await req.db.query('SELECT * FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 ORDER BY id LIMIT 1', [g.email]);
   if (porCorreo && porCorreo.google_sub && porCorreo.google_sub !== g.sub) return { conflicto: true };
   return { cliente: porCorreo || null };
 }
@@ -239,7 +239,7 @@ router.post('/google/completar', async (req, res) => {
       'INSERT INTO clientes (nombre, apellido, telefono, email, cedula, password_hash, email_verificado, google_sub) VALUES (?, ?, ?, ?, ?, NULL, 1, ?)',
       [nombre, apellido, String(telefono).trim(), pase.email, String(cedula).trim(), pase.sub]
     );
-    const [[nuevo]] = await req.db.query('SELECT * FROM clientes WHERE id = ?', [r.insertId]);
+    const [[nuevo]] = await req.db.query('SELECT * FROM clientes WHERE tenant_id = @tenant AND id = ?', [r.insertId]);
     const { payload, token } = tokenCliente(nuevo);
     res.status(201).json({ data: { token, cliente: { ...payload, foto: null } } });
   } catch (err) {
@@ -332,7 +332,7 @@ router.post('/registro/verificar', async (req, res) => {
 
     const ok = await bcrypt.compare(String(codigo).trim(), reg.code_hash);
     if (!ok) {
-      await req.db.query('UPDATE email_verify_codes SET attempts = attempts + 1 WHERE id = ?', [reg.id]);
+      await req.db.query('UPDATE email_verify_codes SET attempts = attempts + 1 WHERE tenant_id = @tenant AND id = ?', [reg.id]);
       return invalido(res, 'codigo', ERR_CODIGO);
     }
 
@@ -387,7 +387,7 @@ router.post('/recuperar/solicitar', antibot(), async (req, res) => {
 
     const [[cliente]] = await req.db.query(
       // También quien entró solo con Google: así se crea una contraseña.
-      'SELECT id, nombre, apellido FROM clientes WHERE email = ? AND activo = 1 AND (password_hash IS NOT NULL OR google_sub IS NOT NULL)',
+      'SELECT id, nombre, apellido FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND (password_hash IS NOT NULL OR google_sub IS NOT NULL)',
       [email]
     );
 
@@ -418,7 +418,7 @@ router.post('/recuperar/confirmar', async (req, res) => {
     if (password.length < 8) return invalido(res, 'password', 'La contraseña debe tener al menos 8 caracteres');
 
     const [[cliente]] = await req.db.query(
-      'SELECT id, nombre, apellido FROM clientes WHERE email = ? AND activo = 1 AND (password_hash IS NOT NULL OR google_sub IS NOT NULL)',
+      'SELECT id, nombre, apellido FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND (password_hash IS NOT NULL OR google_sub IS NOT NULL)',
       [email]
     );
     const ERR_CODIGO = 'Código inválido o expirado';
@@ -434,7 +434,7 @@ router.post('/recuperar/confirmar', async (req, res) => {
 
     const ok = await bcrypt.compare(String(codigo).trim(), reg.code_hash);
     if (!ok) {
-      await req.db.query('UPDATE password_reset_codes SET attempts = attempts + 1 WHERE id = ?', [reg.id]);
+      await req.db.query('UPDATE password_reset_codes SET attempts = attempts + 1 WHERE tenant_id = @tenant AND id = ?', [reg.id]);
       return invalido(res, 'codigo', ERR_CODIGO);
     }
 
@@ -556,7 +556,7 @@ router.get('/resumen', async (req, res) => {
        + (SELECT COALESCE(SUM(costo_mano_obra + costo_repuestos - descuento), 0)
             FROM ordenes_trabajo
             WHERE tenant_id = @tenant AND cliente_id = ? AND estado = 'entregada'
-              AND id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL)) AS total_pagado`,
+              AND id NOT IN (SELECT orden_id FROM citas WHERE tenant_id = @tenant AND orden_id IS NOT NULL)) AS total_pagado`,
       [id, id]
     );
     const [[{ completadas }]] = await req.db.query(
@@ -564,7 +564,7 @@ router.get('/resumen', async (req, res) => {
          (SELECT COUNT(*) FROM citas WHERE tenant_id = @tenant AND cliente_id = ? AND estado = 'entregado')
        + (SELECT COUNT(*) FROM ordenes_trabajo
             WHERE tenant_id = @tenant AND cliente_id = ? AND estado = 'entregada'
-              AND id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL)) AS completadas`,
+              AND id NOT IN (SELECT orden_id FROM citas WHERE tenant_id = @tenant AND orden_id IS NOT NULL)) AS completadas`,
       [id, id]
     );
     // Cita destacada del inicio. Antes se tomaba la cita no-terminal más antigua,
@@ -703,7 +703,7 @@ router.get('/perfil', async (req, res) => {
       `SELECT id, nombre, apellido, email, email_pendiente, telefono, cedula, foto,
               notif_avances, notif_recordatorios,
               (password_hash IS NOT NULL) AS tiene_password, (google_sub IS NOT NULL) AS con_google
-       FROM clientes WHERE id = ? AND activo = 1`,
+       FROM clientes WHERE tenant_id = @tenant AND id = ? AND activo = 1`,
       [req.cliente.id]
     );
     if (!c) return res.status(404).json({ error: 'Cuenta no encontrada' });
@@ -822,14 +822,14 @@ router.post('/perfil/email/confirmar', async (req, res) => {
     if (!reg || reg.attempts >= 5) return invalido(res, 'codigo', ERR_CODIGO);
 
     if (!(await bcrypt.compare(String(codigo).trim(), reg.code_hash))) {
-      await req.db.query('UPDATE email_verify_codes SET attempts = attempts + 1 WHERE id = ?', [reg.id]);
+      await req.db.query('UPDATE email_verify_codes SET attempts = attempts + 1 WHERE tenant_id = @tenant AND id = ?', [reg.id]);
       return invalido(res, 'codigo', ERR_CODIGO);
     }
 
     // Se vuelve a comprobar acá: entre el pedido y la confirmación alguien más pudo
     // haberse quedado con ese correo.
     if (await correoOcupado(c.email_pendiente, req.cliente.id)) {
-      await req.db.query('UPDATE clientes SET email_pendiente = NULL WHERE id = ?', [req.cliente.id]);
+      await req.db.query('UPDATE clientes SET email_pendiente = NULL WHERE tenant_id = @tenant AND id = ?', [req.cliente.id]);
       return invalido(res, 'email', 'Ese correo ya está en uso por otra cuenta', 409);
     }
 
@@ -902,7 +902,7 @@ router.put('/perfil/password', async (req, res) => {
     const { actual, nueva } = req.body;
     if (faltante(res, req.body, [['actual', 'la contraseña actual'], ['nueva', 'la nueva contraseña']])) return;
     if (String(nueva).length < 8) return invalido(res, 'nueva', 'La nueva contraseña debe tener al menos 8 caracteres');
-    const [[c]] = await req.db.query('SELECT password_hash FROM clientes WHERE id = ? AND activo = 1', [req.cliente.id]);
+    const [[c]] = await req.db.query('SELECT password_hash FROM clientes WHERE tenant_id = @tenant AND id = ? AND activo = 1', [req.cliente.id]);
     if (!c || !c.password_hash) return res.status(404).json({ error: 'Cuenta no encontrada' });
     const ok = await bcrypt.compare(String(actual), c.password_hash);
     if (!ok) return invalido(res, 'actual', 'La contraseña actual no es correcta');
@@ -1076,7 +1076,7 @@ router.get('/ordenes/:id', async (req, res) => {
       [req.params.id]
     );
     const [repuestos] = await req.db.query(
-      'SELECT nombre, cantidad, costo_unitario, estado, adicional FROM orden_repuestos WHERE orden_id = ? ORDER BY created_at ASC',
+      'SELECT nombre, cantidad, costo_unitario, estado, adicional FROM orden_repuestos WHERE tenant_id = @tenant AND orden_id = ? ORDER BY created_at ASC',
       [req.params.id]
     );
     const [fotos] = await req.db.query(
@@ -1149,7 +1149,7 @@ router.get('/fidelidad', async (req, res) => {
          (SELECT COUNT(*) FROM citas WHERE tenant_id = @tenant AND cliente_id = ? AND estado = 'entregado')
        + (SELECT COUNT(*) FROM ordenes_trabajo
             WHERE tenant_id = @tenant AND cliente_id = ? AND estado = 'entregada'
-              AND id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL)) AS completadas`,
+              AND id NOT IN (SELECT orden_id FROM citas WHERE tenant_id = @tenant AND orden_id IS NOT NULL)) AS completadas`,
       [req.cliente.id, req.cliente.id]
     );
     const r = recompensas(completadas);
@@ -1406,7 +1406,7 @@ router.put('/citas/:id', async (req, res) => {
     const sucursalPedida = (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
 
     const [[cita]] = await req.db.query(
-      "SELECT id, estado, orden_id, sucursal_id, duracion_horas, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora FROM citas WHERE id = ? AND cliente_id = ?",
+      "SELECT id, estado, orden_id, sucursal_id, duracion_horas, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora FROM citas WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?",
       [req.params.id, req.cliente.id]
     );
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
@@ -1458,7 +1458,7 @@ router.put('/citas/:id', async (req, res) => {
         return invalido(res, 'hora', 'Esa hora ya no está disponible, elige otra.');
       }
       await conn.query(
-        'UPDATE citas SET moto_id = ?, fecha = ?, hora = ?, motivo = ?, sucursal_id = ? WHERE id = ?',
+        'UPDATE citas SET moto_id = ?, fecha = ?, hora = ?, motivo = ?, sucursal_id = ? WHERE tenant_id = @tenant AND id = ?',
         [moto_id, fecha, hora, motivo, sucursalId, req.params.id]
       );
       await guardarServiciosCita(req.params.id, servicios, conn);
@@ -1639,7 +1639,7 @@ router.patch('/citas/:id/confirmar', async (req, res) => {
 // adicional: rechazarlo no anula lo que ya aprobó, el trabajo sigue sin el adicional.
 async function actualizarAprobacion(ordenId, clienteId, decision, motivo) {
   const [[orden]] = await req.db.query(
-    "SELECT id, total_aprobado FROM ordenes_trabajo WHERE id = ? AND cliente_id = ? AND estado = 'esperando_aprobacion'",
+    "SELECT id, total_aprobado FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ? AND cliente_id = ? AND estado = 'esperando_aprobacion'",
     [ordenId, clienteId]
   );
   if (!orden) return false;
@@ -1654,7 +1654,7 @@ async function actualizarAprobacion(ordenId, clienteId, decision, motivo) {
       `UPDATE ordenes_trabajo
          SET aprobacion_cliente = 'rechazado', motivo_rechazo = ?,
              aprobado_por_cliente = 0, fecha_aprobacion = NOW()
-       WHERE id = ?`,
+       WHERE tenant_id = @tenant AND id = ?`,
       [motivo, ordenId]
     );
     await avanzarEstadoOrden(ordenId, 'diagnostico');

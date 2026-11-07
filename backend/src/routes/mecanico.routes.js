@@ -35,9 +35,9 @@ const SELECT_CITA = `
          m.marca, m.modelo, m.placa,
          c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.telefono AS cliente_telefono
   FROM citas ci
-  LEFT JOIN vehiculos m    ON m.id = ci.vehiculo_id
-  JOIN clientes c      ON c.id = ci.cliente_id
-  LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id`;
+  LEFT JOIN vehiculos m    ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant
+  JOIN clientes c      ON c.id = ci.cliente_id AND c.tenant_id = @tenant
+  LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id AND o.tenant_id = @tenant`;
 
 // GET /api/mecanico/resumen — KPIs del técnico logueado
 router.get('/resumen', async (req, res) => {
@@ -50,7 +50,7 @@ router.get('/resumen', async (req, res) => {
       [yo]
     );
     const [[{ completadas_hoy }]] = await req.db.query(
-      `SELECT COUNT(*) AS completadas_hoy FROM citas WHERE tecnico_id = ? AND estado = 'entregado' AND ${enPeriodo('fecha_fin', 'hoy', { momento: true, offset: off })}`,
+      `SELECT COUNT(*) AS completadas_hoy FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND estado = 'entregado' AND ${enPeriodo('fecha_fin', 'hoy', { momento: true, offset: off })}`,
       [yo]
     );
     const [[{ en_proceso }]] = await req.db.query(
@@ -62,7 +62,7 @@ router.get('/resumen', async (req, res) => {
       [yo]
     );
     const [[{ generado_hoy }]] = await req.db.query(
-      `SELECT COALESCE(SUM(monto), 0) AS generado_hoy FROM citas WHERE tecnico_id = ? AND estado = 'entregado' AND ${enPeriodo('fecha_fin', 'hoy', { momento: true, offset: off })}`,
+      `SELECT COALESCE(SUM(monto), 0) AS generado_hoy FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND estado = 'entregado' AND ${enPeriodo('fecha_fin', 'hoy', { momento: true, offset: off })}`,
       [yo]
     );
     const [[{ tiempo_promedio_min }]] = await req.db.query(
@@ -183,7 +183,7 @@ router.post('/ordenes/:id/repuestos', exigirPermiso('taller.repuestos'), async (
       return res.status(400).json({ error: `Máximo ${MAX_PIEZAS_SOLICITUD} repuestos por solicitud` });
     }
     const [[orden]] = await req.db.query(
-      'SELECT id, numero_orden, total_aprobado FROM ordenes_trabajo WHERE id = ? AND tecnico_id = ?',
+      'SELECT id, numero_orden, total_aprobado FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ? AND tecnico_id = ?',
       [req.params.id, req.usuario.id]
     );
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada o no asignada a vos' });
@@ -195,14 +195,14 @@ router.post('/ordenes/:id/repuestos', exigirPermiso('taller.repuestos'), async (
       [piezas.map((p) => [req.params.id, p.nombre, p.cantidad, 0, 'solicitado', adicional])]
     );
     const [nuevos] = await req.db.query(
-      'SELECT * FROM orden_repuestos WHERE orden_id = ? AND id >= ? ORDER BY id ASC LIMIT ?',
+      'SELECT * FROM orden_repuestos WHERE tenant_id = @tenant AND orden_id = ? AND id >= ? ORDER BY id ASC LIMIT ?',
       [req.params.id, result.insertId, piezas.length]
     );
     // Notificar a recepción vía mensaje interno (uno por solicitud, no uno por pieza)
     const detalle = piezas.map((p) => `${p.nombre} ×${p.cantidad}`).join(', ');
     await req.db.query(
       `INSERT INTO mensajes_internos (remitente_id, destino_rol, mensaje, orden_id, tipo, sucursal_id)
-       VALUES (?, 'recepcion', ?, ?, 'directo', (SELECT sucursal_id FROM usuarios WHERE id = ?))`,
+       VALUES (?, 'recepcion', ?, ?, 'directo', (SELECT sucursal_id FROM usuarios WHERE tenant_id = @tenant AND id = ?))`,
       [req.usuario.id, `Solicitud de repuesto (${orden.numero_orden}): ${detalle}`.slice(0, 500), req.params.id, req.usuario.id]
     );
     const unaSola = !Array.isArray(req.body.piezas);
@@ -292,7 +292,7 @@ const SELECT_MENSAJE = `
          ${LEIDO_POR_MI}, ${VISTO_POR_OTRO}
   FROM mensajes_internos m
   JOIN usuarios u ON u.id = m.remitente_id AND u.tenant_id = @tenant
-  LEFT JOIN ordenes_trabajo o ON o.id = m.orden_id`;
+  LEFT JOIN ordenes_trabajo o ON o.id = m.orden_id AND o.tenant_id = @tenant`;
 
 router.get('/mensajes', async (req, res) => {
   try {
@@ -382,7 +382,7 @@ router.get('/perfil', async (req, res) => {
     const satisfechos_pct = sat.total ? Math.round((sat.buenas / sat.total) * 100) : null;
     const [[mes]] = await req.db.query(
       `SELECT COUNT(*) AS citas_mes
-       FROM citas WHERE tecnico_id = ? AND estado = 'entregado'
+       FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND estado = 'entregado'
          AND ${enPeriodo('fecha_fin', 'mes', { momento: true, offset: (await getConfig()).zona_horaria_offset })}`,
       [yo]
     );
@@ -475,7 +475,7 @@ router.put('/perfil/foto', async (req, res) => {
   try {
     const { foto } = req.body;
     if (!fotoValida(foto)) return res.status(400).json({ error: 'Imagen inválida' });
-    await req.db.query('UPDATE usuarios SET foto = ? WHERE id = ?', [foto || null, req.usuario.id]);
+    await req.db.query('UPDATE usuarios SET foto = ? WHERE tenant_id = @tenant AND id = ?', [foto || null, req.usuario.id]);
     if (foto) anotar(req.usuario.id, 'foto');
     res.json({ data: { foto: foto || null }, message: foto ? 'Foto actualizada' : 'Foto eliminada' });
   } catch (err) {
@@ -487,7 +487,7 @@ router.put('/perfil/password', async (req, res) => {
   try {
     const { actual, nueva } = req.body;
     if (!actual || !nueva) return res.status(400).json({ error: 'Contraseña actual y nueva son requeridas' });
-    const [[u]] = await req.db.query('SELECT password_hash, email, nombre FROM usuarios WHERE id = ?', [req.usuario.id]);
+    const [[u]] = await req.db.query('SELECT password_hash, email, nombre FROM usuarios WHERE tenant_id = @tenant AND id = ?', [req.usuario.id]);
     if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
     // La política de Configuración → Seguridad (utils/contrasena.js).
     const malaClave = problemaDeContrasena(nueva, politica(await getConfig()), u);
@@ -495,7 +495,7 @@ router.put('/perfil/password', async (req, res) => {
     const ok = await bcrypt.compare(String(actual), u.password_hash);
     if (!ok) return res.status(400).json({ error: 'La contraseña actual no es correcta' });
     const hash = await bcrypt.hash(String(nueva), 10);
-    await req.db.query('UPDATE usuarios SET password_hash = ? WHERE id = ?', [hash, req.usuario.id]);
+    await req.db.query('UPDATE usuarios SET password_hash = ? WHERE tenant_id = @tenant AND id = ?', [hash, req.usuario.id]);
     anotar(req.usuario.id, 'contrasena');
     res.json({ message: 'Contraseña actualizada' });
   } catch (err) {

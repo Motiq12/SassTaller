@@ -51,7 +51,7 @@ router.post('/', exigirPermiso('clientes.editar'), async (req, res) => {
     if (!telefonoValido(telefono)) return invalido(res, 'telefono', 'El teléfono no tiene un formato válido');
     if (!cedulaValida(cedula)) return invalido(res, 'cedula', 'La cédula no tiene un formato válido');
     const [result] = await req.db.query(
-      'INSERT INTO clientes (nombre, apellido, telefono, email, cedula, direccion) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO clientes (tenant_id, nombre, apellido, telefono, email, cedula, direccion) VALUES (@tenant, ?, ?, ?, ?, ?, ?)',
       [nombre, apellido, telefono, email || null, cedula || null, direccion || null]
     );
     const [[nuevo]] = await req.db.query(
@@ -154,7 +154,7 @@ router.put('/:id', exigirPermiso('clientes.editar'), async (req, res) => {
     if (!telefonoValido(telefono)) return invalido(res, 'telefono', 'El teléfono no tiene un formato válido');
     if (!cedulaValida(cedula)) return invalido(res, 'cedula', 'La cédula no tiene un formato válido');
     await req.db.query(
-      'UPDATE clientes SET nombre=?, apellido=?, telefono=?, email=?, cedula=?, direccion=? WHERE id=?',
+      'UPDATE clientes SET nombre=?, apellido=?, telefono=?, email=?, cedula=?, direccion=? WHERE id=? AND tenant_id = @tenant',
       [nombre, apellido, telefono, email || null, cedula || null, direccion || null, req.params.id]
     );
     const [[actualizado]] = await req.db.query(
@@ -184,9 +184,9 @@ router.get('/:id/ordenes', async (req, res) => {
       `SELECT ot.*, m.marca, m.modelo, m.placa,
               u.nombre AS tecnico_nombre
        FROM ordenes_trabajo ot
-       JOIN motos m ON ot.moto_id = m.id
-       LEFT JOIN usuarios u ON ot.tecnico_id = u.id
-       WHERE ot.cliente_id = ?${soloSucursal(req, 'ot.sucursal_id')}
+       JOIN vehiculos m ON ot.vehiculo_id = m.id AND m.tenant_id = @tenant
+       LEFT JOIN usuarios u ON ot.tecnico_id = u.id AND u.tenant_id = @tenant
+       WHERE ot.tenant_id = @tenant AND ot.cliente_id = ?${soloSucursal(req, 'ot.sucursal_id')}
        ORDER BY ot.fecha_ingreso DESC`,
       [req.params.id]
     );
