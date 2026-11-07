@@ -1,10 +1,11 @@
 const router = require('express').Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
-// Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
-const { fail } = require('../utils/responder');
+const crypto = require('node:crypto');
+const { pool } = require('../db/pool');
+const { fail, invalido, faltante } = require('../utils/responder');
+const { registrarEvento } = require('../utils/eventos-seguridad');
 const authCliente = require('../middleware/auth-cliente');
-const tenantPublico = require('../middleware/tenant-publico');
 const {
   emailValido, fotoValida, textoDentroDeLimite, cedulaValida, telefonoValido, anioValido, placaValida,
 } = require('../utils/validar');
@@ -17,17 +18,19 @@ const {
   enviarCodigoCambioCorreo, enviarAvisoCambioCorreo,
 } = require('../services/mailer');
 const { antibot } = require('../utils/antibot');
-const { servicioValido, getServicios } = require('../utils/servicios');
+const { getServicios } = require('../utils/servicios');
+const { serviciosDelPedido, problemaConServicios, textoServicios, guardarServiciosCita } = require('../utils/servicios-cita');
 const { getConfig, horasDisponibles } = require('../utils/configuracion');
-const { normalizarTipos, limpiarAtributos } = require('../utils/tipos-vehiculo');
+const { agendaDia, agendaRango, conflictosDeCita, horasPasadas } = require('../utils/agenda');
 const { getSucursales, sucursalValida, sucursalPorDefecto } = require('../utils/sucursales');
-const { avanzarEstadoOrden, estadoTrasAprobacion } = require('../utils/ordenes');
+const { avanzarEstadoOrden, registrarAprobacion, registrarRechazoAdicional } = require('../utils/ordenes');
 const { recompensas } = require('../utils/recompensas');
+const { verificarIdToken, googleConfigurado } = require('../utils/google-id');
 
 // Fecha de hoy en zona del taller (offset configurable, por defecto UTC-6).
 // Evita rechazar/permitir un día de más cuando el server corre en UTC.
-async function hoyCR(db) {
-  const config = await getConfig(db);
+async function hoyCR() {
+  const config = await getConfig();
   const offset = Number(config.zona_horaria_offset) || -6;
   return new Date(Date.now() + offset * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
@@ -48,47 +51,42 @@ function horasHastaCita(fecha, hora) {
   return (inicio.getTime() - Date.now()) / 3600000;
 }
 
+// Código de 6 dígitos para verificar el correo, recuperar la contraseña o entrar
+// sin ella. Abre una sesión, así que sale del generador criptográfico del sistema
+// y no de Math.random.
+const codigoDeSeisDigitos = () => String(crypto.randomInt(100000, 1000000));
+
 // Firma el JWT del cliente y arma el payload estándar.
 function tokenCliente(cliente) {
-  const payload = { id: cliente.id, tipo: 'cliente', nombre: cliente.nombre, apellido: cliente.apellido, tenant_id: cliente.tenant_id };
+  const payload = { id: cliente.id, tipo: 'cliente', nombre: cliente.nombre, apellido: cliente.apellido };
   const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '8h' });
   return { payload, token };
 }
-
-
-// Identidad del taller para encabezar los correos: su nombre y su slug (que el
-// endpoint publico del logo necesita para saber cual servir).
-async function marcaDelTaller(db, slug) {
-  try {
-    const cfg = await getConfig(db);
-    return { nombre: cfg.nombre_taller, slug: slug || null };
-  } catch { return {}; }
-}
-
-// Tramo publico (login, registro, recuperar, OTP): el taller sale del subdominio
-// o de un campo `taller`, porque todavia no hay token del que leerlo.
-router.use(tenantPublico);
 
 // POST /api/portal/login — login del cliente con email + contraseña
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: 'Email y contraseña requeridos' });
-    if (!emailValido(email)) return res.status(400).json({ error: 'El correo no tiene un formato válido' });
-    const [[cliente]] = await req.db.query(
-      'SELECT * FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1',
+    if (faltante(res, req.body, [['email', 'el correo'], ['password', 'la contraseña']])) return;
+    if (!emailValido(email)) return invalido(res, 'email', 'El correo no tiene un formato válido');
+    const [[cliente]] = await pool.query(
+      'SELECT * FROM clientes WHERE email = ? AND activo = 1',
       [email]
     );
     if (!cliente || !cliente.password_hash) {
+      registrarEvento('portal_login_fallido', { email, ip: req.ip, detalle: cliente ? 'sin contraseña' : 'cuenta inexistente' });
       return res.status(401).json({ error: 'Credenciales incorrectas o portal no habilitado' });
     }
     const ok = await bcrypt.compare(password, cliente.password_hash);
-    if (!ok) return res.status(401).json({ error: 'Credenciales incorrectas' });
+    if (!ok) {
+      registrarEvento('portal_login_fallido', { email, ip: req.ip, detalle: 'contraseña incorrecta' });
+      return res.status(401).json({ error: 'Credenciales incorrectas' });
+    }
 
     // La contraseña ya se comprobó correcta (no hay riesgo de enumeración en avisar
     // esto acá): falta confirmar el correo antes de otorgar sesión.
     if (!cliente.email_verificado) {
-      return res.status(403).json({ error: 'Confirmá tu correo para entrar. Te enviamos un código al registrarte.', requiere_verificacion: true });
+      return res.status(403).json({ error: 'Confirma tu correo para entrar. Te enviamos un código al registrarte.', requiere_verificacion: true });
     }
 
     const { payload, token } = tokenCliente(cliente);
@@ -103,40 +101,136 @@ router.post('/login', async (req, res) => {
 // Invalida los códigos previos del cliente para que solo el último sea válido.
 // El propósito separa dos códigos que conviven: el de estrenar la cuenta y el de mudar
 // el correo desde el perfil. Sin distinguirlos, pedir uno anularía el otro.
-async function nuevoCodigoVerificacion(db, clienteId, proposito) {
-  const codigo = String(Math.floor(100000 + Math.random() * 900000)); // 6 dígitos
+async function nuevoCodigoVerificacion(clienteId, proposito) {
+  const codigo = codigoDeSeisDigitos();
   const codeHash = await bcrypt.hash(codigo, 10);
-  await db.query(
-    'UPDATE email_verify_codes SET used = 1 WHERE tenant_id = @tenant AND cliente_id = ? AND proposito = ? AND used = 0',
+  await pool.query(
+    'UPDATE email_verify_codes SET used = 1 WHERE cliente_id = ? AND proposito = ? AND used = 0',
     [clienteId, proposito]
   );
-  await db.query(
-    `INSERT INTO email_verify_codes (tenant_id, cliente_id, code_hash, proposito, expires_at)
-     VALUES (@tenant, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))`,
+  await pool.query(
+    `INSERT INTO email_verify_codes (cliente_id, code_hash, proposito, expires_at)
+     VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))`,
     [clienteId, codeHash, proposito]
   );
   return codigo;
 }
 
-async function enviarVerificacion(db, slug, clienteId, email, nombre) {
-  const codigo = await nuevoCodigoVerificacion(db, clienteId, 'registro');
-  await enviarCodigoVerificacion(email, nombre, codigo, await marcaDelTaller(db, slug));
+async function enviarVerificacion(clienteId, email, nombre) {
+  const codigo = await nuevoCodigoVerificacion(clienteId, 'registro');
+  await enviarCodigoVerificacion(email, nombre, codigo);
 }
 
 // Código a la dirección NUEVA para confirmar un cambio de correo desde el perfil.
-async function enviarCodigoCambio(db, slug, clienteId, emailNuevo, nombre) {
-  const codigo = await nuevoCodigoVerificacion(db, clienteId, 'cambio');
-  await enviarCodigoCambioCorreo(emailNuevo, nombre, codigo, await marcaDelTaller(db, slug));
+async function enviarCodigoCambio(clienteId, emailNuevo, nombre) {
+  const codigo = await nuevoCodigoVerificacion(clienteId, 'cambio');
+  await enviarCodigoCambioCorreo(emailNuevo, nombre, codigo);
 }
 
 // ¿Otra cuenta ya tiene ese correo, o lo tiene reservado como pendiente?
-async function correoOcupado(db, email, exceptoId) {
-  const [[dup]] = await db.query(
-    'SELECT id FROM clientes WHERE tenant_id = @tenant AND (email = ? OR email_pendiente = ?) AND id <> ? AND activo = 1',
+async function correoOcupado(email, exceptoId) {
+  const [[dup]] = await pool.query(
+    'SELECT id FROM clientes WHERE (email = ? OR email_pendiente = ?) AND id <> ? AND activo = 1',
     [email, email, exceptoId]
   );
   return !!dup;
 }
+
+// ── Entrar con Google (solo clientes) ──
+// El botón de Google (en el navegador) entrega un "ID token"; acá se comprueba con
+// utils/google-id.js. Quien ya tiene cuenta (por la cuenta de Google o por el mismo
+// correo) entra directo; quien no, completa teléfono y cédula en /google/completar.
+// Sin GOOGLE_CLIENT_ID no hay botón y estas rutas responden que no está activo.
+const GOOGLE_NO_ACTIVO = 'El ingreso con Google no está activado.';
+const ERR_GOOGLE = 'No se pudo comprobar tu cuenta de Google. Intenta de nuevo.';
+
+// GET /api/portal/google/config — el ID de cliente para el botón (no es secreto), o null.
+router.get('/google/config', (req, res) => {
+  res.json({ data: { clientId: process.env.GOOGLE_CLIENT_ID || null } });
+});
+
+// Entra con la cuenta que ya existe: la une a la cuenta de Google si todavía no lo
+// estaba y da el correo por verificado (Google ya lo verificó).
+async function entrarConGoogle(res, cliente, g) {
+  if (!cliente.google_sub) {
+    await pool.query('UPDATE clientes SET google_sub = ?, email_verificado = 1 WHERE id = ?', [g.sub, cliente.id]);
+  }
+  const { payload, token } = tokenCliente(cliente);
+  res.json({ data: { token, cliente: { ...payload, foto: cliente.foto || null } } });
+}
+
+// Busca la cuenta del cliente: primero por la cuenta de Google, después por el correo.
+// Si el correo ya está unido a OTRA cuenta de Google, no se toca.
+async function clienteDeGoogle(g) {
+  const [[porSub]] = await pool.query('SELECT * FROM clientes WHERE google_sub = ? AND activo = 1', [g.sub]);
+  if (porSub) return { cliente: porSub };
+  const [[porCorreo]] = await pool.query('SELECT * FROM clientes WHERE email = ? AND activo = 1 ORDER BY id LIMIT 1', [g.email]);
+  if (porCorreo && porCorreo.google_sub && porCorreo.google_sub !== g.sub) return { conflicto: true };
+  return { cliente: porCorreo || null };
+}
+
+// POST /api/portal/google — { credential } del botón de Google.
+router.post('/google', async (req, res) => {
+  try {
+    if (!googleConfigurado()) return res.status(404).json({ error: GOOGLE_NO_ACTIVO });
+    const limite = consumir(`google:${req.ip}`, { porMinuto: 10, porHora: 60 });
+    if (!limite.ok) return res.status(429).json({ error: `Demasiados intentos. Espera ${limite.retryAfter}s e intenta de nuevo.` });
+
+    let g;
+    try { g = await verificarIdToken(req.body?.credential); } catch { return res.status(401).json({ error: ERR_GOOGLE }); }
+
+    const { cliente, conflicto } = await clienteDeGoogle(g);
+    if (conflicto) return res.status(409).json({ error: 'Ese correo ya está unido a otra cuenta de Google. Entra con tu correo y contraseña.' });
+    if (cliente) return entrarConGoogle(res, cliente, g);
+
+    // Cuenta nueva: faltan teléfono y cédula. Se devuelve un pase corto (15 min) con
+    // lo que ya dio Google, para no tener que volver a pedir el token.
+    const pase = jwt.sign({ tipo: 'google-alta', sub: g.sub, email: g.email, nombre: g.nombre, apellido: g.apellido },
+      process.env.JWT_SECRET, { expiresIn: '15m' });
+    res.json({ data: { requiere_datos: true, pase_google: pase, email: g.email, nombre: g.nombre, apellido: g.apellido } });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// POST /api/portal/google/completar — { pase_google, nombre, apellido, telefono, cedula }.
+// Crea la cuenta sin contraseña (entra con Google; si después quiere una, la crea en
+// "¿Olvidaste tu contraseña?") y abre la sesión.
+router.post('/google/completar', async (req, res) => {
+  try {
+    if (!googleConfigurado()) return res.status(404).json({ error: GOOGLE_NO_ACTIVO });
+    let pase;
+    try {
+      pase = jwt.verify(String(req.body?.pase_google || ''), process.env.JWT_SECRET);
+      if (pase.tipo !== 'google-alta') throw new Error('pase de otro tipo');
+    } catch {
+      return res.status(401).json({ error: 'Se venció el ingreso con Google. Vuelve a tocar "Continuar con Google".' });
+    }
+
+    const nombre = String(req.body?.nombre || pase.nombre || '').trim();
+    const apellido = String(req.body?.apellido || pase.apellido || '').trim();
+    const { telefono, cedula } = req.body || {};
+    if (faltante(res, { nombre, apellido, telefono, cedula }, [['nombre', 'el nombre'], ['apellido', 'el apellido'], ['telefono', 'el teléfono'], ['cedula', 'la cédula']])) return;
+    if (!telefonoValido(telefono)) return invalido(res, 'telefono', 'El teléfono no tiene un formato válido');
+    if (!cedulaValida(cedula)) return invalido(res, 'cedula', 'La cédula no tiene un formato válido');
+
+    // Entre el primer paso y este pudo haberse creado la cuenta (otra pestaña).
+    const g = { sub: pase.sub, email: pase.email };
+    const { cliente, conflicto } = await clienteDeGoogle(g);
+    if (conflicto) return res.status(409).json({ error: 'Ese correo ya está unido a otra cuenta de Google. Entra con tu correo y contraseña.' });
+    if (cliente) return entrarConGoogle(res, cliente, g);
+
+    const [r] = await pool.query(
+      'INSERT INTO clientes (nombre, apellido, telefono, email, cedula, password_hash, email_verificado, google_sub) VALUES (?, ?, ?, ?, ?, NULL, 1, ?)',
+      [nombre, apellido, String(telefono).trim(), pase.email, String(cedula).trim(), pase.sub]
+    );
+    const [[nuevo]] = await pool.query('SELECT * FROM clientes WHERE id = ?', [r.insertId]);
+    const { payload, token } = tokenCliente(nuevo);
+    res.status(201).json({ data: { token, cliente: { ...payload, foto: null } } });
+  } catch (err) {
+    fail(res, err);
+  }
+});
 
 // POST /api/portal/registro — auto-registro del cliente (público). NO abre sesión:
 // crea la cuenta sin verificar y manda un código de 6 dígitos al correo. La sesión
@@ -145,45 +239,43 @@ async function correoOcupado(db, email, exceptoId) {
 router.post('/registro', antibot(), async (req, res) => {
   try {
     const { nombre, apellido, telefono, email, cedula, password } = req.body;
-    if (!nombre || !apellido || !telefono || !email || !cedula || !password) {
-      return res.status(400).json({ error: 'Nombre, apellido, teléfono, correo, cédula y contraseña son requeridos' });
-    }
-    if (!emailValido(email)) return res.status(400).json({ error: 'El correo no tiene un formato válido' });
-    if (password.length < 8) return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
-    if (!telefonoValido(telefono)) return res.status(400).json({ error: 'El teléfono no tiene un formato válido' });
-    if (!cedulaValida(cedula)) return res.status(400).json({ error: 'La cédula no tiene un formato válido' });
+    if (faltante(res, req.body, [['nombre', 'el nombre'], ['apellido', 'el apellido'], ['telefono', 'el teléfono'], ['email', 'el correo'], ['cedula', 'la cédula'], ['password', 'la contraseña']])) return;
+    if (!emailValido(email)) return invalido(res, 'email', 'El correo no tiene un formato válido');
+    if (password.length < 8) return invalido(res, 'password', 'La contraseña debe tener al menos 8 caracteres');
+    if (!telefonoValido(telefono)) return invalido(res, 'telefono', 'El teléfono no tiene un formato válido');
+    if (!cedulaValida(cedula)) return invalido(res, 'cedula', 'La cédula no tiene un formato válido');
 
     // Rate-limit por correo: frena el sondeo de cuentas existentes vía el 409 de abajo.
     const limite = consumir(`registro:${String(email).trim().toLowerCase()}`, { porMinuto: 3, porHora: 20 });
     if (!limite.ok) {
-      return res.status(429).json({ error: `Demasiados intentos. Esperá ${limite.retryAfter}s e intentá de nuevo.` });
+      return res.status(429).json({ error: `Demasiados intentos. Espera ${limite.retryAfter}s e intenta de nuevo.` });
     }
 
-    const [[existente]] = await req.db.query('SELECT id, password_hash FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1', [email]);
+    const [[existente]] = await pool.query('SELECT id, password_hash FROM clientes WHERE email = ? AND activo = 1', [email]);
     const hash = await bcrypt.hash(password, 10);
     let clienteId;
 
     if (existente) {
       if (existente.password_hash) {
-        return res.status(409).json({ error: 'Ese correo ya tiene una cuenta. Iniciá sesión.' });
+        return invalido(res, 'email', 'Ese correo ya tiene una cuenta. Inicia sesión.', 409);
       }
       // El taller ya tenía registrado al cliente: "reclama" la cuenta definiendo su
       // contraseña. Igual exige verificar el correo — sin esto, cualquiera que supiera
       // el email de un cliente ya cargado por el taller podía apropiarse de su cuenta.
-      await req.db.query(
-        'UPDATE clientes SET password_hash = ?, cedula = COALESCE(cedula, ?), email_verificado = 0 WHERE id = ? AND tenant_id = @tenant',
+      await pool.query(
+        'UPDATE clientes SET password_hash = ?, cedula = COALESCE(cedula, ?), email_verificado = 0 WHERE id = ?',
         [hash, cedula || null, existente.id]
       );
       clienteId = existente.id;
     } else {
-      const [result] = await req.db.query(
-        'INSERT INTO clientes (tenant_id, nombre, apellido, telefono, email, cedula, password_hash, email_verificado) VALUES (@tenant, ?, ?, ?, ?, ?, ?, 0)',
+      const [result] = await pool.query(
+        'INSERT INTO clientes (nombre, apellido, telefono, email, cedula, password_hash, email_verificado) VALUES (?, ?, ?, ?, ?, ?, 0)',
         [nombre, apellido, telefono, email, cedula || null, hash]
       );
       clienteId = result.insertId;
     }
 
-    await enviarVerificacion(req.db, req.tallerSlug, clienteId, email, nombre);
+    await enviarVerificacion(clienteId, email, nombre);
     res.status(201).json({ data: { requiere_verificacion: true, email }, message: 'Te enviamos un código para confirmar tu correo.' });
   } catch (err) {
     fail(res, err);
@@ -194,42 +286,43 @@ router.post('/registro', antibot(), async (req, res) => {
 router.post('/registro/verificar', async (req, res) => {
   try {
     const { email, codigo } = req.body;
-    if (!emailValido(email)) return res.status(400).json({ error: 'El correo no tiene un formato válido' });
-    if (!codigo) return res.status(400).json({ error: 'El código es requerido' });
+    if (!emailValido(email)) return invalido(res, 'email', 'El correo no tiene un formato válido');
+    if (!codigo) return invalido(res, 'codigo', 'Falta el código');
 
-    const [[cliente]] = await req.db.query(
-      'SELECT id, nombre, apellido, email_verificado FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1', [email]
+    const [[cliente]] = await pool.query(
+      'SELECT id, nombre, apellido, email_verificado FROM clientes WHERE email = ? AND activo = 1', [email]
     );
     const ERR_CODIGO = 'Código inválido o expirado';
-    if (!cliente) return res.status(400).json({ error: ERR_CODIGO });
+    if (!cliente) return invalido(res, 'codigo', ERR_CODIGO);
 
-    // Idempotente: si ya se verificó (p. ej. doble clic), simplemente entra.
-    if (cliente.email_verificado) {
-      const { payload, token } = tokenCliente(cliente);
-      return res.json({ data: { token, cliente: payload } });
-    }
-
+    // Una cuenta ya verificada NO entra por acá sin código. Antes había un atajo
+    // ("si ya se verificó, simplemente entra") que devolvía la sesión sin mirar el
+    // código: alcanzaba con el correo de un cliente para abrir su cuenta. Ahora toda
+    // cuenta pasa por la misma comprobación de abajo; la que ya está verificada no
+    // tiene código pendiente y recibe el mismo error genérico. Quien ya verificó
+    // entra por el login normal. (El doble envío lo frena la pantalla, que
+    // deshabilita el botón mientras espera.)
     const limite = consumir(`registro-verificar:${String(email).trim().toLowerCase()}`, { porMinuto: 5, porHora: 20 });
     if (!limite.ok) {
-      return res.status(429).json({ error: `Demasiados intentos. Esperá ${limite.retryAfter}s e intentá de nuevo.` });
+      return res.status(429).json({ error: `Demasiados intentos. Espera ${limite.retryAfter}s e intenta de nuevo.` });
     }
 
-    const [[reg]] = await req.db.query(
+    const [[reg]] = await pool.query(
       `SELECT id, code_hash, attempts FROM email_verify_codes
-       WHERE tenant_id = @tenant AND cliente_id = ? AND proposito = 'registro' AND used = 0 AND expires_at > NOW()
+       WHERE cliente_id = ? AND proposito = 'registro' AND used = 0 AND expires_at > NOW()
        ORDER BY created_at DESC LIMIT 1`,
       [cliente.id]
     );
-    if (!reg || reg.attempts >= 5) return res.status(400).json({ error: ERR_CODIGO });
+    if (!reg || reg.attempts >= 5) return invalido(res, 'codigo', ERR_CODIGO);
 
     const ok = await bcrypt.compare(String(codigo).trim(), reg.code_hash);
     if (!ok) {
-      await req.db.query('UPDATE email_verify_codes SET attempts = attempts + 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
-      return res.status(400).json({ error: ERR_CODIGO });
+      await pool.query('UPDATE email_verify_codes SET attempts = attempts + 1 WHERE id = ?', [reg.id]);
+      return invalido(res, 'codigo', ERR_CODIGO);
     }
 
-    await req.db.query('UPDATE email_verify_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
-    await req.db.query('UPDATE clientes SET email_verificado = 1 WHERE id = ? AND tenant_id = @tenant', [cliente.id]);
+    await pool.query('UPDATE email_verify_codes SET used = 1 WHERE id = ?', [reg.id]);
+    await pool.query('UPDATE clientes SET email_verificado = 1 WHERE id = ?', [cliente.id]);
 
     const { payload, token } = tokenCliente(cliente);
     res.json({ data: { token, cliente: payload } });
@@ -244,17 +337,17 @@ router.post('/registro/verificar', async (req, res) => {
 router.post('/registro/reenviar', antibot(), async (req, res) => {
   try {
     const { email } = req.body;
-    if (!emailValido(email)) return res.status(400).json({ error: 'El correo no tiene un formato válido' });
+    if (!emailValido(email)) return invalido(res, 'email', 'El correo no tiene un formato válido');
 
     const limite = consumir(`registro-reenviar:${String(email).trim().toLowerCase()}`, { porMinuto: 1, porHora: 5 });
     if (!limite.ok) {
-      return res.status(429).json({ error: `Esperá ${limite.retryAfter}s antes de pedir otro código.` });
+      return res.status(429).json({ error: `Espera ${limite.retryAfter}s antes de pedir otro código.` });
     }
 
-    const [[cliente]] = await req.db.query(
-      'SELECT id, nombre FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND email_verificado = 0', [email]
+    const [[cliente]] = await pool.query(
+      'SELECT id, nombre FROM clientes WHERE email = ? AND activo = 1 AND email_verificado = 0', [email]
     );
-    if (cliente) await enviarVerificacion(req.db, req.tallerSlug, cliente.id, email, cliente.nombre);
+    if (cliente) await enviarVerificacion(cliente.id, email, cliente.nombre);
 
     res.json({ message: 'Si tu cuenta está pendiente de verificar, te enviamos un nuevo código.' });
   } catch (err) {
@@ -268,29 +361,31 @@ const MSG_GENERICO = 'Si la cuenta existe, te enviamos un código a tu correo.';
 router.post('/recuperar/solicitar', antibot(), async (req, res) => {
   try {
     const { email } = req.body;
-    if (!emailValido(email)) return res.status(400).json({ error: 'El correo no tiene un formato válido' });
+    if (!emailValido(email)) return invalido(res, 'email', 'El correo no tiene un formato válido');
 
     const clave = String(email).trim().toLowerCase();
     const limite = consumir(`reset:${clave}`, { porMinuto: 1, porHora: 5 });
     if (!limite.ok) {
-      return res.status(429).json({ error: `Esperá ${limite.retryAfter}s antes de pedir otro código.` });
+      return res.status(429).json({ error: `Espera ${limite.retryAfter}s antes de pedir otro código.` });
     }
+    registrarEvento('recuperacion_pedida', { email, ip: req.ip });
 
-    const [[cliente]] = await req.db.query(
-      'SELECT id, nombre, apellido FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND password_hash IS NOT NULL',
+    const [[cliente]] = await pool.query(
+      // También quien entró solo con Google: así se crea una contraseña.
+      'SELECT id, nombre, apellido FROM clientes WHERE email = ? AND activo = 1 AND (password_hash IS NOT NULL OR google_sub IS NOT NULL)',
       [email]
     );
 
     if (cliente) {
-      const codigo = String(Math.floor(100000 + Math.random() * 900000)); // 6 dígitos
+      const codigo = codigoDeSeisDigitos();
       const codeHash = await bcrypt.hash(codigo, 10);
       // Invalida códigos previos y guarda el nuevo (vence en 10 min).
-      await req.db.query('UPDATE password_reset_codes SET used = 1 WHERE tenant_id = @tenant AND cliente_id = ? AND used = 0', [cliente.id]);
-      await req.db.query(
-        'INSERT INTO password_reset_codes (tenant_id, cliente_id, code_hash, expires_at) VALUES (@tenant, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))',
+      await pool.query('UPDATE password_reset_codes SET used = 1 WHERE cliente_id = ? AND used = 0', [cliente.id]);
+      await pool.query(
+        'INSERT INTO password_reset_codes (cliente_id, code_hash, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))',
         [cliente.id, codeHash]
       );
-      await enviarCodigoReset(email, cliente.nombre, codigo, await marcaDelTaller(req.db, req.tallerSlug));
+      await enviarCodigoReset(email, cliente.nombre, codigo);
     }
 
     res.json({ message: MSG_GENERICO });
@@ -303,36 +398,36 @@ router.post('/recuperar/solicitar', antibot(), async (req, res) => {
 router.post('/recuperar/confirmar', async (req, res) => {
   try {
     const { email, codigo, password } = req.body;
-    if (!emailValido(email)) return res.status(400).json({ error: 'El correo no tiene un formato válido' });
-    if (!codigo || !password) return res.status(400).json({ error: 'Código y nueva contraseña son requeridos' });
-    if (password.length < 8) return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+    if (!emailValido(email)) return invalido(res, 'email', 'El correo no tiene un formato válido');
+    if (faltante(res, req.body, [['codigo', 'el código'], ['password', 'la nueva contraseña']])) return;
+    if (password.length < 8) return invalido(res, 'password', 'La contraseña debe tener al menos 8 caracteres');
 
-    const [[cliente]] = await req.db.query(
-      'SELECT id, nombre, apellido FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND password_hash IS NOT NULL',
+    const [[cliente]] = await pool.query(
+      'SELECT id, nombre, apellido FROM clientes WHERE email = ? AND activo = 1 AND (password_hash IS NOT NULL OR google_sub IS NOT NULL)',
       [email]
     );
     const ERR_CODIGO = 'Código inválido o expirado';
-    if (!cliente) return res.status(400).json({ error: ERR_CODIGO });
+    if (!cliente) return invalido(res, 'codigo', ERR_CODIGO);
 
-    const [[reg]] = await req.db.query(
+    const [[reg]] = await pool.query(
       `SELECT id, code_hash, attempts FROM password_reset_codes
-       WHERE tenant_id = @tenant AND cliente_id = ? AND used = 0 AND expires_at > NOW()
+       WHERE cliente_id = ? AND used = 0 AND expires_at > NOW()
        ORDER BY created_at DESC LIMIT 1`,
       [cliente.id]
     );
-    if (!reg || reg.attempts >= 5) return res.status(400).json({ error: ERR_CODIGO });
+    if (!reg || reg.attempts >= 5) return invalido(res, 'codigo', ERR_CODIGO);
 
     const ok = await bcrypt.compare(String(codigo).trim(), reg.code_hash);
     if (!ok) {
-      await req.db.query('UPDATE password_reset_codes SET attempts = attempts + 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
-      return res.status(400).json({ error: ERR_CODIGO });
+      await pool.query('UPDATE password_reset_codes SET attempts = attempts + 1 WHERE id = ?', [reg.id]);
+      return invalido(res, 'codigo', ERR_CODIGO);
     }
 
     // Completar el reset por correo prueba que se controla la bandeja: de paso
     // verifica la cuenta (cierra el reset como atajo para "reclamar" sin verificar).
     const hash = await bcrypt.hash(password, 10);
-    await req.db.query('UPDATE clientes SET password_hash = ?, email_verificado = 1 WHERE id = ? AND tenant_id = @tenant', [hash, cliente.id]);
-    await req.db.query('UPDATE password_reset_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
+    await pool.query('UPDATE clientes SET password_hash = ?, email_verificado = 1 WHERE id = ?', [hash, cliente.id]);
+    await pool.query('UPDATE password_reset_codes SET used = 1 WHERE id = ?', [reg.id]);
 
     const { payload, token } = tokenCliente(cliente);
     res.json({ data: { token, cliente: payload } });
@@ -350,28 +445,28 @@ const MSG_OTP_GENERICO = 'Si tu correo está registrado, te enviamos un código 
 router.post('/otp/solicitar', antibot(), async (req, res) => {
   try {
     const { email } = req.body;
-    if (!emailValido(email)) return res.status(400).json({ error: 'El correo no tiene un formato válido' });
+    if (!emailValido(email)) return invalido(res, 'email', 'El correo no tiene un formato válido');
 
     const clave = String(email).trim().toLowerCase();
     const limite = consumir(`otp:${clave}`, { porMinuto: 1, porHora: 5 });
     if (!limite.ok) {
-      return res.status(429).json({ error: `Esperá ${limite.retryAfter}s antes de pedir otro código.` });
+      return res.status(429).json({ error: `Espera ${limite.retryAfter}s antes de pedir otro código.` });
     }
 
-    const [[cliente]] = await req.db.query(
-      'SELECT id, nombre FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1',
+    const [[cliente]] = await pool.query(
+      'SELECT id, nombre FROM clientes WHERE email = ? AND activo = 1',
       [email]
     );
     if (cliente) {
-      const codigo = String(Math.floor(100000 + Math.random() * 900000)); // 6 dígitos
+      const codigo = codigoDeSeisDigitos();
       const codeHash = await bcrypt.hash(codigo, 10);
       // Invalida códigos previos y guarda el nuevo (vence en 10 min).
-      await req.db.query('UPDATE login_codes SET used = 1 WHERE tenant_id = @tenant AND cliente_id = ? AND used = 0', [cliente.id]);
-      await req.db.query(
-        'INSERT INTO login_codes (tenant_id, cliente_id, code_hash, expires_at) VALUES (@tenant, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))',
+      await pool.query('UPDATE login_codes SET used = 1 WHERE cliente_id = ? AND used = 0', [cliente.id]);
+      await pool.query(
+        'INSERT INTO login_codes (cliente_id, code_hash, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))',
         [cliente.id, codeHash]
       );
-      await enviarCodigoLogin(email, cliente.nombre, codigo, await marcaDelTaller(req.db, req.tallerSlug));
+      await enviarCodigoLogin(email, cliente.nombre, codigo);
     }
 
     res.json({ message: MSG_OTP_GENERICO });
@@ -384,34 +479,34 @@ router.post('/otp/solicitar', antibot(), async (req, res) => {
 router.post('/otp/verificar', async (req, res) => {
   try {
     const { email, codigo } = req.body;
-    if (!emailValido(email)) return res.status(400).json({ error: 'El correo no tiene un formato válido' });
-    if (!codigo) return res.status(400).json({ error: 'El código es requerido' });
+    if (!emailValido(email)) return invalido(res, 'email', 'El correo no tiene un formato válido');
+    if (!codigo) return invalido(res, 'codigo', 'Falta el código');
 
-    const [[cliente]] = await req.db.query(
-      'SELECT id, nombre, apellido, foto FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1',
+    const [[cliente]] = await pool.query(
+      'SELECT id, nombre, apellido, foto FROM clientes WHERE email = ? AND activo = 1',
       [email]
     );
     const ERR_CODIGO = 'Código inválido o expirado';
-    if (!cliente) return res.status(400).json({ error: ERR_CODIGO });
+    if (!cliente) return invalido(res, 'codigo', ERR_CODIGO);
 
-    const [[reg]] = await req.db.query(
+    const [[reg]] = await pool.query(
       `SELECT id, code_hash, attempts FROM login_codes
-       WHERE tenant_id = @tenant AND cliente_id = ? AND used = 0 AND expires_at > NOW()
+       WHERE cliente_id = ? AND used = 0 AND expires_at > NOW()
        ORDER BY created_at DESC LIMIT 1`,
       [cliente.id]
     );
-    if (!reg || reg.attempts >= 5) return res.status(400).json({ error: ERR_CODIGO });
+    if (!reg || reg.attempts >= 5) return invalido(res, 'codigo', ERR_CODIGO);
 
     const ok = await bcrypt.compare(String(codigo).trim(), reg.code_hash);
     if (!ok) {
-      await req.db.query('UPDATE login_codes SET attempts = attempts + 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
-      return res.status(400).json({ error: ERR_CODIGO });
+      await pool.query('UPDATE login_codes SET attempts = attempts + 1 WHERE id = ?', [reg.id]);
+      return invalido(res, 'codigo', ERR_CODIGO);
     }
 
-    await req.db.query('UPDATE login_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
+    await pool.query('UPDATE login_codes SET used = 1 WHERE id = ?', [reg.id]);
     // Entrar con el código por correo prueba lo mismo que la verificación de registro:
     // se controla la bandeja. Se promueve sin fricción extra.
-    await req.db.query('UPDATE clientes SET email_verificado = 1 WHERE tenant_id = @tenant AND id = ? AND email_verificado = 0', [cliente.id]);
+    await pool.query('UPDATE clientes SET email_verificado = 1 WHERE id = ? AND email_verificado = 0', [cliente.id]);
     const { payload, token } = tokenCliente(cliente);
     res.json({ data: { token, cliente: { ...payload, foto: cliente.foto || null } } });
   } catch (err) {
@@ -428,32 +523,32 @@ router.get('/resumen', async (req, res) => {
     const id = req.cliente.id;
     // "Citas totales" del cliente = pendientes + completadas (NO cuenta las canceladas,
     // que para el cliente quedan eliminadas de su vista).
-    const [[{ citas_totales }]] = await req.db.query(
-      "SELECT COUNT(*) AS citas_totales FROM citas WHERE tenant_id = @tenant AND cliente_id = ? AND estado <> 'cancelado'",
+    const [[{ citas_totales }]] = await pool.query(
+      "SELECT COUNT(*) AS citas_totales FROM citas WHERE cliente_id = ? AND estado <> 'cancelado'",
       [id]
     );
-    const [[{ citas_pendientes }]] = await req.db.query(
-      "SELECT COUNT(*) AS citas_pendientes FROM citas WHERE tenant_id = @tenant AND cliente_id = ? AND estado NOT IN ('entregado','cancelado')",
+    const [[{ citas_pendientes }]] = await pool.query(
+      "SELECT COUNT(*) AS citas_pendientes FROM citas WHERE cliente_id = ? AND estado NOT IN ('entregado','cancelado')",
       [id]
     );
-    const [[{ motos_registradas }]] = await req.db.query('SELECT COUNT(*) AS motos_registradas FROM vehiculos WHERE tenant_id = @tenant AND cliente_id = ? AND activa = 1', [id]);
+    const [[{ motos_registradas }]] = await pool.query('SELECT COUNT(*) AS motos_registradas FROM motos WHERE cliente_id = ? AND activa = 1', [id]);
     // Total pagado y visitas completadas: una sola fuente que cruza los dos mundos
     // sin doble conteo. Cuenta citas entregadas (su monto ya = total de la orden
     // vinculada al entregar) + órdenes entregadas SIN cita (visitas sin agenda previa).
-    const [[{ total_pagado }]] = await req.db.query(
+    const [[{ total_pagado }]] = await pool.query(
       `SELECT
-         (SELECT COALESCE(SUM(monto), 0) FROM citas WHERE tenant_id = @tenant AND cliente_id = ? AND estado = 'entregado')
+         (SELECT COALESCE(SUM(monto), 0) FROM citas WHERE cliente_id = ? AND estado = 'entregado')
        + (SELECT COALESCE(SUM(costo_mano_obra + costo_repuestos - descuento), 0)
             FROM ordenes_trabajo
-            WHERE tenant_id = @tenant AND cliente_id = ? AND estado = 'entregada'
+            WHERE cliente_id = ? AND estado = 'entregada'
               AND id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL)) AS total_pagado`,
       [id, id]
     );
-    const [[{ completadas }]] = await req.db.query(
+    const [[{ completadas }]] = await pool.query(
       `SELECT
-         (SELECT COUNT(*) FROM citas WHERE tenant_id = @tenant AND cliente_id = ? AND estado = 'entregado')
+         (SELECT COUNT(*) FROM citas WHERE cliente_id = ? AND estado = 'entregado')
        + (SELECT COUNT(*) FROM ordenes_trabajo
-            WHERE tenant_id = @tenant AND cliente_id = ? AND estado = 'entregada'
+            WHERE cliente_id = ? AND estado = 'entregada'
               AND id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL)) AS completadas`,
       [id, id]
     );
@@ -463,15 +558,15 @@ router.get('/resumen', async (req, res) => {
     //   1) en_curso  → la moto ya está en el taller (estado != 'agendado').
     //   2) proxima   → agendada para hoy o más adelante.
     //   3) vencida   → agendada pero la fecha ya pasó y nunca se inició.
-    const hoy = await hoyCR(req.db);
-    const [citasAbiertas] = await req.db.query(
+    const hoy = await hoyCR();
+    const [citasAbiertas] = await pool.query(
       `SELECT ci.id, DATE_FORMAT(ci.fecha,'%Y-%m-%d') AS fecha, TIME_FORMAT(ci.hora,'%H:%i') AS hora,
-              ci.tipo_servicio, ci.estado,
+              ci.tipo_servicio, ci.servicios, ci.estado,
               m.marca, m.modelo, m.placa, t.nombre AS tecnico_nombre
        FROM citas ci
-       LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant
-       LEFT JOIN usuarios t ON t.id = ci.tecnico_id AND t.tenant_id = @tenant
-       WHERE ci.tenant_id = @tenant AND ci.cliente_id = ? AND ci.estado NOT IN ('entregado','cancelado')
+       LEFT JOIN motos m ON m.id = ci.moto_id
+       LEFT JOIN usuarios t ON t.id = ci.tecnico_id
+       WHERE ci.cliente_id = ? AND ci.estado NOT IN ('entregado','cancelado')
        ORDER BY ci.fecha ASC, ci.hora ASC`,
       [id]
     );
@@ -511,12 +606,12 @@ const NOTIF_RETENCION_DIAS = 7;
 // info real vive en el detalle de la cita; el feed no debe crecer sin límite).
 router.get('/notificaciones', async (req, res) => {
   try {
-    await req.db.query(
-      'DELETE FROM notificaciones WHERE tenant_id = @tenant AND cliente_id = ? AND leida = 1 AND created_at < (NOW() - INTERVAL ? DAY)',
+    await pool.query(
+      'DELETE FROM notificaciones WHERE cliente_id = ? AND leida = 1 AND created_at < (NOW() - INTERVAL ? DAY)',
       [req.cliente.id, NOTIF_RETENCION_DIAS]
     );
-    const [rows] = await req.db.query(
-      'SELECT id, cita_id, titulo, mensaje, tipo, leida, created_at FROM notificaciones WHERE tenant_id = @tenant AND cliente_id = ? ORDER BY created_at DESC LIMIT 50',
+    const [rows] = await pool.query(
+      'SELECT id, cita_id, titulo, mensaje, tipo, leida, created_at FROM notificaciones WHERE cliente_id = ? ORDER BY created_at DESC LIMIT 50',
       [req.cliente.id]
     );
     res.json({ data: rows });
@@ -528,8 +623,8 @@ router.get('/notificaciones', async (req, res) => {
 // GET /api/portal/notificaciones/contador — solo el # de no leídas (para el badge).
 router.get('/notificaciones/contador', async (req, res) => {
   try {
-    const [[{ no_leidas }]] = await req.db.query(
-      'SELECT COUNT(*) AS no_leidas FROM notificaciones WHERE tenant_id = @tenant AND cliente_id = ? AND leida = 0',
+    const [[{ no_leidas }]] = await pool.query(
+      'SELECT COUNT(*) AS no_leidas FROM notificaciones WHERE cliente_id = ? AND leida = 0',
       [req.cliente.id]
     );
     res.json({ data: { no_leidas } });
@@ -541,7 +636,7 @@ router.get('/notificaciones/contador', async (req, res) => {
 // POST /api/portal/notificaciones/leer — marca todas como leídas
 router.post('/notificaciones/leer', async (req, res) => {
   try {
-    await req.db.query('UPDATE notificaciones SET leida = 1 WHERE tenant_id = @tenant AND cliente_id = ? AND leida = 0', [req.cliente.id]);
+    await pool.query('UPDATE notificaciones SET leida = 1 WHERE cliente_id = ? AND leida = 0', [req.cliente.id]);
     res.json({ message: 'Notificaciones leídas' });
   } catch (err) {
     fail(res, err);
@@ -551,8 +646,8 @@ router.post('/notificaciones/leer', async (req, res) => {
 // PATCH /api/portal/notificaciones/:id/leer — marca UNA como leída.
 router.patch('/notificaciones/:id/leer', async (req, res) => {
   try {
-    await req.db.query(
-      'UPDATE notificaciones SET leida = 1 WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?',
+    await pool.query(
+      'UPDATE notificaciones SET leida = 1 WHERE id = ? AND cliente_id = ?',
       [req.params.id, req.cliente.id]
     );
     res.json({ message: 'Notificación leída' });
@@ -564,7 +659,7 @@ router.patch('/notificaciones/:id/leer', async (req, res) => {
 // DELETE /api/portal/notificaciones/leidas — borra todas las leídas (limpiar feed).
 router.delete('/notificaciones/leidas', async (req, res) => {
   try {
-    await req.db.query('DELETE FROM notificaciones WHERE tenant_id = @tenant AND cliente_id = ? AND leida = 1', [req.cliente.id]);
+    await pool.query('DELETE FROM notificaciones WHERE cliente_id = ? AND leida = 1', [req.cliente.id]);
     res.json({ message: 'Notificaciones leídas eliminadas' });
   } catch (err) {
     fail(res, err);
@@ -574,8 +669,8 @@ router.delete('/notificaciones/leidas', async (req, res) => {
 // DELETE /api/portal/notificaciones/:id — borra UNA (deslizar para eliminar).
 router.delete('/notificaciones/:id', async (req, res) => {
   try {
-    await req.db.query(
-      'DELETE FROM notificaciones WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?',
+    await pool.query(
+      'DELETE FROM notificaciones WHERE id = ? AND cliente_id = ?',
       [req.params.id, req.cliente.id]
     );
     res.json({ message: 'Notificación eliminada' });
@@ -589,10 +684,11 @@ router.delete('/notificaciones/:id', async (req, res) => {
 // GET /api/portal/perfil — datos de la cuenta del cliente autenticado
 router.get('/perfil', async (req, res) => {
   try {
-    const [[c]] = await req.db.query(
+    const [[c]] = await pool.query(
       `SELECT id, nombre, apellido, email, email_pendiente, telefono, cedula, foto,
-              notif_avances, notif_recordatorios
-       FROM clientes WHERE tenant_id = @tenant AND id = ? AND activo = 1`,
+              notif_avances, notif_recordatorios,
+              (password_hash IS NOT NULL) AS tiene_password, (google_sub IS NOT NULL) AS con_google
+       FROM clientes WHERE id = ? AND activo = 1`,
       [req.cliente.id]
     );
     if (!c) return res.status(404).json({ error: 'Cuenta no encontrada' });
@@ -606,23 +702,21 @@ router.get('/perfil', async (req, res) => {
 router.put('/perfil', async (req, res) => {
   try {
     const { nombre, apellido, telefono, email } = req.body;
-    if (!nombre || !nombre.trim() || !apellido || !apellido.trim()) {
-      return res.status(400).json({ error: 'Nombre y apellido son requeridos' });
-    }
+    if (faltante(res, req.body, [['nombre', 'el nombre'], ['apellido', 'el apellido']])) return;
     if (!email || !emailValido(email)) {
-      return res.status(400).json({ error: 'El correo no tiene un formato válido' });
+      return invalido(res, 'email', 'El correo no tiene un formato válido');
     }
     // Obligatorio igual que en el registro: es la vía por la que el taller avisa que
     // la moto está lista. Antes se podía vaciar desde el perfil y quedaba una cuenta
     // sin teléfono aunque al registrarse hubiera sido requerido.
     if (!telefono || !String(telefono).trim()) {
-      return res.status(400).json({ error: 'El teléfono es requerido' });
+      return invalido(res, 'telefono', 'Falta el teléfono');
     }
     if (!telefonoValido(telefono)) {
-      return res.status(400).json({ error: 'El teléfono no tiene un formato válido' });
+      return invalido(res, 'telefono', 'El teléfono no tiene un formato válido');
     }
-    const [[actual]] = await req.db.query(
-      'SELECT nombre, email, password_hash FROM clientes WHERE id = ? AND tenant_id = @tenant', [req.cliente.id]
+    const [[actual]] = await pool.query(
+      'SELECT nombre, email, password_hash FROM clientes WHERE id = ?', [req.cliente.id]
     );
     if (!actual) return res.status(404).json({ error: 'Cuenta no encontrada' });
 
@@ -640,7 +734,7 @@ router.put('/perfil', async (req, res) => {
     if (cambiaCorreo) {
       const { password } = req.body;
       if (!password) {
-        return res.status(400).json({ error: 'Para cambiar el correo, escribí tu contraseña actual', requiere_password: true });
+        return res.status(400).json({ error: 'Para cambiar el correo, escribe tu contraseña actual', requiere_password: true });
       }
       if (!actual.password_hash || !(await bcrypt.compare(password, actual.password_hash))) {
         return res.status(401).json({ error: 'La contraseña actual no es correcta' });
@@ -648,17 +742,17 @@ router.put('/perfil', async (req, res) => {
 
       const limite = consumir(`cambio-correo:${req.cliente.id}`, { porMinuto: 2, porHora: 10 });
       if (!limite.ok) {
-        return res.status(429).json({ error: `Demasiados intentos. Esperá ${limite.retryAfter}s e intentá de nuevo.` });
+        return res.status(429).json({ error: `Demasiados intentos. Espera ${limite.retryAfter}s e intenta de nuevo.` });
       }
 
       // No puede pisar la cuenta de otro, ni el correo ya en uso ni uno que otro tenga
       // reservado como pendiente (se vuelve a comprobar al confirmar, por si acaso).
-      if (await correoOcupado(req.db, emailNuevo, req.cliente.id)) {
-        return res.status(409).json({ error: 'Ese correo ya está en uso por otra cuenta' });
+      if (await correoOcupado(emailNuevo, req.cliente.id)) {
+        return invalido(res, 'email', 'Ese correo ya está en uso por otra cuenta', 409);
       }
 
-      await req.db.query('UPDATE clientes SET email_pendiente = ? WHERE id = ? AND tenant_id = @tenant', [emailNuevo, req.cliente.id]);
-      await enviarCodigoCambio(req.db, req.tallerSlug, req.cliente.id, emailNuevo, actual.nombre);
+      await pool.query('UPDATE clientes SET email_pendiente = ? WHERE id = ?', [emailNuevo, req.cliente.id]);
+      await enviarCodigoCambio(req.cliente.id, emailNuevo, actual.nombre);
       // Al correo viejo le avisamos aunque el cambio no esté hecho: si le robaron la
       // sesión, ese aviso es la única forma de que el dueño se entere a tiempo.
       await enviarAvisoCambioCorreo(actual.email, actual.nombre, emailNuevo);
@@ -666,20 +760,20 @@ router.put('/perfil', async (req, res) => {
 
     // Recién acá se tocan los demás datos: si el cambio de correo se rechazó por
     // contraseña incorrecta, no queremos haber guardado el nombre a medias.
-    await req.db.query(
-      'UPDATE clientes SET nombre = ?, apellido = ?, telefono = ? WHERE id = ? AND tenant_id = @tenant',
+    await pool.query(
+      'UPDATE clientes SET nombre = ?, apellido = ?, telefono = ? WHERE id = ?',
       [nombre.trim(), apellido.trim(), (telefono || '').trim() || null, req.cliente.id]
     );
 
-    const [[c]] = await req.db.query(
-      'SELECT id, nombre, apellido, email, email_pendiente, telefono, cedula FROM clientes WHERE id = ? AND tenant_id = @tenant',
+    const [[c]] = await pool.query(
+      'SELECT id, nombre, apellido, email, email_pendiente, telefono, cedula FROM clientes WHERE id = ?',
       [req.cliente.id]
     );
     res.json({
       data: c,
       cambio_correo_pendiente: cambiaCorreo,
       message: cambiaCorreo
-        ? `Te enviamos un código a ${emailNuevo}. Hasta que lo confirmes seguís entrando con tu correo actual.`
+        ? `Te enviamos un código a ${emailNuevo}. Hasta que lo confirmes sigues entrando con tu correo actual.`
         : 'Perfil actualizado',
     });
   } catch (err) {
@@ -691,47 +785,47 @@ router.put('/perfil', async (req, res) => {
 router.post('/perfil/email/confirmar', async (req, res) => {
   try {
     const { codigo } = req.body;
-    if (!codigo) return res.status(400).json({ error: 'El código es requerido' });
+    if (!codigo) return invalido(res, 'codigo', 'Falta el código');
 
-    const [[c]] = await req.db.query(
-      'SELECT nombre, email, email_pendiente FROM clientes WHERE tenant_id = @tenant AND id = ? AND activo = 1', [req.cliente.id]
+    const [[c]] = await pool.query(
+      'SELECT nombre, email, email_pendiente FROM clientes WHERE id = ? AND activo = 1', [req.cliente.id]
     );
     if (!c || !c.email_pendiente) return res.status(400).json({ error: 'No hay ningún cambio de correo pendiente' });
 
     const limite = consumir(`cambio-correo-verificar:${req.cliente.id}`, { porMinuto: 5, porHora: 20 });
     if (!limite.ok) {
-      return res.status(429).json({ error: `Demasiados intentos. Esperá ${limite.retryAfter}s e intentá de nuevo.` });
+      return res.status(429).json({ error: `Demasiados intentos. Espera ${limite.retryAfter}s e intenta de nuevo.` });
     }
 
     const ERR_CODIGO = 'Código inválido o expirado';
-    const [[reg]] = await req.db.query(
+    const [[reg]] = await pool.query(
       `SELECT id, code_hash, attempts FROM email_verify_codes
-       WHERE tenant_id = @tenant AND cliente_id = ? AND proposito = 'cambio' AND used = 0 AND expires_at > NOW()
+       WHERE cliente_id = ? AND proposito = 'cambio' AND used = 0 AND expires_at > NOW()
        ORDER BY created_at DESC LIMIT 1`,
       [req.cliente.id]
     );
-    if (!reg || reg.attempts >= 5) return res.status(400).json({ error: ERR_CODIGO });
+    if (!reg || reg.attempts >= 5) return invalido(res, 'codigo', ERR_CODIGO);
 
     if (!(await bcrypt.compare(String(codigo).trim(), reg.code_hash))) {
-      await req.db.query('UPDATE email_verify_codes SET attempts = attempts + 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
-      return res.status(400).json({ error: ERR_CODIGO });
+      await pool.query('UPDATE email_verify_codes SET attempts = attempts + 1 WHERE id = ?', [reg.id]);
+      return invalido(res, 'codigo', ERR_CODIGO);
     }
 
     // Se vuelve a comprobar acá: entre el pedido y la confirmación alguien más pudo
     // haberse quedado con ese correo.
-    if (await correoOcupado(req.db, c.email_pendiente, req.cliente.id)) {
-      await req.db.query('UPDATE clientes SET email_pendiente = NULL WHERE id = ? AND tenant_id = @tenant', [req.cliente.id]);
-      return res.status(409).json({ error: 'Ese correo ya está en uso por otra cuenta' });
+    if (await correoOcupado(c.email_pendiente, req.cliente.id)) {
+      await pool.query('UPDATE clientes SET email_pendiente = NULL WHERE id = ?', [req.cliente.id]);
+      return invalido(res, 'email', 'Ese correo ya está en uso por otra cuenta', 409);
     }
 
-    await req.db.query('UPDATE email_verify_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
-    await req.db.query(
-      'UPDATE clientes SET email = email_pendiente, email_verificado = 1, email_pendiente = NULL WHERE id = ? AND tenant_id = @tenant',
+    await pool.query('UPDATE email_verify_codes SET used = 1 WHERE id = ?', [reg.id]);
+    await pool.query(
+      'UPDATE clientes SET email = email_pendiente, email_verificado = 1, email_pendiente = NULL WHERE id = ?',
       [req.cliente.id]
     );
 
-    const [[actualizado]] = await req.db.query(
-      'SELECT id, nombre, apellido, email, email_pendiente, telefono, cedula FROM clientes WHERE id = ? AND tenant_id = @tenant',
+    const [[actualizado]] = await pool.query(
+      'SELECT id, nombre, apellido, email, email_pendiente, telefono, cedula FROM clientes WHERE id = ?',
       [req.cliente.id]
     );
     res.json({ data: actualizado, message: 'Listo, ese ya es tu correo. Usalo la próxima vez que entres.' });
@@ -743,17 +837,17 @@ router.post('/perfil/email/confirmar', async (req, res) => {
 // POST /api/portal/perfil/email/reenviar — otro código a la dirección pendiente.
 router.post('/perfil/email/reenviar', async (req, res) => {
   try {
-    const [[c]] = await req.db.query(
-      'SELECT nombre, email_pendiente FROM clientes WHERE tenant_id = @tenant AND id = ? AND activo = 1', [req.cliente.id]
+    const [[c]] = await pool.query(
+      'SELECT nombre, email_pendiente FROM clientes WHERE id = ? AND activo = 1', [req.cliente.id]
     );
     if (!c || !c.email_pendiente) return res.status(400).json({ error: 'No hay ningún cambio de correo pendiente' });
 
     const limite = consumir(`cambio-correo:${req.cliente.id}`, { porMinuto: 2, porHora: 10 });
     if (!limite.ok) {
-      return res.status(429).json({ error: `Esperá ${limite.retryAfter}s antes de pedir otro código.` });
+      return res.status(429).json({ error: `Espera ${limite.retryAfter}s antes de pedir otro código.` });
     }
 
-    await enviarCodigoCambio(req.db, req.tallerSlug, req.cliente.id, c.email_pendiente, c.nombre);
+    await enviarCodigoCambio(req.cliente.id, c.email_pendiente, c.nombre);
     res.json({ message: `Te enviamos otro código a ${c.email_pendiente}.` });
   } catch (err) {
     fail(res, err);
@@ -764,8 +858,8 @@ router.post('/perfil/email/reenviar', async (req, res) => {
 // o el dueño real recibió el aviso y quiere frenarlo).
 router.delete('/perfil/email', async (req, res) => {
   try {
-    await req.db.query("UPDATE email_verify_codes SET used = 1 WHERE tenant_id = @tenant AND cliente_id = ? AND proposito = 'cambio' AND used = 0", [req.cliente.id]);
-    await req.db.query('UPDATE clientes SET email_pendiente = NULL WHERE id = ? AND tenant_id = @tenant', [req.cliente.id]);
+    await pool.query("UPDATE email_verify_codes SET used = 1 WHERE cliente_id = ? AND proposito = 'cambio' AND used = 0", [req.cliente.id]);
+    await pool.query('UPDATE clientes SET email_pendiente = NULL WHERE id = ?', [req.cliente.id]);
     res.json({ message: 'Cambio de correo cancelado' });
   } catch (err) {
     fail(res, err);
@@ -777,8 +871,8 @@ router.put('/perfil/notificaciones', async (req, res) => {
   try {
     const avances = req.body.notif_avances ? 1 : 0;
     const recordatorios = req.body.notif_recordatorios ? 1 : 0;
-    await req.db.query(
-      'UPDATE clientes SET notif_avances = ?, notif_recordatorios = ? WHERE id = ? AND tenant_id = @tenant',
+    await pool.query(
+      'UPDATE clientes SET notif_avances = ?, notif_recordatorios = ? WHERE id = ?',
       [avances, recordatorios, req.cliente.id]
     );
     res.json({ data: { notif_avances: avances, notif_recordatorios: recordatorios }, message: 'Preferencias actualizadas' });
@@ -791,14 +885,14 @@ router.put('/perfil/notificaciones', async (req, res) => {
 router.put('/perfil/password', async (req, res) => {
   try {
     const { actual, nueva } = req.body;
-    if (!actual || !nueva) return res.status(400).json({ error: 'Contraseña actual y nueva son requeridas' });
-    if (String(nueva).length < 8) return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres' });
-    const [[c]] = await req.db.query('SELECT password_hash FROM clientes WHERE tenant_id = @tenant AND id = ? AND activo = 1', [req.cliente.id]);
+    if (faltante(res, req.body, [['actual', 'la contraseña actual'], ['nueva', 'la nueva contraseña']])) return;
+    if (String(nueva).length < 8) return invalido(res, 'nueva', 'La nueva contraseña debe tener al menos 8 caracteres');
+    const [[c]] = await pool.query('SELECT password_hash FROM clientes WHERE id = ? AND activo = 1', [req.cliente.id]);
     if (!c || !c.password_hash) return res.status(404).json({ error: 'Cuenta no encontrada' });
     const ok = await bcrypt.compare(String(actual), c.password_hash);
-    if (!ok) return res.status(400).json({ error: 'La contraseña actual no es correcta' });
+    if (!ok) return invalido(res, 'actual', 'La contraseña actual no es correcta');
     const hash = await bcrypt.hash(String(nueva), 10);
-    await req.db.query('UPDATE clientes SET password_hash = ? WHERE id = ? AND tenant_id = @tenant', [hash, req.cliente.id]);
+    await pool.query('UPDATE clientes SET password_hash = ? WHERE id = ?', [hash, req.cliente.id]);
     res.json({ message: 'Contraseña actualizada' });
   } catch (err) {
     fail(res, err);
@@ -815,7 +909,7 @@ router.put('/perfil/foto', async (req, res) => {
       return res.status(400).json({ error: 'La imagen no es válida o es demasiado grande.' });
     }
     const val = fotoParaGuardar(foto);
-    await req.db.query('UPDATE clientes SET foto = ? WHERE id = ? AND tenant_id = @tenant', [val, req.cliente.id]);
+    await pool.query('UPDATE clientes SET foto = ? WHERE id = ?', [val, req.cliente.id]);
     res.json({ data: { foto: val }, message: val ? 'Foto actualizada' : 'Foto eliminada' });
   } catch (err) {
     fail(res, err);
@@ -827,7 +921,7 @@ router.put('/perfil/foto', async (req, res) => {
 // del taller; se desactiva el acceso al portal (activo=0 + sin contraseña).
 router.delete('/perfil', async (req, res) => {
   try {
-    await req.db.query('UPDATE clientes SET activo = 0, password_hash = NULL WHERE id = ? AND tenant_id = @tenant', [req.cliente.id]);
+    await pool.query('UPDATE clientes SET activo = 0, password_hash = NULL WHERE id = ?', [req.cliente.id]);
     res.json({ message: 'Cuenta eliminada' });
   } catch (err) {
     fail(res, err);
@@ -837,7 +931,7 @@ router.delete('/perfil', async (req, res) => {
 // GET /api/portal/sucursales — locales activos para el selector del formulario de citas.
 router.get('/sucursales', async (req, res) => {
   try {
-    const activas = await getSucursales(req.db, { soloActivas: true });
+    const activas = await getSucursales({ soloActivas: true });
     res.json({ data: activas.map((s) => ({ id: s.id, nombre: s.nombre, direccion: s.direccion })) });
   } catch (err) {
     fail(res, err);
@@ -849,7 +943,7 @@ router.get('/sucursales', async (req, res) => {
 // estaba copiado en el frontend y podía quedar desfasado del que exige el servidor.
 router.get('/servicios', async (req, res) => {
   try {
-    res.json({ data: await getServicios(req.db) });
+    res.json({ data: await getServicios() });
   } catch (err) {
     fail(res, err);
   }
@@ -864,17 +958,21 @@ router.get('/disponibilidad', async (req, res) => {
     if (!fecha) return res.status(400).json({ error: 'Fecha requerida' });
     // Sucursal: la pedida (si es válida) o la primera activa por compatibilidad.
     let sucursalId = Number(req.query.sucursal_id);
-    if (!(await sucursalValida(req.db, sucursalId))) sucursalId = await sucursalPorDefecto(req.db);
-    const config = await getConfig(req.db);
-    const horas = horasDisponibles(fecha, config);
-    const [rows] = await req.db.query(
-      `SELECT TIME_FORMAT(hora, '%H:%i') AS hora, COUNT(*) AS n
-       FROM citas WHERE tenant_id = @tenant AND fecha = ? AND sucursal_id = ? AND estado != 'cancelado' GROUP BY 1`,
-      [fecha, sucursalId]
-    );
-    const ocupacion = {};
-    for (const r of rows) ocupacion[r.hora] = r.n;
-    res.json({ data: { horas, max: config.max_citas_hora, ocupacion, sucursal_id: sucursalId } });
+    if (!(await sucursalValida(sucursalId))) sucursalId = await sucursalPorDefecto();
+    const config = await getConfig();
+    // Cada cita cuenta en todas las horas que dura (ver utils/agenda.js).
+    const dia = await agendaDia(fecha, sucursalId, config);
+    // Las horas que bloqueó administración no se ofrecen: van fuera de `horas` y
+    // como llenas en `ocupacion` (la pantalla del portal las tacha). El cliente no
+    // necesita saber por qué no hay lugar.
+    // Tampoco las que ya empezaron: no se confía en el reloj del celular del cliente.
+    const pasadas = horasPasadas(String(fecha).slice(0, 10), dia.horas, config.zona_horaria_offset);
+    const horas = dia.horas.filter((h) => dia.bloqueadas[h] === undefined && !pasadas.includes(h));
+    const ocupacion = { ...dia.ocupacion };
+    for (const h of Object.keys(dia.bloqueadas)) ocupacion[h] = Number(config.max_citas_hora) || 1;
+    // `todas`: las del horario de ese día (para dibujar la grilla, con las no disponibles
+    // tachadas); `horas`: las que se pueden elegir. Día cerrado = las dos vacías.
+    res.json({ data: { horas, todas: dia.horas, max: config.max_citas_hora, ocupacion, sucursal_id: sucursalId } });
   } catch (err) {
     fail(res, err);
   }
@@ -886,31 +984,26 @@ router.get('/proximo-libre', async (req, res) => {
   try {
     // El cupo es por sucursal: la sugerencia se calcula para la sucursal pedida.
     let sucursalId = Number(req.query.sucursal_id);
-    if (!(await sucursalValida(req.db, sucursalId))) sucursalId = await sucursalPorDefecto(req.db);
-    const config = await getConfig(req.db);
+    if (!(await sucursalValida(sucursalId))) sucursalId = await sucursalPorDefecto();
+    const config = await getConfig();
     const max = Number(config.max_citas_hora) || 1;
     const dias = Number(config.dias_anticipacion) || 30;
-    const hoy = await hoyCR(req.db);
+    const hoy = await hoyCR();
     const fin = new Date(`${hoy}T00:00:00Z`);
     fin.setUTCDate(fin.getUTCDate() + dias);
     const finStr = fin.toISOString().slice(0, 10);
 
-    // Ocupación de todo el rango en una sola consulta (fecha+hora → cantidad), por sucursal.
-    const [filas] = await req.db.query(
-      `SELECT DATE_FORMAT(fecha, '%Y-%m-%d') AS f, TIME_FORMAT(hora, '%H:%i') AS h, COUNT(*) AS n
-       FROM citas WHERE tenant_id = @tenant AND fecha BETWEEN ? AND ? AND sucursal_id = ? AND estado <> 'cancelado' GROUP BY f, h`,
-      [hoy, finStr, sucursalId]
-    );
-    const ocup = {};
-    for (const r of filas) { (ocup[r.f] || (ocup[r.f] = {}))[r.h] = Number(r.n); }
+    // Ocupación (con la duración de cada cita) y bloqueos de todo el rango, por sucursal.
+    const agenda = await agendaRango(hoy, finStr, sucursalId, config);
 
-    // Primer slot con cupo y que aún no haya pasado.
+    // Primer slot con cupo, sin bloquear y que aún no haya pasado.
     const cursor = new Date(`${hoy}T00:00:00Z`);
     for (let i = 0; i <= dias; i++) {
       const fecha = cursor.toISOString().slice(0, 10);
-      for (const hora of horasDisponibles(fecha, config)) {
-        const usados = (ocup[fecha] || {})[hora] || 0;
-        if (usados < max && horasHastaCita(fecha, hora) > 0) {
+      const dia = agenda[fecha] || { horas: horasDisponibles(fecha, config), ocupacion: {}, bloqueadas: {} };
+      for (const hora of dia.horas) {
+        const usados = dia.ocupacion[hora] || 0;
+        if (dia.bloqueadas[hora] === undefined && usados < max && horasHastaCita(fecha, hora) > 0) {
           return res.json({ data: { fecha, hora, sucursal_id: sucursalId } });
         }
       }
@@ -925,13 +1018,13 @@ router.get('/proximo-libre', async (req, res) => {
 // GET /api/portal/ordenes — órdenes del cliente autenticado
 router.get('/ordenes', async (req, res) => {
   try {
-    const [rows] = await req.db.query(
+    const [rows] = await pool.query(
       `SELECT o.id, o.numero_orden, o.estado, o.problema_reportado, o.aprobacion_cliente,
-              o.fecha_ingreso, o.fecha_estimada_entrega,
+              o.total_aprobado, o.fecha_ingreso, o.fecha_estimada_entrega,
               m.marca, m.modelo, m.placa
        FROM ordenes_trabajo o
-       JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
-       WHERE o.tenant_id = @tenant AND o.cliente_id = ?
+       JOIN motos m ON m.id = o.moto_id
+       WHERE o.cliente_id = ?
        ORDER BY o.fecha_ingreso DESC`,
       [req.cliente.id]
     );
@@ -944,35 +1037,35 @@ router.get('/ordenes', async (req, res) => {
 // GET /api/portal/ordenes/:id — detalle de una orden propia
 router.get('/ordenes/:id', async (req, res) => {
   try {
-    const [[orden]] = await req.db.query(
+    const [[orden]] = await pool.query(
       `SELECT o.id, o.numero_orden, o.estado, o.problema_reportado, o.diagnostico,
               o.costo_mano_obra, o.costo_repuestos, o.descuento,
               (o.costo_mano_obra + o.costo_repuestos - o.descuento) AS total,
-              o.aprobacion_cliente, o.motivo_rechazo, o.tiempo_estimado_horas,
+              o.aprobacion_cliente, o.motivo_rechazo, o.tiempo_estimado_horas, o.total_aprobado,
               o.fecha_ingreso, o.fecha_estimada_entrega, o.fecha_entrega_real,
               o.metodo_pago, o.garantia_dias, o.calificacion, o.comentario_satisfaccion,
               m.marca, m.modelo, m.placa, m.anio,
               u.nombre AS tecnico_nombre
        FROM ordenes_trabajo o
-       JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
-       LEFT JOIN usuarios u ON u.id = o.tecnico_id AND u.tenant_id = @tenant
-       WHERE o.tenant_id = @tenant AND o.id = ? AND o.cliente_id = ?`,
+       JOIN motos m ON m.id = o.moto_id
+       LEFT JOIN usuarios u ON u.id = o.tecnico_id
+       WHERE o.id = ? AND o.cliente_id = ?`,
       [req.params.id, req.cliente.id]
     );
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
 
-    const [avances] = await req.db.query(
+    const [avances] = await pool.query(
       `SELECT a.descripcion, a.created_at, u.nombre AS usuario_nombre
-       FROM orden_avances a LEFT JOIN usuarios u ON u.id = a.usuario_id AND u.tenant_id = @tenant
-       WHERE a.tenant_id = @tenant AND a.orden_id = ? ORDER BY a.created_at ASC`,
+       FROM orden_avances a LEFT JOIN usuarios u ON u.id = a.usuario_id
+       WHERE a.orden_id = ? ORDER BY a.created_at ASC`,
       [req.params.id]
     );
-    const [repuestos] = await req.db.query(
-      'SELECT nombre, cantidad, costo_unitario, estado FROM orden_repuestos WHERE tenant_id = @tenant AND orden_id = ? ORDER BY created_at ASC',
+    const [repuestos] = await pool.query(
+      'SELECT nombre, cantidad, costo_unitario, estado, adicional FROM orden_repuestos WHERE orden_id = ? ORDER BY created_at ASC',
       [req.params.id]
     );
-    const [fotos] = await req.db.query(
-      'SELECT url, tipo, descripcion FROM orden_fotos WHERE tenant_id = @tenant AND orden_id = ? ORDER BY created_at ASC',
+    const [fotos] = await pool.query(
+      'SELECT url, tipo, descripcion FROM orden_fotos WHERE orden_id = ? ORDER BY created_at ASC',
       [req.params.id]
     );
     res.json({ data: { ...orden, avances, repuestos, fotos } });
@@ -984,7 +1077,7 @@ router.get('/ordenes/:id', async (req, res) => {
 // POST /api/portal/ordenes/:id/aprobar — el cliente aprueba el presupuesto
 router.post('/ordenes/:id/aprobar', async (req, res) => {
   try {
-    const ok = await actualizarAprobacion(req.db, req.params.id, req.cliente.id, 'aprobado', null);
+    const ok = await actualizarAprobacion(req.params.id, req.cliente.id, 'aprobado', null);
     if (!ok) return res.status(400).json({ error: 'La orden no está esperando aprobación' });
     res.json({ message: 'Presupuesto aprobado' });
   } catch (err) {
@@ -999,7 +1092,7 @@ router.post('/ordenes/:id/rechazar', async (req, res) => {
     if (!textoDentroDeLimite(motivoRechazo, MAX_MOTIVO_RECHAZO)) {
       return res.status(400).json({ error: `motivo no puede exceder ${MAX_MOTIVO_RECHAZO} caracteres` });
     }
-    const ok = await actualizarAprobacion(req.db, req.params.id, req.cliente.id, 'rechazado', motivoRechazo);
+    const ok = await actualizarAprobacion(req.params.id, req.cliente.id, 'rechazado', motivoRechazo);
     if (!ok) return res.status(400).json({ error: 'La orden no está esperando aprobación' });
     res.json({ message: 'Presupuesto rechazado' });
   } catch (err) {
@@ -1014,15 +1107,15 @@ router.post('/ordenes/:id/encuesta', async (req, res) => {
     if (!(calificacion >= 1 && calificacion <= 5)) {
       return res.status(400).json({ error: 'La calificación debe ser de 1 a 5' });
     }
-    const [[orden]] = await req.db.query(
-      "SELECT id, calificacion FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ? AND cliente_id = ? AND estado = 'entregada'",
+    const [[orden]] = await pool.query(
+      "SELECT id, calificacion FROM ordenes_trabajo WHERE id = ? AND cliente_id = ? AND estado = 'entregada'",
       [req.params.id, req.cliente.id]
     );
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada o no entregada' });
     if (orden.calificacion) return res.status(400).json({ error: 'Ya calificaste esta orden' });
 
-    await req.db.query(
-      'UPDATE ordenes_trabajo SET calificacion = ?, comentario_satisfaccion = ? WHERE id = ? AND tenant_id = @tenant',
+    await pool.query(
+      'UPDATE ordenes_trabajo SET calificacion = ?, comentario_satisfaccion = ? WHERE id = ?',
       [calificacion, req.body.comentario || null, req.params.id]
     );
     res.json({ message: '¡Gracias por tu opinión!' });
@@ -1036,11 +1129,11 @@ router.post('/ordenes/:id/encuesta', async (req, res) => {
 // por órdenes), para que ambas pantallas siempre coincidan.
 router.get('/fidelidad', async (req, res) => {
   try {
-    const [[{ completadas }]] = await req.db.query(
+    const [[{ completadas }]] = await pool.query(
       `SELECT
-         (SELECT COUNT(*) FROM citas WHERE tenant_id = @tenant AND cliente_id = ? AND estado = 'entregado')
+         (SELECT COUNT(*) FROM citas WHERE cliente_id = ? AND estado = 'entregado')
        + (SELECT COUNT(*) FROM ordenes_trabajo
-            WHERE tenant_id = @tenant AND cliente_id = ? AND estado = 'entregada'
+            WHERE cliente_id = ? AND estado = 'entregada'
               AND id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL)) AS completadas`,
       [req.cliente.id, req.cliente.id]
     );
@@ -1056,11 +1149,11 @@ router.get('/fidelidad', async (req, res) => {
 // GET /api/portal/recompensas — historial de cortesías canjeadas del cliente.
 router.get('/recompensas', async (req, res) => {
   try {
-    const [rows] = await req.db.query(
+    const [rows] = await pool.query(
       `SELECT rc.id, DATE_FORMAT(rc.created_at, '%Y-%m-%d') AS fecha, rc.descripcion, o.numero_orden
        FROM recompensas_canjeadas rc
-       LEFT JOIN ordenes_trabajo o ON o.id = rc.orden_id AND o.tenant_id = @tenant
-       WHERE rc.tenant_id = @tenant AND rc.cliente_id = ?
+       LEFT JOIN ordenes_trabajo o ON o.id = rc.orden_id
+       WHERE rc.cliente_id = ?
        ORDER BY rc.created_at DESC`,
       [req.cliente.id]
     );
@@ -1073,10 +1166,10 @@ router.get('/recompensas', async (req, res) => {
 // GET /api/portal/promos — promociones activas (sin imagen pesada para carga rápida)
 router.get('/promos', async (req, res) => {
   try {
-    const [rows] = await req.db.query(
+    const [rows] = await pool.query(
       `SELECT id, titulo, descripcion, descuento, precio_final,
               CASE WHEN imagen IS NOT NULL THEN 1 ELSE 0 END AS tiene_imagen
-       FROM promos WHERE tenant_id = @tenant AND activa = 1 ORDER BY created_at DESC`
+       FROM promos WHERE activa = 1 ORDER BY created_at DESC`
     );
     res.json({ data: rows });
   } catch (err) {
@@ -1087,7 +1180,7 @@ router.get('/promos', async (req, res) => {
 // GET /api/portal/promos/:id/imagen — imagen individual (lazy load)
 router.get('/promos/:id/imagen', async (req, res) => {
   try {
-    const [[row]] = await req.db.query('SELECT imagen FROM promos WHERE tenant_id = @tenant AND id = ? AND activa = 1', [req.params.id]);
+    const [[row]] = await pool.query('SELECT imagen FROM promos WHERE id = ? AND activa = 1', [req.params.id]);
     if (!row || !row.imagen) return res.status(404).json({ error: 'Sin imagen' });
     res.json({ data: row.imagen });
   } catch (err) {
@@ -1096,13 +1189,13 @@ router.get('/promos/:id/imagen', async (req, res) => {
 });
 
 // GET /api/portal/motos — motos del cliente (para asociar a una cita)
-router.get('/vehiculos', async (req, res) => {
+router.get('/motos', async (req, res) => {
   try {
-    const [rows] = await req.db.query(
+    const [rows] = await pool.query(
       `SELECT m.id, m.marca, m.modelo, m.placa, m.anio, m.color, m.kilometraje_actual, m.foto,
               (SELECT DATE_FORMAT(MAX(COALESCE(c.fecha_fin, c.fecha)), '%Y-%m-%d')
-               FROM citas c WHERE c.tenant_id = @tenant AND c.vehiculo_id = m.id AND c.estado = 'entregado') AS ultimo_servicio
-       FROM vehiculos m WHERE m.tenant_id = @tenant AND m.cliente_id = ? AND m.activa = 1 ORDER BY m.created_at DESC`,
+               FROM citas c WHERE c.moto_id = m.id AND c.estado = 'entregado') AS ultimo_servicio
+       FROM motos m WHERE m.cliente_id = ? AND m.activa = 1 ORDER BY m.created_at DESC`,
       [req.cliente.id]
     );
     res.json({ data: rows });
@@ -1113,40 +1206,27 @@ router.get('/vehiculos', async (req, res) => {
 
 // POST /api/portal/motos — el cliente registra una moto propia
 // Obligatorios: marca, modelo, placa. Evita placas duplicadas.
-router.post('/vehiculos', async (req, res) => {
+router.post('/motos', async (req, res) => {
   try {
     const { marca, modelo, placa, anio, color, kilometraje_actual, foto } = req.body;
-    if (!marca || !modelo || !placa) {
-      return res.status(400).json({ error: 'Marca, modelo y placa son requeridos' });
-    }
-    if (!placaValida(placa)) return res.status(400).json({ error: 'La placa no tiene un formato válido' });
-    if (!anioValido(anio)) return res.status(400).json({ error: 'El año no es válido' });
-    if (!fotoValida(foto)) return res.status(400).json({ error: 'La foto de la moto no es válida o es demasiado grande.' });
+    if (faltante(res, req.body, [['marca', 'la marca'], ['modelo', 'el modelo'], ['placa', 'la placa']])) return;
+    if (!placaValida(placa)) return invalido(res, 'placa', 'La placa no tiene un formato válido');
+    if (!anioValido(anio)) return invalido(res, 'anio', 'El año no es válido');
+    if (!fotoValida(foto)) return invalido(res, 'foto', 'La foto de la moto no es válida o es demasiado grande.');
     // Bloquea placas ya registradas (normaliza espacios y guiones).
-    const [[existe]] = await req.db.query(
-      `SELECT id FROM vehiculos WHERE tenant_id = @tenant AND activa = 1
+    const [[existe]] = await pool.query(
+      `SELECT id FROM motos WHERE activa = 1
          AND UPPER(REPLACE(REPLACE(placa, ' ', ''), '-', '')) = UPPER(REPLACE(REPLACE(?, ' ', ''), '-', ''))`,
       [placa]
     );
-    if (existe) return res.status(409).json({ error: 'Esa placa ya está registrada en el taller' });
+    if (existe) return invalido(res, 'placa', 'Esa placa ya está registrada en el taller', 409);
 
-    // El cliente elige entre los tipos que atiende SU taller. Si el taller atiende
-    // uno solo (el caso común) no se le pregunta nada: se usa ese.
-    const cfgTaller = await getConfig(req.db);
-    const tiposDelTaller = normalizarTipos(cfgTaller.tipos_vehiculo);
-    const tipoPedido = String(req.body.tipo || tiposDelTaller[0]).toLowerCase();
-    if (!tiposDelTaller.includes(tipoPedido)) {
-      return res.status(400).json({ error: 'El taller no atiende ese tipo de vehículo' });
-    }
-    const atributos = limpiarAtributos(tipoPedido, req.body.atributos);
-
-    const [result] = await req.db.query(
-      `INSERT INTO vehiculos (tenant_id, cliente_id, tipo, marca, modelo, placa, anio, color, kilometraje_actual, foto, atributos)
-       VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.cliente.id, tipoPedido, marca, modelo, placa, anio || null, color || null, kilometraje_actual || 0, fotoParaGuardar(foto), atributos ? JSON.stringify(atributos) : null]
+    const [result] = await pool.query(
+      'INSERT INTO motos (cliente_id, marca, modelo, placa, anio, color, kilometraje_actual, foto) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [req.cliente.id, marca, modelo, placa, anio || null, color || null, kilometraje_actual || 0, fotoParaGuardar(foto)]
     );
-    const [[nueva]] = await req.db.query(
-      'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM vehiculos WHERE id = ? AND tenant_id = @tenant',
+    const [[nueva]] = await pool.query(
+      'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM motos WHERE id = ?',
       [result.insertId]
     );
     res.status(201).json({ data: nueva, message: 'Moto registrada' });
@@ -1156,32 +1236,30 @@ router.post('/vehiculos', async (req, res) => {
 });
 
 // PUT /api/portal/motos/:id — el cliente edita su propia moto
-router.put('/vehiculos/:id', async (req, res) => {
+router.put('/motos/:id', async (req, res) => {
   try {
     const { marca, modelo, placa, anio, color, kilometraje_actual, foto } = req.body;
-    if (!marca || !modelo || !placa) {
-      return res.status(400).json({ error: 'Marca, modelo y placa son requeridos' });
-    }
-    if (!placaValida(placa)) return res.status(400).json({ error: 'La placa no tiene un formato válido' });
-    if (!anioValido(anio)) return res.status(400).json({ error: 'El año no es válido' });
-    if (!fotoValida(foto)) return res.status(400).json({ error: 'La foto de la moto no es válida o es demasiado grande.' });
+    if (faltante(res, req.body, [['marca', 'la marca'], ['modelo', 'el modelo'], ['placa', 'la placa']])) return;
+    if (!placaValida(placa)) return invalido(res, 'placa', 'La placa no tiene un formato válido');
+    if (!anioValido(anio)) return invalido(res, 'anio', 'El año no es válido');
+    if (!fotoValida(foto)) return invalido(res, 'foto', 'La foto de la moto no es válida o es demasiado grande.');
     // La moto debe ser del cliente
-    const [[moto]] = await req.db.query('SELECT id FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ? AND activa = 1', [req.params.id, req.cliente.id]);
+    const [[moto]] = await pool.query('SELECT id FROM motos WHERE id = ? AND cliente_id = ? AND activa = 1', [req.params.id, req.cliente.id]);
     if (!moto) return res.status(404).json({ error: 'Moto no encontrada' });
     // Placa duplicada (excluyendo la propia)
-    const [[dup]] = await req.db.query(
-      `SELECT id FROM vehiculos WHERE tenant_id = @tenant AND activa = 1 AND id <> ?
+    const [[dup]] = await pool.query(
+      `SELECT id FROM motos WHERE activa = 1 AND id <> ?
          AND UPPER(REPLACE(REPLACE(placa, ' ', ''), '-', '')) = UPPER(REPLACE(REPLACE(?, ' ', ''), '-', ''))`,
       [req.params.id, placa]
     );
-    if (dup) return res.status(409).json({ error: 'Esa placa ya está registrada en el taller' });
+    if (dup) return invalido(res, 'placa', 'Esa placa ya está registrada en el taller', 409);
 
-    await req.db.query(
-      'UPDATE vehiculos SET marca = ?, modelo = ?, placa = ?, anio = ?, color = ?, kilometraje_actual = ?, foto = ? WHERE id = ? AND tenant_id = @tenant',
+    await pool.query(
+      'UPDATE motos SET marca = ?, modelo = ?, placa = ?, anio = ?, color = ?, kilometraje_actual = ?, foto = ? WHERE id = ?',
       [marca, modelo, placa, anio || null, color || null, kilometraje_actual || 0, fotoParaGuardar(foto), req.params.id]
     );
-    const [[actualizada]] = await req.db.query(
-      'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM vehiculos WHERE id = ? AND tenant_id = @tenant',
+    const [[actualizada]] = await pool.query(
+      'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM motos WHERE id = ?',
       [req.params.id]
     );
     res.json({ data: actualizada, message: 'Moto actualizada' });
@@ -1192,11 +1270,11 @@ router.put('/vehiculos/:id', async (req, res) => {
 
 // DELETE /api/portal/motos/:id — el cliente da de baja una moto propia (soft-delete).
 // No se borra la fila (preserva el historial de citas/órdenes); deja de aparecer en su lista.
-router.delete('/vehiculos/:id', async (req, res) => {
+router.delete('/motos/:id', async (req, res) => {
   try {
-    const [[moto]] = await req.db.query('SELECT id FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ? AND activa = 1', [req.params.id, req.cliente.id]);
+    const [[moto]] = await pool.query('SELECT id FROM motos WHERE id = ? AND cliente_id = ? AND activa = 1', [req.params.id, req.cliente.id]);
     if (!moto) return res.status(404).json({ error: 'Moto no encontrada' });
-    await req.db.query('UPDATE vehiculos SET activa = 0 WHERE id = ? AND tenant_id = @tenant', [req.params.id]);
+    await pool.query('UPDATE motos SET activa = 0 WHERE id = ?', [req.params.id]);
     res.json({ message: 'Moto eliminada' });
   } catch (err) {
     fail(res, err);
@@ -1206,23 +1284,23 @@ router.delete('/vehiculos/:id', async (req, res) => {
 // GET /api/portal/motos/:id/historial — línea de tiempo de servicios de una moto.
 // Devuelve la moto + sus citas entregadas (qué se le hizo y cuándo). No filtra por
 // activa=1: el historial sobrevive aunque el cliente haya eliminado la moto de su lista.
-router.get('/vehiculos/:id/historial', async (req, res) => {
+router.get('/motos/:id/historial', async (req, res) => {
   try {
-    const [[moto]] = await req.db.query(
-      'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?',
+    const [[moto]] = await pool.query(
+      'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM motos WHERE id = ? AND cliente_id = ?',
       [req.params.id, req.cliente.id]
     );
     if (!moto) return res.status(404).json({ error: 'Moto no encontrada' });
 
-    const [servicios] = await req.db.query(
+    const [servicios] = await pool.query(
       `SELECT ci.id, DATE_FORMAT(COALESCE(ci.fecha_fin, ci.fecha), '%Y-%m-%d') AS fecha,
-              ci.tipo_servicio, ci.motivo, ci.monto, ci.calificacion,
+              ci.tipo_servicio, ci.servicios, ci.motivo, ci.monto, ci.calificacion,
               ci.orden_id, o.numero_orden, o.diagnostico,
               t.nombre AS tecnico_nombre
        FROM citas ci
-       LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id AND o.tenant_id = @tenant
-       LEFT JOIN usuarios t ON t.id = ci.tecnico_id AND t.tenant_id = @tenant
-       WHERE ci.tenant_id = @tenant AND ci.vehiculo_id = ? AND ci.cliente_id = ? AND ci.estado = 'entregado'
+       LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id
+       LEFT JOIN usuarios t ON t.id = ci.tecnico_id
+       WHERE ci.moto_id = ? AND ci.cliente_id = ? AND ci.estado = 'entregado'
        ORDER BY COALESCE(ci.fecha_fin, ci.fecha) DESC, ci.hora DESC`,
       [req.params.id, req.cliente.id]
     );
@@ -1235,20 +1313,20 @@ router.get('/vehiculos/:id/historial', async (req, res) => {
 // GET /api/portal/citas — citas del cliente
 router.get('/citas', async (req, res) => {
   try {
-    const [rows] = await req.db.query(
+    const [rows] = await pool.query(
       `SELECT ci.id, DATE_FORMAT(ci.fecha,'%Y-%m-%d') AS fecha, TIME_FORMAT(ci.hora,'%H:%i') AS hora,
-              ci.motivo, ci.tipo_servicio, ci.estado,
+              ci.motivo, ci.tipo_servicio, ci.servicios, ci.estado,
               ci.monto, ci.calificacion, ci.confirmada_cliente,
               ci.orden_id, o.numero_orden, o.estado AS orden_estado, o.aprobacion_cliente,
               m.marca, m.modelo, m.placa,
               t.nombre AS tecnico_nombre,
               ci.sucursal_id, s.nombre AS sucursal_nombre
        FROM citas ci
-       LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant
-       LEFT JOIN usuarios t ON t.id = ci.tecnico_id AND t.tenant_id = @tenant
-       LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id AND o.tenant_id = @tenant
-       LEFT JOIN sucursales s ON s.id = ci.sucursal_id AND s.tenant_id = @tenant
-       WHERE ci.tenant_id = @tenant AND ci.cliente_id = ? AND ci.estado <> 'cancelado'
+       LEFT JOIN motos m ON m.id = ci.moto_id
+       LEFT JOIN usuarios t ON t.id = ci.tecnico_id
+       LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id
+       LEFT JOIN sucursales s ON s.id = ci.sucursal_id
+       WHERE ci.cliente_id = ? AND ci.estado <> 'cancelado'
        ORDER BY ci.fecha DESC, ci.hora DESC`,
       [req.cliente.id]
     );
@@ -1261,9 +1339,9 @@ router.get('/citas', async (req, res) => {
 // GET /api/portal/citas/:id — detalle de una cita propia (para la pantalla de detalle)
 router.get('/citas/:id', async (req, res) => {
   try {
-    const [[cita]] = await req.db.query(
+    const [[cita]] = await pool.query(
       `SELECT ci.id, DATE_FORMAT(ci.fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(ci.hora, '%H:%i') AS hora,
-              ci.motivo, ci.tipo_servicio, ci.estado, ci.vehiculo_id,
+              ci.motivo, ci.tipo_servicio, ci.servicios, ci.estado, ci.moto_id,
               ci.monto, ci.calificacion, ci.comentario_satisfaccion, ci.fecha_inicio, ci.fecha_fin,
               ci.confirmada_cliente,
               ci.orden_id, o.numero_orden, o.estado AS orden_estado, o.aprobacion_cliente,
@@ -1271,11 +1349,11 @@ router.get('/citas/:id', async (req, res) => {
               t.nombre AS tecnico_nombre,
               ci.sucursal_id, s.nombre AS sucursal_nombre, s.direccion AS sucursal_direccion
        FROM citas ci
-       LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant
-       LEFT JOIN usuarios t ON t.id = ci.tecnico_id AND t.tenant_id = @tenant
-       LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id AND o.tenant_id = @tenant
-       LEFT JOIN sucursales s ON s.id = ci.sucursal_id AND s.tenant_id = @tenant
-       WHERE ci.tenant_id = @tenant AND ci.id = ? AND ci.cliente_id = ?`,
+       LEFT JOIN motos m ON m.id = ci.moto_id
+       LEFT JOIN usuarios t ON t.id = ci.tecnico_id
+       LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id
+       LEFT JOIN sucursales s ON s.id = ci.sucursal_id
+       WHERE ci.id = ? AND ci.cliente_id = ?`,
       [req.params.id, req.cliente.id]
     );
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
@@ -1290,77 +1368,77 @@ router.get('/citas/:id', async (req, res) => {
 // Revalida la NUEVA fecha/hora con las mismas reglas que agendar (cupo atómico).
 router.put('/citas/:id', async (req, res) => {
   try {
-    const { vehiculo_id, fecha, hora, tipo_servicio, descripcion } = req.body;
-    if (!vehiculo_id || !fecha || !hora || !tipo_servicio) {
+    const { moto_id, fecha, hora, descripcion } = req.body;
+    // Uno o varios servicios del catálogo (`tipo_servicio` suelto: la app sin actualizar).
+    const servicios = serviciosDelPedido(req.body);
+    if (!moto_id || !fecha || !hora || !servicios.length) {
       return res.status(400).json({ error: 'Moto, servicio, fecha y hora son requeridos' });
     }
-    if (!(await servicioValido(req.db, tipo_servicio))) {
-      return res.status(400).json({ error: 'Servicio no válido' });
-    }
+    const problemaServicios = await problemaConServicios(servicios, { obligatorio: true, delCatalogo: true });
+    if (problemaServicios) return invalido(res, 'servicios', problemaServicios);
     // Sucursal: la pedida (si es válida) o se conserva la actual de la cita más abajo.
-    const sucursalPedida = (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
+    const sucursalPedida = (await sucursalValida(req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
 
-    const [[cita]] = await req.db.query(
-      "SELECT id, estado, orden_id, sucursal_id, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora FROM citas WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?",
+    const [[cita]] = await pool.query(
+      "SELECT id, estado, orden_id, sucursal_id, duracion_horas, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora FROM citas WHERE id = ? AND cliente_id = ?",
       [req.params.id, req.cliente.id]
     );
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
     if (cita.estado !== 'agendado' || cita.orden_id) {
-      return res.status(400).json({ error: 'Esta cita ya no se puede modificar. Comunicate con el taller.' });
+      return res.status(400).json({ error: 'Esta cita ya no se puede modificar. Comunícate con el taller.' });
     }
 
-    const config = await getConfig(req.db);
+    const config = await getConfig();
     const minH = Number(config.cancelacion_horas_min || 0);
     // Ventana mínima sobre la cita ACTUAL (no reprogramar a último momento).
     if (minH > 0 && horasHastaCita(cita.fecha, cita.hora) < minH) {
-      return res.status(400).json({ error: `No se puede modificar con menos de ${minH} h de anticipación. Comunicate con el taller.` });
+      return res.status(400).json({ error: `No se puede modificar con menos de ${minH} h de anticipación. Comunícate con el taller.` });
     }
 
     // Validaciones de la NUEVA fecha/hora (mismas reglas que agendar).
     const horas = horasDisponibles(fecha, config);
     if (!horas.includes(hora)) {
-      return res.status(400).json({ error: 'Ese día/hora no está disponible para agendar' });
+      return invalido(res, 'hora', 'Ese día/hora no está disponible para agendar');
     }
-    const hoy = await hoyCR(req.db);
-    if (fecha < hoy) return res.status(400).json({ error: 'La fecha no puede ser en el pasado' });
+    const hoy = await hoyCR();
+    if (fecha < hoy) return invalido(res, 'fecha', 'La fecha no puede ser en el pasado');
     if (fecha === hoy && horasHastaCita(fecha, hora) <= 0) {
-      return res.status(400).json({ error: 'Esa hora ya pasó. Elegí un horario más tarde.' });
+      return invalido(res, 'hora', 'Esa hora ya pasó. Elige un horario más tarde.');
     }
     const limiteFecha = new Date(`${hoy}T12:00:00Z`);
     limiteFecha.setUTCDate(limiteFecha.getUTCDate() + Number(config.dias_anticipacion || 30));
     if (fecha > limiteFecha.toISOString().slice(0, 10)) {
-      return res.status(400).json({ error: `Solo se puede agendar hasta ${config.dias_anticipacion} días por adelantado` });
+      return invalido(res, 'fecha', `Solo se puede agendar hasta ${config.dias_anticipacion} días por adelantado`);
     }
 
-    const [[moto]] = await req.db.query('SELECT id FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?', [vehiculo_id, req.cliente.id]);
-    if (!moto) return res.status(400).json({ error: 'Moto no válida' });
+    const [[moto]] = await pool.query('SELECT id FROM motos WHERE id = ? AND cliente_id = ?', [moto_id, req.cliente.id]);
+    if (!moto) return invalido(res, 'moto_id', 'Moto no válida');
 
-    const motivo = (descripcion || '').trim() || tipo_servicio;
+    const motivo = (descripcion || '').trim() || textoServicios(servicios).slice(0, MAX_MOTIVO);
     if (!textoDentroDeLimite(motivo, MAX_MOTIVO)) {
-      return res.status(400).json({ error: `descripcion no puede exceder ${MAX_MOTIVO} caracteres` });
+      return invalido(res, 'descripcion', `La descripción no puede pasar de ${MAX_MOTIVO} caracteres`);
     }
     // Sucursal efectiva: la nueva pedida, o la que ya tenía la cita (fallback al default).
-    const sucursalId = sucursalPedida || cita.sucursal_id || (await sucursalPorDefecto(req.db));
+    const sucursalId = sucursalPedida || cita.sucursal_id || (await sucursalPorDefecto());
 
-    // Cupo atómico de la NUEVA franja (por sucursal), excluyendo esta misma cita.
-    const conn = await req.db.conexion();
+    // Cupo atómico de la NUEVA franja (por sucursal), excluyendo esta misma cita: en
+    // todas las horas que dura (si administración la alargó) y sin horas bloqueadas.
+    const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
-      const [[{ ocupadas }]] = await conn.query(
-        "SELECT COUNT(*) AS ocupadas FROM citas WHERE tenant_id = @tenant AND fecha = ? AND hora = ? AND sucursal_id = ? AND estado != 'cancelado' AND id != ? FOR UPDATE",
-        [fecha, hora, sucursalId, req.params.id]
-      );
-      if (ocupadas >= config.max_citas_hora) {
+      const dia = await agendaDia(fecha, sucursalId, config, { db: conn, bloquear: true, excluirId: req.params.id });
+      if (conflictosDeCita(dia, hora, cita.duracion_horas, Number(config.max_citas_hora) || 1).length) {
         await conn.rollback();
-        return res.status(400).json({ error: 'Esa hora ya no está disponible, elegí otra.' });
+        return invalido(res, 'hora', 'Esa hora ya no está disponible, elige otra.');
       }
       await conn.query(
-        'UPDATE citas SET vehiculo_id = ?, fecha = ?, hora = ?, tipo_servicio = ?, motivo = ?, sucursal_id = ? WHERE id = ? AND tenant_id = @tenant',
-        [vehiculo_id, fecha, hora, tipo_servicio, motivo, sucursalId, req.params.id]
+        'UPDATE citas SET moto_id = ?, fecha = ?, hora = ?, motivo = ?, sucursal_id = ? WHERE id = ?',
+        [moto_id, fecha, hora, motivo, sucursalId, req.params.id]
       );
+      await guardarServiciosCita(req.params.id, servicios, conn);
       const [[actualizada]] = await conn.query(
-        `SELECT ci.id, ci.fecha, ci.hora, ci.motivo, ci.tipo_servicio, ci.estado, m.marca, m.modelo, m.placa
-         FROM citas ci LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant WHERE ci.tenant_id = @tenant AND ci.id = ?`,
+        `SELECT ci.id, ci.fecha, ci.hora, ci.motivo, ci.tipo_servicio, ci.servicios, ci.estado, m.marca, m.modelo, m.placa
+         FROM citas ci LEFT JOIN motos m ON m.id = ci.moto_id WHERE ci.id = ?`,
         [req.params.id]
       );
       await conn.commit();
@@ -1379,72 +1457,72 @@ router.put('/citas/:id', async (req, res) => {
 // POST /api/portal/citas — el cliente solicita una cita (queda pendiente de confirmar)
 router.post('/citas', async (req, res) => {
   try {
-    const { vehiculo_id, fecha, hora, tipo_servicio, descripcion } = req.body;
-    if (!vehiculo_id || !fecha || !hora || !tipo_servicio) {
+    const { moto_id, fecha, hora, descripcion } = req.body;
+    // Uno o varios servicios del catálogo (`tipo_servicio` suelto: la app sin actualizar).
+    const servicios = serviciosDelPedido(req.body);
+    if (!moto_id || !fecha || !hora || !servicios.length) {
       return res.status(400).json({ error: 'Moto, servicio, fecha y hora son requeridos' });
     }
-    if (!(await servicioValido(req.db, tipo_servicio))) {
-      return res.status(400).json({ error: 'Servicio no válido' });
-    }
+    const problemaServicios = await problemaConServicios(servicios, { obligatorio: true, delCatalogo: true });
+    if (problemaServicios) return invalido(res, 'servicios', problemaServicios);
     // Sucursal obligatoria y válida (activa). El cupo se controla por sucursal.
-    const sucursalId = (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
-    if (!sucursalId) return res.status(400).json({ error: 'Elegí una sucursal válida' });
-    const config = await getConfig(req.db);
+    const sucursalId = (await sucursalValida(req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
+    if (!sucursalId) return invalido(res, 'sucursal_id', 'Elige una sucursal válida');
+    const config = await getConfig();
     const horas = horasDisponibles(fecha, config);
     if (!horas.includes(hora)) {
-      return res.status(400).json({ error: 'Ese día/hora no está disponible para agendar' });
+      return invalido(res, 'hora', 'Ese día/hora no está disponible para agendar');
     }
-    const hoy = await hoyCR(req.db);
+    const hoy = await hoyCR();
     if (fecha < hoy) {
-      return res.status(400).json({ error: 'La fecha no puede ser en el pasado' });
+      return invalido(res, 'fecha', 'La fecha no puede ser en el pasado');
     }
     // Si es hoy, no permitir horas que ya pasaron (el slot debe iniciar en el futuro).
     if (fecha === hoy && horasHastaCita(fecha, hora) <= 0) {
-      return res.status(400).json({ error: 'Esa hora ya pasó. Elegí un horario más tarde.' });
+      return invalido(res, 'hora', 'Esa hora ya pasó. Elige un horario más tarde.');
     }
     // Tope de anticipación configurable: no se agenda más allá de N días.
     const limiteFecha = new Date(`${hoy}T12:00:00Z`);
     limiteFecha.setUTCDate(limiteFecha.getUTCDate() + Number(config.dias_anticipacion || 30));
     if (fecha > limiteFecha.toISOString().slice(0, 10)) {
-      return res.status(400).json({ error: `Solo se puede agendar hasta ${config.dias_anticipacion} días por adelantado` });
+      return invalido(res, 'fecha', `Solo se puede agendar hasta ${config.dias_anticipacion} días por adelantado`);
     }
 
     // Anti-spam: limita cuántas citas pide un mismo cliente.
     const limite = consumir(`cita:${req.cliente.id}`, { porMinuto: 3, porHora: 15 });
     if (!limite.ok) {
-      return res.status(429).json({ error: `Estás agendando muy seguido. Esperá ${limite.retryAfter}s.` });
+      return res.status(429).json({ error: `Estás agendando muy seguido. Espera ${limite.retryAfter}s.` });
     }
 
     // La moto debe ser del cliente
-    const [[moto]] = await req.db.query('SELECT id FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?', [vehiculo_id, req.cliente.id]);
-    if (!moto) return res.status(400).json({ error: 'Moto no válida' });
+    const [[moto]] = await pool.query('SELECT id FROM motos WHERE id = ? AND cliente_id = ?', [moto_id, req.cliente.id]);
+    if (!moto) return invalido(res, 'moto_id', 'Moto no válida');
 
-    const motivo = (descripcion || '').trim() || tipo_servicio;
+    const motivo = (descripcion || '').trim() || textoServicios(servicios).slice(0, MAX_MOTIVO);
     if (!textoDentroDeLimite(motivo, MAX_MOTIVO)) {
-      return res.status(400).json({ error: `descripcion no puede exceder ${MAX_MOTIVO} caracteres` });
+      return invalido(res, 'descripcion', `La descripción no puede pasar de ${MAX_MOTIVO} caracteres`);
     }
 
-    // Cupo atómico: una transacción bloquea el rango (fecha,hora) con FOR UPDATE,
-    // cuenta y recién ahí inserta. Dos solicitudes simultáneas se serializan, así
-    // nunca se superan las MAX_POR_HORA citas por franja (evita la carrera del COUNT+INSERT).
-    const conn = await req.db.conexion();
+    // Cupo atómico: una transacción bloquea las citas del día (FOR UPDATE), cuenta y
+    // recién ahí inserta. Dos solicitudes simultáneas se serializan, así nunca se
+    // superan las citas por hora (evita la carrera del COUNT+INSERT). Cuenta también
+    // las citas largas que pasan por esa hora, y no deja agendar en horas bloqueadas.
+    const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
-      const [[{ ocupadas }]] = await conn.query(
-        "SELECT COUNT(*) AS ocupadas FROM citas WHERE tenant_id = @tenant AND fecha = ? AND hora = ? AND sucursal_id = ? AND estado != 'cancelado' FOR UPDATE",
-        [fecha, hora, sucursalId]
-      );
-      if (ocupadas >= config.max_citas_hora) {
+      const dia = await agendaDia(fecha, sucursalId, config, { db: conn, bloquear: true });
+      if (conflictosDeCita(dia, hora, 1, Number(config.max_citas_hora) || 1).length) {
         await conn.rollback();
-        return res.status(400).json({ error: 'Esa hora ya no está disponible, elegí otra.' });
+        return invalido(res, 'hora', 'Esa hora ya no está disponible, elige otra.');
       }
       const [result] = await conn.query(
-        "INSERT INTO citas (tenant_id, cliente_id, vehiculo_id, sucursal_id, fecha, hora, motivo, tipo_servicio, estado) VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, 'agendado')",
-        [req.cliente.id, vehiculo_id, sucursalId, fecha, hora, motivo, tipo_servicio]
+        "INSERT INTO citas (cliente_id, moto_id, sucursal_id, fecha, hora, motivo, tipo_servicio, estado) VALUES (?, ?, ?, ?, ?, ?, ?, 'agendado')",
+        [req.cliente.id, moto_id, sucursalId, fecha, hora, motivo, servicios[0]]
       );
+      await guardarServiciosCita(result.insertId, servicios, conn);
       const [[nueva]] = await conn.query(
-        `SELECT ci.id, ci.fecha, ci.hora, ci.motivo, ci.tipo_servicio, ci.estado, m.marca, m.modelo, m.placa
-         FROM citas ci LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant WHERE ci.tenant_id = @tenant AND ci.id = ?`,
+        `SELECT ci.id, ci.fecha, ci.hora, ci.motivo, ci.tipo_servicio, ci.servicios, ci.estado, m.marca, m.modelo, m.placa
+         FROM citas ci LEFT JOIN motos m ON m.id = ci.moto_id WHERE ci.id = ?`,
         [result.insertId]
       );
       await conn.commit();
@@ -1467,15 +1545,15 @@ router.post('/citas/:id/calificar', async (req, res) => {
     if (!(calificacion >= 1 && calificacion <= 5)) {
       return res.status(400).json({ error: 'La calificación debe ser de 1 a 5' });
     }
-    const [[cita]] = await req.db.query(
-      "SELECT id, calificacion FROM citas WHERE tenant_id = @tenant AND id = ? AND cliente_id = ? AND estado = 'entregado'",
+    const [[cita]] = await pool.query(
+      "SELECT id, calificacion FROM citas WHERE id = ? AND cliente_id = ? AND estado = 'entregado'",
       [req.params.id, req.cliente.id]
     );
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada o no entregada' });
     if (cita.calificacion) return res.status(400).json({ error: 'Ya calificaste esta cita' });
 
-    await req.db.query(
-      'UPDATE citas SET calificacion = ?, comentario_satisfaccion = ? WHERE id = ? AND tenant_id = @tenant',
+    await pool.query(
+      'UPDATE citas SET calificacion = ?, comentario_satisfaccion = ? WHERE id = ?',
       [calificacion, req.body.comentario || null, req.params.id]
     );
     res.json({ message: '¡Gracias por tu opinión!' });
@@ -1489,22 +1567,22 @@ router.post('/citas/:id/calificar', async (req, res) => {
 // (después la gestiona el taller). Libera el cupo de la franja.
 router.patch('/citas/:id/cancelar', async (req, res) => {
   try {
-    const [[cita]] = await req.db.query(
-      "SELECT id, estado, orden_id, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora FROM citas WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?",
+    const [[cita]] = await pool.query(
+      "SELECT id, estado, orden_id, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora FROM citas WHERE id = ? AND cliente_id = ?",
       [req.params.id, req.cliente.id]
     );
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
     if (cita.estado !== 'agendado' || cita.orden_id) {
-      return res.status(400).json({ error: 'Esta cita ya no se puede cancelar. Comunicate con el taller.' });
+      return res.status(400).json({ error: 'Esta cita ya no se puede cancelar. Comunícate con el taller.' });
     }
-    const config = await getConfig(req.db);
+    const config = await getConfig();
     const minH = Number(config.cancelacion_horas_min || 0);
     if (minH > 0 && horasHastaCita(cita.fecha, cita.hora) < minH) {
-      return res.status(400).json({ error: `No se puede cancelar con menos de ${minH} h de anticipación. Comunicate con el taller.` });
+      return res.status(400).json({ error: `No se puede cancelar con menos de ${minH} h de anticipación. Comunícate con el taller.` });
     }
     // fecha_cancelacion deja rastro del momento: es lo que hace visible la
     // cancelación en las alertas de recepción (antes la cita desaparecía en silencio).
-    await req.db.query("UPDATE citas SET estado = 'cancelado', fecha_cancelacion = NOW() WHERE id = ? AND tenant_id = @tenant", [req.params.id]);
+    await pool.query("UPDATE citas SET estado = 'cancelado', fecha_cancelacion = NOW() WHERE id = ?", [req.params.id]);
     res.json({ message: 'Cita cancelada' });
   } catch (err) {
     fail(res, err);
@@ -1515,15 +1593,15 @@ router.patch('/citas/:id/cancelar', async (req, res) => {
 // Marca confirmada_cliente=1 (el taller lo usa como señal de presencia / no-show).
 router.patch('/citas/:id/confirmar', async (req, res) => {
   try {
-    const [[cita]] = await req.db.query(
-      'SELECT id, estado FROM citas WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?',
+    const [[cita]] = await pool.query(
+      'SELECT id, estado FROM citas WHERE id = ? AND cliente_id = ?',
       [req.params.id, req.cliente.id]
     );
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
     if (cita.estado !== 'agendado') {
       return res.status(400).json({ error: 'Solo se puede confirmar una cita agendada.' });
     }
-    await req.db.query('UPDATE citas SET confirmada_cliente = 1 WHERE id = ? AND tenant_id = @tenant', [req.params.id]);
+    await pool.query('UPDATE citas SET confirmada_cliente = 1 WHERE id = ?', [req.params.id]);
     res.json({ message: 'Asistencia confirmada' });
   } catch (err) {
     fail(res, err);
@@ -1531,25 +1609,29 @@ router.patch('/citas/:id/confirmar', async (req, res) => {
 });
 
 // Solo permite aprobar/rechazar si la orden es del cliente y está esperando aprobación.
-async function actualizarAprobacion(db, ordenId, clienteId, decision, motivo) {
-  const [[orden]] = await db.query(
-    "SELECT id FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ? AND cliente_id = ? AND estado = 'esperando_aprobacion'",
+// Si el cliente ya había aprobado antes (total_aprobado), lo que decide ahora es un
+// adicional: rechazarlo no anula lo que ya aprobó, el trabajo sigue sin el adicional.
+async function actualizarAprobacion(ordenId, clienteId, decision, motivo) {
+  const [[orden]] = await pool.query(
+    "SELECT id, total_aprobado FROM ordenes_trabajo WHERE id = ? AND cliente_id = ? AND estado = 'esperando_aprobacion'",
     [ordenId, clienteId]
   );
   if (!orden) return false;
-  await db.query(
-    `UPDATE ordenes_trabajo
-       SET aprobacion_cliente = ?, motivo_rechazo = ?,
-           aprobado_por_cliente = ?, fecha_aprobacion = NOW()
-     WHERE id = ?`,
-    [decision, motivo, decision === 'aprobado' ? 1 : 0, ordenId]
-  );
   // La orden no debe quedar "esperando aprobación" después de la decisión:
   // aprobado → a trabajar (o esperar repuestos); rechazado → vuelve a diagnóstico.
   if (decision === 'aprobado') {
-    await avanzarEstadoOrden(db, ordenId, await estadoTrasAprobacion(db, ordenId));
-  } else if (decision === 'rechazado') {
-    await avanzarEstadoOrden(db, ordenId, 'diagnostico');
+    await registrarAprobacion(ordenId);
+  } else if (orden.total_aprobado !== null) {
+    await registrarRechazoAdicional(ordenId, motivo);
+  } else {
+    await pool.query(
+      `UPDATE ordenes_trabajo
+         SET aprobacion_cliente = 'rechazado', motivo_rechazo = ?,
+             aprobado_por_cliente = 0, fecha_aprobacion = NOW()
+       WHERE id = ?`,
+      [motivo, ordenId]
+    );
+    await avanzarEstadoOrden(ordenId, 'diagnostico');
   }
   return true;
 }

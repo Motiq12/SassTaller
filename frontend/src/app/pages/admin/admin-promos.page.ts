@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { AlertController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -11,10 +11,6 @@ import { PromosService, Promo } from '../../services/promos.service';
   styleUrls: ['./admin-promos.page.scss'],
 })
 export class AdminPromosPage implements OnInit, OnDestroy {
-  private svc = inject(PromosService);
-  private toast = inject(ToastController);
-  private alert = inject(AlertController);
-
   private destroy$ = new Subject<void>();
   promos: Promo[] = [];
   cargando = true;
@@ -28,13 +24,24 @@ export class AdminPromosPage implements OnInit, OnDestroy {
   form: { titulo: string; descripcion: string; descuento: number | null; precio_final: number | null; imagen: string | null; activa: boolean } =
     { titulo: '', descripcion: '', descuento: null, precio_final: null, imagen: null, activa: true };
 
+  constructor(private svc: PromosService, private toast: ToastController, private alert: AlertController) {}
+
   ngOnInit() { this.cargar(); }
   ionViewWillEnter() { this.cargar(); }
 
   cargar(ev?: any) {
     this.cargando = true;
     this.svc.getAll().pipe(takeUntil(this.destroy$)).subscribe({
-      next: r => { this.promos = r.data; this.cargando = false; if (ev) ev.target.complete(); },
+      next: r => {
+        this.promos = r.data;
+        this.cargando = false;
+        if (ev) ev.target.complete();
+        // Las imágenes van aparte (pesan). Se piden las de las primeras 6 y las de
+        // todas las que son solo una imagen: sin ella no se sabe cuál es cuál.
+        const conImagen = r.data.filter((p: Promo) => (p as any).tiene_imagen && !this.imagenes[p.id!]);
+        const soloImagen = conImagen.filter((p: Promo) => !p.titulo && !p.descripcion);
+        new Set([...conImagen.slice(0, 6), ...soloImagen]).forEach(p => this.cargarImagen(p));
+      },
       error: () => { this.cargando = false; if (ev) ev.target.complete(); },
     });
   }
@@ -68,10 +75,14 @@ export class AdminPromosPage implements OnInit, OnDestroy {
     reader.readAsDataURL(file);
   }
 
-  get valido(): boolean { return !!(this.form.titulo.trim() && this.form.descripcion.trim()); }
+  // Título y descripción, o una imagen sola (la que el taller diseña con todo puesto).
+  get valido(): boolean { return !!((this.form.titulo.trim() && this.form.descripcion.trim()) || this.form.imagen); }
+
+  // Cómo se llama en la lista una promoción que es solo una imagen.
+  nombre(p: Promo): string { return (p.titulo || '').trim() || 'Promoción con imagen'; }
 
   guardar() {
-    if (!this.valido) { this.aviso('Título y descripción son requeridos', 'warning'); return; }
+    if (!this.valido) { this.aviso('Pon un título y una descripción, o sube una imagen', 'warning'); return; }
     this.guardando = true;
     const editando = !!this.editId;
     const payload: any = {
@@ -112,7 +123,7 @@ export class AdminPromosPage implements OnInit, OnDestroy {
     const al = await this.alert.create({
       cssClass: 'alert-light',
       header: 'Eliminar promoción',
-      message: `¿Eliminar "${p.titulo}"? No se puede deshacer.`,
+      message: `¿Eliminar "${this.nombre(p)}"? No se puede deshacer.`,
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         { text: 'Eliminar', role: 'destructive', handler: () => {

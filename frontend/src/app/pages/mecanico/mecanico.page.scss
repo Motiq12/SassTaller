@@ -1,146 +1,43 @@
-.mec { max-width: 920px; margin: 0 auto; padding: 14px 16px 0; }
+// Inicio del mecánico (y la tarjeta de cita que reusa el Historial). Encabezado,
+// cifras, tarjetas, campos y botones: el estándar del panel (global.scss).
 
-.greet {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
-  margin: 2px 2px 16px;
-  .greet-l h1 { font-family: var(--font-display); font-size: 26px; font-weight: 800; letter-spacing: -0.04em; margin: 0; }
-  .greet-date { font-size: 12px; color: var(--n-400); text-transform: capitalize; flex-shrink: 0; }
+.mc-citas { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+@media (min-width: 992px) { .mc-citas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.mc-vacio { grid-column: 1 / -1; }
+
+.mc-cita {
+  display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 16px;
+  background: var(--sur2); border: 1px solid var(--bd); border-radius: 8px;
+  .fg { margin: 4px 0 0; }
 }
-
-/* Stat cards con acento de esquina */
-.stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
-@media (min-width: 820px) { .stat-grid { grid-template-columns: repeat(4, 1fr); } }
-
-.stat {
-  background: var(--ion-card-background); border: 1px solid var(--hairline);
-  border-radius: 24px; box-shadow: var(--shadow-sm); padding: 16px; text-align: center;
-  position: relative; overflow: hidden;
-  animation: cardRise .4s var(--ease, cubic-bezier(0.32, 0.72, 0, 1)) both;
-  &::after { content: ''; position: absolute; top: 0; right: 0; width: 56px; height: 56px; background: var(--n-100); border-bottom-left-radius: 999px; }
-  &.accent::after { background: var(--rose-50); }
-  &.money { grid-column: 1 / -1; }
-  .stat-num { font-family: var(--font-display); font-size: 34px; font-weight: 900; line-height: 1; letter-spacing: -0.04em; position: relative; z-index: 1; color: var(--ion-color-primary);
-    &.em { font-family: var(--font-mono, monospace); font-size: 24px; color: var(--emerald-700); }
-    &.amber { color: var(--amber-700); }
-    &.ink { color: var(--ion-text-color); } }
-  .stat-lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--n-500); margin-top: 6px; position: relative; z-index: 1; }
+.mc-cita-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.mc-moto { font-size: 15px; font-weight: 700; color: var(--tx); .mono { font-weight: 500; color: var(--tx3); } }
+.mc-servicio { font-size: 13px; color: var(--tx2); }
+.mc-senal {
+  display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; padding: 4px 10px; border-radius: 2px;
+  font-size: 11.5px; font-weight: 700;
+  ion-icon { font-size: 14px; }
+  &.ok { background: var(--adm-em-bg); color: var(--adm-em-fg); }
+  &.pend { background: var(--adm-am-bg); color: var(--adm-am-fg); }
 }
-
-.card {
-  background: var(--ion-card-background); border: 1px solid var(--hairline);
-  border-radius: 24px; box-shadow: var(--shadow-sm); padding: 18px; margin-bottom: 14px;
+.mc-prog { height: 6px; border-radius: 2px; background: var(--sur3); overflow: hidden;
+  span { display: block; height: 100%; background: var(--cr); &.full { background: var(--em); } } }
+.mc-calif { font-size: 12px; color: var(--tx3); }
+.mc-estrellas { color: var(--am); letter-spacing: 1px; }
+.mc-cotiz {
+  display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 2px;
+  background: var(--sur); border: 1px solid var(--bd);
+  .cd-title { margin: 0; }
 }
-.card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.section-label { display: block; margin: 0 0 10px; }
-.cnt-badge { font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 999px; background: var(--ion-color-primary); color: #fff; }
-
-/* Promedios */
-.avg-row {
-  display: flex; justify-content: space-between; align-items: center; padding: 8px 0; font-size: 13px;
-  & + .avg-row { border-top: 1px dashed var(--hairline); }
-  .lbl { color: var(--n-500); }
-  .val { font-weight: 700; }
-  .stars { color: var(--amber-700); letter-spacing: 1px; }
+.mc-cotiz-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mc-motivo { margin: 0; font-size: 12.5px; font-style: italic; color: var(--adm-cr-fg); }
+.mc-link {
+  display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 4px 0;
+  border: none; background: none; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--cr-tx);
+  ion-icon { font-size: 15px; }
+  &:hover { text-decoration: underline; }
 }
-
-/* Citas */
-.cita-list { display: flex; flex-direction: column; gap: 12px; }
-.cita-card {
-  background: var(--ion-card-background); border: 1px solid var(--hairline);
-  border-radius: 20px; box-shadow: var(--shadow-xs); padding: 16px;
-  .cita-head { display: flex; align-items: center; justify-content: space-between; gap: 8px;
-    h4 { margin: 0; font-size: 15px; font-weight: 700; }
-    .placa { color: var(--n-400); font-weight: 500; } }
-  .cita-info { font-size: 12.5px; color: var(--n-500); line-height: 1.6; margin: 6px 0;
-    strong { color: var(--n-700); }
-    .cc-monto { color: var(--emerald-700); font-weight: 700; } }
-  .cita-rating { font-size: 12px; color: var(--n-500); margin: 8px 0 0; .stars { color: var(--amber-700); letter-spacing: 1px; } }
-
-  // Señal de confirmación de asistencia del cliente (no-show).
-  .conf { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700;
-    padding: 5px 11px; border-radius: 999px; margin: 2px 0;
-    ion-icon { font-size: 14px; }
-    &.ok { background: var(--emerald-50); color: var(--emerald-700); }
-    &.pend { background: var(--amber-100); color: var(--amber-700); } }
-}
-
-.st-badge { font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 999px; display: inline-flex; flex-shrink: 0; }
-.st-badge.agendado     { background: var(--indigo-50);  color: var(--indigo-600); }
-.st-badge.revision     { background: var(--amber-100);  color: var(--amber-700); }
-.st-badge.mantenimiento{ background: var(--rose-50);    color: var(--rose-700); }
-.st-badge.listo        { background: var(--emerald-50); color: var(--emerald-700); }
-.st-badge.entregado    { background: var(--n-100);      color: var(--n-500); }
-.st-badge.cancelado    { background: rgba(220, 38, 38, .08); color: var(--ion-color-danger, #dc2626); }
-
-/* Barra de progreso */
-.pr-t { height: 8px; background: var(--n-200); border-radius: 999px; overflow: hidden; margin: 10px 0 4px; }
-.pr-f { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--ion-color-primary), var(--ion-color-primary-tint));
-  transition: width .5s var(--ease, cubic-bezier(0.32, 0.72, 0, 1));
-  &.full { background: var(--emerald-700); } }
-.pr-l { font-size: 10px; color: var(--n-400); }
-
-/* Select de estado */
-.est-sel {
-  width: 100%; margin-top: 10px; padding: 9px 12px;
-  border: 1px solid var(--hairline); border-radius: 12px;
-  font-family: var(--font-body, inherit); font-size: 13px; font-weight: 600;
-  background: var(--ion-card-background); color: var(--ion-text-color); cursor: pointer;
-}
-
-/* Caja de cotización (cita vinculada a una orden) */
-.cotiz {
-  margin-top: 12px; padding: 12px 14px; border-radius: 14px;
-  background: var(--n-50); border: 1px solid var(--hairline);
-  .cotiz-top { display: flex; align-items: center; justify-content: space-between; }
-  .cotiz-lbl { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--n-400); }
-  .cotiz-total { font-family: var(--font-display); font-size: 20px; font-weight: 800; margin-top: 6px; color: var(--ion-text-color); }
-  .cotiz-motivo { margin: 6px 0 0; font-size: 12.5px; color: var(--rose-700); font-style: italic; }
-  .trabajar-btn {
-    width: 100%; margin-top: 10px; padding: 10px; cursor: pointer;
-    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-    border: none; border-radius: 12px; background: var(--ion-color-primary); color: #fff;
-    font-family: inherit; font-size: 13px; font-weight: 700;
-    ion-icon { font-size: 16px; }
-    &:active { transform: scale(.98); }
-  }
-}
-
-/* Notas */
-.notas-btn { background: none; border: none; padding: 8px 0 2px; cursor: pointer;
-  display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--text-accent);  // AA
-  ion-icon { font-size: 15px; } }
-.notas-box { margin: 4px 0 2px; font-size: 13px; color: var(--n-600); font-style: italic;
-  background: var(--n-50); border: 1px dashed var(--n-300); border-radius: 12px; padding: 10px 12px; }
-
-/* CTA outline */
-.cta-out {
-  width: 100%; margin-top: 2px; padding: 13px; cursor: pointer;
-  background: none; border: 1.5px solid var(--hairline); border-radius: 16px;
-  font-size: 13px; font-weight: 700; color: var(--ion-text-color);
-  display: flex; align-items: center; justify-content: center; gap: 6px;
-  ion-icon { font-size: 18px; }
-}
-
-.empty { text-align: center; padding: 36px 16px; color: var(--n-400); font-size: 13px;
-  .ico { font-size: 40px; opacity: .35; display: block; margin: 0 auto 8px; } p { margin: 0; } }
-
-/* ───────── Agenda semanal ───────── */
-.sem-nav {
-  display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
-  .sem-rango { font-family: var(--font-display); font-weight: 700; font-size: 16px; text-transform: capitalize; }
-}
-.week-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 4px 0 16px; }
-.dia-list { display: flex; flex-direction: column; gap: 14px; }
-.dia {
-  .dia-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 700; font-size: 14px; text-transform: capitalize;
-    .dia-count { background: var(--ion-color-primary); color: #fff; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 8px; } }
-  .dia-vacio { font-size: 12px; color: var(--n-400); padding: 4px 2px 8px; }
-}
-.ag-cita {
-  display: flex; align-items: center; gap: 12px;
-  background: var(--ion-card-background); border: 1px solid var(--hairline);
-  border-radius: 14px; box-shadow: var(--shadow-xs); padding: 10px 14px; margin-bottom: 8px;
-  .ag-hora { font-size: 13px; font-weight: 700; color: var(--text-accent); min-width: 48px; }  // AA
-  .ag-info { flex: 1; min-width: 0; display: flex; flex-direction: column;
-    strong { font-size: 13.5px; } span { font-size: 12px; color: var(--n-500); } }
+.mc-notas {
+  margin: 0; padding: 10px 12px; border-radius: 2px; border: 1px dashed var(--bd2); background: var(--sur);
+  font-size: 13px; font-style: italic; color: var(--tx2); white-space: pre-line;
 }

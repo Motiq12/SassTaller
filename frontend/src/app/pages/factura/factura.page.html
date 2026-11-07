@@ -1,19 +1,22 @@
 <ion-header class="no-print">
-  <ion-toolbar color="primary">
+  <ion-toolbar class="admin-topbar">
     <ion-buttons slot="start">
-      <ion-button (click)="volver()"><ion-icon slot="icon-only" name="arrow-back"></ion-icon></ion-button>
+      <ion-button (click)="volver()" aria-label="Volver"><ion-icon slot="icon-only" name="arrow-back"></ion-icon></ion-button>
     </ion-buttons>
     <ion-title>Factura</ion-title>
-    <ion-buttons slot="end">
-      <ion-button (click)="imprimir()">
-        <ion-icon slot="start" name="print-outline"></ion-icon> Imprimir / PDF
+    <!-- Fuera de ion-buttons, como "Nueva cita" del panel: adentro toma el color gris de
+         la barra y el alto completo. -->
+    <div slot="end" class="fac-acc">
+      <ion-button class="adm-nueva" size="small" (click)="imprimir()" title="Imprimir o guardar en PDF" aria-label="Imprimir o guardar en PDF">
+        <ion-icon name="print-outline" aria-hidden="true"></ion-icon><span class="adm-nueva-txt">Imprimir / PDF</span>
       </ion-button>
-    </ion-buttons>
+    </div>
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
-  <div class="ion-padding ion-text-center" *ngIf="cargando" style="padding-top:40px">
+<!-- El fondo es el del panel; la hoja de la factura sigue siendo blanca (ver el scss). -->
+<ion-content class="admin-dark">
+  <div class="fac-cargando" *ngIf="cargando">
     <ion-spinner name="crescent"></ion-spinner>
   </div>
 
@@ -23,6 +26,11 @@
       <div class="fac-marca">
         <img [src]="logo" [alt]="nombreTaller" style="height:64px;width:auto" />
         <p>Motos · Repuestos · Taller</p>
+        <p class="fac-legal" *ngIf="marca?.razon_social || marca?.cedula_juridica">
+          <strong *ngIf="marca?.razon_social">{{ marca?.razon_social }}</strong>
+          <ng-container *ngIf="marca?.razon_social && marca?.cedula_juridica"> · </ng-container>
+          <ng-container *ngIf="marca?.cedula_juridica">Céd. jurídica {{ marca?.cedula_juridica }}</ng-container>
+        </p>
         <p class="fac-suc" *ngIf="orden.sucursal_nombre">
           <strong>Sucursal {{ orden.sucursal_nombre }}</strong>
           <ng-container *ngIf="orden.sucursal_direccion"><br>{{ orden.sucursal_direccion }}</ng-container>
@@ -37,7 +45,7 @@
       </div>
     </div>
 
-    <!-- Datos cliente / vehiculo -->
+    <!-- Datos cliente / moto -->
     <div class="fac-datos">
       <div>
         <span class="etiqueta">Cliente</span>
@@ -87,7 +95,7 @@
     <div class="fac-totales">
       <div><span>Mano de obra</span><span>₡{{ orden.costo_mano_obra | number:'1.0-0' }}</span></div>
       <div><span>Repuestos</span><span>₡{{ totalRepuestos | number:'1.0-0' }}</span></div>
-      <div *ngIf="orden.descuento"><span>Descuento</span><span>-₡{{ orden.descuento | number:'1.0-0' }}</span></div>
+      <div *ngIf="descuento > 0"><span>Descuento</span><span>-₡{{ descuento | number:'1.0-0' }}</span></div>
       <div class="total"><span>TOTAL</span><span>₡{{ total | number:'1.0-0' }}</span></div>
     </div>
 
@@ -96,7 +104,14 @@
       <p *ngIf="orden.metodo_pago"><strong>Método de pago:</strong> {{ orden.metodo_pago | titlecase }}</p>
       <p *ngIf="orden.garantia_dias"><strong>Garantía:</strong> {{ orden.garantia_dias }} días</p>
       <p *ngIf="orden.observaciones_finales">{{ orden.observaciones_finales }}</p>
+      <p class="fac-nota" *ngIf="marca?.nota_factura">{{ marca?.nota_factura }}</p>
       <p class="gracias">¡Gracias por su preferencia!</p>
+    </div>
+
+    <div class="fac-firma" *ngIf="firma">
+      <img [src]="firma" alt="Firma">
+      <span class="fac-firma-nombre">{{ emisor }}</span>
+      <span class="etiqueta">Emitida por</span>
     </div>
   </div>
 </ion-content>

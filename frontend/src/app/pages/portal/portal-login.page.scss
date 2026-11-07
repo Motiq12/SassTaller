@@ -1,4 +1,457 @@
-// Honeypot anti-bot: fuera de pantalla y sin interacción (invisible para humanos).
+// Entrar, crear cuenta y recuperar el acceso (las tres pantallas usan este archivo).
+//
+// Siempre oscuras, como el sitio, en los dos temas del teléfono: por eso los
+// colores van escritos aquí y no salen de las variables del tema.
+//
+// La foto del taller ocupa toda la pantalla y encima va un panel sólido con una
+// franja a cuadros (la bandera de llegada), arriba en el celular y en el borde
+// izquierdo en escritorio:
+//
+//   Celular y tablet (<1024px): la marca arriba (logo y título) y el panel sube
+//   como una hoja que llega hasta abajo.
+//   Escritorio (≥1024px): la marca a la izquierda, sobre la foto, y el panel es
+//   la columna de la derecha, de alto completo.
+
+$tinta: #0b0d10;
+$borde: #262b34;
+$borde-campo: #3a404b;
+$texto: #f1f5f9;
+$texto-2: #94a3b8;
+$texto-3: #8591a3;
+$rojo: var(--ion-color-primary);
+$rojo-claro: var(--ion-color-primary-tint);
+$ease: var(--ease-out, cubic-bezier(0.32, 0.72, 0, 1));
+
+// La bandera a cuadros: blanco y tinta, cuadros de 6 px.
+@mixin cuadros($lado: 6px) {
+  background:
+    repeating-conic-gradient(#e9edf2 0 25%, $tinta 0 50%) 0 0 / #{$lado * 2} #{$lado * 2};
+}
+
+.acceso-content {
+  --background: #{$tinta};
+  --color: #{$texto};
+  color: $texto;
+  color-scheme: dark;
+}
+
+.acceso {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  // En celular y tablet la foto va solo detrás de la marca (ver acceso-marca); en
+  // escritorio, de fondo de toda la pantalla (más abajo).
+  background: $tinta;
+}
+
+// ── El panel ──
+.acceso-panel {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 38px 22px calc(16px + var(--ion-safe-area-bottom, 0px));
+  background: $tinta;
+  // La franja a cuadros arriba, con una raya roja debajo.
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 12px;
+    @include cuadros(6px);
+    box-shadow: 0 3px 0 0 #e2231a;
+  }
+}
+
+.acceso-caja {
+  width: 100%;
+  max-width: 420px;
+  margin-block: auto;
+  animation: entra .45s .05s $ease both;
+}
+
+// ── Pestañas Entrar / Crear cuenta ──
+.pits-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 26px;
+  border-bottom: 1px solid $borde;
+
+  a {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: $texto-3;
+    transition: color .2s $ease;
+
+    &::after {
+      content: '';
+      position: absolute;
+      left: 0; right: 0; bottom: -1px;
+      height: 3px;
+      background: $rojo;
+      transform: scaleX(0);
+      transition: transform .25s $ease;
+    }
+
+    &:hover { color: $texto; }
+    &.on { color: #fff; &::after { transform: none; } }
+    &:focus-visible { outline: 2px solid $rojo; outline-offset: -2px; }
+  }
+}
+
+// ── Encabezado ──
+.acceso-head {
+  margin-bottom: 20px;
+
+  h1 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: 0;
+    color: #fff;
+  }
+
+  p {
+    margin: 8px 0 0;
+    font-size: 14.5px;
+    line-height: 1.55;
+    color: $texto-2;
+    overflow-wrap: anywhere;
+
+    strong { color: $texto; font-weight: 600; }
+  }
+}
+
+// Ícono de la verificación en dos pasos.
+.acceso-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 16px;
+  border: 1px solid $borde;
+  border-radius: 2px;
+
+  ion-icon { font-size: 24px; color: $rojo-claro; }
+}
+
+// Pasos: una raya por paso y el nombre del paso en que se está.
+.pasos {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+
+  span {
+    flex: 1;
+    max-width: 44px;
+    height: 3px;
+    border-radius: 2px;
+    background: $borde;
+    transition: background-color .3s $ease;
+
+    &.on { background: $rojo; }
+  }
+
+  em {
+    margin-left: 8px;
+    font-family: var(--font-display);
+    font-style: normal;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: $texto-3;
+  }
+}
+
+// ── El formulario: sin tarjeta ──
+ion-card.acceso-form {
+  --background: transparent;
+  --color: #{$texto};
+  margin: 0 !important;
+  border: none;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  overflow: visible;
+  animation: none;
+
+  ion-card-content { padding: 0; }
+}
+
+// Campos subrayados: la etiqueta arriba, una raya abajo que se pone roja al escribir.
+.acceso-form ion-item {
+  --background: transparent;
+  --background-hover: transparent;
+  --background-focused: transparent;
+  --color: #{$texto};
+  --padding-start: 0;
+  --padding-end: 0;
+  --inner-padding-end: 0;
+  --min-height: 58px;
+  --border-width: 0;
+  --inner-border-width: 0;
+  --highlight-height: 0;
+  margin-bottom: 10px;
+  border-bottom: 1px solid $borde-campo;
+  transition: border-color .2s $ease, box-shadow .2s $ease;
+
+  &:hover { border-bottom-color: #5b6472; }
+
+  &:focus-within {
+    border-bottom-color: $rojo;
+    box-shadow: 0 1px 0 0 #e2231a;
+  }
+
+  // Ionic achica la etiqueta de arriba al 75 %: queda en su tamaño, legible.
+  ion-label {
+    margin-top: 8px !important;
+    transform: none !important;
+    color: $texto-2 !important;
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  &:focus-within ion-label { color: $rojo-claro !important; }
+
+  ion-input {
+    --color: #fff;
+    --placeholder-color: #5f6b7d;
+    --placeholder-opacity: 1;
+    --padding-top: 6px;
+    --padding-bottom: 8px;
+    font-size: 16px;
+    font-weight: 500;
+  }
+
+  // El ojo para ver u ocultar la contraseña, dentro del campo.
+  .ver-pass {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px; margin: 0; padding: 0;
+    border: 0; border-radius: 4px; background: transparent; color: $texto-2; cursor: pointer;
+    ion-icon { font-size: 20px; }
+    &:hover { color: #fff; }
+    &:focus-visible { outline: 2px solid $rojo; outline-offset: 2px; }
+  }
+
+  // Error que marca el servidor (shared/errores.ts): la raya en rojo. El mensaje
+  // de abajo se pinta desde global.scss (lo crea ese archivo a mano).
+  &.campo-error {
+    border-bottom-color: var(--ion-color-danger-tint);
+    box-shadow: 0 1px 0 0 var(--ion-color-danger-tint);
+  }
+}
+
+// Los códigos de 6 dígitos se leen mejor grandes y espaciados.
+.acceso-form ion-item.campo-codigo ion-input {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: .35em;
+}
+
+// De a dos los pares cortos (nombre y apellido, teléfono y cédula).
+.campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 18px; }
+.campos > * { grid-column: 1 / -1; }
+.campos > .campo-par { grid-column: auto; }
+
+// Lo que pide la contraseña, mientras se escribe: gris si todavía no, verde si ya.
+.pass-reglas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 2px 0 14px;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+  color: $texto-3;
+
+  li { display: inline-flex; align-items: center; gap: 5px; transition: color .2s $ease; }
+  ion-icon { font-size: 15px; }
+  li.ok { color: #4ade80; }
+  li.mal { color: #fca5a5; }
+}
+
+// ── Botones ──
+.acceso-form ion-button.btn-principal {
+  height: 54px;
+  margin: 22px 0 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  letter-spacing: .08em;
+  --border-radius: 2px;
+  --background: #{$rojo};
+  --background-hover: var(--ion-color-primary-shade);
+  --background-hover-opacity: 1;
+  --background-activated: var(--ion-color-primary-shade);
+  --color: #fff;
+  --box-shadow: 0 12px 28px rgba(226, 35, 26, .3);
+
+  ion-icon { transition: transform .2s $ease; }
+  &:hover ion-icon[slot="end"] { transform: translateX(4px); }
+
+  // Apagado (falta llenar algo) sigue siendo el botón rojo, más tenue.
+  &.button-disabled {
+    opacity: 1;
+    --background: rgba(226, 35, 26, .3);
+    --color: rgba(255, 255, 255, .7);
+    --box-shadow: none;
+  }
+}
+
+.acceso-form ion-button.btn-secundario {
+  height: 48px;
+  margin: 0 0 10px;
+  font-size: 14px;
+  --border-radius: 2px;
+  --background: transparent;
+  --background-hover: rgba(255, 255, 255, .04);
+  --background-hover-opacity: 1;
+  --background-activated: rgba(255, 255, 255, .06);
+  --border-width: 1px;
+  --border-color: #{$borde-campo} !important;
+  --color: #{$texto} !important;
+  --box-shadow: none;
+
+  &:hover { --border-color: #5b6472 !important; }
+  ion-icon { color: $texto-2; }
+}
+
+// "o" entre Ingresar y las otras formas de entrar.
+.separador {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 16px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: $texto-3;
+
+  &::before, &::after { content: ''; flex: 1; height: 1px; background: $borde; }
+}
+
+// ── Enlaces ──
+.enlace {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: $texto-2;
+  text-decoration: underline;
+  text-decoration-color: #4b5361;
+  text-underline-offset: 4px;
+  cursor: pointer;
+  transition: color .2s $ease, text-decoration-color .2s $ease;
+
+  ion-icon { font-size: 15px; }
+  &:hover { color: #fff; text-decoration-color: $rojo; }
+  &:focus-visible { outline: 2px solid $rojo; outline-offset: 3px; }
+  &:disabled { opacity: .5; cursor: default; pointer-events: none; }
+}
+
+// "← Volver a entrar", arriba del título en recuperar el acceso.
+.volver-arriba { margin-bottom: 18px; text-decoration: none; }
+
+.fila-olvido { display: flex; justify-content: flex-end; margin: 2px 0 0; }
+.fila-centro { display: flex; justify-content: center; margin-top: 12px; }
+
+.ayuda {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: $texto-3;
+}
+ion-item + .ayuda { margin: 0 0 12px; }
+.ayuda.falta { margin-top: 10px; text-align: center; }
+
+// Ley 8968: términos y privacidad, arriba de "Crear cuenta".
+.aviso-legal {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: $texto-3;
+
+  a { color: $rojo-claro; text-underline-offset: 3px; }
+}
+
+// Debajo del formulario: "Volver al sitio web".
+.acceso-pie { margin-top: 24px; text-align: center; }
+
+.acceso-legal {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 28px;
+  font-size: 12px;
+  color: #64748b;
+
+  a { color: $texto-3; text-decoration: none; &:hover { color: #fff; text-decoration: underline; } }
+}
+
+// ── Tablet: el formulario un poco más ancho ──
+@media (min-width: 640px) {
+  .acceso-panel { padding-top: 46px; }
+  .acceso-caja { max-width: 440px; }
+}
+
+// ── Escritorio: la marca a la izquierda, sobre la foto; el panel a la derecha ──
+@media (min-width: 1024px) {
+  .acceso {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(480px, 520px);
+    background:
+      linear-gradient(90deg, rgba(11, 13, 16, .25) 0%, rgba(11, 13, 16, .5) 60%, rgba(11, 13, 16, .85) 100%),
+      linear-gradient(180deg, rgba(11, 13, 16, .2) 0%, rgba(11, 13, 16, .3) 50%, rgba(11, 13, 16, .9) 100%),
+      url('/assets/portal/taller-bg.jpg') 30% center / cover no-repeat,
+      $tinta;
+  }
+
+  .acceso-panel {
+    justify-content: center;
+    min-height: 100vh;
+    min-height: 100dvh;
+    box-sizing: border-box;
+    padding: 48px 56px 24px 68px;
+
+    // La franja a cuadros pasa al borde izquierdo, de alto completo.
+    &::before {
+      inset: 0 auto 0 0;
+      width: 12px;
+      height: auto;
+      box-shadow: 3px 0 0 0 #e2231a;
+    }
+  }
+
+  .acceso-caja { max-width: 400px; }
+
+  .acceso-head h1 { font-size: 36px; }
+}
+
+// Anti-bot: honeypot fuera de pantalla y sin interacción (invisible para humanos).
 .hp-field {
   position: absolute !important;
   left: -9999px;
@@ -11,139 +464,18 @@
 
 // Contenedor del captcha Turnstile.
 .turnstile-box {
+  display: flex;
+  justify-content: center;
   margin: 14px 0 4px;
-  display: flex;
-  justify-content: center;
-  min-height: 0;
 }
 
-// Logo: llave + martillo cruzados en carmesí
-.logo-cross {
-  position: relative;
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  ion-icon { position: absolute; }
-  .ico-wrench { font-size: 36px; color: var(--ion-color-primary); transform: rotate(-18deg); }
-  .ico-hammer { font-size: 26px; color: var(--ion-color-primary-tint); transform: rotate(72deg) translateX(2px); }
+@keyframes entra {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
 }
 
-// Chrome pinta de amarillo lo que autocompleta. Se tapa con el fondo del campo —
-// que ahora sigue al tema, no un gris fijo: con el negro de antes, en modo claro
-// el correo autocompletado aparecía en un recuadro oscuro en medio del formulario.
-//
-// El relleno tiene que ser el MISMO que calcula .login-content para el campo (ver
-// global.scss): si acá quedara --ion-item-background, el campo autocompletado saldría
-// de otro color que el de al lado, y justo el del correo, que es el que más se
-// autocompleta. El respaldo es para las pantallas que no son las de acceso.
-input:-webkit-autofill,
-input:-webkit-autofill:hover,
-input:-webkit-autofill:focus,
-input:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 40px
-    color-mix(in srgb, var(--ion-text-color, #000) 7%, var(--lienzo, var(--ion-item-background, #fff))) inset !important;
-  -webkit-text-fill-color: var(--ion-text-color, #111) !important;
-  caret-color: var(--ion-text-color, #111);
-  transition: background-color 5000s ease-in-out 0s;
-}
-
-// Los enlaces de abajo del formulario. Los colores eran para el fondo negro que
-// tenía esta pantalla; sobre la superficie clara del panel nuevo no se leían.
-.portal-link {
-  display: block;
-  text-align: center;
-  margin-top: 18px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ion-color-medium-shade, #6b7280);
-  text-decoration: underline;
-  text-underline-offset: 4px;
-  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
-  position: relative;
-  z-index: 1;
-  cursor: pointer;
-
-  &:hover, &:active { color: var(--acento-texto, var(--ion-color-primary)); }
-
-  // CTA secundario: "Crear una cuenta". Es la acción que sigue en importancia al
-  // botón de ingresar, así que se separa del resto en vez de ser un enlace más.
-  &.strong {
-    color: var(--acento-texto, var(--ion-color-primary));
-    font-weight: 700;
-    font-size: 14px;
-    text-decoration-color: color-mix(in srgb, var(--acento-texto, var(--ion-color-primary)) 45%, transparent);
-    text-underline-offset: 5px;
-    margin-top: 22px;
-  }
-  // Links secundarios (olvidé contraseña / registrar un taller)
-  // Enlaces secundarios (olvidé contraseña / registrar un taller). El gris del
-  // tema daba 4.04:1 sobre el lienzo claro, por debajo del 4.5:1 que pide WCAG para
-  // texto chico. Se deriva del color de texto mezclado con el lienzo, así que la
-  // cuenta sale bien en los dos modos sin un gris fijo para cada uno.
-  &.sub {
-    margin-top: 10px;
-    font-size: 12px;
-    color: color-mix(in srgb, var(--ion-text-color, #111) 62%, var(--lienzo, transparent));
-  }
-  // Reenviar deshabilitado durante el cooldown
-  &.disabled {
-    opacity: 0.45;
-    pointer-events: none;
-    cursor: default;
-  }
-}
-
-/* Nota de ayuda en recuperar contraseña (reusa este scss) */
-.ayuda-correo {
-  font-size: 11.5px;
-  color: var(--n-500, #737373);
-  margin: 8px 4px 0;
-  line-height: 1.5;
-}
-
-/* Paso de verificación en dos pasos (personal con 2FA activo) */
-.dosfa-card {
-  .dosfa-head {
-    text-align: center;
-    margin-bottom: 6px;
-
-    ion-icon {
-      font-size: 40px;
-      color: var(--ion-color-primary);
-    }
-    h2 {
-      margin: 8px 0 4px;
-      font-family: var(--font-display, inherit);
-      font-size: 19px;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-    }
-    p {
-      margin: 0;
-      font-size: 13px;
-      color: var(--n-500, #737373);
-      line-height: 1.5;
-    }
-  }
-
-  /* El código se lee mejor grande y espaciado, como en las apps de autenticación */
-  ion-input {
-    --padding-start: 0;
-    font-family: var(--font-mono, monospace);
-    font-size: 26px;
-    font-weight: 700;
-    letter-spacing: 6px;
-    text-align: center;
-  }
-
-  .dosfa-ayuda {
-    font-size: 11.5px;
-    color: var(--n-500, #737373);
-    margin: 14px 4px 0;
-    line-height: 1.5;
-    text-align: center;
-  }
+@media (prefers-reduced-motion: reduce) {
+  .acceso-caja { animation: none; }
+  .pits-tabs a::after,
+  .acceso-form ion-button.btn-principal ion-icon { transition: none; }
 }

@@ -1,0 +1,161 @@
+// Mi perfil de los tres roles, con los colores del panel (.admin-dark): siguen el tema.
+// Como los ajustes de un celular: arriba la persona, abajo los grupos de filas.
+// Desde 1200 px la lista queda a la izquierda y la sección abierta a la derecha; más
+// angosto, se ve una cosa a la vez (la sección trae su "volver").
+// Lo carga app-perfil-lista sin encapsulación: todo va bajo .pf.
+.pf {
+  max-width: 1080px; margin: 0 auto; padding: 18px 16px 60px;
+  .cd { margin-bottom: 14px; }
+
+  // ── Lista ──
+  app-perfil-lista { display: block; }
+  .pf-lista.cd { padding: 0; overflow: hidden; }
+
+  .pf-quien {
+    display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 28px 20px 22px; text-align: center;
+    h1 { margin: 8px 0 0; font-family: var(--fd); font-size: 24px; font-weight: 700; line-height: 1.15; color: var(--tx); overflow-wrap: anywhere; }
+  }
+  .pf-correo { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--tx3); overflow-wrap: anywhere; ion-icon { font-size: 15px; flex-shrink: 0; } }
+  .pf-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 6px; }
+  .pf-chip {
+    display: inline-flex; align-items: center; padding: 3px 9px; border: 1px solid var(--bd2); border-radius: 2px;
+    font-size: 11.5px; font-weight: 600; color: var(--tx2);
+    &.rol { border-color: var(--cr); color: var(--cr-tx); }
+  }
+
+  .pf-avatar {
+    position: relative; width: 88px; height: 88px; border-radius: 50%; padding: 0; overflow: hidden; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    background: var(--cr); color: #fff; border: 3px solid var(--sur);
+    box-shadow: 0 0 0 1px var(--bd), 0 8px 22px rgba(0, 0, 0, .18);
+    font-family: var(--fd); font-size: 30px; font-weight: 700;
+    img { width: 100%; height: 100%; object-fit: cover; }
+    &.grande { width: 128px; height: 128px; font-size: 42px; }
+    &:disabled { cursor: default; }
+    &:focus-visible { outline: 2px solid var(--cr); outline-offset: 3px; }
+  }
+  .pf-avatar-velo {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(0, 0, 0, .45); color: #fff; opacity: 0; transition: opacity .15s;
+    ion-icon { font-size: 24px; }
+  }
+  .pf-avatar:hover .pf-avatar-velo, .pf-avatar:focus-visible .pf-avatar-velo { opacity: 1; }
+
+  .pf-grupos { border-top: 1px solid var(--bd); }
+  .pf-grupo {
+    padding: 14px 10px 10px; border-bottom: 1px solid var(--bd);
+    &:last-child { border-bottom: 0; }
+    h2 { margin: 0 10px 6px; font-size: 12px; font-weight: 600; color: var(--tx3); }
+  }
+  .pf-fila {
+    display: flex; align-items: center; gap: 12px; width: 100%; min-height: 46px; padding: 10px; border: 0; border-radius: 6px;
+    background: none; font: inherit; text-align: left; cursor: pointer; color: var(--tx); transition: background .15s;
+    .pf-fila-ico { font-size: 18px; color: var(--tx3); flex-shrink: 0; }
+    .pf-fila-txt { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 500; }
+    .pf-fila-valor {
+      font-size: 12.5px; color: var(--tx3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%;
+      &.ok { color: var(--em); font-weight: 600; }
+      &.aviso { color: var(--am); font-weight: 600; }
+    }
+    .pf-fila-chev { font-size: 15px; color: var(--tx3); flex-shrink: 0; }
+    &:hover { background: var(--sur2); }
+    &:focus-visible { outline: 2px solid var(--cr); outline-offset: -2px; }
+    // La sección abierta (en escritorio): fondo y una raya roja.
+    &.on { background: color-mix(in srgb, var(--cr) 9%, transparent); box-shadow: inset 3px 0 0 var(--cr);
+      .pf-fila-ico, .pf-fila-chev { color: var(--cr-tx); } .pf-fila-txt { font-weight: 700; } }
+    &.salir { color: var(--rd); .pf-fila-ico { color: var(--rd); } }
+  }
+
+  // ── Sección abierta ──
+  .pf-detalle { min-width: 0; }
+  .pf-volver {
+    display: inline-flex; align-items: center; gap: 4px; margin: 0 0 12px -4px; padding: 6px 8px; border: 0; border-radius: 4px;
+    background: none; font: inherit; font-size: 14px; font-weight: 600; color: var(--cr-tx); cursor: pointer;
+    ion-icon { font-size: 18px; }
+    &:hover { background: var(--sur2); }
+    &:focus-visible { outline: 2px solid var(--cr); outline-offset: 1px; }
+  }
+
+  .pf-sec-cab {
+    display: flex; align-items: flex-start; gap: 12px; margin-bottom: 18px;
+    h2 { margin: 0; font-family: var(--fd); font-size: 20px; font-weight: 700; color: var(--tx); }
+    p { margin: 2px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--tx3); }
+  }
+  .pf-sec-icono {
+    display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex-shrink: 0;
+    border-radius: 8px; background: rgba(226, 35, 26, .12); color: var(--cr-tx);
+    ion-icon { font-size: 18px; }
+  }
+  .pf-pie { display: flex; justify-content: flex-end; margin-top: 4px; }
+  .pf-nota { margin: -4px 2px 0; font-size: 12.5px; color: var(--tx3); a { color: var(--cr-tx); font-weight: 600; } }
+
+  // Datos que no se cambian acá.
+  .pf-datos-fijos {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 4px 0 16px;
+    > div { padding: 10px 12px; border: 1px solid var(--bd); border-radius: 4px; background: var(--sur2); }
+    span { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--tx3); }
+    strong { display: block; margin-top: 2px; font-size: 13.5px; color: var(--tx); }
+    small { display: block; margin-top: 2px; font-size: 12px; color: var(--tx3); }
+  }
+
+  // Foto
+  .pf-foto { display: flex; flex-wrap: wrap; align-items: center; gap: 20px 28px; }
+  .pf-foto-acciones { display: flex; flex-wrap: wrap; gap: 8px; ion-icon { font-size: 15px; } }
+
+  // Contraseña
+  .pass-field .pass-wrap {
+    position: relative;
+    input { padding-right: 40px; }
+    .pass-eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; padding: 4px; cursor: pointer; color: var(--tx3);
+      ion-icon { font-size: 20px; }
+      &:hover { color: var(--tx); } }
+  }
+  .pf-fuerza {
+    display: flex; align-items: center; gap: 10px; margin-top: 8px;
+    .pf-fuerza-barras { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 120px; flex-shrink: 0;
+      span { height: 4px; border-radius: 2px; background: var(--sur3); } }
+    .pf-fuerza-txt { font-size: 12px; color: var(--tx3); }
+    &[data-nivel='1'] { .pf-fuerza-barras span:nth-child(-n+1) { background: var(--rd); } .pf-fuerza-txt { color: var(--rd); } }
+    &[data-nivel='2'] { .pf-fuerza-barras span:nth-child(-n+2) { background: var(--am); } }
+    &[data-nivel='3'] { .pf-fuerza-barras span { background: var(--em); } .pf-fuerza-txt { color: var(--em); } }
+  }
+
+  // Apariencia
+  .pf-opcion {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 14px;
+    padding: 12px 0; border-top: 1px solid var(--bd);
+    &:first-of-type { border-top: 0; padding-top: 0; }
+  }
+  .pf-opcion-txt { strong { display: block; font-size: 14px; color: var(--tx); } span { font-size: 12px; color: var(--tx3); } }
+  .pf-seg {
+    display: inline-flex; gap: 3px; padding: 3px; background: var(--sur2); border-radius: 2px;
+    button {
+      display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 38px; height: 34px; padding: 0 10px;
+      border: 0; border-radius: 2px; background: none; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--tx3); cursor: pointer;
+      ion-icon { font-size: 15px; }
+      span { font-weight: 800; line-height: 1; }
+      &.on { background: var(--sur); color: var(--tx); box-shadow: 0 1px 2px rgba(0, 0, 0, .14); ion-icon { color: var(--cr-tx); } }
+      &:focus-visible { outline: 2px solid var(--cr); outline-offset: 1px; }
+    }
+  }
+
+  // El componente de dos pasos trae su propia caja: solo se le da el mismo aire.
+  app-dosfa { display: block; margin-bottom: 14px; }
+}
+
+// Una cosa a la vez: con una sección abierta, la lista se esconde.
+@media (max-width: 1199px) {
+  .pf { max-width: 640px; }
+  .pf.con-seccion .pf-lista { display: none; }
+}
+@media (max-width: 560px) {
+  .pf { padding: 14px 12px 48px; }
+  .pf .pf-seg { width: 100%; button { flex: 1; } }
+}
+// Lado a lado: la lista queda fija al bajar; el "volver" no hace falta.
+@media (min-width: 1200px) {
+  .pf { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 0 20px; align-items: start; }
+  .pf .pf-lista { position: sticky; top: 18px; }
+  .pf .pf-volver { display: none; }
+}

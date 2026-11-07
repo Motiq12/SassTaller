@@ -7,15 +7,17 @@ import { PortalTabsPage } from './portal-tabs.page';
 import { PortalInicioPage } from './portal-inicio.page';
 import { PortalAgendarPage } from './portal-agendar.page';
 import { PortalCitasPage } from './portal-citas.page';
-import { PortalVehiculosPage } from './portal-vehiculos.page';
+import { PortalMotosPage } from './portal-motos.page';
 import { PortalOfertasPage } from './portal-ofertas.page';
 import { PortalPerfilPage } from './portal-perfil.page';
 import { PortalLegalPage } from './portal-legal.page';
 import { PortalCitaDetallePage } from './portal-cita-detalle.page';
-import { PortalVehiculoHistorialPage } from './portal-vehiculo-historial.page';
+import { PortalMotoHistorialPage } from './portal-moto-historial.page';
 import { PortalNotificacionesPage } from './portal-notificaciones.page';
 import { PortalActionsComponent } from './portal-actions.component';
 import { PortalOnboardingComponent } from './portal-onboarding.component';
+import { AccesoMarcaComponent } from './acceso-marca.component';
+import { GoogleBotonComponent } from './google-boton.component';
 import { SharedModule } from '../../shared/shared.module';
 
 @NgModule({
@@ -23,9 +25,9 @@ import { SharedModule } from '../../shared/shared.module';
   declarations: [
     PortalLoginPage, PortalRegistroPage, PortalRecuperarPage,
     PortalTabsPage, PortalInicioPage, PortalAgendarPage,
-    PortalCitasPage, PortalVehiculosPage, PortalOfertasPage, PortalPerfilPage,
-    PortalLegalPage, PortalCitaDetallePage, PortalVehiculoHistorialPage, PortalNotificacionesPage,
-    PortalActionsComponent, PortalOnboardingComponent,
+    PortalCitasPage, PortalMotosPage, PortalOfertasPage, PortalPerfilPage,
+    PortalLegalPage, PortalCitaDetallePage, PortalMotoHistorialPage, PortalNotificacionesPage,
+    PortalActionsComponent, PortalOnboardingComponent, AccesoMarcaComponent, GoogleBotonComponent,
   ],
 })
 export class PortalPageModule {}

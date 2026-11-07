@@ -69,9 +69,33 @@
   margin-top: 4px;
   padding: 3px 6px;
   border: 1px solid var(--bd);
-  border-radius: 6px;
+  border-radius: 2px;
   background: var(--sur3);
   color: var(--tx2);
   font-size: 11px;
   max-width: 170px;
+}
+
+// Casillas de permisos del sitio web en el alta/edición de un empleado.
+.emp-web {
+  .emp-web-op {
+    display: flex !important;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    margin: 0 0 6px !important;
+    background: var(--sur2);
+    border: 1px solid var(--bd);
+    border-radius: 2px;
+    cursor: pointer;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    font-size: 13px !important;
+    font-weight: 400 !important;
+    color: var(--tx) !important;
+
+    input { width: 18px !important; height: 18px; margin-top: 2px; padding: 0 !important; accent-color: var(--cr); flex-shrink: 0; }
+    strong { display: block; font-size: 13px; font-weight: 700; }
+    small { display: block; font-size: 11px; color: var(--tx3); margin-top: 2px; line-height: 1.4; }
+  }
 }

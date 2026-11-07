@@ -3,12 +3,10 @@ import { RecepcionPageRoutingModule } from './recepcion-routing.module';
 import { RecepcionTabsPage } from './recepcion-tabs.page';
 import { RecepcionActionsComponent } from './recepcion-actions.component';
 import { RecepcionPage } from './recepcion.page';
-import { RecepcionAgendarPage } from './recepcion-agendar.page';
 import { RecepcionAgendaPage } from './recepcion-agenda.page';
 import { RecepcionOrdenesPage } from './recepcion-ordenes.page';
 import { RecepcionCotizPage } from './recepcion-cotiz.page';
 import { RecepcionMensajesPage } from './recepcion-mensajes.page';
-import { RecepcionClientesPage } from './recepcion-clientes.page';
 import { RecepcionPerfilPage } from './recepcion-perfil.page';
 import { SharedModule } from '../../shared/shared.module';
 
@@ -18,12 +16,10 @@ import { SharedModule } from '../../shared/shared.module';
     RecepcionTabsPage,
     RecepcionActionsComponent,
     RecepcionPage,
-    RecepcionAgendarPage,
     RecepcionAgendaPage,
     RecepcionOrdenesPage,
     RecepcionCotizPage,
     RecepcionMensajesPage,
-    RecepcionClientesPage,
     RecepcionPerfilPage,
   ],
 })

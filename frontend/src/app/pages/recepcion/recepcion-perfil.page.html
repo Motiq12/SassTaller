@@ -5,88 +5,131 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
-  <ion-refresher slot="fixed" (ionRefresh)="cargar(); $event.target.complete()">
-    <ion-refresher-content pullingIcon="chevron-down" refreshingSpinner="crescent"></ion-refresher-content>
-  </ion-refresher>
+<!-- La misma lista de ajustes que el panel (shared/perfil): a la izquierda la lista y
+     a la derecha la sección desde 1200 px; en el celular, una cosa a la vez. -->
+<ion-content class="admin-dark">
+  <div class="pf" [class.con-seccion]="!!seccion">
+    <input #fotoInput type="file" accept="image/*" hidden (change)="onFoto($event)">
 
-  <div class="rec-perfil">
-    <!-- Skeleton -->
-    <div *ngIf="cargando" style="display:flex;flex-direction:column;gap:14px">
-      <div class="skeleton" style="height:108px"></div>
-      <div class="skeleton" style="height:96px"></div>
-      <div class="skeleton" style="height:240px"></div>
-    </div>
+    <div *ngIf="cargando" class="sk-dark" style="height:420px"></div>
 
     <ng-container *ngIf="!cargando">
-      <!-- Cabecera con foto -->
-      <div class="profile-header">
-        <div class="avatar-wrap">
-          <button type="button" class="avatar" (click)="pedirFoto(fotoInput)" [disabled]="subiendoFoto"
-                  [attr.aria-label]="perfil?.foto ? 'Cambiar foto de perfil' : 'Agregar foto de perfil'">
-            <img *ngIf="perfil?.foto; else iniTpl" [src]="perfil.foto" alt="Foto de perfil">
-            <ng-template #iniTpl>{{ iniciales }}</ng-template>
-          </button>
-          <button type="button" class="avatar-cam" [class.cargando]="subiendoFoto" (click)="pedirFoto(fotoInput)"
-                  [disabled]="subiendoFoto" aria-label="Cambiar foto de perfil">
-            <ion-icon [name]="subiendoFoto ? 'hourglass-outline' : 'camera'"></ion-icon>
-          </button>
-          <input #fotoInput type="file" accept="image/*" hidden (change)="onFoto($event)">
-        </div>
-        <div class="info">
-          <h2>{{ cuenta.nombre || 'Recepción' }}</h2>
-          <span class="role-chip">Recepcionista</span>
-          <p class="contact">{{ cuenta.email || '—' }}<ng-container *ngIf="cuenta.telefono"> · <ion-icon name="call-outline"></ion-icon> {{ cuenta.telefono }}</ng-container></p>
-          <button type="button" class="quitar-foto" *ngIf="perfil?.foto" (click)="quitarFoto()" [disabled]="subiendoFoto">Quitar foto</button>
-        </div>
-      </div>
+      <app-perfil-lista class="pf-lista cd" [grupos]="grupos" [vista]="vista" [valores]="valores" [estados]="estados"
+                        [nombre]="perfil?.nombre || ''" [email]="perfil?.email || ''" [fotoUrl]="perfil?.foto" [iniciales]="iniciales"
+                        [chips]="[rolNombre, sedeLabel]" [subiendoFoto]="subiendoFoto"
+                        (abrir)="abrir($event)" (salir)="logout()" (foto)="pedirFoto(fotoInput)"></app-perfil-lista>
 
-      <!-- Mi cuenta -->
-      <section class="card">
-        <span class="section-label">Mi cuenta</span>
-        <div class="ig"><label>Nombre</label><input [(ngModel)]="cuenta.nombre" placeholder="Tu nombre"></div>
-        <div class="ig"><label>Correo</label><input type="email" [(ngModel)]="cuenta.email" placeholder="correo@taller.com"></div>
-        <div class="ig"><label>Teléfono</label><input type="tel" [(ngModel)]="cuenta.telefono" placeholder="8888-8888"></div>
+      <main class="pf-detalle" *ngIf="vista as v">
+        <button type="button" class="pf-volver" (click)="volverALista()">
+          <ion-icon name="chevron-back"></ion-icon> Mi perfil
+        </button>
 
-        <!-- Datos que fija el admin (solo lectura) -->
-        <div class="ro-row">
-          <div class="ro"><ion-icon name="location-outline"></ion-icon><div><span class="ro-lbl">Sede asignada</span><strong>{{ sedeLabel }}</strong></div></div>
-          <div class="ro"><ion-icon name="calendar-outline"></ion-icon><div><span class="ro-lbl">Miembro desde</span><strong>{{ miembroDesde }}</strong></div></div>
-        </div>
+        <ng-container [ngSwitch]="v">
+          <!-- Datos personales -->
+          <section class="cd" *ngSwitchCase="'datos'">
+            <div class="pf-sec-cab">
+              <span class="pf-sec-icono"><ion-icon name="person-outline"></ion-icon></span>
+              <div><h2>Datos personales</h2><p>Tu nombre se ve en las órdenes y en los mensajes del equipo.</p></div>
+            </div>
+            <div class="fg"><label>Nombre</label><input [(ngModel)]="cuenta.nombre" name="nombre" placeholder="Tu nombre" autocomplete="name"></div>
+            <div class="fg"><label>Correo</label><input type="email" [(ngModel)]="cuenta.email" name="email" placeholder="correo@taller.com" autocomplete="email">
+              <div class="hint">Es con el que entrás al sistema.</div></div>
+            <div class="fg"><label>Teléfono o WhatsApp</label><input type="tel" [(ngModel)]="cuenta.telefono" name="telefono" placeholder="8888-8888" autocomplete="tel"></div>
+            <div class="pf-datos-fijos">
+              <div><span>Sede asignada</span><strong>{{ sedeLabel }}</strong></div>
+              <div><span>En el equipo desde</span><strong>{{ miembroDesde }}</strong></div>
+            </div>
+            <div class="pf-pie">
+              <button class="btn btn-cr" [disabled]="guardando || !cuentaCambiada" (click)="guardarCuenta()">{{ guardando ? 'Guardando…' : 'Guardar cambios' }}</button>
+            </div>
+          </section>
 
-        <button class="cta" [disabled]="guardando" (click)="guardarCuenta()">Guardar cambios</button>
-      </section>
+          <!-- Foto de perfil -->
+          <section class="cd" *ngSwitchCase="'foto'">
+            <div class="pf-sec-cab">
+              <span class="pf-sec-icono"><ion-icon name="image-outline"></ion-icon></span>
+              <div><h2>Foto de perfil</h2><p>Se ve en el menú y en los mensajes del equipo. Al subirla la podés encuadrar.</p></div>
+            </div>
+            <div class="pf-foto">
+              <button type="button" class="pf-avatar grande" (click)="pedirFoto(fotoInput)" [disabled]="subiendoFoto" [attr.aria-label]="perfil?.foto ? 'Cambiar la foto' : 'Subir una foto'">
+                <img *ngIf="perfil?.foto; else ini2" [src]="perfil.foto" alt="">
+                <ng-template #ini2>{{ iniciales }}</ng-template>
+                <span class="pf-avatar-velo"><ion-icon [name]="subiendoFoto ? 'hourglass-outline' : 'camera-outline'"></ion-icon></span>
+              </button>
+              <div class="pf-foto-acciones">
+                <button type="button" class="btn btn-cr" (click)="pedirFoto(fotoInput)" [disabled]="subiendoFoto">
+                  <ion-icon name="camera-outline"></ion-icon> {{ perfil?.foto ? 'Cambiar foto' : 'Subir foto' }}
+                </button>
+                <button type="button" class="btn btn-ou" *ngIf="perfil?.foto" (click)="quitarFoto()" [disabled]="subiendoFoto">Quitar foto</button>
+              </div>
+            </div>
+          </section>
 
-      <!-- Accesibilidad -->
-      <section class="card">
-        <span class="section-label">Accesibilidad</span>
-        <div class="a11y-row">
-          <div class="a11y-info">
-            <strong>Tamaño de texto</strong>
-            <span>{{ nivelesTexto[a11y.nivel].nombre }}</span>
-          </div>
-          <div class="a11y-opts" role="group" aria-label="Tamaño de texto">
-            <button *ngFor="let n of nivelesTexto" class="a11y-opt" [class.on]="a11y.nivel === n.i"
-                    (click)="setTexto(n.i)" [attr.aria-pressed]="a11y.nivel === n.i" [attr.aria-label]="n.nombre"
-                    [style.font-size.px]="13 + n.i * 5">{{ n.etiqueta }}</button>
-          </div>
-        </div>
-      </section>
+          <app-mi-firma *ngSwitchCase="'firma'"></app-mi-firma>
 
-      <!-- Seguridad -->
-      <section class="card">
-        <span class="section-label">Seguridad</span>
-        <div class="ig"><label>Contraseña actual</label><input type="password" [(ngModel)]="pass.actual" placeholder="••••••••"></div>
-        <div class="ig"><label>Nueva contraseña</label><input type="password" [(ngModel)]="pass.nueva" placeholder="Mín. 8 caracteres"></div>
-        <button class="cta outline" [disabled]="guardandoPass" (click)="cambiarPassword()"><ion-icon name="lock-closed-outline"></ion-icon> Cambiar contraseña</button>
-      </section>
+          <!-- Contraseña -->
+          <section class="cd" *ngSwitchCase="'contrasena'">
+            <div class="pf-sec-cab">
+              <span class="pf-sec-icono"><ion-icon name="lock-closed-outline"></ion-icon></span>
+              <div><h2>Cambiar contraseña</h2><p>Mínimo {{ minimo }} caracteres{{ pideVariedad ? ', con letras y números' : '' }}. Una frase de varias palabras es lo más seguro.</p></div>
+            </div>
+            <div class="fg pass-field">
+              <label>Contraseña actual</label>
+              <div class="pass-wrap">
+                <input [type]="verActual ? 'text' : 'password'" [(ngModel)]="pass.actual" name="actual" placeholder="••••••••" autocomplete="current-password">
+                <button type="button" class="pass-eye" (click)="verActual = !verActual" [attr.aria-label]="verActual ? 'Ocultar' : 'Mostrar'">
+                  <ion-icon [name]="verActual ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+                </button>
+              </div>
+            </div>
+            <div class="fg pass-field">
+              <label>Nueva contraseña</label>
+              <div class="pass-wrap">
+                <input [type]="verNueva ? 'text' : 'password'" [(ngModel)]="pass.nueva" name="nueva" [placeholder]="'Mínimo ' + minimo + ' caracteres'" autocomplete="new-password">
+                <button type="button" class="pass-eye" (click)="verNueva = !verNueva" [attr.aria-label]="verNueva ? 'Ocultar' : 'Mostrar'">
+                  <ion-icon [name]="verNueva ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+                </button>
+              </div>
+              <div class="pf-fuerza" *ngIf="pass.nueva" [attr.data-nivel]="fuerza.nivel">
+                <div class="pf-fuerza-barras"><span></span><span></span><span></span></div>
+                <span class="pf-fuerza-txt">{{ fuerza.texto }}</span>
+              </div>
+            </div>
+            <div class="pf-pie">
+              <button class="btn btn-cr" [disabled]="guardandoPass || !pass.actual || !pass.nueva" (click)="cambiarPassword()">{{ guardandoPass ? 'Cambiando…' : 'Cambiar contraseña' }}</button>
+            </div>
+          </section>
 
-      <!-- Verificación en dos pasos (componente compartido) -->
-      <app-dosfa></app-dosfa>
+          <app-dosfa *ngSwitchCase="'dosfa'"></app-dosfa>
+          <app-mis-sesiones *ngSwitchCase="'sesiones'"></app-mis-sesiones>
 
-      <button class="cta danger" (click)="logout()"><ion-icon name="log-out-outline"></ion-icon> Cerrar sesión</button>
+          <!-- Apariencia -->
+          <section class="cd" *ngSwitchCase="'apariencia'">
+            <div class="pf-sec-cab">
+              <span class="pf-sec-icono"><ion-icon name="color-palette-outline"></ion-icon></span>
+              <div><h2>Apariencia</h2><p>Solo en este dispositivo.</p></div>
+            </div>
+            <div class="pf-opcion">
+              <div class="pf-opcion-txt"><strong>Tema</strong><span>{{ a11y.temaDetalle }}</span></div>
+              <div class="pf-seg" role="group" aria-label="Tema">
+                <button *ngFor="let t of a11y.temas" type="button" [class.on]="a11y.tema === t.id" (click)="a11y.setTema(t.id)" [attr.aria-pressed]="a11y.tema === t.id">
+                  <ion-icon [name]="iconoTema(t.id)"></ion-icon> {{ t.nombre }}
+                </button>
+              </div>
+            </div>
+            <div class="pf-opcion">
+              <div class="pf-opcion-txt"><strong>Tamaño de texto</strong><span>{{ nivelesTexto[a11y.nivel].nombre }}</span></div>
+              <div class="pf-seg" role="group" aria-label="Tamaño de texto">
+                <button *ngFor="let n of nivelesTexto" type="button" [class.on]="a11y.nivel === n.i" (click)="setTexto(n.i)" [attr.aria-pressed]="a11y.nivel === n.i"
+                        [attr.aria-label]="n.nombre"><span [style.font-size.px]="12 + n.i * 4">A</span></button>
+              </div>
+            </div>
+          </section>
+
+          <app-mis-preferencias *ngSwitchCase="'inicio'" rol="recepcion"></app-mis-preferencias>
+          <app-mi-actividad *ngSwitchCase="'actividad'"></app-mi-actividad>
+        </ng-container>
+      </main>
     </ng-container>
-
-    <div style="height:80px"></div>
   </div>
 </ion-content>

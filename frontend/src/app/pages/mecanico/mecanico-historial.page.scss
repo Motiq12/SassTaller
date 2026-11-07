@@ -1,13 +1,8 @@
-// Resumen y lista reusan los estilos de mecanico.page.scss (multi-styleUrls).
-// Solo agrega el pie verde de cada cita entregada (monto + calificación).
-.hist-sub { font-size: 13px; color: var(--n-500); margin: 4px 0 0; }
-
-.hist-foot {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  margin-top: 10px; padding: 9px 12px;
-  background: var(--emerald-50); border-radius: 12px;
-
-  .monto { font-size: 13px; font-weight: 700; color: var(--emerald-700); }
-  .stars { font-size: 14px; color: var(--amber-700); letter-spacing: 1px; }
-  .sin-calif { font-size: 11px; color: var(--n-400); font-style: italic; }
+// La tarjeta de cita es la del inicio (mecanico.page.scss, multi-styleUrls); acá
+// solo el pie con la calificación.
+.mc-citas { margin-top: 2px; }
+.mh-pie {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 2px; background: var(--sur);
+  font-size: 13px;
 }
+.mh-sin { font-size: 12px; font-style: italic; color: var(--tx3); }

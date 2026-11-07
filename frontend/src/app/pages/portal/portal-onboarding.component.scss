@@ -14,11 +14,11 @@
 .ob-card {
   position: relative; width: 100%; max-width: 360px;
   background: var(--ion-card-background); border: 1px solid var(--hairline);
-  border-radius: 26px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+  border-radius: 8px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
   padding: 30px 24px 22px; text-align: center;
   animation: obRise .28s cubic-bezier(0.32, 0.72, 0, 1) both;
 
-  h2 { font-family: var(--font-display); font-size: 21px; font-weight: 800; letter-spacing: -0.02em;
+  h2 { font-family: var(--font-display); font-size: 21px; font-weight: 800; letter-spacing: 0;
     margin: 0 0 8px; color: var(--ion-text-color); }
   p { font-size: 13.5px; line-height: 1.6; color: var(--n-500); margin: 0 0 20px; }
 }
@@ -30,10 +30,10 @@
 }
 
 .ob-illu {
-  width: 84px; height: 84px; margin: 6px auto 18px; border-radius: 26px;
+  width: 84px; height: 84px; margin: 6px auto 18px; border-radius: 8px;
   display: flex; align-items: center; justify-content: center;
   background: linear-gradient(135deg, var(--rose-50), var(--amber-100));
-  ion-icon { font-size: 40px; color: var(--ion-color-primary); }
+  ion-icon { font-size: 40px; color: var(--text-accent); }
   &[data-paso="1"] { background: linear-gradient(135deg, var(--rose-50), var(--emerald-50)); }
   &[data-paso="2"] { background: linear-gradient(135deg, var(--amber-100), #fde68a);
     ion-icon { color: var(--amber-700); } }
@@ -41,8 +41,8 @@
 
 .ob-dots { display: flex; justify-content: center; gap: 7px; margin-bottom: 20px; }
 .ob-dot {
-  width: 8px; height: 8px; border-radius: 999px; border: none; padding: 0; cursor: pointer;
-  background: var(--n-200); transition: all .2s;
+  width: 8px; height: 8px; border-radius: 50%; border: none; padding: 0; cursor: pointer;
+  background: var(--n-200); transition: background-color .2s, border-color .2s, color .2s, box-shadow .2s, transform .2s, opacity .2s;
   &.on { width: 22px; background: var(--ion-color-primary); }
 }
 

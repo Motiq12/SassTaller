@@ -1,5 +1,5 @@
 <ion-header>
-  <ion-toolbar>
+  <ion-toolbar class="admin-topbar">
     <ion-buttons slot="start" *ngIf="editId">
       <ion-back-button [defaultHref]="'/portal/cita/' + editId" text=""></ion-back-button>
     </ion-buttons>
@@ -8,26 +8,26 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
+<ion-content class="admin-dark">
   <div class="agendar">
     <div class="intro">
-      <h2>{{ editId ? 'Editá tu cita' : 'Reservá tu cita' }}</h2>
-      <p>{{ editId ? 'Cambiá la vehiculo, el servicio o el horario.' : 'Elegí tu vehiculo, el servicio y el horario.' }}</p>
+      <h2>{{ editId ? 'Edita tu cita' : 'Reserva tu cita' }}</h2>
+      <p>{{ editId ? 'Cambia la moto, el servicio o el horario.' : 'Elige tu moto, el servicio y el horario.' }}</p>
     </div>
 
-    <!-- Sin vehiculos: CTA guiado (no se puede agendar sin una vehiculo) -->
-    <section class="card sin-vehiculos" *ngIf="vehiculos.length === 0">
+    <!-- Sin motos: CTA guiado (no se puede agendar sin una moto) -->
+    <section class="card sin-motos" *ngIf="motos.length === 0">
       <ion-icon name="bicycle-outline"></ion-icon>
-      <h3>Primero registrá tu vehiculo</h3>
-      <p>Necesitás al menos una vehiculo para poder agendar una cita.</p>
-      <button type="button" class="cta" (click)="irAMotos()"><ion-icon name="add"></ion-icon> Agregar mi vehiculo</button>
+      <h3>Primero registra tu moto</h3>
+      <p>Necesitas al menos una moto para poder agendar una cita.</p>
+      <button type="button" class="cta" (click)="irAMotos()"><ion-icon name="add"></ion-icon> Agregar mi moto</button>
     </section>
 
-    <section class="card" *ngIf="vehiculos.length > 0">
+    <section class="card" *ngIf="motos.length > 0">
       <div class="fg" *ngIf="sucursales.length > 1">
         <label>Sucursal *</label>
-        <select [(ngModel)]="form.sucursal_id" (ngModelChange)="onSucursal()">
-          <option [ngValue]="null" disabled>Elegí la sucursal</option>
+        <select [(ngModel)]="form.sucursal_id" name="sucursal_id" (ngModelChange)="onSucursal()">
+          <option [ngValue]="null" disabled>Elige la sucursal</option>
           <option *ngFor="let s of sucursales" [ngValue]="s.id">{{ s.nombre }}</option>
         </select>
         <!-- Dirección de la sucursal elegida (ayuda a no equivocarse de local) -->
@@ -35,13 +35,13 @@
       </div>
 
       <div class="fg">
-        <label>Seleccionar vehiculo *</label>
-        <select [(ngModel)]="form.moto_id">
-          <option [ngValue]="null" disabled>Elegí tu vehiculo</option>
-          <option *ngFor="let m of vehiculos" [ngValue]="m.id">{{ m.marca }} {{ m.modelo }}<ng-container *ngIf="m.placa"> — {{ m.placa }}</ng-container></option>
+        <label>Seleccionar moto *</label>
+        <select [(ngModel)]="form.moto_id" name="moto_id">
+          <option [ngValue]="null" disabled>Elige tu moto</option>
+          <option *ngFor="let m of motos" [ngValue]="m.id">{{ m.marca }} {{ m.modelo }}<ng-container *ngIf="m.placa"> — {{ m.placa }}</ng-container></option>
         </select>
-        <!-- Preview de la vehiculo elegida con su foto -->
-        <div class="vehiculo-sel" *ngIf="motoSel">
+        <!-- Preview de la moto elegida con su foto -->
+        <div class="moto-sel" *ngIf="motoSel">
           <div class="ms-thumb" [class.empty]="!motoSel.foto">
             <img *ngIf="motoSel.foto; else msIcon" [src]="motoSel.foto" [alt]="motoSel.marca + ' ' + motoSel.modelo">
             <ng-template #msIcon><ion-icon name="bicycle"></ion-icon></ng-template>
@@ -54,45 +54,43 @@
       </div>
 
       <div class="fg">
-        <label>Tipo de servicio *</label>
-        <select [(ngModel)]="form.tipo_servicio">
-          <option value="" disabled>Elegí el servicio</option>
-          <option *ngFor="let s of servicios" [ngValue]="s">{{ s }}</option>
-        </select>
+        <label>Servicios que necesitas *</label>
+        <app-elegir-servicios [servicios]="servicios" [(seleccion)]="form.servicios" etiqueta="Servicios que necesitas"></app-elegir-servicios>
       </div>
 
       <!-- Sugerir próximo horario libre -->
       <button type="button" class="sugerir-btn" (click)="sugerir()" [disabled]="sugiriendo">
         <ion-icon [name]="sugiriendo ? 'hourglass-outline' : 'flash-outline'"></ion-icon>
-        {{ sugiriendo ? 'Buscando...' : 'Sugerir próximo horario libre' }}
+        {{ sugiriendo ? 'Buscando…' : 'Sugerir próximo horario libre' }}
       </button>
 
       <div class="fg">
         <label>Fecha *</label>
-        <input type="date" [min]="hoy" [(ngModel)]="form.fecha" (ngModelChange)="onFecha()">
+        <input type="date" [min]="hoy" [(ngModel)]="form.fecha" name="fecha" (ngModelChange)="onFecha()">
       </div>
 
       <div class="fg">
         <label>Hora disponible *</label>
-        <div class="tg" *ngIf="form.fecha && form.sucursal_id">
+        <div class="tg" data-campo="hora" *ngIf="form.fecha && form.sucursal_id">
           <div class="ts" *ngFor="let h of horas"
                [class.sel]="form.hora === h" [class.full]="horaLlena(h) || horaPasada(h)"
                (click)="seleccionarHora(h)">{{ h }}</div>
         </div>
-        <div class="hint" *ngIf="!form.sucursal_id">Elegí primero la sucursal y la fecha para ver los horarios.</div>
-        <div class="hint" *ngIf="form.sucursal_id && !form.fecha">Elegí primero una fecha para ver los horarios.</div>
+        <div class="full-msg" *ngIf="form.fecha && form.sucursal_id && dispCargada && !horas.length"><ion-icon name="moon-outline"></ion-icon> Ese día el taller está cerrado. Elige otra fecha.</div>
+        <div class="hint" *ngIf="!form.sucursal_id">Elige primero la sucursal y la fecha para ver los horarios.</div>
+        <div class="hint" *ngIf="form.sucursal_id && !form.fecha">Elige primero una fecha para ver los horarios.</div>
         <div class="full-msg" *ngIf="msgHora"><ion-icon name="warning-outline"></ion-icon> {{ msgHora }}</div>
         <div class="hint" *ngIf="form.fecha">Máximo {{ maxPorHora }} citas por hora. Las horas tachadas no están disponibles.</div>
       </div>
 
       <div class="fg">
         <label>Descripción del problema (opcional)</label>
-        <textarea [(ngModel)]="form.descripcion" placeholder="Contanos qué le pasa a tu vehiculo..."></textarea>
+        <textarea [(ngModel)]="form.descripcion" name="descripcion" placeholder="Cuéntanos qué le pasa a tu moto…"></textarea>
       </div>
 
       <button class="cta" (click)="agendar()" [disabled]="!valido || enviando">
         <ion-spinner *ngIf="enviando" name="crescent"></ion-spinner>
-        {{ enviando ? (editId ? 'Guardando...' : 'Agendando...') : (editId ? 'Guardar cambios' : 'Agendar cita') }}
+        {{ enviando ? (editId ? 'Guardando…' : 'Agendando…') : (editId ? 'Guardar cambios' : 'Agendar cita') }}
       </button>
 
       <!-- Limpiar el formulario (solo al crear y si hay algo cargado) -->

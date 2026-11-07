@@ -1,0 +1,98 @@
+<ion-header>
+  <ion-toolbar [class.admin-topbar]="dentroDelPanel">
+    <ion-buttons slot="start">
+      <ion-back-button [defaultHref]="volverA" text=""></ion-back-button>
+    </ion-buttons>
+    <ion-title>{{ moto ? moto.marca + ' ' + moto.modelo : 'Moto' }}</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="admin-dark">
+  <div class="mh-page" *ngIf="!cargando && moto as m">
+
+    <!-- Cabecera: la moto, su dueño y qué se puede hacer -->
+    <section class="cd mh-heroe">
+      <div class="mh-heroe-quien">
+        <div class="mh-icono">
+          <img *ngIf="m.foto_url; else icono" [src]="m.foto_url" [alt]="m.marca + ' ' + m.modelo">
+          <ng-template #icono><ion-icon name="bicycle"></ion-icon></ng-template>
+        </div>
+        <div class="mh-heroe-texto">
+          <h1>{{ m.marca }} {{ m.modelo }}<span *ngIf="m.anio"> {{ m.anio }}</span></h1>
+          <div class="mh-chips">
+            <span class="placa" *ngIf="m.placa">{{ m.placa }}</span>
+            <span class="mh-chip" *ngIf="m.color"><ion-icon name="color-palette-outline"></ion-icon> {{ m.color }}</span>
+            <span class="mh-chip" *ngIf="m.kilometraje_actual"><ion-icon name="speedometer-outline"></ion-icon> {{ m.kilometraje_actual | number }} km</span>
+            <span class="mh-chip activo" *ngIf="enCurso">{{ enCurso }} {{ enCurso === 1 ? 'orden' : 'órdenes' }} en curso</span>
+          </div>
+          <button type="button" class="mh-duenio" (click)="abrirCliente()">
+            <ion-icon name="person-outline"></ion-icon> {{ m.cliente_nombre }} {{ m.cliente_apellido }}
+            <ion-icon name="chevron-forward" class="mh-duenio-chev"></ion-icon>
+          </button>
+        </div>
+      </div>
+      <div class="mh-heroe-acciones">
+        <a class="btn btn-ou btn-sm" *ngIf="m.cliente_telefono" [href]="'tel:' + m.cliente_telefono"><ion-icon name="call-outline"></ion-icon> Llamar</a>
+        <button type="button" class="btn btn-ou btn-sm" *ngIf="puedeEditar" (click)="editar()"><ion-icon name="create-outline"></ion-icon> Editar</button>
+        <button type="button" class="btn btn-cr btn-sm" *ngIf="puedeAbrirOrden" (click)="nuevaOrden()"><ion-icon name="add-outline"></ion-icon> Nueva orden</button>
+      </div>
+    </section>
+
+    <!-- Cifras -->
+    <section class="mh-cifras">
+      <div><strong>{{ historial.length }}</strong><span>servicio{{ historial.length === 1 ? '' : 's' }}</span></div>
+      <div><strong>{{ ultimaVisita || '—' }}</strong><span>última visita</span></div>
+      <div *ngIf="verMontos"><strong>₡{{ totalCobrado | number:'1.0-0' }}</strong><span>cobrado en órdenes entregadas</span></div>
+    </section>
+
+    <div class="mh-grid">
+      <!-- Historial como línea de tiempo -->
+      <section class="cd">
+        <span class="cd-title"><ion-icon name="time-outline"></ion-icon> Historial de servicios</span>
+        <ol class="mh-tiempo" *ngIf="historial.length">
+          <li *ngFor="let o of historial" [class.activa]="!cerrada(o)">
+            <span class="mh-punto"></span>
+            <button type="button" class="mh-orden" (click)="abrirOrden(o.id!)">
+              <span class="mh-orden-cab">
+                <strong class="mono">{{ o.numero_orden }}</strong>
+                <ion-badge [color]="o.estado | estadoColor">{{ o.estado | estadoLabel }}</ion-badge>
+              </span>
+              <span class="mh-orden-problema" *ngIf="o.problema_reportado">{{ o.problema_reportado }}</span>
+              <span class="mh-orden-meta">
+                <span><ion-icon name="log-in-outline"></ion-icon> {{ o.fecha_ingreso | date:'dd/MM/yyyy' }}</span>
+                <span *ngIf="o.fecha_entrega_real"><ion-icon name="log-out-outline"></ion-icon> {{ o.fecha_entrega_real | date:'dd/MM/yyyy' }}</span>
+                <span *ngIf="o.tecnico_nombre"><ion-icon name="construct-outline"></ion-icon> {{ o.tecnico_nombre }}</span>
+                <span class="mh-orden-monto mono" *ngIf="verMontos && totalDe(o) > 0 && o.estado !== 'cancelada'">₡{{ totalDe(o) | number:'1.0-0' }}</span>
+              </span>
+            </button>
+          </li>
+        </ol>
+        <div class="mh-vacio" *ngIf="!historial.length">
+          <ion-icon name="document-text-outline"></ion-icon>
+          <span>Esta moto todavía no tiene servicios.</span>
+          <button type="button" class="btn btn-cr btn-sm" *ngIf="puedeAbrirOrden" (click)="nuevaOrden()"><ion-icon name="add-outline"></ion-icon> Abrir la primera orden</button>
+        </div>
+      </section>
+
+      <!-- Ficha técnica -->
+      <section class="cd mh-ficha">
+        <span class="cd-title"><ion-icon name="document-outline"></ion-icon> Datos de la moto</span>
+        <dl>
+          <div><dt>Marca y modelo</dt><dd>{{ m.marca }} {{ m.modelo }}</dd></div>
+          <div><dt>Año</dt><dd [class.falta]="!m.anio">{{ m.anio || 'Sin cargar' }}</dd></div>
+          <div><dt>Placa</dt><dd class="mono" [class.falta]="!m.placa">{{ m.placa || 'Sin cargar' }}</dd></div>
+          <div><dt>Color</dt><dd [class.falta]="!m.color">{{ m.color || 'Sin cargar' }}</dd></div>
+          <div><dt>Kilometraje</dt><dd>{{ (m.kilometraje_actual || 0) | number }} km</dd></div>
+          <div><dt>N.º de motor</dt><dd class="mono" [class.falta]="!m.numero_motor">{{ m.numero_motor || 'Sin cargar' }}</dd></div>
+          <div><dt>N.º de chasis</dt><dd class="mono" [class.falta]="!m.numero_chasis">{{ m.numero_chasis || 'Sin cargar' }}</dd></div>
+        </dl>
+      </section>
+    </div>
+  </div>
+
+  <div class="mh-page" *ngIf="cargando">
+    <div class="sk-dark" style="height:140px;margin-bottom:14px"></div>
+    <div class="sk-dark" style="height:76px;margin-bottom:14px"></div>
+    <div class="sk-dark" style="height:240px"></div>
+  </div>
+</ion-content>

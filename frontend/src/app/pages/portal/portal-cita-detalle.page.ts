@@ -1,11 +1,10 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ToastController, AlertController } from '@ionic/angular';
-import { MarcaService } from '../../services/marca.service';
 import { Subject, interval } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PortalService } from '../../services/portal.service';
-import { FLUJO_CITA, ESTADO_CITA_LABEL } from '../../shared/utils/servicios.util';
+import { FLUJO_CITA, ESTADO_CITA_LABEL } from '../../utils/servicios';
 
 @Component({
   standalone: false,
@@ -14,13 +13,6 @@ import { FLUJO_CITA, ESTADO_CITA_LABEL } from '../../shared/utils/servicios.util
   styleUrls: ['./portal-cita-detalle.page.scss'],
 })
 export class PortalCitaDetallePage implements OnInit, OnDestroy {
-  private route = inject(ActivatedRoute);
-  private router = inject(Router);
-  private portal = inject(PortalService);
-  private toast = inject(ToastController);
-  private alert = inject(AlertController);
-  marca = inject(MarcaService);
-
   private destroy$ = new Subject<void>();
   cita: any = null;
   orden: any = null;        // detalle de la orden vinculada (si hay)
@@ -38,6 +30,14 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
     { key: 'listo', label: 'Listo para entrega', icon: 'checkmark-done-outline' },
     { key: 'entregado', label: 'Entregado', icon: 'flag-outline' },
   ];
+
+  constructor(
+    private route: ActivatedRoute,
+    private router: Router,
+    private portal: PortalService,
+    private toast: ToastController,
+    private alert: AlertController,
+  ) {}
 
   // Cada etapa con su posición relativa al estado actual (pasado | activo | futuro).
   get etapas(): { key: string; label: string; icon: string; estado: 'pasado' | 'activo' | 'futuro' }[] {
@@ -105,11 +105,22 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
 
   // —— Aprobar / rechazar el presupuesto SIN salir del cockpit (fricción cero) ——
   // Reusa los mismos endpoints y el diálogo de confirmación que el flujo de Inicio.
+  // Si ya había aprobado antes, lo que se le pide ahora es un adicional.
+  get esAdicional(): boolean {
+    return this.orden?.total_aprobado !== null && this.orden?.total_aprobado !== undefined;
+  }
+
+  get montoAdicional(): number {
+    return Math.max(0, this.total - Number(this.orden?.total_aprobado || 0));
+  }
+
   async aprobar() {
     const al = await this.alert.create({
       cssClass: 'portal-alert',
-      header: 'Aprobar presupuesto',
-      message: `¿Aprobás el presupuesto de la orden ${this.cita?.numero_orden}? El taller comenzará la reparación.`,
+      header: this.esAdicional ? 'Aprobar adicional' : 'Aprobar presupuesto',
+      message: this.esAdicional
+        ? `¿Apruebas el adicional de ₡${Number(this.montoAdicional || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 })}? El nuevo total es ₡${Number(this.total || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 })}.`
+        : `¿Apruebas el presupuesto de la orden ${this.cita?.numero_orden}? El taller comenzará la reparación.`,
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         { text: 'Aprobar', cssClass: 'portal-alert-confirm', handler: () => this.enviarDecision('aprobar') },
@@ -121,8 +132,10 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
   async rechazar() {
     const al = await this.alert.create({
       cssClass: 'portal-alert',
-      header: 'Rechazar presupuesto',
-      message: 'Contanos por qué rechazás el presupuesto (opcional).',
+      header: this.esAdicional ? 'Rechazar adicional' : 'Rechazar presupuesto',
+      message: this.esAdicional
+        ? 'Lo que ya aprobaste sigue en pie: el taller hace solo eso. Cuéntanos por qué no quieres el adicional (opcional).'
+        : 'Cuéntanos por qué rechazas el presupuesto (opcional).',
       inputs: [{ name: 'motivo', type: 'textarea', placeholder: 'Motivo (opcional)' }],
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
@@ -150,7 +163,7 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
       },
       error: async () => {
         this.procesando = false;
-        const t = await this.toast.create({ message: 'No se pudo procesar, intentá de nuevo', duration: 2200, color: 'danger' });
+        const t = await this.toast.create({ message: 'No se pudo procesar, intenta de nuevo', duration: 2200, color: 'danger' });
         await t.present();
       },
     });
@@ -205,8 +218,8 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
       <style>
         * { box-sizing: border-box; } body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; margin: 0; padding: 28px; }
         .doc { max-width: 620px; margin: 0 auto; }
-        .hd { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #e11d48; padding-bottom: 14px; margin-bottom: 18px; }
-        .hd h1 { font-size: 22px; margin: 0; color: #e11d48; letter-spacing: -.02em; }
+        .hd { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #e2231a; padding-bottom: 14px; margin-bottom: 18px; }
+        .hd h1 { font-size: 22px; margin: 0; color: #e2231a; letter-spacing: 0; }
         .hd .sub { font-size: 12px; color: #666; margin-top: 2px; }
         .hd .num { text-align: right; font-size: 12px; color: #444; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; font-size: 13px; margin-bottom: 18px; }
@@ -214,31 +227,31 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
         table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 8px; }
         td { padding: 8px 0; border-bottom: 1px solid #eee; } td.r { text-align: right; font-variant-numeric: tabular-nums; }
         .total { display: flex; justify-content: space-between; font-size: 17px; font-weight: 800; padding-top: 10px; }
-        .diag { background: #f7f7f7; border-radius: 8px; padding: 12px; font-size: 12.5px; color: #444; margin-bottom: 16px; }
+        .diag { background: #f7f7f7; border-radius: 2px; padding: 12px; font-size: 12.5px; color: #444; margin-bottom: 16px; }
         .ft { margin-top: 24px; text-align: center; font-size: 11px; color: #999; }
         h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #999; margin: 0 0 6px; }
       </style></head><body><div class="doc">
       <div class="hd">
-        <div><h1>${esc(this.marca.actual.nombre_taller)}</h1><div class="sub">Comprobante de servicio</div></div>
+        <div><h1>MS Motos</h1><div class="sub">Comprobante de servicio</div></div>
         <div class="num"><strong>${esc(c.numero_orden || ('Cita #' + c.id))}</strong><br>${esc(fecha)}</div>
       </div>
       <div class="grid">
         <div><div class="k">Cliente</div><div class="v">${esc(cli ? cli.nombre + ' ' + cli.apellido : '—')}</div></div>
-        <div><div class="k">Vehiculo</div><div class="v">${esc(c.marca)} ${esc(c.modelo)}${c.placa ? ' · ' + esc(c.placa) : ''}</div></div>
+        <div><div class="k">Moto</div><div class="v">${esc(c.marca)} ${esc(c.modelo)}${c.placa ? ' · ' + esc(c.placa) : ''}</div></div>
         <div><div class="k">Servicio</div><div class="v">${esc(c.tipo_servicio || c.motivo || '—')}</div></div>
         <div><div class="k">Mecánico</div><div class="v">${esc(c.tecnico_nombre || 'Por asignar')}</div></div>
       </div>
       ${o?.diagnostico ? `<div class="diag"><strong>Diagnóstico:</strong> ${esc(o.diagnostico)}</div>` : ''}
       ${filas.length ? `<h3>Detalle</h3><table>${filas.join('')}</table>` : ''}
       <div class="total"><span>Total</span><span>${money(total)}</span></div>
-      <div class="ft">Gracias por confiar en ${esc(this.marca.actual.nombre_taller)} · Documento generado el ${new Date().toLocaleDateString('es-CR')}</div>
+      <div class="ft">Gracias por confiar en MS Motos · Documento generado el ${new Date().toLocaleDateString('es-CR')}</div>
       </div>
       <script>window.onload = function(){ window.print(); }</script>
       </body></html>`;
 
     const w = window.open('', '_blank');
     if (!w) {
-      this.toast.create({ message: 'Permití las ventanas emergentes para descargar el comprobante.', duration: 3000, color: 'warning' }).then(t => t.present());
+      this.toast.create({ message: 'Permite las ventanas emergentes para descargar el comprobante.', duration: 3000, color: 'warning' }).then(t => t.present());
       return;
     }
     w.document.open();
@@ -250,7 +263,7 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
     const al = await this.alert.create({
       cssClass: 'portal-alert',
       header: 'Cancelar cita',
-      message: 'Esta acción no se puede deshacer. ¿Querés cancelar esta cita?',
+      message: 'Esta acción no se puede deshacer. ¿Quieres cancelar esta cita?',
       buttons: [
         { text: 'No', role: 'cancel' },
         { text: 'Sí, cancelar', role: 'destructive', cssClass: 'portal-alert-danger', handler: () => this.confirmarCancelar() },

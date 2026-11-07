@@ -1,53 +1,79 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
-import { Router } from '@angular/router';
-import { ToastController } from '@ionic/angular';
-import { Subject } from 'rxjs';
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { Location } from '@angular/common';
+import { ModalController, ToastController } from '@ionic/angular';
 import { takeUntil } from 'rxjs/operators';
 import { RecepcionService } from '../../services/recepcion.service';
 import { AuthService } from '../../services/auth.service';
 import { AccesibilidadService } from '../../services/accesibilidad.service';
-import { comprimirImagen } from '../../shared/utils/image.util';
+import { MiPerfilService } from '../../services/mi-perfil.service';
+import { recortarFoto } from '../../shared/perfil/recortar-foto.component';
+import { GrupoPerfil, PerfilListaBase } from '../../shared/perfil/perfil-lista.base';
 
+// Mi perfil de recepción: la misma lista de ajustes que el panel (shared/perfil).
 @Component({
   standalone: false,
   selector: 'app-recepcion-perfil',
   templateUrl: './recepcion-perfil.page.html',
-  styleUrls: ['./recepcion-perfil.page.scss'],
 })
-export class RecepcionPerfilPage implements OnInit, OnDestroy {
-  private rec = inject(RecepcionService);
-  private auth = inject(AuthService);
-  a11y = inject(AccesibilidadService);
-  private router = inject(Router);
-  private toast = inject(ToastController);
+export class RecepcionPerfilPage extends PerfilListaBase implements OnInit, OnDestroy {
+  readonly rol = 'recepcion' as const;
+  readonly grupos: GrupoPerfil[] = [
+    { titulo: 'Información personal', items: [
+      { id: 'datos', nombre: 'Datos personales', icono: 'person-outline' },
+      { id: 'foto', nombre: 'Foto de perfil', icono: 'image-outline' },
+      { id: 'firma', nombre: 'Mi firma', icono: 'pencil-outline' },
+    ] },
+    { titulo: 'Seguridad', items: [
+      { id: 'contrasena', nombre: 'Cambiar contraseña', icono: 'lock-closed-outline' },
+      { id: 'dosfa', nombre: 'Verificación en dos pasos', icono: 'shield-checkmark-outline' },
+      { id: 'sesiones', nombre: 'Dónde estás conectado', icono: 'laptop-outline' },
+    ] },
+    { titulo: 'Preferencias', items: [
+      { id: 'apariencia', nombre: 'Apariencia', icono: 'color-palette-outline' },
+      { id: 'inicio', nombre: 'Al entrar y avisos', icono: 'options-outline' },
+    ] },
+    { titulo: 'Actividad', items: [
+      { id: 'actividad', nombre: 'Mi actividad', icono: 'time-outline' },
+    ] },
+  ];
 
-  private destroy$ = new Subject<void>();
   perfil: any = null;
   cuenta = { nombre: '', email: '', telefono: '' };
+  private cuentaGuardada = { nombre: '', email: '', telefono: '' };
   pass = { actual: '', nueva: '' };
   cargando = true;
   guardando = false;
   guardandoPass = false;
   subiendoFoto = false;
+  verActual = false;
+  verNueva = false;
 
-  // Niveles de tamaño de texto (accesibilidad), igual que el portal del cliente.
-  readonly nivelesTexto = [
-    { i: 0, etiqueta: 'A', nombre: 'Normal' },
-    { i: 1, etiqueta: 'A', nombre: 'Grande' },
-    { i: 2, etiqueta: 'A', nombre: 'Muy grande' },
-  ];
+  constructor(
+    private rec: RecepcionService,
+    private toast: ToastController,
+    private modal: ModalController,
+    route: ActivatedRoute,
+    router: Router,
+    location: Location,
+    miPerfil: MiPerfilService,
+    auth: AuthService,
+    a11y: AccesibilidadService,
+  ) {
+    super(route, router, location, miPerfil, auth, a11y);
+  }
 
-  ngOnInit() { this.cargar(); }
-  ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
+  ngOnInit() { this.iniciarLista(); this.cargar(); }
+  ngOnDestroy() { this.terminarLista(); }
   ionViewWillEnter() { this.cargar(); }
 
   cargar() {
-    this.cargando = true;
     this.rec.getMiPerfil().pipe(takeUntil(this.destroy$)).subscribe({
       next: r => {
         this.perfil = r.data;
         this.cuenta = { nombre: r.data.nombre || '', email: r.data.email || '', telefono: r.data.telefono || '' };
-        // Refleja la foto en la sesión (avatar del sidebar) por si entró sin ella.
+        this.cuentaGuardada = { ...this.cuenta };
+        // Refleja la foto en la sesión (avatar del menú) por si entró sin ella.
         this.sincronizarSesion({ foto: r.data.foto ?? null });
         this.cargando = false;
       },
@@ -55,22 +81,17 @@ export class RecepcionPerfilPage implements OnInit, OnDestroy {
     });
   }
 
-  get iniciales(): string {
-    const p = (this.cuenta.nombre || 'Recepción').trim().split(/\s+/);
-    return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || 'R';
-  }
-
-  // Sede asignada (la fija el admin). null = atiende todas las sedes.
+  protected get fotoActual(): string | null { return this.perfil?.foto || null; }
+  get iniciales(): string { return this.inicialesDe(this.perfil?.nombre || '', 'Recepción'); }
+  // Sede asignada (la fija administración). null = atiende todas las sedes.
   get sedeLabel(): string { return this.perfil?.sucursal_nombre || 'Todas las sedes'; }
-
-  // "Miembro desde" a partir de created_at.
-  get miembroDesde(): string {
-    if (!this.perfil?.created_at) return '—';
-    const d = new Date(this.perfil.created_at);
-    return d.toLocaleDateString('es-CR', { month: 'long', year: 'numeric' });
+  get rolNombre(): string { return this.auth.getUsuario()?.rol_nombre || 'Recepción'; }
+  get miembroDesde(): string { return this.fechaDesde(this.perfil?.created_at); }
+  get fuerza() { return this.fuerzaDe(this.pass.nueva); }
+  get cuentaCambiada(): boolean {
+    return this.cuenta.nombre.trim() !== this.cuentaGuardada.nombre || this.cuenta.email.trim() !== this.cuentaGuardada.email
+      || this.cuenta.telefono.trim() !== this.cuentaGuardada.telefono;
   }
-
-  setTexto(i: number) { this.a11y.setNivel(i); }
 
   // —— Foto de perfil ——
   pedirFoto(input: HTMLInputElement) { if (!this.subiendoFoto) input.click(); }
@@ -80,9 +101,11 @@ export class RecepcionPerfilPage implements OnInit, OnDestroy {
     const file = input.files?.[0];
     input.value = ''; // permite re-elegir el mismo archivo
     if (!file) return;
-    this.subiendoFoto = true;
     try {
-      const dataUrl = await comprimirImagen(file, { maxLado: 400, calidad: 0.8 });
+      // Primero se encuadra (y sale ya en 400 px); cancelar no sube nada.
+      const dataUrl = await recortarFoto(this.modal, file);
+      if (!dataUrl) return;
+      this.subiendoFoto = true;
       this.rec.updateMiFoto(dataUrl).pipe(takeUntil(this.destroy$)).subscribe({
         next: r => {
           this.perfil = { ...this.perfil, foto: r.data.foto };
@@ -118,6 +141,7 @@ export class RecepcionPerfilPage implements OnInit, OnDestroy {
     this.rec.updateMiPerfil({ nombre: this.cuenta.nombre.trim(), email: this.cuenta.email.trim(), telefono: this.cuenta.telefono.trim() }).pipe(takeUntil(this.destroy$)).subscribe({
       next: r => {
         this.perfil = r.data;
+        this.cuentaGuardada = { nombre: r.data.nombre || '', email: r.data.email || '', telefono: r.data.telefono || '' };
         this.sincronizarSesion({ nombre: r.data.nombre, email: r.data.email, foto: r.data.foto ?? null });
         this.guardando = false;
         this.aviso('Perfil actualizado');
@@ -128,7 +152,7 @@ export class RecepcionPerfilPage implements OnInit, OnDestroy {
 
   cambiarPassword() {
     if (!this.pass.actual || !this.pass.nueva) { this.aviso('Completá ambas contraseñas', 'warning'); return; }
-    if (this.pass.nueva.length < 8) { this.aviso('La nueva debe tener al menos 8 caracteres', 'warning'); return; }
+    if (this.pass.nueva.length < this.minimo) { this.aviso(`Mínimo ${this.minimo} caracteres`, 'warning'); return; }
     this.guardandoPass = true;
     this.rec.updateMiPassword({ actual: this.pass.actual, nueva: this.pass.nueva }).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => { this.guardandoPass = false; this.pass = { actual: '', nueva: '' }; this.aviso('Contraseña actualizada'); },
@@ -136,7 +160,7 @@ export class RecepcionPerfilPage implements OnInit, OnDestroy {
     });
   }
 
-  // Mantiene la sesión guardada (header/sidebar) al día con los cambios del perfil.
+  // Mantiene la sesión guardada (menú) al día con los cambios del perfil.
   private sincronizarSesion(parcial: { nombre?: string; email?: string; foto?: string | null }) {
     const u = this.auth.getUsuario();
     const token = this.auth.getToken();

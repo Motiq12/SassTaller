@@ -1,7 +1,7 @@
 <ion-header>
   <ion-toolbar class="admin-topbar">
     <ion-buttons slot="start">
-      <ion-back-button defaultHref="/admin/citas"></ion-back-button>
+      <ion-back-button [defaultHref]="volverA"></ion-back-button>
     </ion-buttons>
     <ion-title>{{ esEdicion ? 'Editar' : 'Nueva' }} Cita</ion-title>
   </ion-toolbar>
@@ -15,7 +15,7 @@
       <!-- Cliente (autocompletar) -->
       <div class="fg cli-wrap">
         <label>Cliente *</label>
-        <input [(ngModel)]="busquedaCliente" (ngModelChange)="buscarClientes()" placeholder="Buscar cliente por nombre...">
+        <input [(ngModel)]="busquedaCliente" name="busquedaCliente" data-campo="cliente_id" (ngModelChange)="buscarClientes()" placeholder="Buscar cliente por nombre…">
         <div class="cli-results" *ngIf="clientes.length">
           <button type="button" class="cli-item" *ngFor="let c of clientes" (click)="seleccionarCliente(c)">
             <strong>{{ c.nombre }} {{ c.apellido }}</strong>
@@ -24,39 +24,45 @@
         </div>
       </div>
 
-      <!-- Vehiculo (opcional) -->
-      <div class="fg" *ngIf="vehiculos.length">
-        <label>Vehiculo (opcional)</label>
-        <select [(ngModel)]="form.moto_id">
-          <option [ngValue]="undefined">Seleccionar vehiculo</option>
-          <option *ngFor="let m of vehiculos" [ngValue]="m.id">{{ m.marca }} {{ m.modelo }}{{ m.placa ? ' (' + m.placa + ')' : '' }}</option>
+      <!-- Moto (opcional) -->
+      <div class="fg" *ngIf="motos.length">
+        <label>Moto (opcional)</label>
+        <select [(ngModel)]="form.moto_id" name="moto_id">
+          <option [ngValue]="null">Seleccionar moto</option>
+          <option *ngFor="let m of motos" [ngValue]="m.id">{{ m.marca }} {{ m.modelo }}{{ m.placa ? ' (' + m.placa + ')' : '' }}</option>
         </select>
       </div>
 
       <div class="fg-row">
         <div class="fg">
           <label>Fecha *</label>
-          <input type="date" [(ngModel)]="form.fecha">
+          <input type="date" [(ngModel)]="form.fecha" name="fecha">
         </div>
         <div class="fg">
           <label>Hora *</label>
-          <input type="time" [(ngModel)]="form.hora">
+          <input type="time" [(ngModel)]="form.hora" name="hora">
         </div>
       </div>
 
-      <!-- Tipo de servicio -->
-      <div class="fg">
-        <label>Tipo de servicio</label>
-        <select [(ngModel)]="form.tipo_servicio">
-          <option [ngValue]="undefined">Seleccionar servicio</option>
-          <option *ngFor="let t of tiposServicio" [ngValue]="t">{{ t }}</option>
+      <!-- Duración (solo administración): ocupa un lugar en cada hora que dure -->
+      <div class="fg" *ngIf="auth.tieneRol('admin')">
+        <label>Duración</label>
+        <select [(ngModel)]="form.duracion_horas" name="duracion_horas">
+          <option *ngFor="let d of duraciones" [ngValue]="d.v">{{ d.l }}</option>
         </select>
+        <div class="hint">Ocupa un lugar en cada hora que dure. «Todo el día» llega hasta el cierre.</div>
+      </div>
+
+      <!-- Servicios: uno o varios -->
+      <div class="fg">
+        <label>Servicios</label>
+        <app-elegir-servicios [servicios]="tiposServicio" [(seleccion)]="listaServicios" etiqueta="Servicios de la cita"></app-elegir-servicios>
       </div>
 
       <!-- Técnico (solo admin) -->
       <div class="fg" *ngIf="auth.tieneRol('admin')">
         <label>Técnico asignado</label>
-        <select [(ngModel)]="form.tecnico_id">
+        <select [(ngModel)]="form.tecnico_id" name="tecnico_id">
           <option [ngValue]="null">Sin asignar</option>
           <option *ngFor="let t of tecnicos" [ngValue]="t.id">{{ t.nombre }}</option>
         </select>
@@ -65,12 +71,15 @@
       <!-- Motivo / Notas -->
       <div class="fg" style="margin-bottom:4px">
         <label>Motivo / Notas *</label>
-        <textarea [(ngModel)]="form.motivo" rows="3" placeholder="Motivo de la cita..."></textarea>
+        <textarea [(ngModel)]="form.motivo" name="motivo" rows="3" placeholder="Motivo de la cita…"></textarea>
       </div>
     </div>
 
     <button class="btn btn-cr btn-block" style="padding:14px;margin-top:4px" (click)="guardar()">
       <ion-icon name="save-outline"></ion-icon> Guardar
+    </button>
+    <button class="btn btn-ou btn-block cf-borrar" *ngIf="puedeEliminar" (click)="eliminar()">
+      <ion-icon name="trash-outline"></ion-icon> Eliminar cita
     </button>
   </div>
 </ion-content>

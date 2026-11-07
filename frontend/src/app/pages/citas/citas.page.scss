@@ -1,7 +1,7 @@
 .citas-search {
   padding: 8px 16px 0;
   max-width: 1240px; margin: 0 auto;
-  ion-searchbar { --border-radius: 14px; --background: var(--ion-card-background); }
+  ion-searchbar { --border-radius: 2px; --background: var(--ion-card-background); }
 }
 
 .citas-wrapper { max-width: 1240px; margin: 0 auto; padding: 0 14px; }
@@ -12,11 +12,11 @@
   .fecha-label {
     font-family: var(--font-display, inherit); font-size: 16px; font-weight: 800;
     color: var(--ion-text-color); text-transform: capitalize;
-    &.hoy { color: var(--ion-color-primary); }
+    &.hoy { color: var(--text-accent); }
     &.manana { color: var(--emerald-700); }
   }
   .fecha-count {
-    font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 999px;
+    font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 2px;
     background: var(--ion-color-primary); color: #fff;
   }
 }
@@ -38,7 +38,7 @@
 .cita-card {
   display: flex; align-items: stretch;
   background: var(--ion-card-background); border: 1px solid var(--hairline);
-  border-radius: 20px; overflow: hidden;
+  border-radius: 8px; overflow: hidden;
   box-shadow: var(--shadow-sm); cursor: pointer;
   transition: transform .15s var(--ease-out), box-shadow .15s;
   &:active { transform: scale(.985); }
@@ -54,11 +54,11 @@
 
 .cc-hora {
   display: flex; align-items: center; gap: 5px;
-  font-size: 13px; font-weight: 700; color: var(--ion-color-primary); margin-bottom: 4px;
+  font-size: 13px; font-weight: 700; color: var(--text-accent); margin-bottom: 4px;
   ion-icon { font-size: 14px; }
 }
 
-.cc-vehiculo {
+.cc-moto {
   display: flex; align-items: center; gap: 5px;
   font-size: 13px; color: var(--n-500); margin-bottom: 3px;
   ion-icon { font-size: 14px; color: var(--n-400); flex-shrink: 0; }

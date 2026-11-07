@@ -1,141 +1,158 @@
 <ion-header>
-  <ion-toolbar color="primary">
+  <ion-toolbar class="admin-topbar">
     <ion-buttons slot="start">
-      <ion-back-button defaultHref="/tabs/ordenes"></ion-back-button>
+      <ion-back-button [defaultHref]="listaOrdenes" text=""></ion-back-button>
     </ion-buttons>
-    <ion-title>Nueva Orden</ion-title>
+    <ion-title>Nueva orden</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="ion-padding">
-  <!-- Indicador de pasos -->
-  <ion-segment [value]="paso" readonly>
-    <ion-segment-button [value]="1"><ion-label>1. Cliente</ion-label></ion-segment-button>
-    <ion-segment-button [value]="2"><ion-label>2. Vehiculo</ion-label></ion-segment-button>
-    <ion-segment-button [value]="3"><ion-label>3. Recepción</ion-label></ion-segment-button>
-  </ion-segment>
+<ion-content class="admin-dark">
+  <div class="pg no-pg">
+    <header class="pg-cab">
+      <div>
+        <h1>Nueva orden de trabajo</h1>
+        <p>Elegí el cliente y la moto, y anotá cómo llega al taller.</p>
+      </div>
+    </header>
 
-  <!-- PASO 1: Seleccionar cliente -->
-  <div *ngIf="paso === 1">
-    <ion-card>
-      <ion-card-header><ion-card-title>Buscar cliente</ion-card-title></ion-card-header>
-      <ion-card-content>
-        <ion-searchbar [(ngModel)]="busquedaCliente" (ionInput)="buscarClientes()"
-          placeholder="Nombre, teléfono o cédula" debounce="400">
-        </ion-searchbar>
-        <ion-list *ngIf="clientes.length">
-          <ion-item *ngFor="let c of clientes" button (click)="seleccionarCliente(c)" detail="false">
-            <ion-label>
-              <h2>{{ c.nombre }} {{ c.apellido }}</h2>
-              <p>{{ c.telefono }}</p>
-            </ion-label>
-          </ion-item>
-        </ion-list>
-      </ion-card-content>
-    </ion-card>
+    <!-- Pasos: se puede volver a uno anterior, no saltar adelante -->
+    <div class="pg-tabs no-pasos" role="tablist" aria-label="Pasos">
+      <button type="button" role="tab" [class.on]="paso === 1" [attr.aria-selected]="paso === 1" (click)="irAPaso(1)">
+        <span class="no-n">1</span> Cliente
+      </button>
+      <button type="button" role="tab" [class.on]="paso === 2" [attr.aria-selected]="paso === 2" [disabled]="!clienteSeleccionado" (click)="irAPaso(2)">
+        <span class="no-n">2</span> Moto
+      </button>
+      <button type="button" role="tab" [class.on]="paso === 3" [attr.aria-selected]="paso === 3" [disabled]="!motoSeleccionada" (click)="irAPaso(3)">
+        <span class="no-n">3</span> Recepción
+      </button>
+    </div>
 
-    <ion-card *ngIf="!clientes.length && busquedaCliente.length > 2">
-      <ion-card-content class="ion-text-center">
-        <p color="medium">Cliente no encontrado.</p>
-        <ion-button routerLink="/cliente-form" fill="outline">
-          <ion-icon name="person-add-outline" slot="start"></ion-icon>
-          Crear nuevo cliente
-        </ion-button>
-      </ion-card-content>
-    </ion-card>
-  </div>
+    <!-- PASO 1: cliente -->
+    <section class="cd pg-card" *ngIf="paso === 1">
+      <div class="pg-card-cab"><span class="cd-title"><ion-icon name="person-outline"></ion-icon> Cliente</span></div>
 
-  <!-- PASO 2: Seleccionar vehiculo -->
-  <div *ngIf="paso === 2">
-    <ion-card>
-      <ion-card-header>
-        <ion-card-subtitle>Cliente: {{ clienteSeleccionado?.nombre }} {{ clienteSeleccionado?.apellido }}</ion-card-subtitle>
-        <ion-card-title>Seleccionar vehiculo</ion-card-title>
-      </ion-card-header>
-      <ion-list>
-        <ion-item *ngFor="let m of vehiculos" button (click)="seleccionarMoto(m)" detail="false">
-          <ion-icon name="bicycle-outline" slot="start"></ion-icon>
-          <ion-label>
-            <h2>{{ m.marca }} {{ m.modelo }} {{ m.anio }}</h2>
-            <p *ngIf="m.placa">Placa: {{ m.placa }}</p>
-          </ion-label>
-        </ion-item>
-        <ion-item *ngIf="vehiculos.length === 0">
-          <ion-label color="medium"><p>Este cliente no tiene vehiculos registradas</p></ion-label>
-        </ion-item>
-      </ion-list>
-      <ion-card-content>
-        <ion-button expand="block" fill="outline" [routerLink]="['/vehiculo-form']"
-          [queryParams]="{ cliente_id: clienteSeleccionado?.id }">
-          <ion-icon name="add-outline" slot="start"></ion-icon>
-          Registrar nueva vehiculo
-        </ion-button>
-        <ion-button expand="block" fill="clear" (click)="pasoAnterior()">Volver</ion-button>
-      </ion-card-content>
-    </ion-card>
-  </div>
+      <div class="pg-buscar">
+        <ion-icon name="search-outline"></ion-icon>
+        <input type="search" [(ngModel)]="busquedaCliente" (ngModelChange)="buscarConEspera()" data-campo="cliente_id"
+               placeholder="Nombre, teléfono o cédula" aria-label="Buscar cliente" autocomplete="off" />
+        <button type="button" class="pg-buscar-x" *ngIf="busquedaCliente" (click)="busquedaCliente = ''; buscarClientes()" aria-label="Borrar búsqueda">
+          <ion-icon name="close-circle"></ion-icon>
+        </button>
+      </div>
 
-  <!-- PASO 3: Datos de recepción -->
-  <div *ngIf="paso === 3">
-    <ion-card>
-      <ion-card-header>
-        <ion-card-subtitle>{{ motoSeleccionada?.marca }} {{ motoSeleccionada?.modelo }} — {{ clienteSeleccionado?.nombre }}</ion-card-subtitle>
-        <ion-card-title>Datos de recepción</ion-card-title>
-      </ion-card-header>
-      <ion-card-content>
-        <ion-item>
-          <ion-label position="stacked">Problema reportado *</ion-label>
-          <ion-textarea [(ngModel)]="form.problema_reportado" rows="3"
-            placeholder="Describe el problema que reporta el cliente..."></ion-textarea>
-        </ion-item>
+      <div class="pg-lista" *ngIf="clientes.length">
+        <button type="button" class="pg-item no-elegir" *ngFor="let c of clientes" (click)="seleccionarCliente(c)">
+          <div class="pg-item-txt">
+            <strong>{{ c.nombre }} {{ c.apellido }}</strong>
+            <span>{{ c.telefono || 'Sin teléfono' }}<ng-container *ngIf="c.cedula"> · <span class="mono">{{ c.cedula }}</span></ng-container></span>
+          </div>
+          <ion-icon name="chevron-forward" class="no-chev" aria-hidden="true"></ion-icon>
+        </button>
+      </div>
 
-        <ion-item>
-          <ion-label position="stacked">Nivel de combustible</ion-label>
-          <ion-select [(ngModel)]="form.nivel_combustible" interface="action-sheet">
-            <ion-select-option value="vacio">Vacío</ion-select-option>
-            <ion-select-option value="cuarto">1/4</ion-select-option>
-            <ion-select-option value="mitad">1/2</ion-select-option>
-            <ion-select-option value="tres_cuartos">3/4</ion-select-option>
-            <ion-select-option value="lleno">Lleno</ion-select-option>
-          </ion-select>
-        </ion-item>
+      <div class="pg-vacio" *ngIf="!clientes.length && busquedaCliente.trim().length <= 2">
+        <ion-icon name="information-circle-outline"></ion-icon>
+        Escribí al menos tres letras o números para buscar.
+      </div>
 
-        <ion-item>
-          <ion-label position="stacked">Kilometraje de ingreso</ion-label>
-          <ion-input type="number" [(ngModel)]="form.kilometraje_ingreso"></ion-input>
-        </ion-item>
+      <div class="no-nuevo" *ngIf="!clientes.length && busquedaCliente.trim().length > 2">
+        <div class="pg-vacio"><ion-icon name="search-outline"></ion-icon> Ningún cliente coincide con «{{ busquedaCliente }}».</div>
+        <a class="btn btn-ou" [routerLink]="ruta('/cliente-form')">
+          <ion-icon name="person-add-outline"></ion-icon> Crear cliente nuevo
+        </a>
+      </div>
+    </section>
 
-        <ion-item>
-          <ion-label position="stacked">Prioridad</ion-label>
-          <ion-select [(ngModel)]="form.prioridad" interface="action-sheet">
-            <ion-select-option value="normal">Normal</ion-select-option>
-            <ion-select-option value="urgente">Urgente</ion-select-option>
-            <ion-select-option value="emergencia">Emergencia</ion-select-option>
-            <ion-select-option value="garantia">Garantía</ion-select-option>
-          </ion-select>
-        </ion-item>
+    <!-- PASO 2: moto -->
+    <section class="cd pg-card" *ngIf="paso === 2">
+      <div class="pg-card-cab">
+        <span class="cd-title"><ion-icon name="bicycle-outline"></ion-icon> Moto</span>
+        <span class="pg-cuenta">{{ clienteSeleccionado?.nombre }} {{ clienteSeleccionado?.apellido }}</span>
+      </div>
 
-        <ion-item>
-          <ion-label position="stacked">Fecha estimada de entrega</ion-label>
-          <ion-input type="date" [(ngModel)]="form.fecha_estimada_entrega"></ion-input>
-        </ion-item>
+      <div class="pg-lista" *ngIf="motos.length">
+        <button type="button" class="pg-item no-elegir" *ngFor="let m of motos" (click)="seleccionarMoto(m)">
+          <div class="pg-item-txt">
+            <strong>{{ m.marca }} {{ m.modelo }} <ng-container *ngIf="m.anio">{{ m.anio }}</ng-container></strong>
+            <span *ngIf="m.placa">Placa <span class="mono">{{ m.placa }}</span></span>
+            <span *ngIf="!m.placa">Sin placa</span>
+          </div>
+          <ion-icon name="chevron-forward" class="no-chev" aria-hidden="true"></ion-icon>
+        </button>
+      </div>
+      <div class="pg-vacio" *ngIf="!motos.length">
+        <ion-icon name="bicycle-outline"></ion-icon> Este cliente no tiene motos registradas.
+      </div>
 
-        <ion-item>
-          <ion-label position="stacked">Accesorios entregados</ion-label>
-          <ion-textarea [(ngModel)]="form.accesorios_entregados" rows="2"></ion-textarea>
-        </ion-item>
+      <div class="no-pie">
+        <button type="button" class="btn btn-ou" (click)="pasoAnterior()"><ion-icon name="arrow-back-outline"></ion-icon> Volver</button>
+        <a class="btn btn-ou" [routerLink]="[ruta('/moto-form')]" [queryParams]="{ cliente_id: clienteSeleccionado?.id }">
+          <ion-icon name="add-outline"></ion-icon> Registrar moto
+        </a>
+      </div>
+    </section>
 
-        <ion-item>
-          <ion-label position="stacked">Estado físico de la vehiculo</ion-label>
-          <ion-textarea [(ngModel)]="form.estado_fisico" rows="2"></ion-textarea>
-        </ion-item>
+    <!-- PASO 3: recepción -->
+    <section class="cd pg-card" *ngIf="paso === 3">
+      <div class="pg-card-cab">
+        <span class="cd-title"><ion-icon name="clipboard-outline"></ion-icon> Recepción</span>
+        <span class="pg-cuenta">{{ motoSeleccionada?.marca }} {{ motoSeleccionada?.modelo }} · {{ clienteSeleccionado?.nombre }} {{ clienteSeleccionado?.apellido }}</span>
+      </div>
 
-        <ion-button expand="block" class="ion-margin-top" (click)="guardar()">
-          <ion-icon name="save-outline" slot="start"></ion-icon>
-          Crear Orden de Trabajo
-        </ion-button>
-        <ion-button expand="block" fill="clear" (click)="pasoAnterior()">Volver</ion-button>
-      </ion-card-content>
-    </ion-card>
+      <div class="fg">
+        <label for="no-problema">Problema reportado *</label>
+        <textarea id="no-problema" [(ngModel)]="form.problema_reportado" name="problema_reportado" rows="3"
+                  placeholder="Qué le pasa a la moto, según el cliente"></textarea>
+      </div>
+
+      <div class="fg-row">
+        <div class="fg">
+          <label for="no-km">Kilometraje de ingreso</label>
+          <input id="no-km" type="number" inputmode="numeric" [(ngModel)]="form.kilometraje_ingreso" name="kilometraje_ingreso" placeholder="0" />
+        </div>
+        <div class="fg">
+          <label for="no-entrega">Entrega estimada</label>
+          <input id="no-entrega" type="date" [(ngModel)]="form.fecha_estimada_entrega" name="fecha_estimada_entrega" />
+        </div>
+      </div>
+
+      <div class="fg">
+        <label>Combustible</label>
+        <div class="no-opciones" role="radiogroup" aria-label="Nivel de combustible">
+          <button type="button" *ngFor="let n of niveles" class="chip-filtro" role="radio"
+                  [class.on]="form.nivel_combustible === n.valor" [attr.aria-checked]="form.nivel_combustible === n.valor"
+                  (click)="form.nivel_combustible = n.valor">{{ n.label }}</button>
+        </div>
+      </div>
+
+      <div class="fg">
+        <label>Prioridad</label>
+        <div class="no-opciones" role="radiogroup" aria-label="Prioridad">
+          <button type="button" *ngFor="let p of prioridades" class="chip-filtro" role="radio"
+                  [class.on]="form.prioridad === p.valor" [attr.aria-checked]="form.prioridad === p.valor"
+                  (click)="form.prioridad = p.valor">{{ p.label }}</button>
+        </div>
+      </div>
+
+      <div class="fg-row">
+        <div class="fg">
+          <label for="no-acc">Accesorios entregados</label>
+          <textarea id="no-acc" [(ngModel)]="form.accesorios_entregados" name="accesorios_entregados" rows="2"
+                    placeholder="Casco, llaves, documentos…"></textarea>
+        </div>
+        <div class="fg">
+          <label for="no-fisico">Estado físico</label>
+          <textarea id="no-fisico" [(ngModel)]="form.estado_fisico" name="estado_fisico" rows="2"
+                    placeholder="Rayones, golpes, piezas faltantes…"></textarea>
+        </div>
+      </div>
+
+      <div class="no-pie">
+        <button type="button" class="btn btn-ou" (click)="pasoAnterior()"><ion-icon name="arrow-back-outline"></ion-icon> Volver</button>
+        <button type="button" class="btn btn-cr" (click)="guardar()"><ion-icon name="save-outline"></ion-icon> Crear orden</button>
+      </div>
+    </section>
   </div>
 </ion-content>

@@ -54,11 +54,11 @@
         <div class="promo-top">
           <div class="promo-titulo">
             <ion-badge *ngIf="p.descuento" color="danger">-{{ p.descuento }}%</ion-badge>
-            <strong>{{ p.titulo }}</strong>
+            <strong>{{ p.titulo || 'Promoción con imagen' }}</strong>
           </div>
           <ion-toggle [checked]="!!p.activa" (ionChange)="toggle(p)"></ion-toggle>
         </div>
-        <p class="promo-desc">{{ p.descripcion }}</p>
+        <p class="promo-desc" *ngIf="p.descripcion">{{ p.descripcion }}</p>
         <div class="promo-acciones">
           <span class="promo-estado" [class.on]="p.activa">{{ p.activa ? 'Activa' : 'Inactiva' }}</span>
           <ion-button fill="clear" size="small" color="danger" (click)="eliminar(p)">

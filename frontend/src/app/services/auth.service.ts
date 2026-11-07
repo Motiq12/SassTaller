@@ -1,11 +1,10 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Capacitor } from '@capacitor/core';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { Usuario, LoginResponse } from '../models/usuario.model';
-import { secureGet, secureSet, secureRemove } from '../shared/utils/secure-store.util';
-import { TallerService } from './taller.service';
+import { secureGet, secureSet, secureRemove } from '../shared/secure-store.util';
 
 const TOKEN_KEY = 'tallerms_token';
 const USUARIO_KEY = 'tallerms_usuario';
@@ -24,9 +23,6 @@ export interface LoginUnificadoResp {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private http = inject(HttpClient);
-  private taller = inject(TallerService);
-
   private apiUrl = environment.apiUrl;
   // En nativo el token vive en el Keychain/Keystore (ver secure-store.util); acá solo
   // se cachea en memoria para lecturas síncronas (interceptor, guards). En web sigue
@@ -35,6 +31,8 @@ export class AuthService {
   private usuarioSubject = new BehaviorSubject<Usuario | null>(nativo ? null : this.getUsuarioGuardadoWeb());
 
   usuario$ = this.usuarioSubject.asObservable();
+
+  constructor(private http: HttpClient) {}
 
   // Hidrata la sesión desde el Keychain/Keystore en plataforma nativa. Se llama desde
   // un APP_INITIALIZER (app.module.ts) para que termine ANTES de que arranquen los
@@ -48,14 +46,8 @@ export class AuthService {
     }
   }
 
-  // El `taller` viaja en el login porque con multi-tenant el correo ya no identifica
-  // a una persona sola: el mismo correo puede existir en varios talleres. Si no se
-  // pudo resolver (sin subdominio y sin taller guardado) no se manda la clave, y el
-  // backend resuelve por contraseña o pide elegir entre los que coincidan.
   login(email: string, password: string): Observable<{ data: LoginResponse }> {
-    return this.http.post<{ data: LoginResponse }>(
-      `${this.apiUrl}/auth/login`, this.taller.conTaller({ email, password })
-    ).pipe(
+    return this.http.post<{ data: LoginResponse }>(`${this.apiUrl}/auth/login`, { email, password }).pipe(
       tap(res => this.guardarSesion(res.data.token, res.data.usuario))
     );
   }
@@ -64,9 +56,7 @@ export class AuthService {
   // Si el usuario tiene verificación en dos pasos, la respuesta NO trae sesión:
   // llega `requiere_2fa` + `token_parcial` para canjear en verificar2FA().
   loginUnificado(email: string, password: string): Observable<{ data: LoginUnificadoResp }> {
-    return this.http.post<{ data: LoginUnificadoResp }>(
-      `${this.apiUrl}/auth/login`, this.taller.conTaller({ email, password })
-    );
+    return this.http.post<{ data: LoginUnificadoResp }>(`${this.apiUrl}/auth/login`, { email, password });
   }
 
   // ── Verificación en dos pasos (personal) ──
@@ -99,17 +89,6 @@ export class AuthService {
     return this.http.post<{ message: string }>(`${this.apiUrl}/auth/2fa/desactivar`, { password });
   }
 
-  // Confirmación del correo del personal. No es 2FA ni le pone una traba a nadie: ese
-  // correo es la única vía para recuperar la contraseña, y hasta ahora nadie comprobaba
-  // que existiera.
-  enviarCodigoCorreo(): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/verificar-correo/enviar`, {});
-  }
-
-  confirmarCorreo(codigo: string): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/verificar-correo`, { codigo });
-  }
-
   // Guarda la sesión del personal (la usa el login unificado cuando tipo === 'staff').
   aplicarSesionStaff(token: string, usuario: Usuario) {
     this.guardarSesion(token, usuario);
@@ -125,6 +104,13 @@ export class AuthService {
   }
 
   logout() {
+    // Que la sesión deje de valer también en el servidor (si alguien copió el token).
+    // Sin esperar la respuesta: salir no puede depender de la red. Solo el personal
+    // tiene esta ruta; el token del portal la recibiría con 403.
+    const token = this.tokenCache;
+    if (token && this.usuarioSubject.value && !this.isTokenExpired()) {
+      this.http.post(`${this.apiUrl}/auth/salir`, {}, { headers: { Authorization: `Bearer ${token}` } }).subscribe({ error: () => {} });
+    }
     this.tokenCache = null;
     this.usuarioSubject.next(null);
     secureRemove(TOKEN_KEY);
@@ -152,6 +138,42 @@ export class AuthService {
     } catch {
       return true;
     }
+  }
+
+  // Relee los datos del usuario de la API (/auth/me) y actualiza la sesión
+  // guardada. Sirve para que un cambio de permisos que hizo el admin se refleje
+  // en el menú sin tener que volver a iniciar sesión.
+  refrescarUsuario(): Observable<{ data: Usuario }> {
+    return this.http.get<{ data: Usuario }>(`${this.apiUrl}/auth/me`).pipe(
+      tap(res => {
+        const actual = this.getUsuario();
+        const token = this.getToken();
+        if (!actual || !token) return;
+        this.guardarSesion(token, {
+          ...actual,
+          rol: res.data.rol,
+          permisos_web: res.data.permisos_web || {},
+          rol_id: res.data.rol_id ?? null,
+          rol_nombre: res.data.rol_nombre ?? null,
+          permisos: res.data.permisos || [],
+          permisos_ajustables: res.data.permisos_ajustables || [],
+          preferencias: res.data.preferencias ?? actual.preferencias,
+          // La foto vive en el servidor: así se ve también al entrar desde otro equipo.
+          foto: res.data.foto !== undefined ? res.data.foto : actual.foto,
+        });
+      })
+    );
+  }
+
+  // ¿Las casillas de su rol (Equipo → Roles) le dejan hacer esto? Solo sirve para
+  // esconder botones: el servidor lo vuelve a revisar en cada acción. Una casilla que
+  // no se elige en su base no se revisa (decide la pantalla, como siempre), y con una
+  // sesión de antes de que hubiera casillas se deja todo como estaba.
+  puede(permiso: string): boolean {
+    const u = this.getUsuario();
+    if (!u) return false;
+    if (u.rol === 'admin' || !u.permisos_ajustables) return true;
+    return !u.permisos_ajustables.includes(permiso) || (u.permisos || []).includes(permiso);
   }
 
   tieneRol(...roles: string[]): boolean {

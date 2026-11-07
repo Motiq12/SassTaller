@@ -21,8 +21,9 @@ import { mergeMap } from 'rxjs/operators';
 // Módulos que tiene sentido precargar según quién esté conectado.
 const POR_ROL: Record<string, string[]> = {
   admin:    ['admin', 'tabs', 'recepcion', 'mecanico', 'garantias', 'promociones', 'nueva-orden', 'cita-form'],
-  recepcion:['recepcion', 'tabs', 'nueva-orden', 'cita-form', 'cliente-form', 'vehiculo-form'],
+  recepcion:['recepcion', 'tabs', 'nueva-orden', 'cita-form', 'cliente-form', 'moto-form'],
   tecnico:  ['mecanico', 'tabs'],
+  contenido:['admin'],
   cliente:  ['portal'],
 };
 

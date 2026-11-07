@@ -1,107 +1,110 @@
 <ion-header>
-  <ion-toolbar>
+  <ion-toolbar class="admin-topbar">
     <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
     <ion-title>Recepción</ion-title>
     <app-recepcion-actions slot="end"></app-recepcion-actions>
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
+<ion-content class="admin-dark">
   <ion-refresher slot="fixed" (ionRefresh)="cargar($event)">
     <ion-refresher-content pullingIcon="chevron-down" refreshingSpinner="crescent"></ion-refresher-content>
   </ion-refresher>
 
-  <div class="rec">
-    <!-- Saludo -->
-    <div class="greet">
-      <div class="greet-l">
+  <div class="pg">
+    <!-- Encabezado: fecha, saludo y la acción del mostrador -->
+    <header class="pg-cab">
+      <div>
+        <span class="pg-ante">{{ fechaHoy }}</span>
         <h1>Hola, {{ primerNombre }}</h1>
+        <p>Así va el mostrador hoy.</p>
       </div>
-      <span class="greet-date mono">{{ fechaHoy }}</span>
-    </div>
+      <div class="pg-acciones">
+        <button type="button" class="btn btn-cr" [routerLink]="['/recepcion/recibir']" [queryParams]="{ modo: 'ahora' }">
+          <ion-icon name="person-add-outline"></ion-icon> Recibir cliente
+        </button>
+      </div>
+    </header>
 
     <!-- Buscador rápido: cliente / teléfono / placa -->
-    <div class="quick-search">
-      <div class="qs-box">
-        <ion-icon name="search-outline" class="qs-ico"></ion-icon>
+    <div class="rec-buscar">
+      <div class="pg-buscar">
+        <ion-icon name="search-outline"></ion-icon>
         <input type="text" [value]="buscarTexto" (input)="onBuscar($any($event.target).value)"
-               placeholder="Buscar cliente, teléfono o placa…" autocapitalize="off" autocomplete="off" />
-        <button *ngIf="buscarTexto" class="qs-x" (click)="limpiarBusqueda()" aria-label="Limpiar">
+               placeholder="Buscar cliente, teléfono o placa…" autocapitalize="off" autocomplete="off" aria-label="Buscar cliente" />
+        <button *ngIf="buscarTexto" class="pg-buscar-x" (click)="limpiarBusqueda()" aria-label="Limpiar">
           <ion-icon name="close-circle"></ion-icon>
         </button>
       </div>
-      <div class="qs-results" *ngIf="buscando || resultados.length || buscarTexto.length >= 2">
-        <div class="qs-msg" *ngIf="buscando">Buscando…</div>
-        <button class="qs-item" *ngFor="let c of resultados" (click)="abrirResultado(c)">
-          <span class="qs-ava">{{ (c.nombre || '?').charAt(0) }}{{ (c.apellido || '').charAt(0) }}</span>
-          <span class="qs-info">
+      <div class="rec-res" *ngIf="buscando || resultados.length || buscarTexto.length >= 2">
+        <div class="rec-res-msg" *ngIf="buscando">Buscando…</div>
+        <button class="rec-res-item" *ngFor="let c of resultados" (click)="abrirResultado(c)">
+          <span class="rec-av">{{ (c.nombre || '?').charAt(0) }}{{ (c.apellido || '').charAt(0) }}</span>
+          <span class="pg-item-txt">
             <strong>{{ c.nombre }} {{ c.apellido }}</strong>
-            <span>{{ c.telefono }}<ng-container *ngIf="c.total_motos"> · {{ c.total_motos }} vehiculo(s)</ng-container></span>
+            <span>{{ c.telefono }}<ng-container *ngIf="c.total_motos"> · {{ c.total_motos }} moto(s)</ng-container></span>
           </span>
           <ion-icon name="chevron-forward"></ion-icon>
         </button>
-        <div class="qs-msg" *ngIf="!buscando && !resultados.length && buscarTexto.length >= 2">Sin coincidencias</div>
+        <div class="rec-res-msg" *ngIf="!buscando && !resultados.length && buscarTexto.length >= 2">Sin coincidencias</div>
       </div>
     </div>
 
-    <!-- Acceso rápido: recibir un cliente (ingresar ahora o agendar) -->
-    <button class="walkin-cta" [routerLink]="['/recepcion/recibir']" [queryParams]="{ modo: 'ahora' }">
-      <ion-icon name="person-add-outline"></ion-icon>
-      <span>Recibir cliente</span>
-      <ion-icon name="chevron-forward" class="wc-go"></ion-icon>
-    </button>
-
-    <!-- Skeleton -->
-    <div *ngIf="cargando">
-      <div class="stat-grid">
-        <div class="skeleton" style="height:96px"></div>
-        <div class="skeleton" style="height:96px"></div>
-        <div class="skeleton" style="height:96px"></div>
-        <div class="skeleton" style="height:96px"></div>
+    <!-- Cargando -->
+    <ng-container *ngIf="cargando">
+      <div class="pg-kpis">
+        <div class="sk-dark" style="height:104px" *ngFor="let i of [1,2,3,4]"></div>
       </div>
-      <div class="skeleton" style="height:220px;margin-top:16px"></div>
-      <div class="skeleton" style="height:160px;margin-top:16px"></div>
-    </div>
+      <div class="sk-dark" style="height:220px;margin-bottom:14px"></div>
+    </ng-container>
 
-    <div *ngIf="!cargando">
-      <!-- 4 stat-cards (solo lectura) -->
-      <div class="stat-grid">
-        <div class="stat accent">
-          <div class="stat-num">{{ resumen?.citas_hoy ?? 0 }}</div>
-          <div class="stat-lbl">Citas hoy</div>
+    <ng-container *ngIf="!cargando">
+      <!-- Cifras del día -->
+      <section class="pg-kpis">
+        <button type="button" class="pg-kpi in" [routerLink]="['/recepcion/agenda']">
+          <span class="pg-kpi-icono"><ion-icon name="calendar-outline"></ion-icon></span>
+          <span class="pg-kpi-label">Citas hoy</span>
+          <strong class="pg-kpi-val">{{ resumen?.citas_hoy ?? 0 }}</strong>
+          <span class="pg-kpi-sub">{{ totalConfirmadas }} confirmada(s)</span>
+        </button>
+        <button type="button" class="pg-kpi" [routerLink]="['/recepcion/ordenes']">
+          <span class="pg-kpi-icono"><ion-icon name="construct-outline"></ion-icon></span>
+          <span class="pg-kpi-label">Órdenes activas</span>
+          <strong class="pg-kpi-val">{{ resumen?.ordenes_activas ?? 0 }}</strong>
+          <span class="pg-kpi-sub" [class.alerta]="listas.length">{{ listas.length ? listas.length + ' lista(s) para entregar' : 'Ninguna lista todavía' }}</span>
+        </button>
+        <button type="button" class="pg-kpi am" [routerLink]="['/recepcion/cotizaciones']">
+          <span class="pg-kpi-icono"><ion-icon name="receipt-outline"></ion-icon></span>
+          <span class="pg-kpi-label">Cotizaciones</span>
+          <strong class="pg-kpi-val">{{ resumen?.cotizaciones_pendientes ?? 0 }}</strong>
+          <span class="pg-kpi-sub">Pendientes de enviar</span>
+        </button>
+        <div class="pg-kpi em">
+          <span class="pg-kpi-icono"><ion-icon name="people-outline"></ion-icon></span>
+          <span class="pg-kpi-label">Mecánicos</span>
+          <strong class="pg-kpi-val">{{ resumen?.mecanicos_ocupados ?? 0 }}/{{ resumen?.mecanicos_totales ?? 0 }}</strong>
+          <span class="pg-kpi-sub">Ocupados ahora</span>
         </div>
-        <div class="stat accent">
-          <div class="stat-num">{{ resumen?.ordenes_activas ?? 0 }}</div>
-          <div class="stat-lbl">Órdenes activas</div>
-        </div>
-        <div class="stat">
-          <div class="stat-num amber">{{ resumen?.cotizaciones_pendientes ?? 0 }}</div>
-          <div class="stat-lbl">Cotizaciones pend.</div>
-        </div>
-        <div class="stat">
-          <div class="stat-num ink">{{ resumen?.mecanicos_ocupados ?? 0 }}/{{ resumen?.mecanicos_totales ?? 0 }}</div>
-          <div class="stat-lbl">Mecánicos</div>
-        </div>
-      </div>
+      </section>
 
       <!-- Listas para entregar (cierre + cobro desde el mostrador) -->
-      <section class="card entregas" *ngIf="listas.length">
-        <div class="card-head">
-          <span class="section-label">Listas para entregar</span>
-          <span class="cnt-badge">{{ listas.length }}</span>
+      <section class="cd pg-card rec-entregas" *ngIf="listas.length">
+        <div class="pg-card-cab">
+          <span class="cd-title"><ion-icon name="checkmark-done-outline"></ion-icon> Listas para entregar</span>
+          <span class="pg-num">{{ listas.length }}</span>
         </div>
-        <div class="cita-list">
-          <div class="cita-row" *ngFor="let o of listas">
-            <div class="cita-info">
+        <div class="pg-lista">
+          <div class="pg-item" *ngFor="let o of listas">
+            <div class="pg-item-txt">
               <strong>{{ o.cliente_nombre }} {{ o.cliente_apellido }}</strong>
               <span>{{ o.marca }} {{ o.modelo }}<ng-container *ngIf="o.placa"> · {{ o.placa }}</ng-container></span>
-              <span class="ent-orden mono">{{ o.numero_orden }} · ₡{{ totalOrden(o) | number:'1.0-0' }}</span>
+              <span class="mono rec-orden">{{ o.numero_orden }} · ₡{{ totalOrden(o) | number:'1.0-0' }}</span>
             </div>
-            <div class="cita-right">
-              <button class="cita-act wa" *ngIf="o.cliente_telefono" (click)="whatsappLista(o)" title="Avisar que está lista">
+            <div class="pg-item-acc">
+              <button class="btn btn-ou btn-sm" *ngIf="o.cliente_telefono" (click)="whatsappLista(o)" title="Avisar que está lista">
                 <ion-icon name="logo-whatsapp"></ion-icon> Avisar
               </button>
-              <button class="cita-act entregar" (click)="entregar(o)" [disabled]="entregando === o.id">
+              <button class="btn btn-em btn-sm" *ngIf="puede('ordenes.entregar')" (click)="entregar(o)" [disabled]="entregando === o.id">
                 <ion-icon name="checkmark-done-outline"></ion-icon> {{ entregando === o.id ? 'Entregando…' : 'Entregar' }}
               </button>
             </div>
@@ -109,111 +112,110 @@
         </div>
       </section>
 
-      <!-- Citas de hoy -->
-      <section class="card">
-        <div class="card-head">
-          <span class="section-label">Citas de hoy</span>
-          <span class="cnt-badge" *ngIf="citas.length">{{ citas.length }}</span>
-        </div>
-        <!-- Resumen de confirmación. "Sin confirmar" es accionable: filtra para recordar. -->
-        <div class="conf-resumen" *ngIf="totalConfirmadas || totalSinConfirmar">
-          <span class="cr ok"><ion-icon name="checkmark-circle"></ion-icon> {{ totalConfirmadas }} confirmada(s)</span>
-          <button class="cr pend btn" *ngIf="totalSinConfirmar" [class.on]="soloSinConfirmar" (click)="toggleSinConfirmar()">
-            <ion-icon name="alert-circle-outline"></ion-icon> {{ totalSinConfirmar }} sin confirmar
-          </button>
-          <button class="cr clear" *ngIf="soloSinConfirmar" (click)="toggleSinConfirmar()">Ver todas</button>
-        </div>
-        <!-- Filtro por sucursal (solo si hoy hay citas en más de un local) -->
-        <div class="suc-filtro" *ngIf="sucursalesHoy.length > 1">
-          <button class="suc-chip" [class.on]="!sucursalFiltro" (click)="setSucursalFiltro('')">Todas</button>
-          <button class="suc-chip" *ngFor="let s of sucursalesHoy" [class.on]="sucursalFiltro === s.id" (click)="setSucursalFiltro(s.id)">
-            <ion-icon name="location-outline"></ion-icon> {{ s.nombre }}
-          </button>
-        </div>
-        <div class="cita-groups">
-          <!-- Fila viva: las citas se agrupan por su momento en el flujo del mostrador -->
-          <div class="cita-group" *ngFor="let g of grupos" [attr.data-grp]="g.key">
-            <div class="grp-head">
-              <ion-icon [name]="g.icon"></ion-icon>
-              <span class="grp-label">{{ g.label }}</span>
-              <span class="grp-cnt">{{ g.citas.length }}</span>
-            </div>
-            <div class="cita-list">
-              <div class="cita-row" *ngFor="let c of g.citas"
+      <div class="pg-fila pg-fila--7-5">
+        <!-- Citas de hoy -->
+        <section class="cd pg-card">
+          <div class="pg-card-cab">
+            <span class="cd-title"><ion-icon name="calendar-outline"></ion-icon> Citas de hoy</span>
+            <span class="pg-num" *ngIf="citas.length">{{ citas.length }}</span>
+          </div>
+          <!-- Resumen de confirmación. "Sin confirmar" es accionable: filtra para recordar. -->
+          <div class="rec-conf" *ngIf="totalConfirmadas || totalSinConfirmar">
+            <span class="ok"><ion-icon name="checkmark-circle"></ion-icon> {{ totalConfirmadas }} confirmada(s)</span>
+            <button class="chip-filtro" *ngIf="totalSinConfirmar" [class.on]="soloSinConfirmar" (click)="toggleSinConfirmar()">
+              <ion-icon name="alert-circle-outline"></ion-icon> {{ totalSinConfirmar }} sin confirmar
+            </button>
+            <button class="rec-link" *ngIf="soloSinConfirmar" (click)="toggleSinConfirmar()">Ver todas</button>
+          </div>
+          <!-- Filtro por sucursal (solo si hoy hay citas en más de un local) -->
+          <div class="pg-filtros" *ngIf="sucursalesHoy.length > 1">
+            <button class="chip-filtro" [class.on]="!sucursalFiltro" (click)="setSucursalFiltro('')">Todas</button>
+            <button class="chip-filtro" *ngFor="let s of sucursalesHoy" [class.on]="sucursalFiltro === s.id" (click)="setSucursalFiltro(s.id)">
+              <ion-icon name="location-outline"></ion-icon> {{ s.nombre }}
+            </button>
+          </div>
+          <div class="rec-grupos">
+            <!-- Fila viva: las citas se agrupan por su momento en el flujo del mostrador -->
+            <div class="rec-grupo" *ngFor="let g of grupos; trackBy: porClave" [attr.data-grp]="g.key">
+              <div class="rec-grupo-cab">
+                <ion-icon [name]="g.icon"></ion-icon>
+                <span>{{ g.label }}</span>
+                <span class="rec-grupo-n">{{ g.citas.length }}</span>
+              </div>
+              <div class="rec-cita" *ngFor="let c of g.citas; trackBy: porId"
                    [class.proxima]="c.id === proximaId && g.key === 'porVenir'"
                    [class.atrasada]="esAtrasada(c)"
                    [class.espera-larga]="g.key === 'esperando' && esperaLarga(c)">
-                <span class="cita-hora mono">{{ c.hora?.slice(0,5) }}</span>
-                <div class="cita-info">
+                <span class="rec-hora mono">{{ c.hora?.slice(0,5) }}</span>
+                <div class="pg-item-txt">
                   <strong>
                     {{ c.cliente_nombre }} {{ c.cliente_apellido }}
-                    <span class="tag-prox" *ngIf="c.id === proximaId && g.key === 'porVenir'">Próxima</span>
-                    <span class="tag-atr" *ngIf="esAtrasada(c)">Atrasada</span>
+                    <span class="bg bg-cr rec-tag" *ngIf="c.id === proximaId && g.key === 'porVenir'">Próxima</span>
+                    <span class="bg bg-am rec-tag" *ngIf="esAtrasada(c)">Atrasada</span>
                   </strong>
-                  <span>{{ c.marca || 'Vehiculo' }} {{ c.modelo || '' }}<ng-container *ngIf="c.tipo_servicio"> · {{ c.tipo_servicio }}</ng-container></span>
-                  <span class="cita-suc" *ngIf="c.sucursal_nombre"><ion-icon name="location-outline"></ion-icon> {{ c.sucursal_nombre }}</span>
+                  <span>{{ c.marca || 'Moto' }} {{ c.modelo || '' }}<ng-container *ngIf="c.servicios || c.tipo_servicio"> · {{ c.servicios || c.tipo_servicio }}</ng-container></span>
+                  <span class="rec-suc" *ngIf="c.sucursal_nombre"><ion-icon name="location-outline"></ion-icon> {{ c.sucursal_nombre }}</span>
                   <!-- En espera: cuánto lleva. Si no, la señal de confirmación de asistencia. -->
-                  <span class="conf espera" *ngIf="g.key === 'esperando'" [class.larga]="esperaLarga(c)">
+                  <span class="rec-senal espera" *ngIf="g.key === 'esperando'" [class.larga]="esperaLarga(c)">
                     <ion-icon name="hourglass-outline"></ion-icon> {{ esperaTexto(c) }}
-                    <button class="undo-llegada" (click)="deshacerLlegada(c)">deshacer</button>
+                    <button class="rec-deshacer" (click)="deshacerLlegada(c)">deshacer</button>
                   </span>
-                  <span class="conf ok" *ngIf="g.key !== 'esperando' && c.confirmada_cliente && c.estado === 'agendado'"><ion-icon name="checkmark-circle"></ion-icon> Asistencia confirmada</span>
-                  <span class="conf pend" *ngIf="g.key !== 'esperando' && !c.confirmada_cliente && c.estado === 'agendado'"><ion-icon name="alert-circle-outline"></ion-icon> Sin confirmar</span>
+                  <span class="rec-senal ok" *ngIf="g.key !== 'esperando' && c.confirmada_cliente && c.estado === 'agendado'"><ion-icon name="checkmark-circle"></ion-icon> Asistencia confirmada</span>
+                  <span class="rec-senal pend" *ngIf="g.key !== 'esperando' && !c.confirmada_cliente && c.estado === 'agendado'"><ion-icon name="alert-circle-outline"></ion-icon> Sin confirmar</span>
                 </div>
-                <div class="cita-right">
+                <div class="rec-cita-acc">
                   <span class="pill" [ngClass]="estadoPill[c.estado]">{{ estadoLabel[c.estado] }}</span>
-                  <!-- Avisar al cliente por WhatsApp (mensaje según su estado). -->
-                  <button class="cita-act wa" *ngIf="c.cliente_telefono && c.estado !== 'entregado'"
-                          (click)="whatsappCita(c)" title="Avisar por WhatsApp">
-                    <ion-icon name="logo-whatsapp"></ion-icon> WhatsApp
-                  </button>
-                  <!-- Por venir: marcar que el cliente llegó (check-in de mostrador). -->
-                  <button class="cita-act llegada" *ngIf="g.key === 'porVenir'"
-                          (click)="marcarLlegada(c)" [disabled]="marcando === c.id">
-                    <ion-icon name="enter-outline"></ion-icon> {{ marcando === c.id ? '…' : 'Marcar llegada' }}
-                  </button>
-                  <!-- Con orden: verla. Sin orden y ya en proceso: crearla. -->
-                  <button class="cita-act ver" *ngIf="c.orden_id" (click)="verOrden(c)">
-                    <ion-icon name="document-text-outline"></ion-icon> {{ c.numero_orden || 'Ver orden' }}
-                  </button>
-                  <button class="cita-act" *ngIf="!c.orden_id && c.estado !== 'entregado'"
-                          (click)="crearOrden(c)" [disabled]="creandoOrden === c.id">
-                    <ion-icon name="add-circle-outline"></ion-icon> {{ creandoOrden === c.id ? 'Creando…' : 'Crear orden' }}
-                  </button>
+                  <div class="pg-item-acc">
+                    <!-- Avisar al cliente por WhatsApp (mensaje según su estado). -->
+                    <button class="btn btn-ou btn-sm" *ngIf="c.cliente_telefono && c.estado !== 'entregado'" (click)="whatsappCita(c)" title="Avisar por WhatsApp">
+                      <ion-icon name="logo-whatsapp"></ion-icon> WhatsApp
+                    </button>
+                    <!-- Por venir: marcar que el cliente llegó (check-in de mostrador). -->
+                    <button class="btn btn-ou btn-sm" *ngIf="g.key === 'porVenir'" (click)="marcarLlegada(c)" [disabled]="marcando === c.id">
+                      <ion-icon name="enter-outline"></ion-icon> {{ marcando === c.id ? '…' : 'Marcar llegada' }}
+                    </button>
+                    <!-- Con orden: verla. Sin orden y ya en proceso: crearla. -->
+                    <button class="btn btn-ou btn-sm" *ngIf="c.orden_id" (click)="verOrden(c)">
+                      <ion-icon name="document-text-outline"></ion-icon> {{ c.numero_orden || 'Ver orden' }}
+                    </button>
+                    <button class="btn btn-cr btn-sm" *ngIf="!c.orden_id && c.estado !== 'entregado' && puede('ordenes.crear')" (click)="crearOrden(c)" [disabled]="creandoOrden === c.id">
+                      <ion-icon name="add-circle-outline"></ion-icon> {{ creandoOrden === c.id ? 'Creando…' : 'Crear orden' }}
+                    </button>
+                    <!-- Sin orden y ya atendida: el cliente se la lleva, se entrega aquí. -->
+                    <button class="btn btn-em btn-sm" *ngIf="puedeEntregarCita(c)" (click)="entregarCita(c)" [disabled]="entregandoCita === c.id">
+                      <ion-icon name="checkmark-done-outline"></ion-icon> {{ entregandoCita === c.id ? 'Entregando…' : 'Entregar' }}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-          <div class="empty-row" *ngIf="!citas.length">
-            <ion-icon name="calendar-clear-outline"></ion-icon>
-            Sin citas para hoy
-          </div>
-        </div>
-      </section>
-
-      <!-- Alertas: eventos del taller (foto, lista, aprobación, cita nueva) -->
-      <section class="card">
-        <div class="card-head">
-          <span class="section-label">Alertas recientes</span>
-          <span style="font-size:11px;color:var(--n-400);font-weight:600">Últimas 24 h</span>
-        </div>
-        <div class="alert-list">
-          <div class="alert-row" *ngFor="let a of alertas" [class.tappable]="alertaClickable(a)" (click)="abrirAlerta(a)">
-            <span class="alert-ico" [ngClass]="alertaColor(a)"><ion-icon [name]="alertaIcono(a)"></ion-icon></span>
-            <div class="alert-body">
-              <span class="alert-txt">{{ alertaTexto(a) }}</span>
-              <span class="alert-time">{{ hace(a.created_at) }}<ng-container *ngIf="a.numero_orden"> · {{ a.numero_orden }}</ng-container></span>
+            <div class="pg-vacio" *ngIf="!citas.length">
+              <ion-icon name="calendar-clear-outline"></ion-icon> Sin citas para hoy.
             </div>
-            <ion-icon name="chevron-forward" class="alert-go" *ngIf="alertaClickable(a)"></ion-icon>
           </div>
-          <div class="empty-row" *ngIf="!alertas.length">
-            <ion-icon name="notifications-off-outline"></ion-icon>
-            Sin alertas en las últimas 24 h
-          </div>
-        </div>
-      </section>
-    </div>
+        </section>
 
-    <div style="height:80px"></div>
+        <!-- Alertas: eventos del taller (foto, lista, aprobación, cita nueva) -->
+        <section class="cd pg-card">
+          <div class="pg-card-cab">
+            <span class="cd-title"><ion-icon name="notifications-outline"></ion-icon> Alertas recientes</span>
+            <span class="pg-cuenta">Últimas 24 h</span>
+          </div>
+          <div class="pg-lista">
+            <div class="pg-item rec-alerta" *ngFor="let a of alertas" [class.tocable]="alertaClickable(a)" (click)="abrirAlerta(a)">
+              <span class="rec-alerta-ico" [ngClass]="alertaColor(a)"><ion-icon [name]="alertaIcono(a)"></ion-icon></span>
+              <div class="pg-item-txt">
+                <strong class="rec-alerta-txt">{{ alertaTexto(a) }}</strong>
+                <span>{{ hace(a.created_at) }}<ng-container *ngIf="a.numero_orden"> · {{ a.numero_orden }}</ng-container></span>
+              </div>
+              <ion-icon name="chevron-forward" class="rec-alerta-ir" *ngIf="alertaClickable(a)"></ion-icon>
+            </div>
+            <div class="pg-vacio" *ngIf="!alertas.length">
+              <ion-icon name="notifications-off-outline"></ion-icon> Sin alertas en las últimas 24 h.
+            </div>
+          </div>
+        </section>
+      </div>
+    </ng-container>
   </div>
 </ion-content>

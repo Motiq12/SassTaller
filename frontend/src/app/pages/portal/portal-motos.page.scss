@@ -1,0 +1,147 @@
+// Estándar de diseño: colores del panel (.admin-dark en global.scss), que siguen el tema.
+.motos { max-width: 820px; margin: 0 auto; padding: 12px 16px 0; }
+
+.intro {
+  margin: 6px 2px 16px;
+  h2 { font-family: var(--font-display); font-size: 24px; font-weight: 800; letter-spacing: 0; margin: 0 0 4px; }
+  p { font-size: 13px; color: var(--tx3); margin: 0; }
+}
+
+/* Lista de motos (tarjetas del mockup) */
+@media (min-width: 720px) {
+  .moto-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 8px; }
+}
+
+.mc {
+  display: flex; align-items: center; gap: 12px; cursor: pointer;
+  background: var(--sur); border: 1px solid var(--bd);
+  border-radius: 8px; padding: 14px; margin-bottom: 10px;
+  transition: border-color .2s, transform .15s;
+  &:hover { border-color: rgba(226, 35, 26, .15); }
+  &:active { transform: scale(.99); }
+
+  .mc-i { width: 54px; height: 54px; border-radius: 2px; flex-shrink: 0; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--adm-cr-bg); color: var(--cr-tx);
+    ion-icon { font-size: 26px; }
+    img { width: 100%; height: 100%; object-fit: cover; display: block; } }
+
+  .mc-m { flex: 1; min-width: 0;
+    h4 { margin: 0 0 5px; font-family: var(--font-display); font-size: 15.5px; font-weight: 800; letter-spacing: 0; }
+    .mc-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .mc-plate { font-weight: 700; color: var(--adm-cr-fg);  // AA sobre pastilla clara
+      background: var(--adm-cr-bg); padding: 1px 7px; border-radius: 2px; letter-spacing: .06em; font-size: 11px; }
+    .mc-km { font-size: 11.5px; color: var(--tx3); }
+    .mc-aviso { display: inline-flex; align-items: center; gap: 5px; margin-top: 7px;
+      font-size: 11px; font-weight: 700;
+      i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+      &.ok   { color: var(--em); }
+      &.warn { color: var(--am); }
+      &.due  { color: var(--cr-tx); }
+      &.none { color: var(--tx3); } } }
+
+  .mc-acts { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+  .mc-e { background: none; border: none; cursor: pointer; color: var(--tx3); padding: 5px;
+    ion-icon { font-size: 18px; } &:active { transform: scale(.9); }
+    &.del { color: var(--ion-color-danger); } }
+}
+
+/* Botón outline "Agregar moto" / Cancelar */
+.cta-o {
+  width: 100%; margin-top: 14px; padding: 12px; border: 1.5px solid var(--bd); border-radius: var(--radius-pill);
+  background: none; color: var(--tx); cursor: pointer;
+  font-family: inherit; font-size: 13px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  ion-icon { font-size: 17px; }
+  &:active { transform: scale(.98); }
+  &:disabled { opacity: .5; }
+}
+
+/* Tarjeta del formulario */
+.cd {
+  display: block; margin-top: 14px; padding: 18px 16px;
+  background: var(--sur); border: 1.5px solid var(--ion-color-primary);
+  border-radius: var(--radius-card);
+}
+.lb { display: block; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--tx3); margin-bottom: 12px; }
+
+/* Selector de foto de la moto */
+.moto-foto {
+  display: flex; align-items: center; gap: 14px; margin-bottom: 16px;
+  .mf-prev {
+    width: 84px; height: 84px; border-radius: 2px; flex-shrink: 0; overflow: hidden; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--adm-cr-bg); color: var(--cr-tx);
+    img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    ion-icon { font-size: 28px; }
+    &.empty { border: 1.5px dashed var(--bd); background: var(--sur2); color: var(--tx3); }
+    &:active { transform: scale(.97); }
+  }
+  .mf-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .mf-btn {
+    background: none; border: 1.5px solid var(--bd); border-radius: var(--radius-pill);
+    padding: 7px 14px; cursor: pointer; font-family: inherit; font-size: 12.5px; font-weight: 700;
+    color: var(--cr-tx);  // AA
+    &.del { border: none; color: var(--ion-color-danger); padding: 4px 6px; }
+    &:disabled { opacity: .6; }
+    &:active { transform: scale(.97); }
+  }
+}
+
+.fg {
+  margin-bottom: 12px;
+  label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--tx3); margin-bottom: 6px; }
+  input {
+    width: 100%; padding: 11px 12px; border: 1px solid var(--bd); border-radius: 2px;
+    font-family: inherit; font-size: 14px; background: var(--sur); color: var(--tx);
+    outline: none; transition: border-color .15s;
+    &:focus { border-color: var(--ion-color-primary); }
+    &.upper { text-transform: uppercase; }
+  }
+}
+
+/* Campo con autocompletado (marca / modelo) */
+.ac-field { position: relative;
+  .ac-results {
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 20;
+    margin-top: 4px; max-height: 220px; overflow-y: auto;
+    background: var(--sur); border: 1px solid var(--bd);
+    border-radius: 2px; box-shadow: var(--shadow-md);
+  }
+  .ac-item {
+    display: block; width: 100%; text-align: left; cursor: pointer;
+    padding: 11px 12px; border: none; background: none; color: var(--tx);
+    font-family: inherit; font-size: 14px;
+    border-bottom: 1px solid var(--bd);
+    &:last-child { border-bottom: none; }
+    &:active, &:hover { background: var(--adm-cr-bg); color: var(--adm-cr-fg); }  // AA sobre fondo claro
+  }
+}
+
+.cta {
+  width: 100%; margin-top: 6px; padding: 14px; border: none; border-radius: var(--radius-pill);
+  background: var(--ion-color-primary); color: #fff; cursor: pointer;
+  font-family: inherit; font-size: 14px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  box-shadow: var(--shadow-accent); transition: transform .15s;
+  &:active { transform: scale(.97); }
+  &:disabled { opacity: .5; box-shadow: none; }
+  ion-spinner { width: 18px; height: 18px; }
+}
+.cd .cta-o { border-color: var(--bd); margin-top: 8px; }
+
+.empty-state {
+  text-align: center; padding: 44px 24px; color: var(--tx3);
+  ion-icon { font-size: 52px; opacity: .4; display: block; margin: 0 auto 12px; }
+  p { font-size: 14px; }
+}
+
+/* Escritorio: más motos por fila; el botón y el formulario no se estiran. */
+@media (min-width: 1200px) {
+  .motos { max-width: 1120px; padding: 20px 32px 0; }
+  .moto-list { gap: 12px 16px; }
+  .cta-o { max-width: 340px; }
+  .cd { max-width: 640px; }
+}

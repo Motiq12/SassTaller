@@ -1,105 +1,104 @@
 <ion-header>
-  <ion-toolbar>
+  <ion-toolbar class="admin-topbar">
     <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
     <ion-title>Agenda</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
+<ion-content class="admin-dark">
   <ion-refresher slot="fixed" (ionRefresh)="cargar($event)">
     <ion-refresher-content pullingIcon="chevron-down" refreshingSpinner="crescent"></ion-refresher-content>
   </ion-refresher>
 
-  <div class="rec">
+  <div class="pg">
     <!-- Cabecera del mes -->
-    <div class="cal-head">
-      <h2>{{ tituloMes }}</h2>
-      <div class="cal-nav">
-        <button (click)="cambiarMes(-1)" aria-label="Mes anterior"><ion-icon name="chevron-back"></ion-icon></button>
-        <button class="hoy" (click)="cambiarMes(0)">Hoy</button>
-        <button (click)="cambiarMes(1)" aria-label="Mes siguiente"><ion-icon name="chevron-forward"></ion-icon></button>
+    <header class="pg-cab">
+      <div>
+        <span class="pg-ante">Agenda</span>
+        <h1>{{ tituloMes }}</h1>
       </div>
-    </div>
+      <div class="pg-acciones">
+        <div class="pg-cal-nav" role="group" aria-label="Cambiar de mes">
+          <button type="button" class="btn btn-ou btn-sm" (click)="cambiarMes(-1)" aria-label="Mes anterior"><ion-icon name="chevron-back"></ion-icon></button>
+          <button type="button" class="btn btn-ou btn-sm" (click)="cambiarMes(0)">Hoy</button>
+          <button type="button" class="btn btn-ou btn-sm" (click)="cambiarMes(1)" aria-label="Mes siguiente"><ion-icon name="chevron-forward"></ion-icon></button>
+        </div>
+      </div>
+    </header>
 
     <!-- Filtro de sede (solo si hay más de una en el mes) -->
-    <div class="ag-chips" *ngIf="sucursales.length > 1">
-      <button class="ag-chip" [class.on]="!sucursalFiltro" (click)="setSucursalFiltro(0)">Todas las sedes</button>
-      <button class="ag-chip" *ngFor="let s of sucursales" [class.on]="sucursalFiltro===s.id" (click)="setSucursalFiltro(s.id)">
+    <div class="pg-filtros" *ngIf="sucursales.length > 1">
+      <button class="chip-filtro" [class.on]="!sucursalFiltro" (click)="setSucursalFiltro(0)">Todas las sedes</button>
+      <button class="chip-filtro" *ngFor="let s of sucursales" [class.on]="sucursalFiltro===s.id" (click)="setSucursalFiltro(s.id)">
         <ion-icon name="location-outline"></ion-icon> {{ s.nombre }}
       </button>
     </div>
 
-    <div class="cal-layout">
+    <div class="pg-fila pg-fila--7-5">
       <!-- Calendario -->
-      <div class="cal-card card">
-        <div class="cal-grid cal-dows">
-          <div class="cal-dow" *ngFor="let d of dows">{{ d }}</div>
+      <section class="cd pg-card">
+        <div class="pg-cal-grid pg-cal-dows">
+          <div class="pg-cal-dow" *ngFor="let d of dows">{{ d }}</div>
         </div>
-        <div class="cal-grid" *ngFor="let semana of semanas">
+        <div class="pg-cal-grid" *ngFor="let semana of semanas">
           <button *ngFor="let c of semana"
-                  class="cal-day"
-                  [class.empty]="!c.dia"
-                  [class.today]="c.hoy"
+                  class="pg-cal-dia"
+                  [class.vacio]="!c.dia"
+                  [class.hoy]="c.hoy"
                   [class.sel]="diaSel && c.fecha === diaSel.fecha && c.dia"
                   [ngClass]="c.flujo ? 'flujo-' + c.flujo : ''"
                   [disabled]="!c.dia"
+                  [attr.aria-label]="c.dia ? c.dia + (c.total ? ', ' + c.total + ' citas' : '') : null"
                   (click)="selDia(c)">
             <ng-container *ngIf="c.dia">
-              <span class="d-num">{{ c.dia }}</span>
-              <span class="d-cnt" *ngIf="c.total">{{ c.total }}</span>
+              <span class="pg-cal-num">{{ c.dia }}</span>
+              <span class="pg-cal-n" *ngIf="c.total">{{ c.total }}</span>
             </ng-container>
           </button>
         </div>
-
-        <!-- Leyenda de carga -->
-        <div class="cal-legend">
-          <span><i class="lg bajo"></i> ≤2</span>
-          <span><i class="lg medio"></i> 3–5</span>
-          <span><i class="lg alto"></i> 6+</span>
+        <div class="pg-cal-ley">
+          <span><i class="em"></i> Hasta 2 citas</span>
+          <span><i class="am"></i> 3 a 5</span>
+          <span><i class="cr"></i> 6 o más</span>
         </div>
-      </div>
+        <div *ngIf="cargando && !semanas.length" class="sk-dark" style="height:300px"></div>
+      </section>
 
       <!-- Panel del día -->
-      <div class="day-card card" *ngIf="diaSel && diaSel.dia">
-        <div class="day-head">
+      <section class="cd pg-card" *ngIf="diaSel && diaSel.dia">
+        <div class="pg-card-cab">
           <div>
-            <h3>{{ detalleTitulo() }}</h3>
-            <p class="day-sub">{{ citasDia.length }} {{ citasDia.length === 1 ? 'cita' : 'citas' }}</p>
+            <span class="cd-title">{{ detalleTitulo() }}</span>
+            <span class="pg-cuenta">{{ citasDia.length }} {{ citasDia.length === 1 ? 'cita' : 'citas' }}</span>
           </div>
-          <button class="day-add" (click)="agendarEnDia()">
-            <ion-icon name="add"></ion-icon> Agendar
-          </button>
+          <button type="button" class="btn btn-cr btn-sm" (click)="agendarEnDia()"><ion-icon name="add"></ion-icon> Agendar</button>
         </div>
 
-        <div class="cita-list">
-          <div class="cita-row" *ngFor="let c of citasDia" (click)="abrirCita(c)">
-            <div class="ci-hora mono">{{ c.hora || '—' }}</div>
-            <div class="ci-info">
-              <strong>{{ c.cliente_nombre }} {{ c.cliente_apellido }}</strong>
-              <span class="ci-vehiculo" *ngIf="c.marca">{{ c.marca }} {{ c.modelo }}<ng-container *ngIf="c.placa"> · {{ c.placa }}</ng-container></span>
-              <span class="ci-vehiculo" *ngIf="c.tecnico_nombre"><ion-icon name="construct-outline"></ion-icon> {{ c.tecnico_nombre }}</span>
-              <div class="ci-badges">
-                <span class="pill" [ngClass]="estadoPill[c.estado]">{{ estadoLabel[c.estado] || c.estado }}</span>
-                <span class="badge llego" *ngIf="llego(c)"><ion-icon name="checkmark-circle"></ion-icon> Llegó</span>
-                <span class="badge sin" *ngIf="sinConfirmar(c)"><ion-icon name="alert-circle"></ion-icon> Sin confirmar</span>
-                <span class="badge noshow" *ngIf="noShow(c)"><ion-icon name="close-circle"></ion-icon> No se presentó</span>
-              </div>
-            </div>
-            <button class="ci-wa" (click)="$event.stopPropagation(); whatsapp(c)" aria-label="WhatsApp">
+        <div class="pg-lista">
+          <div class="pg-item ra-cita" *ngFor="let c of citasDia">
+            <button type="button" class="ra-cita-abrir" (click)="abrirCita(c)">
+              <span class="ra-hora mono">{{ c.hora || '—' }}</span>
+              <span class="pg-item-txt">
+                <strong>{{ c.cliente_nombre }} {{ c.cliente_apellido }}</strong>
+                <span *ngIf="c.marca">{{ c.marca }} {{ c.modelo }}<ng-container *ngIf="c.placa"> · {{ c.placa }}</ng-container></span>
+                <span *ngIf="c.tecnico_nombre"><ion-icon name="construct-outline"></ion-icon> {{ c.tecnico_nombre }}</span>
+                <span class="ra-badges">
+                  <span class="pill" [ngClass]="estadoPill[c.estado]">{{ estadoLabel[c.estado] || c.estado }}</span>
+                  <span class="bg bg-em" *ngIf="llego(c)"><ion-icon name="checkmark-circle"></ion-icon> Llegó</span>
+                  <span class="bg bg-am" *ngIf="sinConfirmar(c)"><ion-icon name="alert-circle"></ion-icon> Sin confirmar</span>
+                  <span class="bg bg-rd" *ngIf="noShow(c)"><ion-icon name="close-circle"></ion-icon> No se presentó</span>
+                </span>
+              </span>
+            </button>
+            <button type="button" class="btn btn-ou btn-sm ra-wa" (click)="whatsapp(c)" aria-label="Avisar por WhatsApp">
               <ion-icon name="logo-whatsapp"></ion-icon>
             </button>
           </div>
-
-          <div class="cita-empty" *ngIf="!citasDia.length">
-            <ion-icon name="calendar-clear-outline"></ion-icon>
-            <p>Sin citas este día.</p>
-            <button class="day-add" (click)="agendarEnDia()"><ion-icon name="add"></ion-icon> Agendar una cita</button>
+          <div class="pg-vacio" *ngIf="!citasDia.length">
+            <ion-icon name="calendar-clear-outline"></ion-icon> Sin citas este día.
           </div>
         </div>
-      </div>
+      </section>
     </div>
-
-    <div *ngIf="cargando && !semanas.length" class="skeleton" style="height:360px;margin-top:6px"></div>
-    <div style="height:80px"></div>
   </div>
 </ion-content>

@@ -49,7 +49,7 @@ function antibot() {
       }
       const token = req.body && (req.body.turnstileToken || req.body.captcha);
       if (!(await turnstileOk(token, req.ip))) {
-        return res.status(400).json({ error: 'Verificación de seguridad fallida. Recargá la página e intentá de nuevo.' });
+        return res.status(400).json({ error: 'Verificación de seguridad fallida. Recarga la página e intenta de nuevo.' });
       }
       next();
     } catch (err) {

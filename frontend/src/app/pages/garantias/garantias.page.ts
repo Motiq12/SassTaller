@@ -1,11 +1,13 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { AlertController, ToastController } from '@ionic/angular';
+import { Router } from '@angular/router';
+import { enPanel } from '../../shared/ruta-panel';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { GarantiasService } from '../../services/garantias.service';
 import { AuthService } from '../../services/auth.service';
 import { Garantia, EstadoGarantia, ESTADO_GARANTIA_CONFIG } from '../../models/garantia.model';
-import { comprimirImagen } from '../../shared/utils/image.util';
+import { comprimirImagen } from '../../shared/image.util';
 
 @Component({
   standalone: false,
@@ -14,11 +16,6 @@ import { comprimirImagen } from '../../shared/utils/image.util';
   styleUrls: ['./garantias.page.scss'],
 })
 export class GarantiasPage implements OnInit, OnDestroy {
-  private garantiaSvc = inject(GarantiasService);
-  auth = inject(AuthService);
-  private alert = inject(AlertController);
-  private toast = inject(ToastController);
-
   private destroy$ = new Subject<void>();
   garantias: Garantia[] = [];
   cargando = true;
@@ -42,6 +39,17 @@ export class GarantiasPage implements OnInit, OnDestroy {
 
   readonly estadosTramite: EstadoGarantia[] = ['abierto', 'en_revision', 'aprobado', 'rechazado', 'resuelto'];
 
+  constructor(
+    private garantiaSvc: GarantiasService,
+    public auth: AuthService,
+    private alert: AlertController,
+    private toast: ToastController,
+    private router: Router,
+  ) {}
+
+  // Abierta desde el panel de administración (ver shared/ruta-panel.ts).
+  get dentroDelPanel(): boolean { return enPanel(this.router); }
+
   ngOnInit() { this.cargar(); }
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
   ionViewWillEnter() { this.cargar(); }
@@ -58,7 +66,10 @@ export class GarantiasPage implements OnInit, OnDestroy {
   filtrar() { this.cargar(); }
 
   estadoLabel(e: EstadoGarantia) { return ESTADO_GARANTIA_CONFIG[e]?.label ?? e; }
-  estadoColor(e: EstadoGarantia) { return ESTADO_GARANTIA_CONFIG[e]?.color ?? 'medium'; }
+  // Insignia del estándar (.pill) para cada estado del trámite.
+  estadoPill(e: EstadoGarantia): string {
+    return ({ abierto: 'indigo', en_revision: 'amber', aprobado: 'green', rechazado: 'rose', resuelto: 'gris' } as Record<string, string>)[e] ?? 'gris';
+  }
 
   abrir(g: Garantia) {
     this.garantiaSvc.getById(g.id!).pipe(takeUntil(this.destroy$)).subscribe(res => {
@@ -104,7 +115,7 @@ export class GarantiasPage implements OnInit, OnDestroy {
     }
     this.subiendoFoto = true;
     try {
-      const dataUrl = await comprimirImagen(file, { maxLado: 1024, calidad: 0.7 });
+      const dataUrl = await comprimirImagen(file);
       this.garantiaSvc.addFoto(this.seleccionada!.id!, { url: dataUrl }).pipe(takeUntil(this.destroy$)).subscribe({
         next: res => {
           this.seleccionada!.fotos = [...(this.seleccionada!.fotos || []), res.data];
@@ -122,7 +133,7 @@ export class GarantiasPage implements OnInit, OnDestroy {
 
   async verFoto(url: string) {
     const a = await this.alert.create({
-      message: `<img src="${url}" style="width:100%;border-radius:8px" />`,
+      message: `<img src="${url}" style="width:100%;border-radius:2px" />`,
       buttons: ['Cerrar'],
     });
     await a.present();

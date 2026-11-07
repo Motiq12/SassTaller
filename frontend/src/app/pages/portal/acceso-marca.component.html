@@ -1,0 +1,15 @@
+<section class="marca">
+  <img class="marca-logo" src="assets/logo/ms-logo-white.png" alt="MS Motos · Repuestos y taller" width="132" height="132" />
+
+  <div class="marca-cuerpo">
+    <span class="marca-rotulo">Portal MS Motos</span>
+    <h2 class="marca-titulo">Tu moto, <span>en buenas manos.</span></h2>
+
+    <ol class="marca-lista">
+      <li *ngFor="let p of puntos; let i = index">
+        <span class="marca-n">{{ (i + 1).toString().padStart(2, '0') }}</span>
+        <span><strong>{{ p.titulo }}</strong>{{ p.texto }}</span>
+      </li>
+    </ol>
+  </div>
+</section>

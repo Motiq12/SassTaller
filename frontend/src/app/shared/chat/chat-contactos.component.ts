@@ -1,8 +1,9 @@
-import { Component, EventEmitter, OnDestroy, OnInit, Output, inject } from '@angular/core';
+import { Component, EventEmitter, OnDestroy, OnInit, Output } from '@angular/core';
 import { Subject, interval } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { MensajeriaService, ChatContacto } from '../../services/mensajeria.service';
 import { AuthService } from '../../services/auth.service';
+import { hoyCR, sumarDias, diaTaller } from '../../utils/fecha-cita';
 
 // Lista de contactos estilo WhatsApp: todo el personal activo con preview del
 // último mensaje y no-leídos por conversación. La usan los 3 roles.
@@ -13,9 +14,6 @@ import { AuthService } from '../../services/auth.service';
   styleUrls: ['./chat-contactos.component.scss'],
 })
 export class ChatContactosComponent implements OnInit, OnDestroy {
-  private msj = inject(MensajeriaService);
-  private auth = inject(AuthService);
-
   private destroy$ = new Subject<void>();
   @Output() abrir = new EventEmitter<ChatContacto>();
   @Output() abrirAvisos = new EventEmitter<void>();
@@ -29,6 +27,8 @@ export class ChatContactosComponent implements OnInit, OnDestroy {
   readonly rolLabel: Record<string, string> = {
     tecnico: 'Mecánico', recepcion: 'Recepción', admin: 'Dueño / Admin',
   };
+
+  constructor(private msj: MensajeriaService, private auth: AuthService) {}
 
   ngOnInit() {
     this.cargar();
@@ -76,9 +76,9 @@ export class ChatContactosComponent implements OnInit, OnDestroy {
   // Hora estilo WhatsApp: hoy → hora, ayer → "Ayer", si no → dd/mm.
   horaLista(fecha: string | null): string {
     if (!fecha) return '';
-    const hoy = new Date().toISOString().slice(0, 10);
-    const ayer = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-    const d = fecha.slice(0, 10);
+    const hoy = hoyCR();
+    const ayer = sumarDias(hoy, -1);
+    const d = diaTaller(fecha);
     if (d === hoy) return new Date(fecha).toLocaleTimeString('es-CR', { hour: '2-digit', minute: '2-digit', hour12: true });
     if (d === ayer) return 'Ayer';
     return new Date(fecha).toLocaleDateString('es-CR', { day: '2-digit', month: '2-digit' });

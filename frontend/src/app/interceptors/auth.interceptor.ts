@@ -1,28 +1,19 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { HttpInterceptor, HttpRequest, HttpHandler, HttpEvent, HttpErrorResponse } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { PortalService } from '../services/portal.service';
-import { MotiqService } from '../services/motiq.service';
 
 @Injectable()
 export class AuthInterceptor implements HttpInterceptor {
-  private auth = inject(AuthService);
-  private portal = inject(PortalService);
-  private motiq = inject(MotiqService);
-  private router = inject(Router);
+  constructor(private auth: AuthService, private portal: PortalService, private router: Router) {}
 
   intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    // Hay tres sesiones que pueden convivir en el mismo navegador y cada una tiene su
-    // token: el personal del taller, el cliente del portal y el admin de la plataforma.
-    // Se elige por la ruta a la que va la llamada — mandar el que no es sería un 403.
+    // Las llamadas al portal del cliente usan su propio token; el resto, el del personal.
     const esPortal = req.url.includes('/api/portal');
-    const esMotiq = req.url.includes('/api/motiq');
-    const token = esPortal ? this.portal.getToken()
-      : esMotiq ? this.motiq.getToken()
-      : this.auth.getToken();
+    const token = esPortal ? this.portal.getToken() : this.auth.getToken();
 
     const authReq = token
       ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
@@ -30,15 +21,14 @@ export class AuthInterceptor implements HttpInterceptor {
 
     return next.handle(authReq).pipe(
       catchError((err: HttpErrorResponse) => {
-        // No expulsar en el propio login (deja que el componente muestre el error).
+        // No expulsar en el propio login (deja que el componente muestre el error), ni
+        // por el aviso de salida: ya se salió, y podría echar a una sesión nueva.
         const esLogin = req.url.includes('/login');
-        if (err.status === 401 && !esLogin) {
+        const esSalida = req.url.endsWith('/auth/salir');
+        if (err.status === 401 && !esLogin && !esSalida) {
           if (esPortal) {
             this.portal.logout();
             this.router.navigate(['/portal/login']);
-          } else if (esMotiq) {
-            this.motiq.logout();
-            this.router.navigate(['/motiq/login']);
           } else {
             this.auth.logout();
             this.router.navigate(['/login']);

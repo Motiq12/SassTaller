@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
@@ -22,9 +22,8 @@ export interface ChatContacto {
 // Mensajería interna 1:1 del personal (los 3 roles usan el mismo servicio).
 @Injectable({ providedIn: 'root' })
 export class MensajeriaService {
-  private http = inject(HttpClient);
-
   private url = `${environment.apiUrl}/mensajeria`;
+  constructor(private http: HttpClient) {}
 
   getContactos(): Observable<{ data: { contactos: ChatContacto[]; avisos_no_leidos: number } }> {
     return this.http.get<{ data: any }>(`${this.url}/contactos`);

@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { ActivatedRouteSnapshot, CanActivate, Router, UrlTree } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 
@@ -7,8 +7,7 @@ import { AuthService } from '../services/auth.service';
 // pantalla que su rol no puede usar (la API igualmente respondería 403).
 @Injectable({ providedIn: 'root' })
 export class RolGuard implements CanActivate {
-  private auth = inject(AuthService);
-  private router = inject(Router);
+  constructor(private auth: AuthService, private router: Router) {}
 
   canActivate(route: ActivatedRouteSnapshot): boolean | UrlTree {
     const permitidos: string[] = route.data?.['roles'] || [];
@@ -20,6 +19,7 @@ export class RolGuard implements CanActivate {
   private home(rol?: string): string {
     if (rol === 'tecnico') return '/mecanico';
     if (rol === 'recepcion') return '/recepcion';
+    if (rol === 'contenido') return '/admin/web';
     return '/tabs';
   }
 }

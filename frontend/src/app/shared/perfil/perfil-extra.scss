@@ -1,0 +1,81 @@
+// Piezas de Mi perfil compartidas por los tres roles (sesiones, actividad, firma,
+// preferencias). Igual que app-dosfa: estilos propios con los tokens globales, para
+// que se vean igual en el panel oscuro del admin y en los claros de recepción y taller.
+:host { display: block; margin-bottom: 14px; }
+
+.px {
+  background: var(--ion-card-background);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 18px;
+  box-shadow: var(--shadow-sm);
+}
+
+.px-titulo {
+  display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px;
+  // Mismo encabezado que las demás tarjetas de Mi perfil: ícono en un cuadro rojizo.
+  > ion-icon {
+    // ion-icon fuerza content-box: 18 px + 9 de relleno por lado = 36.
+    width: 18px; height: 18px; padding: 9px; flex-shrink: 0;
+    border-radius: 8px; background: rgba(226, 35, 26, .12); color: var(--text-accent);
+  }
+  strong { display: block; font-family: var(--font-display, 'Rajdhani', sans-serif); font-size: 18px; font-weight: 700; line-height: 1.2; color: var(--ion-text-color); }
+  span { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.5; color: var(--n-500); }
+}
+
+.px-lista { list-style: none; margin: 0; padding: 0; }
+.px-fila {
+  display: flex; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid var(--hairline);
+  &:first-child { border-top: 0; padding-top: 0; }
+  > ion-icon { font-size: 20px; color: var(--n-500); flex-shrink: 0; }
+}
+.px-fila-txt {
+  flex: 1; min-width: 0;
+  strong { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; color: var(--ion-text-color); }
+  span { display: block; margin-top: 2px; font-size: 12px; color: var(--n-500); overflow-wrap: anywhere; }
+  a { color: var(--text-accent); font-weight: 700; text-decoration: none; &:hover { text-decoration: underline; } }
+}
+.px-hora { flex-shrink: 0; font-size: 11.5px; color: var(--n-500); white-space: nowrap; }
+
+.px-chip {
+  display: inline-block; padding: 2px 8px; border-radius: 2px;
+  font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+  background: rgba(16, 185, 129, .12); color: #059669;
+}
+
+.px-vacio, .px-nota { font-size: 12.5px; line-height: 1.55; color: var(--n-500); margin: 0; }
+.px-nota { margin-top: 12px; }
+
+.px-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.px-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 40px; padding: 9px 14px; border-radius: 2px; border: 1px solid var(--hairline);
+  background: transparent; color: var(--ion-text-color); cursor: pointer;
+  font-family: inherit; font-size: 13px; font-weight: 700;
+  ion-icon { font-size: 16px; }
+  &:hover:not(:disabled) { border-color: var(--n-400); }
+  &:disabled { opacity: .5; cursor: default; }
+  &:focus-visible { outline: 2px solid var(--ion-color-primary); outline-offset: 2px; }
+  &.primario { background: var(--ion-color-primary); border-color: var(--ion-color-primary); color: #fff; }
+  &.mini { min-height: 32px; padding: 5px 10px; font-size: 12px; flex-shrink: 0; }
+  &.peligro { color: var(--ion-color-danger, #dc2626); }
+}
+
+.px-campo {
+  display: block; margin-bottom: 12px;
+  > span { display: block; margin-bottom: 5px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--n-500); }
+  select {
+    width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid var(--hairline); border-radius: 2px;
+    background: var(--ion-card-background); color: var(--ion-text-color); font: inherit; font-size: 13.5px;
+    &:focus-visible { outline: 2px solid var(--ion-color-primary); outline-offset: 1px; }
+  }
+  small { display: block; margin-top: 4px; font-size: 11.5px; color: var(--n-500); }
+}
+
+// Casillas de avisos: fila entera tocable.
+.px-check {
+  display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--hairline); cursor: pointer;
+  font-size: 13px; color: var(--ion-text-color);
+  &:first-of-type { border-top: 0; }
+  input { width: 18px; height: 18px; accent-color: var(--ion-color-primary); flex-shrink: 0; cursor: pointer; }
+}

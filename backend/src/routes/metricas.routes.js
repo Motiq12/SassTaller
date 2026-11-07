@@ -1,9 +1,8 @@
 const router = require('express').Router();
-// Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
+const { pool } = require('../db/pool');
 const { fail } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
-const tenantPublico = require('../middleware/tenant-publico');
 
 // Core Web Vitals medidos en los navegadores de la gente que usa la app.
 //
@@ -20,18 +19,8 @@ const METRICAS = ['LCP', 'CLS', 'INP', 'FCP', 'TTFB'];
 // que ocurren antes de que exista un token. A cambio se valida con dureza y solo se
 // guardan los cinco nombres conocidos: es un endpoint de escritura abierto, así que
 // no puede aceptar nada que venga en el cuerpo.
-//
-// Lleva `tenantPublico` porque la fila necesita un taller y acá no hay sesión de donde
-// sacarlo. Sin ese middleware, `req.db` no existía y CADA llamada terminaba en un 500
-// silencioso: la medición de INP —el motivo por el que existe este endpoint— nunca
-// llegó a guardar un solo dato.
-router.post('/web-vitals', tenantPublico, async (req, res) => {
+router.post('/web-vitals', async (req, res) => {
   try {
-    // Una métrica que no se puede atribuir a ningún taller no se guarda, y tampoco se
-    // reporta como error: quien llama es un `sendBeacon` al cerrar la pestaña, que no
-    // mira la respuesta y no puede hacer nada con ella.
-    if (!req.db) return res.status(204).end();
-
     const { metrica, valor, calificacion, ruta, movil } = req.body || {};
     if (!METRICAS.includes(metrica)) return res.status(400).json({ error: 'Métrica no válida' });
 
@@ -43,8 +32,8 @@ router.post('/web-vitals', tenantPublico, async (req, res) => {
     // Solo la ruta, recortada: sin querystring (puede traer datos) y sin dominio.
     const rutaLimpia = String(ruta || '/').split('?')[0].slice(0, 200);
 
-    await req.db.query(
-      'INSERT INTO web_vitals (tenant_id,metrica, valor, calificacion, ruta, movil) VALUES (@tenant, ?, ?, ?, ?, ?)',
+    await pool.query(
+      'INSERT INTO web_vitals (metrica, valor, calificacion, ruta, movil) VALUES (?, ?, ?, ?, ?)',
       [metrica, n, String(calificacion || '').slice(0, 20) || null, rutaLimpia, movil ? 1 : 0]
     );
     // 204: el navegador manda esto con sendBeacon al cerrar la pestaña y no espera cuerpo.
@@ -61,9 +50,9 @@ router.post('/web-vitals', tenantPublico, async (req, res) => {
 router.get('/web-vitals', auth, requireRol('admin'), async (req, res) => {
   try {
     const dias = Math.min(Math.max(Number(req.query.dias) || 30, 1), 365);
-    const [filas] = await req.db.query(
+    const [filas] = await pool.query(
       `SELECT metrica, valor FROM web_vitals
-       WHERE tenant_id = @tenant AND created_at >= NOW() - INTERVAL ? DAY
+       WHERE created_at >= NOW() - INTERVAL ? DAY
        ORDER BY metrica, valor`,
       [dias]
     );

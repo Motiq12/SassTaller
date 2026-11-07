@@ -10,6 +10,7 @@ export function alertaIcono(a: any): string {
     case 'cita_nueva': return 'calendar-outline';
     case 'cita_cancelada': return 'calendar-clear-outline';
     case 'repuesto': return 'cube-outline';
+    case 'sin_entregar': return 'time-outline';
     default: return 'notifications-outline';
   }
 }
@@ -22,16 +23,17 @@ export function alertaColor(a: any): string {
     case 'cita_nueva': return 'indigo';
     case 'cita_cancelada': return 'rose';
     case 'repuesto': return 'amber';
+    case 'sin_entregar': return 'amber';
     default: return 'amber';
   }
 }
 
 export function alertaTexto(a: any): string {
   const cliente = `${a?.cliente_nombre || ''} ${a?.cliente_apellido || ''}`.trim();
-  const vehiculo = [a?.marca, a?.modelo].filter(Boolean).join(' ') || 'la vehiculo';
+  const moto = [a?.marca, a?.modelo].filter(Boolean).join(' ') || 'la moto';
   switch (a?.tipo) {
     case 'foto':
-      return `${a.tecnico_nombre || 'El mecánico'} subió evidencia · ${vehiculo}`;
+      return `${a.tecnico_nombre || 'El mecánico'} subió evidencia · ${moto}`;
     case 'lista':
       return `${a.numero_orden} lista para entrega · ${cliente}`;
     case 'aprobacion':
@@ -41,7 +43,11 @@ export function alertaTexto(a: any): string {
     case 'cita_cancelada':
       return `Cita cancelada por ${cliente || 'el cliente'} — ${a.fecha_corta || ''} ${a.hora || ''}`.trim();
     case 'repuesto':
-      return `${a.tecnico_nombre || 'Mecánico'} solicita: ${a.repuesto_nombre} ×${a.repuesto_cantidad || 1} · ${vehiculo}`;
+      return `${a.tecnico_nombre || 'Mecánico'} solicita: ${a.repuesto_nombre} ×${a.repuesto_cantidad || 1} · ${moto}`;
+    case 'sin_entregar':
+      // Lista hace más de 2 días (el "Hace N d" de al lado dice cuánto): o el cliente
+      // no ha pasado, o ya se la llevó y faltó marcar la entrega.
+      return `Lista sin entregar${a.numero_orden ? ' · ' + a.numero_orden : ''} · ${cliente || moto}`;
     default:
       return a?.mensaje || '';
   }

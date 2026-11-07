@@ -23,10 +23,16 @@
         recepción al crear una cita.
       </p>
 
+      <!-- Vino desde «Servicios en el sitio» con «Renombrar o eliminar». -->
+      <p class="srv-intro srv-desde-sitio" *ngIf="desdeSitio">
+        Lo que cambies aquí cambia también en el sitio web y en el portal de citas.
+        <a routerLink="/admin/web/servicios">← Volver a Servicios en el sitio</a>
+      </p>
+
       <div class="srv-tools">
         <div class="adm-buscador">
           <ion-icon name="search-outline" class="bs-lupa"></ion-icon>
-          <input type="text" [(ngModel)]="busqueda" placeholder="Buscar servicio…">
+          <input type="text" [(ngModel)]="busqueda" name="busqueda" placeholder="Buscar servicio…">
           <button type="button" class="bs-x" *ngIf="busqueda" (click)="busqueda = ''" aria-label="Limpiar búsqueda">
             <ion-icon name="close-circle"></ion-icon>
           </button>
@@ -85,7 +91,7 @@
       <div class="amb-body">
         <div class="fg">
           <label>Nombre del servicio</label>
-          <input type="text" maxlength="120" [(ngModel)]="nombre"
+          <input type="text" maxlength="120" [(ngModel)]="nombre" name="nombre"
                  placeholder="Ej: Cambio de bujías" (keyup.enter)="guardar()">
           <div class="hint" *ngIf="editandoId">
             Las citas ya agendadas conservan el nombre anterior: renombrar no reescribe el historial.

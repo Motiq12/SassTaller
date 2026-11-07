@@ -10,9 +10,44 @@
 @import "@ionic/angular/css/flex-utils.css";
 
 // ————————————————————————————————
-// Tipografía: Outfit (display) + Plus Jakarta Sans (cuerpo) + JetBrains Mono (cifras)
-// Las fuentes se cargan de forma no bloqueante desde index.html (preconnect + preload).
+// Tipografía: Rajdhani (títulos y etiquetas) + Inter (texto), las del sitio web,
+// y JetBrains Mono para las cifras.
+// Rajdhani e Inter se sirven desde la propia app (assets/fonts, con su licencia
+// OFL al lado): son los mismos archivos del sitio. Solo el subconjunto latino.
+// JetBrains Mono sigue llegando de Google Fonts, sin bloquear (ver index.html).
 // ————————————————————————————————
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('assets/fonts/inter-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Rajdhani';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('assets/fonts/rajdhani-500-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Rajdhani';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('assets/fonts/rajdhani-600-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Rajdhani';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('assets/fonts/rajdhani-700-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 
 * { box-sizing: border-box; }
 
@@ -23,13 +58,13 @@ ion-app {
   text-rendering: optimizeLegibility;
 }
 
-// Display: títulos, montos y números grandes con carácter (Outfit)
+// Display: títulos, montos y números grandes (Rajdhani)
 ion-title,
 ion-card-title,
 .stat-number, .kpi-num, .etapa-horas, .orden-numero, .garantia-orden,
 h1, h2 {
   font-family: var(--font-display);
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 // Monoespaciada para datos: montos ₡, fechas, placas, IDs
@@ -64,7 +99,7 @@ ion-toolbar {
   ion-title {
     font-weight: 700;
     font-size: 19px;
-    letter-spacing: -0.03em;
+    letter-spacing: 0;
   }
 }
 
@@ -104,7 +139,7 @@ ion-card {
     font-size: 17px;
     font-weight: 700;
     color: var(--ion-text-color);
-    letter-spacing: -0.03em;
+    letter-spacing: 0;
   }
 
   ion-card-subtitle {
@@ -145,7 +180,7 @@ ion-item {
   &:last-child { --border-color: transparent; }
 
   ion-label {
-    h2 { font-size: 15px; font-weight: 700; margin-bottom: 2px; letter-spacing: -0.01em; }
+    h2 { font-size: 15px; font-weight: 700; margin-bottom: 2px; letter-spacing: 0; }
     h3 { font-size: 14px; font-weight: 600; }
     p  { font-size: 13px; color: var(--ion-color-medium); margin: 1px 0; }
   }
@@ -164,22 +199,22 @@ ion-badge {
 }
 
 // ————————————————————————————————
-// Botones — radio 16px, easing real, presión física
+// Botones — como los del sitio: rectos, en Rajdhani y en mayúsculas
 // ————————————————————————————————
 ion-button {
   --border-radius: var(--radius-control);
   --box-shadow: none;
   --transition: background .2s var(--ease-out);
-  font-family: var(--ion-font-family);
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: none;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   height: 50px;
-  font-size: 15px;
+  font-size: 16px;
   transition: transform .18s var(--ease-out);
 
   &:active { transform: scale(0.97); }
-  &[size="small"] { height: 38px; font-size: 13px; }
+  &[size="small"] { height: 38px; font-size: 14px; }
 }
 
 ion-button[fill="solid"], ion-button:not([fill]) {
@@ -187,8 +222,35 @@ ion-button[fill="solid"], ion-button:not([fill]) {
 }
 // CTA principal carmesí: sombra tintada
 ion-button[color="primary"][fill="solid"], ion-button[color="primary"]:not([fill]) {
-  --box-shadow: 0 8px 20px rgba(225, 29, 72, .22);
+  --box-shadow: 0 8px 20px rgba(226, 35, 26, .22);
 }
+
+// Botones propios de cada pantalla (los que no son ion-button): mismo criterio,
+// para que no convivan botones en mayúsculas con otros en texto normal. Va con
+// !important porque cada pantalla fijaba su propia letra (`font-family: inherit`),
+// y lo que se quiere es justamente que ninguna se salga.
+// Un botón nuevo tiene que sumarse a esta lista.
+:is(.btn, .cta, .cta-o, .cta-out, .cta-outline, .seg-btn, .filter-btn, .btn-out, .btn-rose, .btn-editar,
+    .btn-descargar, .btn-cancelar, .btn-upload, .btn-solid, .btn-send, .btn-rechazar, .btn-line, .btn-limpiar,
+    .btn-guardar, .btn-calif, .btn-aprobar, .wp-btn, .wa-btn, .wpp-cta, .web-cta, .web-publicar-btn, .walkin-cta,
+    .nuevo-cta, .nueva-cta, .next-cta, .px-cta, .bud-cta, .empty-cta, .asignar-cta, .dosfa-btn, .trabajar-btn,
+    .sugerir-btn, .rep-edit-btn, .qr-btn, .of-detail-btn, .notas-btn, .ms-btn, .mf-btn, .logout-btn,
+    .confirmar-btn, .config-btn-full, .bio-btn, .ot-tab, .ot-foto-subir) {
+  font-family: var(--font-display) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+}
+
+// Foco visible para quien navega con teclado. Muchas pantallas quitan el
+// contorno (`outline: none`) sin poner nada a cambio; esto lo repone solo cuando
+// el foco llega por teclado (:focus-visible), no al hacer clic.
+:is(a, button, summary, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--text-accent) !important;
+  outline-offset: 2px;
+}
+
+// Sin la espera del doble toque en los controles.
+:is(a, button, [role="button"], input, select, textarea, label) { touch-action: manipulation; }
 
 // Utilidad para CTAs en mayúsculas (Confirmar, Facturar y entregar, etc.)
 ion-button.cta-upper {
@@ -204,7 +266,7 @@ a:focus-visible,
 [tabindex]:focus-visible {
   outline: 2px solid var(--ion-color-primary);
   outline-offset: 2px;
-  border-radius: 8px;
+  border-radius: 2px;
 }
 
 // ————————————————————————————————
@@ -223,6 +285,19 @@ ion-searchbar {
 }
 
 // ————————————————————————————————
+// Botones rojos de solo borde o solo texto (fill="outline" / "clear"), en tema oscuro:
+// el rojo base da 3,8:1 sobre el fondo oscuro; el claro (tint) pasa 5:1. Los de la
+// barra de arriba (.in-toolbar) no se tocan: esos no son rojos.
+@mixin botones-rojos-en-oscuro {
+  ion-button.button-outline:not(.ion-color):not(.in-toolbar),
+  ion-button.button-clear:not(.ion-color):not(.in-toolbar) { --color: var(--ion-color-primary-tint); --border-color: var(--ion-color-primary-tint); }
+  ion-button.button-outline.ion-color-primary, ion-button.button-clear.ion-color-primary:not(.in-toolbar) { --ion-color-base: var(--ion-color-primary-tint) !important; }
+  ion-button.button-outline.ion-color-danger, ion-button.button-clear.ion-color-danger:not(.in-toolbar) { --ion-color-base: #f87171 !important; }
+}
+@media (prefers-color-scheme: dark) { :root:not(.tema-claro) { @include botones-rojos-en-oscuro; } }
+:root.tema-oscuro { @include botones-rojos-en-oscuro; }
+
+// ————————————————————————————————
 // Segmento — píldora con indicador carmesí
 // ————————————————————————————————
 ion-segment {
@@ -234,17 +309,27 @@ ion-segment {
 }
 
 ion-segment-button {
-  --border-radius: 11px;
+  --border-radius: 2px;
   --indicator-color: var(--ion-color-primary);
   --color: var(--n-500);
   --color-checked: #ffffff;
-  --indicator-box-shadow: 0 2px 6px rgba(225, 29, 72, .25);
+  --indicator-box-shadow: 0 2px 6px rgba(226, 35, 26, .25);
   font-size: 12px;
   font-weight: 700;
   min-height: 36px;
   letter-spacing: 0;
   text-transform: none;
 }
+// En iPhone (modo ios) el indicador es la píldora de fondo; en computadora y Android
+// (modo md) Ionic lo dibuja como una rayita de 2px abajo, y el texto blanco del botón
+// elegido quedaba blanco sobre el fondo claro del segmento (no se leía en tema claro).
+// En md se pinta la píldora con el fondo del propio botón y se esconde la rayita.
+ion-segment-button.md {
+  --background-checked: var(--ion-color-primary);
+  --indicator-height: 0;
+  --background-hover: var(--n-500);
+}
+ion-segment-button.md.segment-button-checked { box-shadow: 0 2px 6px rgba(226, 35, 26, .25); }
 
 // ————————————————————————————————
 // Tab bar
@@ -261,6 +346,79 @@ ion-tab-bar {
 
     ion-icon { font-size: 22px; margin-bottom: 3px; }
   }
+}
+
+// ————————————————————————————————
+// Barra del portal: cápsula flotante (pages/portal/portal-tabs.page.html)
+// Como la de Instagram: separada del borde, translúcida y desenfocada, solo íconos
+// y la pestaña elegida con una píldora clara y el ícono relleno. Mi perfil sigue
+// arriba, en el encabezado. Sigue el tema (--adm-*). En escritorio no sale (más abajo).
+// ————————————————————————————————
+app-portal-tabs {
+  ion-tab-bar.barra-flotante {
+    position: absolute;
+    left: 12px; right: 12px;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    height: 62px;
+    padding: 0 6px;
+    margin: 0 auto;
+    max-width: 520px;
+    border: 1px solid color-mix(in srgb, var(--adm-tx) 10%, transparent);
+    border-radius: 999px;
+    --background: color-mix(in srgb, var(--adm-sur) 72%, transparent);
+    background: color-mix(in srgb, var(--adm-sur) 72%, transparent);
+    -webkit-backdrop-filter: blur(22px) saturate(180%);
+    backdrop-filter: blur(22px) saturate(180%);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .28), inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+    contain: none;
+
+    ion-tab-button {
+      --color: var(--adm-tx2);
+      --color-selected: var(--adm-tx);
+      --background: transparent;
+      --background-focused: transparent;
+      --ripple-color: transparent;
+      --padding-start: 0; --padding-end: 0;
+      position: relative;
+      max-width: none;
+      font-size: 0;
+
+      // La píldora detrás del ícono elegido.
+      &::before {
+        content: '';
+        position: absolute;
+        inset: 8px 4px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--adm-tx) 13%, transparent);
+        opacity: 0;
+        transform: scale(.85);
+        transition: opacity .2s var(--ease-out, ease), transform .25s var(--ease-out, ease);
+      }
+      &.tab-selected::before { opacity: 1; transform: none; }
+      &:active::before { opacity: .7; transform: scale(.94); }
+
+      ion-icon { position: relative; font-size: 26px; margin: 0; }
+      .ic-on { display: none; }
+      &.tab-selected .ic-off { display: none; }
+      &.tab-selected .ic-on { display: block; }
+    }
+
+    // El nombre de cada pestaña: solo para lectores de pantalla.
+    .tab-nombre {
+      position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
+  }
+
+  // Con la barra flotando encima, el final de cada pantalla queda libre de ella
+  // (solo donde se ve: en escritorio está el menú lateral).
+  @media (max-width: 991px) {
+    ion-content::part(scroll) { padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  app-portal-tabs ion-tab-bar.barra-flotante ion-tab-button::before { transition: none; }
 }
 
 // ————————————————————————————————
@@ -307,7 +465,7 @@ ion-toast {
     rgba(var(--ion-text-color-rgb), .05) 63%);
   background-size: 400% 100%;
   animation: shimmer 1.5s infinite;
-  border-radius: 16px;
+  border-radius: 2px;
 }
 .skeleton-card {
   height: 96px;
@@ -316,7 +474,7 @@ ion-toast {
 }
 .skeleton-line {
   height: 13px;
-  border-radius: 7px;
+  border-radius: 2px;
   margin: 9px 0;
   &.sk-70 { width: 70%; }
   &.sk-50 { width: 50%; }
@@ -376,9 +534,9 @@ ion-toast {
     font-family: var(--font-display);
     font-size: 44px;
     font-weight: 900;
-    color: var(--ion-color-primary);
+    color: var(--text-accent);
     line-height: 1;
-    letter-spacing: -0.04em;
+    letter-spacing: 0;
   }
   .stat-label {
     display: block;
@@ -396,7 +554,7 @@ ion-toast {
     top: 0; right: 0;
     width: 64px; height: 64px;
     background: var(--n-100);
-    border-bottom-left-radius: 999px;
+    border-bottom-left-radius: 50%;
     z-index: 0;
   }
   &.accent::after { background: var(--rose-50); }
@@ -436,7 +594,7 @@ ion-toast {
 .segment {
   display: flex;
   background: var(--n-100);
-  border-radius: var(--radius-control, 16px);
+  border-radius: var(--radius-control, 2px);
   padding: 4px;
   gap: 2px;
   margin-bottom: 14px;
@@ -450,14 +608,54 @@ ion-toast {
   font-size: 12px;
   font-weight: 700;
   color: var(--n-500);
-  border-radius: 12px;
+  border-radius: 2px;
   cursor: pointer;
-  transition: all 0.2s var(--ease, cubic-bezier(0.32, 0.72, 0, 1));
+  transition: background-color 0.2s var(--ease, cubic-bezier(0.32, 0.72, 0, 1)), border-color 0.2s var(--ease, cubic-bezier(0.32, 0.72, 0, 1)), color 0.2s var(--ease, cubic-bezier(0.32, 0.72, 0, 1)), box-shadow 0.2s var(--ease, cubic-bezier(0.32, 0.72, 0, 1)), transform 0.2s var(--ease, cubic-bezier(0.32, 0.72, 0, 1)), opacity 0.2s var(--ease, cubic-bezier(0.32, 0.72, 0, 1));
 }
 .seg-btn.on {
   background: var(--ion-color-primary);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(225, 29, 72, 0.25);
+  box-shadow: 0 2px 8px rgba(226, 35, 26, 0.25);
+}
+
+// Fila de filtros rápidos. Se distingue del .segment de arriba a propósito: aquel
+// cambia de pantalla (son secciones distintas), esta acota lo que ya se está viendo.
+// Por eso va suelta y no dentro de un carril: se lee como un accesorio de la lista.
+// Es hermana de .pill, que es la insignia de estado — esta se toca, aquella no.
+//
+// El nombre lleva sufijo porque `.filtros` y `.chip` ya están tomados dentro de
+// admin-opiniones y portal-citas, con otro significado: allá `.filtros` es el
+// contenedor de buscador + chips, no la fila en sí. Como los estilos globales no
+// están encapsulados, reusar esos nombres les cambiaría la maqueta.
+.chips-filtro {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  // La barra de desplazamiento tapa los chips en pantallas angostas y no hace falta:
+  // se nota que hay más porque el último queda cortado.
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+.chip-filtro {
+  flex: none;
+  padding: 7px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--n-500);
+  font-family: var(--font-body, inherit);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s var(--ease, cubic-bezier(0.32, 0.72, 0, 1)), border-color 0.2s var(--ease, cubic-bezier(0.32, 0.72, 0, 1)), color 0.2s var(--ease, cubic-bezier(0.32, 0.72, 0, 1)), box-shadow 0.2s var(--ease, cubic-bezier(0.32, 0.72, 0, 1)), transform 0.2s var(--ease, cubic-bezier(0.32, 0.72, 0, 1)), opacity 0.2s var(--ease, cubic-bezier(0.32, 0.72, 0, 1));
+  &:active { transform: scale(.96); }
+}
+.chip-filtro.on {
+  border-color: transparent;
+  background: var(--ion-color-primary);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(226, 35, 26, 0.2);
 }
 
 // Timeline vertical con línea y nodos carmesí
@@ -479,7 +677,7 @@ ion-toast {
     position: absolute;
     left: -22px; top: 4px;
     width: 14px; height: 14px;
-    border-radius: 999px;
+    border-radius: 50%;
     background: var(--ion-card-background);
     border: 2px solid var(--ion-color-primary);
     z-index: 1;
@@ -488,451 +686,59 @@ ion-toast {
 }
 
 // ————————————————————————————————
-// Acceso (login, registro, recuperar) — dos paneles
-//
-// Antes era una foto oscura a pantalla completa con una tarjeta flotando encima.
-// Se veía como la portada de una app, no como la entrada de un sistema de trabajo:
-// el formulario —que es a lo que la gente viene— competía con el fondo, y sobre
-// negro el autocompletado del navegador y los mensajes de error se leen peor.
-//
-// Ahora se parte en dos: a la izquierda la MARCA (la del taller, no la nuestra, con
-// su color y su logo), a la derecha el formulario sobre una superficie limpia. Es la
-// forma en que se resuelve esto en el software que se cobra, y no por moda: separar
-// identidad de tarea deja cada mitad haciendo una sola cosa.
-//
-// El corte es solo con CSS, sin tocar el HTML de las tres pantallas: el bloque
-// .login-header pasa a ser el panel de marca y todo lo demás cae en la columna
-// del formulario. Por eso las tres cambian juntas y ninguna queda desparejada.
+// Entrar, crear cuenta y recuperar el acceso (pages/portal/portal-login.page.scss).
+// Aquí solo lo que esa hoja no alcanza: el <input> que Ionic crea dentro de
+// ion-input y el aviso que shared/errores.ts agrega a mano.
 // ————————————————————————————————
-// Aparecer subiendo un poco. Se usa tanto para la entrada de la pantalla como para
-// los cambios de paso: Angular reemplaza el bloque con *ngIf, así que la animación
-// se vuelve a disparar sola al pasar de contraseña a código o al segundo factor.
-// Sin esto el bloque se cambiaba de golpe y parecía que la pantalla se había roto.
-@keyframes acceso-entrar {
-  from { opacity: 0; transform: translateY(9px); }
-  to   { opacity: 1; transform: none; }
-}
-
-// Acercamiento muy lento de la foto del panel. Va en 40s y de ida y vuelta: a esa
-// velocidad no se ve moverse, se nota que está vivo.
-@keyframes acceso-acercar {
-  from { transform: scale(1); }
-  to   { transform: scale(1.09); }
-}
-
-// El formulario se sacude cuando rechazan el ingreso.
-@keyframes acceso-rechazo {
-  10%, 90% { transform: translateX(-3px); }
-  20%, 80% { transform: translateX(5px); }
-  30%, 50%, 70% { transform: translateX(-8px); }
-  40%, 60% { transform: translateX(8px); }
-}
-
-.login-content {
-  // Cuánto ocupa el panel de marca. Va como variable porque el relleno de la otra
-  // columna tiene que seguirlo: si se escriben los dos a mano, se desincronizan.
-  --panel-marca: 40%;
-
-  // El lienzo del formulario se TIÑE con el color del taller en vez de ser el negro
-  // (o el blanco) pelado del tema. No se percibe como color, se percibe como que las
-  // dos mitades son del mismo lugar. Sin esto, el panel de marca y el formulario
-  // parecen dos pantallas distintas pegadas, que es de donde venía buena parte de la
-  // sensación de apagado.
-  //
-  // Se calcula con color-mix sobre el fondo del tema, así que sale solo en claro y
-  // en oscuro, y con el color que haya elegido CADA taller — no hay ningún hex acá.
-  //
-  // Hay DOS cosas que cambian entre temas, no una, y por no ver la segunda este
-  // tinte no se notaba en absoluto:
-  //
-  //   1. El porcentaje. Sobre blanco un 7% ya se lee; sobre negro no.
-  //   2. La BASE sobre la que se mezcla. Y acá está el detalle que importa: el color
-  //      de marca de un taller suele ser oscuro (el del sistema es #1e3a5f), así que
-  //      mezclarlo contra el #0a0a0a del tema da #0f151d — oscuro mezclado con
-  //      oscuro sigue siendo oscuro. Teñir el matiz no alcanza si nadie sube la
-  //      luminancia. En oscuro se parte de un gris levantado, no del fondo del tema.
-  //
-  // Con eso el panel del formulario deja de ser un agujero negro y pasa a ser una
-  // superficie, que es lo que hace que se lea como la otra mitad de la pantalla.
-  --base-lienzo: var(--ion-background-color, #fff);
-  --tinte-lienzo: 7%;
-  --lienzo: color-mix(in srgb, var(--ion-color-primary) var(--tinte-lienzo), var(--base-lienzo));
-  --background: var(--lienzo);
-
-  // El color de marca sirve como RELLENO de un botón (el texto encima es blanco o
-  // negro según haga falta), pero no siempre sirve como COLOR DE TEXTO. El del
-  // sistema es #1e3a5f: sobre el lienzo oscuro da 1.47:1 de contraste, cuando el
-  // mínimo legible es 4.5:1. El enlace "Crear una cuenta" —que es la segunda acción
-  // más importante de la pantalla— quedaba prácticamente invisible en modo oscuro.
-  //
-  // Se usa el color de marca solo donde contrasta, y en oscuro se aclara mezclándolo
-  // con blanco. Sigue siendo el color del taller, solo que a una luminancia que se
-  // puede leer, y la cuenta sale bien con cualquier color que elija cualquier taller.
-  --acento-texto: var(--ion-color-primary);
-
-  .login-container {
-    // El ancho va explícito: dentro del contenedor de scroll de ion-content este div
-    // se encoge al contenido, y sin esto la columna `1fr` del formulario colapsaba a
-    // 80px y las etiquetas se partían en tres líneas.
-    width: 100%;
-    box-sizing: border-box;
-    min-height: 100%;
-    display: grid;
-    grid-template-columns: 1fr;
-    align-content: start;
+.acceso-content {
+  // Sin el amarillo del autocompletado de Chrome: el fondo de los campos.
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 40px #14171c inset !important;
+    -webkit-text-fill-color: #f1f5f9 !important;
+    caret-color: #f1f5f9 !important;
+    transition: background-color 5000s ease-in-out 0s;
   }
-
-  // ---- Panel de marca ----
-  .login-header {
-    position: relative;
-    overflow: hidden;
-    color: #fff;
-    text-align: center;
-    padding: 2.5rem 1.5rem 2.25rem;
-    // La foto y el color van en capas separadas en vez de en un solo `background`:
-    // así se puede acercar la foto sin arrastrar el color ni, sobre todo, el texto
-    // y el logo, que escalados se verían borrosos.
-    //
-    // El color va ENCIMA y semitransparente, no en `multiply`: multiplicando, la
-    // foto oscura se comía el color y el panel salía casi negro para cualquier
-    // taller — justo lo contrario de lo que esta pantalla tiene que demostrar.
-    background: var(--ion-color-primary);
-
-    // Capa 1: la foto, acercándose despacio.
-    &::before {
-      content: '';
-      position: absolute;
-      // Se pasa de los bordes para que al escalar no asome el fondo por los lados.
-      inset: -6%;
-      background: url('/assets/portal/taller-bg.jpg') center / cover no-repeat;
-      animation: acceso-acercar 40s ease-in-out infinite alternate;
-    }
-
-    // Capa 2: el color del taller por encima.
-    //
-    // Antes era un velo parejo al 93%: a esa opacidad la foto es un rumor y el panel
-    // queda como un rectángulo de color liso. Se pagaba el costo de cargar una
-    // fotografía sin recibir nada a cambio.
-    //
-    // Ahora el velo es DIRECCIONAL. Denso donde va el texto (la banda izquierda,
-    // que es donde caen el logo y el título con el layout de escritorio) y mucho más
-    // abierto hacia el borde derecho, donde no hay nada que leer y la foto puede
-    // verse. El taller se reconoce igual por el color, pero el panel vuelve a tener
-    // materia: se ven las herramientas, el banco, el piso.
-    //
-    // El ángulo sigue al layout, no al gusto: el texto está a la izquierda, así que
-    // la opacidad cae hacia la derecha y nunca al revés.
-    &::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(107deg,
-        color-mix(in srgb, var(--ion-color-primary) 94%, transparent) 0%,
-        color-mix(in srgb, var(--ion-color-primary) 88%, transparent) 38%,
-        color-mix(in srgb, var(--ion-color-primary) 66%, transparent) 72%,
-        color-mix(in srgb, var(--ion-color-primary) 52%, transparent) 100%);
-    }
-
-
-    // Capa 3: el contenido, por encima de las dos anteriores.
-    > * {
-      position: relative;
-      z-index: 1;
-      animation: acceso-entrar .5s ease-out both;
-    }
-    > *:nth-child(2) { animation-delay: .07s; }
-    > *:nth-child(3) { animation-delay: .13s; }
-
-    .logo-wrapper {
-      width: 78px;
-      height: 78px;
-      background: #fff;
-      border-radius: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 1.1rem;
-      box-shadow: 0 10px 28px rgba(0, 0, 0, .28);
-
-      ion-icon { font-size: 38px; color: var(--ion-color-primary); }
-      img { width: 56px; height: 56px; object-fit: contain; }
-    }
-
-    // El nombre del taller es lo único que esta mitad tiene para decir, y estaba
-    // puesto al tamaño de un título de tarjeta. En una columna que ocupa media
-    // pantalla eso no se lee como marca, se lee como un texto suelto. El tope del
-    // clamp sube bastante; el piso se queda donde estaba porque en teléfono el panel
-    // es una banda angosta y ahí sí competiría con el formulario.
-    h1 {
-      font-family: var(--font-display);
-      font-size: clamp(1.7rem, 3.4vw, 3.1rem);
-      font-weight: 800;
-      margin: 0 0 .6rem;
-      letter-spacing: -0.04em;
-      line-height: 1.04;
-      color: #fff;
-      // Despega el nombre de la fotografía sin recuadro ni franja de color.
-      text-shadow: 0 2px 18px rgba(0, 0, 0, .35);
-    }
-
-    p {
-      font-size: 11px;
-      color: rgba(255, 255, 255, .82);
-      margin: 0;
-      text-transform: uppercase;
-      letter-spacing: 0.18em;
-      font-weight: 700;
-      text-shadow: 0 1px 10px rgba(0, 0, 0, .3);
-    }
-  }
-
-  // ---- Encabezado de la tarea, arriba del formulario ----
-  // Lo que ancla la columna. Sin esto arrancaba directo en el primer campo y la
-  // mitad superior quedaba vacía, que era buena parte de la sensación de pantalla
-  // desierta — y no se arregla con color, porque el problema era que no había nada.
-  .acceso-intro {
-    width: 100%;
-    max-width: 400px;
-    // El margen de abajo lo pone el encabezado, no la tarjeta: así la separación es
-    // la misma en teléfono y en escritorio, donde la tarjeta tiene margen 0.
-    margin: 0 auto 1.4rem;
-    animation: acceso-entrar .42s ease-out both;
-
-    + ion-card { margin-top: 0; }
-
-    // En teléfono la tarjeta queda con 16px de margen lateral (de Ionic) y este
-    // bloque no: el título arrancaba pegado al borde mientras los campos estaban
-    // adentro. Medido, no estimado. De 860px para arriba las dos columnas se centran
-    // en el mismo eje y el relleno sobra.
-    padding-inline: 16px;
-
-    h2 {
-      font-family: var(--font-display);
-      font-size: clamp(1.45rem, 2.1vw, 1.8rem);
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      line-height: 1.1;
-      margin: 0 0 .4rem;
-      color: var(--ion-text-color, #111);
-    }
-
-    // Se deriva del texto mezclado con el lienzo en vez de un gris fijo: así la
-    // cuenta del contraste sale bien en los dos esquemas (ver los enlaces de abajo,
-    // donde un gris fijo daba 4.04:1 en claro).
-    p {
-      margin: 0;
-      font-size: 13.5px;
-      line-height: 1.55;
-      color: color-mix(in srgb, var(--ion-text-color, #111) 62%, var(--lienzo));
-    }
-  }
-
-  // ---- Columna del formulario ----
-  // La tarjeta deja de ser una tarjeta: sin sombra ni borde redondo enorme, es el
-  // formulario y ya. Una caja flotante dentro de un panel que ya está separado es
-  // un marco dentro de otro marco.
-  ion-card {
-    width: 100%;
-    max-width: 400px;
-    margin: 1.75rem auto 0;
-    --background: transparent;
-    background: transparent;
-    border: 0;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-
-    ion-card-content { padding-inline: 0; }
-
-    // Los campos y el botón entran escalonados. El primer campo entra sin retraso a
-    // propósito: es donde va el foco, y hacer esperar al que ya está escribiendo se
-    // pagaría en cada ingreso, todos los días.
-    ion-item, ion-button[expand="block"], .turnstile-box {
-      animation: acceso-entrar .42s ease-out both;
-    }
-    ion-item:nth-of-type(2) { animation-delay: .06s; }
-    ion-item:nth-of-type(3) { animation-delay: .1s; }
-    ion-button[expand="block"] { animation-delay: .14s; }
-
-    // Rechazado: sacude el formulario entero, no solo el campo de la contraseña —
-    // el correo también puede ser el equivocado y no hay forma de saber cuál falló.
-    &.rechazado {
-      animation: acceso-rechazo .45s cubic-bezier(.36, .07, .19, .97) both;
-    }
-
-    ion-item {
-      // El campo se separa del lienzo por luminancia, no por el borde. Antes el
-      // relleno era #171717 contra un fondo #0a0a0a: trece puntos de diferencia, que
-      // a simple vista es ninguno — los campos no se leían como campos sino como
-      // rectángulos dibujados en el vacío. Se levanta mezclando blanco (en oscuro) o
-      // tinta (en claro) sobre el lienzo ya teñido, así que el campo queda emparentado
-      // con la marca en vez de ser un gris ajeno.
-      --background: color-mix(in srgb, var(--ion-text-color, #000) 7%, var(--lienzo));
-      --border-color: transparent;
-      --highlight-color-focused: var(--ion-color-primary);
-      --padding-start: 14px;
-      --inner-padding-end: 8px;
-      --min-height: 62px;
-      margin-bottom: .6rem;
-      border: 1px solid color-mix(in srgb, var(--ion-text-color, #000) 14%, transparent);
-      border-radius: 12px;
-      transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
-
-      // El foco se ve en el campo entero, no en una rayita de abajo: en un login con
-      // dos campos hay que saber de un vistazo en cuál se está escribiendo. Además
-      // el relleno sube un escalón: el campo activo es el único que se aclara, así
-      // que la mirada va sola sin depender solo del anillo de color.
-      &:focus-within {
-        --background: color-mix(in srgb, var(--ion-text-color, #000) 11%, var(--lienzo));
-        border-color: var(--ion-color-primary);
-        box-shadow: 0 0 0 3px color-mix(in srgb, var(--ion-color-primary) 22%, transparent);
-      }
-
-      ion-label {
-        color: var(--ion-color-medium-shade, #6b7280) !important;
-        font-size: 11px !important;
-        font-weight: 700 !important;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-      }
-      ion-input {
-        color: var(--ion-text-color, #111);
-        font-weight: 500;
-        --placeholder-color: var(--ion-color-medium, #9ca3af);
-      }
-    }
-
-    // CTA principal (Ingresar / Crear cuenta / Enviar código)
-    //
-    // Es el único elemento de la columna que lleva el color lleno, así que tiene que
-    // pesar: sube a 54px y a peso 700. Sin gradiente ni glow a propósito — el
-    // DESIGN.md los prohíbe y además, con el color variable de cada taller, un
-    // gradiente se vería bien con unos hues y sucio con otros.
-    ion-button[expand="block"] {
-      margin-top: 1.15rem;
-      height: 54px;
-      --background: var(--ion-color-primary);
-      --background-activated: var(--ion-color-primary-shade);
-      --background-hover: var(--ion-color-primary-shade);
-      --border-radius: 12px;
-      --box-shadow: 0 8px 22px color-mix(in srgb, var(--ion-color-primary) 34%, transparent);
-      font-weight: 700;
-      letter-spacing: 0;
-      transition: transform .18s cubic-bezier(.22, 1, .36, 1), opacity .18s ease;
-
-      // Hundir al presionar, no rebotar: el gesto tiene que sentirse físico y
-      // terminar donde empezó (ver DESIGN.md, "feedback táctil scale(0.97)").
-      &:active { transform: scale(.985); }
-      &.button-disabled { opacity: .45; --box-shadow: none; }
-    }
-
-    // Botón "ojo" para ver/ocultar la contraseña dentro del campo
-    ion-button[fill="clear"] {
-      margin: 0;
-      height: 38px;
-      --background: transparent;
-      --background-activated: transparent;
-      --background-hover: transparent;
-      --box-shadow: none;
-      --color: var(--ion-color-medium, #9ca3af);
-      --padding-start: 6px;
-      --padding-end: 6px;
-    }
-  }
-
-  // De tablet para arriba, los dos paneles quedan lado a lado y el de marca ocupa
-  // todo el alto. En teléfono no: ahí robaría la pantalla que necesita el teclado.
-  @media (min-width: 860px) {
-    // El panel de marca se saca del flujo en vez de ocupar una columna de la rejilla.
-    // Como columna abarcando todas las filas, su alto lo terminaba fijando el
-    // contenido del formulario y quedaba un recuadro a media pantalla; absoluto ocupa
-    // el alto completo pase lo que pase del otro lado.
-    .login-container {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      padding: 2.5rem 2.5rem 2.5rem calc(var(--panel-marca) + 2.5rem);
-    }
-
-    .login-header {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      left: 0;
-      width: var(--panel-marca);
-      min-width: 320px;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      text-align: left;
-      padding: 3.5rem 3rem;
-      // Remate del canto contra el formulario: una luz del color del taller, sin
-      // línea dura. A pantalla completa un borde de 1px se lee como una costura.
-      box-shadow: 1px 0 0 color-mix(in srgb, var(--ion-color-primary) 55%, transparent),
-                  18px 0 50px -24px rgba(0, 0, 0, .55);
-
-      .logo-wrapper { margin-inline: 0; }
-    }
-
-    .login-container > *:not(.login-header) { width: min(400px, 100%); }
-
-    ion-card { margin-top: 0; }
-    .acceso-intro { padding-inline: 0; }
-  }
-
-  // En pantallas anchas el reparto fijo se rompe: con 40% para la marca, un monitor
-  // de 1600px deja casi mil píxeles para un formulario de 400. El formulario no
-  // queda centrado en una columna, queda perdido en un descampado — que es de donde
-  // salía la mitad de la sensación de pantalla vacía.
-  //
-  // Se corrige moviendo la frontera, no estirando el formulario: un campo de texto
-  // de 600px de ancho es peor de usar, porque el ojo tiene que recorrerlo entero
-  // para volver al principio. La marca se queda con el espacio que sobra, que es
-  // para lo que sirve: es la mitad que puede llenar con una fotografía.
-  @media (min-width: 1280px) {
-    --panel-marca: 46%;
-    .login-header { padding: 4rem 4rem; }
-  }
-
-  @media (min-width: 1700px) {
-    --panel-marca: 50%;
-  }
-
-  // Ver la nota de --base-lienzo: en oscuro cambian la base y el porcentaje.
-  @media (prefers-color-scheme: dark) {
-    --base-lienzo: #161616;
-    --tinte-lienzo: 20%;
-    // Ver la nota de --acento-texto: el color de marca aclarado hasta que se lea.
-    --acento-texto: color-mix(in srgb, var(--ion-color-primary) 45%, #fff);
-  }
+  // Siempre oscuro: el rojo claro es el que se lee.
+  .campo-error-msg { color: var(--ion-color-danger-tint); padding: 0 0 8px; }
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Panel del administrador — tema oscuro, AISLADO bajo .admin-dark.
-   Una sola copia (no se duplica por componente). No afecta el resto
-   del sistema (claro Crimson Ops): nada aplica sin la clase .admin-dark.
-   Topbar y sidebar van con color fijo porque quedan fuera de .admin-dark.
+   Panel del administrador, AISLADO bajo .admin-dark (el nombre quedó de
+   cuando era oscuro siempre). Una sola copia (no se duplica por componente):
+   nada aplica sin la clase .admin-dark. Claro u oscuro según el tema que la
+   persona eligió en Mi perfil: los colores son los --adm-* de variables.scss.
+   Topbar y sidebar quedan fuera de .admin-dark: usan los --adm-* directo.
    ═══════════════════════════════════════════════════════════ */
 /* Isotipo de marca en las toolbars de rol (mecánico/recepción): color en claro, blanco en oscuro. */
 .brand-hd { height: 26px; width: auto; margin-inline-start: 12px; }
 .brand-hd.dark-only { display: none; }
 @media (prefers-color-scheme: dark) {
-  .brand-hd.light-only { display: none; }
-  .brand-hd.dark-only { display: inline-block; }
+  :root:not(.tema-claro) .brand-hd.light-only { display: none; }
+  :root:not(.tema-claro) .brand-hd.dark-only { display: inline-block; }
 }
+:root.tema-oscuro .brand-hd.light-only { display: none; }
+:root.tema-oscuro .brand-hd.dark-only { display: inline-block; }
+/* Logo del menú lateral, igual: a color en claro, blanco en oscuro. */
+@media (prefers-color-scheme: dark) {
+  :root:not(.tema-claro) .admin-dark .sb-logo .sb-brand.light-only { display: none; }
+  :root:not(.tema-claro) .admin-dark .sb-logo .sb-brand.dark-only { display: block; }
+}
+:root.tema-oscuro .admin-dark .sb-logo .sb-brand.light-only { display: none; }
+:root.tema-oscuro .admin-dark .sb-logo .sb-brand.dark-only { display: block; }
 
 .admin-topbar {
-  --background: #111111; --color: #F5F5F5; --border-color: #2A2A2A; --border-width: 0 0 1px 0;
-  ion-title { font-family: 'Outfit', sans-serif; font-weight: 800; letter-spacing: -.03em; font-size: 17px; }
-  ion-menu-button, ion-buttons ion-button { --color: #A3A3A3; }
+  --background: var(--adm-sur); --color: var(--adm-tx); --border-color: var(--adm-bd); --border-width: 0 0 1px 0;
+  ion-title { font-family: 'Rajdhani', sans-serif; font-weight: 800; letter-spacing: 0; font-size: 17px; }
+  ion-menu-button, ion-buttons ion-button { --color: var(--adm-tx2); }
   // Acciones del topbar (fecha de hoy + botón Nueva cita), estilo del mockup.
   app-admin-actions { display: flex; align-items: center; gap: 8px; padding-right: 6px; }
-  .adm-date { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: #A3A3A3;
-    background: #1A1A1A; border: 1px solid #2A2A2A; border-radius: 999px; padding: 5px 12px; white-space: nowrap; }
+  .adm-date { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: var(--adm-tx2);
+    background: var(--adm-sur2); border: 1px solid var(--adm-bd); border-radius: 2px; padding: 5px 12px; white-space: nowrap; }
   .adm-nueva { --background: var(--ion-color-primary); --background-hover: var(--ion-color-primary-shade); --background-activated: var(--ion-color-primary-shade); --color: #fff;
-    --border-radius: 9px; --box-shadow: none; font-weight: 700; text-transform: none; font-size: 12px; letter-spacing: 0; margin: 0;
+    --border-radius: 2px; --box-shadow: none; font-weight: 700; text-transform: none; font-size: 12px; letter-spacing: 0; margin: 0;
     flex-shrink: 0;
     ion-icon { font-size: 15px; }
     .adm-nueva-txt { margin-left: 5px; white-space: nowrap; }
@@ -948,60 +754,97 @@ ion-toast {
   .admin-topbar .adm-nueva { --padding-start: 7px; --padding-end: 7px; }
   .admin-topbar .adm-nueva ion-icon { font-size: 18px; }
 }
-.admin-sidebar { --width: 240px; --background: #111111; --border-color: #2A2A2A; }
-ion-footer.admin-dark { background: #111111; }
+.admin-sidebar { --width: 256px; --background: var(--adm-sur); --border-color: var(--adm-bd); }
+ion-footer.admin-dark { background: var(--adm-sur); }
 
 .admin-dark {
-  // Superficies/bordes/textos: escala oscura propia del panel (sin equivalente
-  // semántico en el sistema en modo oscuro), se dejan literales a propósito.
-  --sur: #111111; --sur2: #1A1A1A; --sur3: #222222;
-  --bd: #2A2A2A; --bd2: #333333;
-  // --tx3 era #525252: sobre los fondos oscuros de este tema daba un contraste de
-  // 2,2 a 2,5, muy lejos del 4,5 que exige WCAG. Se usa en etiquetas de sección y
-  // textos de apoyo, así que la falla aparecía en TODAS las pantallas del panel.
-  // #8A8A8A es el gris más tenue que supera 4,5:1 contra el fondo más claro (#1a1a1a).
-  --tx: #F5F5F5; --tx2: #A3A3A3; --tx3: #8A8A8A;
-  // Acentos y estados: derivados del sistema (una sola fuente de verdad). Se usan
-  // los *-tint porque los colores base están pensados para fondo claro y caen bajo
-  // AA sobre el panel #111 (p. ej. tertiary base ≈3.2:1); los tint mantienen contraste.
+  // Superficies, bordes, textos y acentos: los valores de cada tema están en
+  // variables.scss (--adm-*); aquí solo se les dan los nombres cortos de siempre.
+  --sur: var(--adm-sur); --sur2: var(--adm-sur2); --sur3: var(--adm-sur3);
+  --bd: var(--adm-bd); --bd2: var(--adm-bd2);
+  --tx: var(--adm-tx); --tx2: var(--adm-tx2); --tx3: var(--adm-tx3);
   --cr: var(--ion-color-primary); --cr-d: var(--ion-color-primary-shade);
-  --em: var(--ion-color-success-tint); --am: var(--ion-color-warning-tint);
-  --in: var(--ion-color-tertiary-tint); --rd: var(--ion-color-danger-tint);
-  --fd: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+  // El rojo como TEXTO (números, enlaces, la fecha de hoy): el de marca da 3,5 a 3,8:1
+  // sobre el panel oscuro. --cr queda para los fondos (botones, el menú elegido).
+  --cr-tx: var(--adm-cr-fg);
+  --em: var(--adm-em); --am: var(--adm-am);
+  --in: var(--adm-in); --rd: var(--adm-rd);
+  --fd: 'Rajdhani', 'Inter', sans-serif;
   --fm: 'JetBrains Mono', ui-monospace, monospace;
-  --background: #0A0A0A;
+  --background: var(--adm-bg);
+  // El color del texto de adentro. `color` de aquí abajo NO alcanza: lo que va
+  // dentro de ion-content lo hereda de su capa interna, que usa `--color`, y por
+  // defecto `--color` es el color de texto del TEMA del dispositivo. En tema
+  // oscuro es claro y todo se veía bien de casualidad; en tema claro es negro,
+  // y cada texto del panel sin color propio quedaba negro sobre fondo oscuro
+  // (los días en Configuración, los nombres en Empleados y en Servicios…).
+  --color: var(--tx);
   color: var(--tx);
-  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
 
-  .sidebar-content { --background: #111111; }
-  .sb-logo { padding: 20px 20px 18px; border-bottom: 1px solid var(--bd);
-    display: flex; align-items: center; gap: 18px;
-    .sb-brand { width: 152px; max-width: 100%; height: auto; display: block; margin-bottom: 8px; }
-    h1 { font-family: var(--fd); font-size: 20px; font-weight: 900; letter-spacing: -.04em; margin: 0; .dot { color: var(--cr); } }
-    .sb-logo-txt { min-width: 0; display: flex; flex-direction: column; gap: 3px;
-      strong { font-family: var(--fd); font-size: 15px; font-weight: 800; color: var(--tx);
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      span { font-size: 11px; color: var(--tx3); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; } } }
-  .sb-nav { padding: 12px 10px; }
-  .sb-section { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; color: var(--tx3); padding: 14px 10px 6px; }
-  .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 13px; font-weight: 600;
-    color: var(--tx2); cursor: pointer; margin-bottom: 2px; text-decoration: none; transition: background .15s, color .15s;
-    ion-icon { font-size: 17px; }
-    &:hover { background: var(--sur2); color: var(--tx); }
-    &.on { background: var(--cr); color: #fff; }
+  // ── Menú lateral (panel, recepción y mecánico) ──
+  .sidebar-content { --background: var(--adm-sur); }
+  .sb-logo { padding: 22px 20px 18px; border-bottom: 1px solid var(--bd);
+    .sb-brand { width: 138px; max-width: 100%; height: auto; display: block; margin-bottom: 12px; }
+    .sb-brand.dark-only { display: none; }
+    h1 { font-family: var(--fd); font-size: 20px; font-weight: 900; letter-spacing: 0; margin: 0; .dot { color: var(--cr); } }
+    span { font-size: 11px; color: var(--tx3); font-weight: 600; }
+    .sb-rotulo { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border: 1px solid var(--bd2); border-radius: 2px;
+      font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--tx3);
+      &::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--cr); } } }
+  .sb-nav { padding: 14px 12px 18px; }
+  // Carpetas del menú (se abren y cierran): ícono propio, nombre legible y flecha que gira.
+  .sb-carpeta { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; margin-top: 2px;
+    background: none; border: none; border-radius: 2px; cursor: pointer; font-family: inherit; text-align: left;
+    font-size: 13px; font-weight: 600; letter-spacing: 0; color: var(--tx2); transition: background .15s, color .15s;
+    ion-icon { font-size: 17px; flex-shrink: 0; color: var(--tx3); transition: color .15s; }
+    .sb-carpeta-txt { flex: 1; min-width: 0; }
+    .sb-chev { font-size: 13px; transition: transform .2s ease; &.abierta { transform: rotate(90deg); } }
+    &:hover { color: var(--tx); background: var(--sur2); ion-icon { color: var(--tx2); } }
+    &.actual { color: var(--tx); > ion-icon:first-child { color: var(--cr-tx); } }
+    &:focus-visible { outline: 2px solid var(--cr); outline-offset: -2px; }
+    .nav-badge { min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800; letter-spacing: 0; color: #fff; background: var(--cr); border-radius: 9px; } }
+  // Lo de adentro de una carpeta: con una guía a la izquierda, como un árbol.
+  .sb-carpeta-items { position: relative; margin: 2px 0 8px 18px; padding-left: 10px; border-left: 1px solid var(--bd);
+    .nav-item { padding: 8px 10px; font-size: 13px; font-weight: 500; ion-icon { font-size: 16px; } } }
+  .nav-item.sb-suelto { margin: 2px 0 4px; font-weight: 600; }
+  .sb-section { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; color: var(--tx3); padding: 16px 10px 6px; }
+  .nav-item { position: relative; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 2px; font-size: 13px; font-weight: 600;
+    color: var(--tx2); cursor: pointer; margin-bottom: 1px; text-decoration: none; transition: background .15s, color .15s;
+    ion-icon { font-size: 17px; flex-shrink: 0; color: var(--tx3); transition: color .15s; }
+    &:hover { background: var(--sur2); color: var(--tx); ion-icon { color: var(--tx2); } }
+    &:focus-visible { outline: 2px solid var(--cr); outline-offset: -2px; }
+    // Elegido: fondo suave y una barra roja, en vez de todo el bloque rojo.
+    &.on { background: color-mix(in srgb, var(--cr) 13%, transparent); color: var(--tx); font-weight: 700;
+      ion-icon { color: var(--cr-tx); }
+      &::before { content: ''; position: absolute; left: -11px; top: 6px; bottom: 6px; width: 3px; border-radius: 2px; background: var(--cr); } }
     .nav-badge { margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
       display: flex; align-items: center; justify-content: center;
-      font-size: 11px; font-weight: 800; color: #fff; background: var(--rd, #ef4444);
-      border-radius: 999px; } }
-  .sb-user { display: flex; align-items: center; gap: 10px; padding: 14px 16px; background: var(--sur); border-top: 1px solid var(--bd);
+      font-size: 11px; font-weight: 800; color: #fff; background: var(--cr);
+      border-radius: 9px; } }
+  // Los sueltos (Resumen, Mi perfil) no tienen guía: la barra va pegada al borde.
+  .sb-nav > .nav-item.on::before { left: 0; }
+  .nav-item.sb-suelto.on::before { left: 0; }
+  .nav-item--web { margin-top: 10px; border-top: 1px solid var(--bd); border-radius: 0; padding-top: 14px; color: var(--tx3); font-weight: 500; }
+  .sb-user { display: flex; align-items: center; gap: 10px; margin: 10px; padding: 10px 12px; background: var(--sur2); border: 1px solid var(--bd); border-radius: 8px;
     .sb-av { width: 36px; height: 36px; border-radius: 50%; background: var(--cr); color: #fff; flex-shrink: 0; overflow: hidden;
-      display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; letter-spacing: .02em;
       img { width: 100%; height: 100%; object-fit: cover; } }
-    .sb-info { flex: 1; min-width: 0; strong { display: block; font-size: 13px; font-weight: 700; } span { display: block; font-size: 11px; color: var(--tx3); } }
-    .sb-logout { background: none; border: none; color: var(--tx3); cursor: pointer; padding: 6px; ion-icon { font-size: 19px; } &:hover { color: var(--rd); } } }
+    .sb-info { flex: 1; min-width: 0; strong { display: block; font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      span { display: block; font-size: 11px; color: var(--tx3); } }
+    .sb-perfil-toggle { flex: 1; min-width: 0; display: block; }
+    .sb-perfil { display: flex; align-items: center; gap: 10px; min-width: 0; margin: -6px; padding: 6px; border-radius: 2px;
+      color: inherit; text-decoration: none; transition: background .15s;
+      .sb-perfil-chev { font-size: 14px; color: var(--tx3); margin-left: auto; flex-shrink: 0; }
+      &:hover { background: var(--sur); .sb-perfil-chev { color: var(--tx); } }
+      &:focus-visible { outline: 2px solid var(--cr); outline-offset: 1px; }
+      &.on { .sb-av { box-shadow: 0 0 0 2px var(--sur2), 0 0 0 4px var(--cr); } } }
+    .sb-logout { display: inline-flex; background: none; border: 1px solid transparent; border-radius: 2px; color: var(--tx3); cursor: pointer; padding: 6px;
+      ion-icon { font-size: 18px; } &:hover { color: var(--rd); border-color: var(--bd2); background: var(--sur); } } }
 
   .admin { max-width: 1120px; margin: 0 auto; padding: 18px 16px 60px; }
-  .cd { background: var(--sur); border: 1px solid var(--bd); border-radius: 24px; padding: 20px; }
+  .cd { background: var(--sur); border: 1px solid var(--bd); border-radius: 8px; padding: 20px; }
   .cd-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--tx3); margin-bottom: 14px; display: block; }
   .mb { margin-bottom: 18px; }
   .section-sub { font-family: var(--fd); font-size: 16px; font-weight: 800; margin-bottom: 14px; color: var(--tx); }
@@ -1010,18 +853,18 @@ ion-footer.admin-dark { background: #111111; }
   .mono { font-family: var(--fm); font-feature-settings: "tnum" 1; }
 
   .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
-  .kpi { background: var(--sur); border: 1px solid var(--bd); border-radius: 24px; padding: 18px; position: relative; overflow: hidden;
+  .kpi { background: var(--sur); border: 1px solid var(--bd); border-radius: 8px; padding: 18px; position: relative; overflow: hidden;
     &::after { content: ''; position: absolute; top: -20px; right: -20px; width: 80px; height: 80px; border-radius: 50%; opacity: .08; }
     &.cr::after { background: var(--cr); } &.em::after { background: var(--em); } &.am::after { background: var(--am); } &.in::after { background: var(--in); }
     .kpi-label { font-size: 11px; font-weight: 700; color: var(--tx3); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
-    .kpi-val { font-family: var(--fd); font-size: 28px; font-weight: 900; letter-spacing: -.04em; line-height: 1; }
-    &.cr .kpi-val { color: var(--cr); } &.em .kpi-val { color: var(--em); } &.am .kpi-val { color: var(--am); } &.in .kpi-val { color: var(--in); } }
+    .kpi-val { font-family: var(--fd); font-size: 28px; font-weight: 900; letter-spacing: 0; line-height: 1; }
+    &.cr .kpi-val { color: var(--cr-tx); } &.em .kpi-val { color: var(--em); } &.am .kpi-val { color: var(--am); } &.in .kpi-val { color: var(--in); } }
 
   .bar-item { margin-bottom: 12px; &:last-child { margin-bottom: 0; } }
   .bar-head { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; gap: 10px;
     span { color: var(--tx2); } strong { color: var(--tx); font-family: var(--fm); white-space: nowrap; } }
-  .bar-track { height: 8px; background: var(--sur3); border-radius: 999px; overflow: hidden; }
-  .bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--cr), #F43F5E); }
+  .bar-track { height: 8px; background: var(--sur3); border-radius: 2px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--cr), #F24A3D); }
 
   .tbl { width: 100%; border-collapse: collapse;
     th { text-align: left; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--tx3); padding: 10px 12px; border-bottom: 1px solid var(--bd); white-space: nowrap; }
@@ -1032,42 +875,42 @@ ion-footer.admin-dark { background: #111111; }
     position: relative;
     &::after { content: ''; position: sticky; right: 0; top: 0; bottom: 0; width: 24px;
       background: linear-gradient(to left, var(--sur), transparent); pointer-events: none; } }
-  .pct-bar { height: 5px; background: var(--sur3); border-radius: 999px; overflow: hidden; margin-top: 3px; width: 80px; }
-  .pct-fill { height: 100%; background: var(--cr); border-radius: 999px; }
+  .pct-bar { height: 5px; background: var(--sur3); border-radius: 2px; overflow: hidden; margin-top: 3px; width: 80px; }
+  .pct-fill { height: 100%; background: var(--cr); border-radius: 2px; }
 
   .fw-bold { font-weight: 600; }
   .clr-em { color: var(--em); }
   .clr-rd { color: var(--rd); }
-  .clr-cr { color: var(--cr); }
+  .clr-cr { color: var(--cr-tx); }
   .clr-am { color: var(--am); }
   .clr-in { color: var(--in); }
 
-  .bg { font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 999px; display: inline-flex; white-space: nowrap; }
-  .bg-cr { background: #2C0A12; color: #FB7185; } .bg-am { background: #2C1A00; color: #FBB834; }
-  .bg-em { background: #0A1F0A; color: #4ADE80; } .bg-in { background: #0A0F2E; color: #818CF8; }
-  .bg-n { background: var(--sur2); color: var(--tx2); } .bg-rd { background: #2B0D0D; color: #F87171; }
+  .bg { font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 2px; display: inline-flex; white-space: nowrap; }
+  .bg-cr { background: var(--adm-cr-bg); color: var(--adm-cr-fg); } .bg-am { background: var(--adm-am-bg); color: var(--adm-am-fg); }
+  .bg-em { background: var(--adm-em-bg); color: var(--adm-em-fg); } .bg-in { background: var(--adm-in-bg); color: var(--adm-in-fg); }
+  .bg-n { background: var(--sur2); color: var(--tx2); } .bg-rd { background: var(--adm-rd-bg); color: var(--adm-rd-fg); }
 
-  .btn { padding: 12px 20px; border-radius: 14px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; border: none;
+  .btn { padding: 12px 20px; border-radius: 2px; font-family: var(--fd); font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; cursor: pointer; border: none; background: var(--sur3); color: var(--tx);
     min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background .15s, border-color .15s; ion-icon { font-size: 16px; }
     &:active { transform: scale(.97); } &:disabled { opacity: .5; } }
   .btn-cr { background: var(--cr); color: #fff; &:hover { background: var(--cr-d); } }
   .btn-ou { background: none; border: 1px solid var(--bd); color: var(--tx2); &:hover { border-color: var(--tx2); color: var(--tx); } }
-  .btn-em { background: #0D2B0D; color: #4ADE80; border: 1px solid #14532D; }
-  .btn-rd { background: #2B0D0D; color: #F87171; border: 1px solid #7F1D1D; }
-  .btn-am { background: #2C1A00; color: #FBB834; border: 1px solid #78350F; }
-  .btn-sm { padding: 5px 10px; font-size: 11px; border-radius: 7px; }
+  .btn-em { background: var(--adm-em-bg); color: var(--adm-em-fg); border: 1px solid var(--adm-em-bd); }
+  .btn-rd { background: var(--adm-rd-bg); color: var(--adm-rd-fg); border: 1px solid var(--adm-rd-bd); }
+  .btn-am { background: var(--adm-am-bg); color: var(--adm-am-fg); border: 1px solid var(--adm-am-bd); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 2px; }
   .btn-block { width: 100%; padding: 12px; }
 
   .filter-bar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
-  .filter-btn { padding: 7px 14px; border-radius: 999px; font-size: 12px; font-weight: 700; cursor: pointer; border: 1px solid var(--bd); background: none; color: var(--tx2);
+  .filter-btn { padding: 7px 14px; border-radius: 2px; font-size: 12px; font-weight: 700; cursor: pointer; border: 1px solid var(--bd); background: none; color: var(--tx2);
     &.on { background: var(--cr); color: #fff; border-color: var(--cr); } }
   .search-row { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; align-items: center;
-    input, select { padding: 11px 14px; border: 1px solid var(--bd); border-radius: 12px; font-family: inherit; font-size: 14px; background: var(--sur2); color: var(--tx); outline: none; min-height: 44px; &:focus { border-color: var(--cr); } }
+    input, select { padding: 11px 14px; border: 1px solid var(--bd); border-radius: 2px; font-family: inherit; font-size: 14px; background: var(--sur2); color: var(--tx); outline: none; min-height: 44px; &:focus { border-color: var(--cr); } }
     input.grow { flex: 1; min-width: 160px; } }
 
   .fg { margin-bottom: 14px;
     label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--tx3); margin-bottom: 6px; }
-    input, select, textarea { width: 100%; padding: 11px 14px; border: 1px solid var(--bd); border-radius: 12px; font-family: inherit; font-size: 14px; background: var(--sur2); color: var(--tx); outline: none; transition: border-color .2s; &:focus { border-color: var(--cr); } }
+    input, select, textarea { width: 100%; padding: 11px 14px; border: 1px solid var(--bd); border-radius: 2px; font-family: inherit; font-size: 14px; background: var(--sur2); color: var(--tx); outline: none; transition: border-color .2s; &:focus { border-color: var(--cr); } }
     &.error input, &.error select { border-color: var(--rd); }
     select option { background: var(--sur2); }
     textarea { resize: none; min-height: 72px; }
@@ -1081,10 +924,10 @@ ion-footer.admin-dark { background: #111111; }
   // La fila envuelve: en pantallas angostas el bloque de acciones (estado +
   // activar/desactivar + eliminar) no cabe junto al nombre, y sin wrap estiraba
   // la tarjeta y desbordaba toda la página en horizontal.
-  .emp-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px; background: var(--sur2); border-radius: 16px; margin-bottom: 10px; border: 1px solid var(--bd);
+  .emp-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px; background: var(--sur2); border-radius: 2px; margin-bottom: 10px; border: 1px solid var(--bd);
     &.inactivo { opacity: .55; }
     .emp-av { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0; background: var(--cr);
-      &.in { background: var(--in); } &.am { background: #78350F; } &.off { background: var(--sur3); } }
+      &.in { background: var(--ion-color-tertiary); } &.am { background: #78350F; } &.off { background: var(--sur3); } }
     // Con base 140px pide su espacio, pero cede y deja que las acciones bajen a otra línea.
     .emp-info { flex: 1 1 140px; min-width: 0; strong { display: block; font-size: 13px; font-weight: 700; } span { display: block; font-size: 11px; color: var(--tx3); margin-top: 1px; } }
     // margin-left:auto lo mantiene pegado a la derecha, tanto en una línea como al envolver.
@@ -1093,59 +936,59 @@ ion-footer.admin-dark { background: #111111; }
   .promo-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
   @media (min-width: 640px) { .promo-grid { grid-template-columns: repeat(2, 1fr); } }
   @media (min-width: 1024px) { .promo-grid { grid-template-columns: repeat(3, 1fr); } }
-  .promo-card { background: var(--sur2); border: 1px solid var(--bd); border-radius: 20px; overflow: hidden;
+  .promo-card { background: var(--sur2); border: 1px solid var(--bd); border-radius: 8px; overflow: hidden;
     &.inactiva { opacity: .55; }
     .promo-img { width: 100%; height: 90px; object-fit: cover; display: block; }
-    .promo-img-ph { height: 80px; display: flex; align-items: center; justify-content: center; font-size: 28px; background: linear-gradient(135deg, #2C0A12, #1A0A1A); }
+    .promo-img-ph { height: 80px; display: flex; align-items: center; justify-content: center; font-size: 28px; background: linear-gradient(135deg, var(--adm-cr-bg), var(--sur3)); }
     .promo-body { padding: 12px; }
     .promo-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; h4 { font-size: 14px; font-weight: 700; margin: 0; } }
     .promo-body p { font-size: 11px; color: var(--tx2); margin: 0 0 8px; line-height: 1.5; }
     .promo-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .promo-price { font-family: var(--fm); font-size: 14px; font-weight: 700; color: var(--em); }
     .promo-btns { display: flex; gap: 6px; flex-wrap: wrap; } }
-  .upload-box { border: 2px dashed var(--bd2); border-radius: 12px; padding: 20px; text-align: center; cursor: pointer;
+  .upload-box { border: 2px dashed var(--bd2); border-radius: 2px; padding: 20px; text-align: center; cursor: pointer;
     .up-ico { font-size: 26px; margin-bottom: 6px; } .up-txt { font-size: 12px; color: var(--tx3); }
-    img { max-height: 110px; border-radius: 8px; } }
+    img { max-height: 110px; border-radius: 2px; } }
 
   .empty { text-align: center; padding: 48px 20px; color: var(--tx3);
     ion-icon { font-size: 46px; opacity: .4; display: block; margin: 0 auto 10px; } p { font-size: 13px; margin: 0; } }
   .placeholder { text-align: center; padding: 70px 24px; color: var(--tx3);
     ion-icon { font-size: 54px; opacity: .35; display: block; margin: 0 auto 14px; color: var(--cr); }
     h3 { font-family: var(--fd); font-size: 18px; color: var(--tx); margin: 0 0 6px; } p { font-size: 13px; margin: 0; } }
-  .sk-dark { background: linear-gradient(90deg, var(--sur2) 25%, var(--sur3) 37%, var(--sur2) 63%); background-size: 400% 100%; animation: shimmer 1.5s infinite; border-radius: 16px; min-height: 20px; }
+  .sk-dark { background: linear-gradient(90deg, var(--sur2) 25%, var(--sur3) 37%, var(--sur2) 63%); background-size: 400% 100%; animation: shimmer 1.5s infinite; border-radius: 2px; min-height: 20px; }
 
   // ——— Calendario de citas ———
   .cal-wrap { display: grid; grid-template-columns: 1fr; gap: 20px; }
   .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;
-    h3 { font-family: var(--fd); font-size: 18px; font-weight: 800; letter-spacing: -.03em; margin: 0; } }
+    h3 { font-family: var(--fd); font-size: 18px; font-weight: 800; letter-spacing: 0; margin: 0; } }
   .cal-nav { display: flex; gap: 6px;
-    button { padding: 6px 14px; border-radius: 8px; border: 1px solid var(--bd); background: none; color: var(--tx2); font-size: 13px; font-weight: 700; cursor: pointer;
+    button { padding: 6px 14px; border-radius: 2px; border: 1px solid var(--bd); background: none; color: var(--tx2); font-size: 13px; font-weight: 700; cursor: pointer;
       &:hover { background: var(--sur2); color: var(--tx); } &.on { background: var(--cr); color: #fff; border-color: var(--cr); } } }
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
   .cal-dow { text-align: center; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--tx3); padding: 8px 0; }
-  .cal-day { min-height: 56px; background: var(--sur2); border-radius: 12px; padding: 8px; cursor: pointer; border: 1.5px solid transparent; transition: all .15s; position: relative;
+  .cal-day { min-height: 56px; background: var(--sur2); border-radius: 2px; padding: 8px; cursor: pointer; border: 1.5px solid transparent; transition: background-color .15s, border-color .15s, color .15s, box-shadow .15s, transform .15s, opacity .15s; position: relative;
     &:hover { border-color: var(--bd2); background: var(--sur3); }
     &.empty { background: transparent; cursor: default; &:hover { border-color: transparent; } }
-    &.today { border-color: var(--cr); background: #1A0608; }
-    &.low { background: #0A1A0A; }
-    &.high { background: #1A0A0A; }
+    &.today { border-color: var(--cr); background: var(--adm-hoy); }
+    &.low { background: var(--adm-flujo-bajo); }
+    &.high { background: var(--adm-flujo-alto); }
     .day-num { font-size: 12px; font-weight: 700; color: var(--tx2); margin-bottom: 6px; }
-    &.today .day-num { color: var(--cr); font-weight: 800; }
+    &.today .day-num { color: var(--cr-tx); font-weight: 800; }
     .day-citas { display: flex; flex-direction: column; gap: 3px; }
-    .flujo { position: absolute; bottom: 6px; right: 6px; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 999px;
-      &.flujo-bajo { background: #0A1A0A; color: #4ADE80; } &.flujo-medio { background: #2C1A00; color: #FBB834; } &.flujo-alto { background: #2C0A12; color: #FB7185; } } }
-  .mec-dot { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .flujo { position: absolute; bottom: 6px; right: 6px; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 2px;
+      &.flujo-bajo { background: var(--adm-em-bg); color: var(--adm-em-fg); } &.flujo-medio { background: var(--adm-am-bg); color: var(--adm-am-fg); } &.flujo-alto { background: var(--adm-cr-bg); color: var(--adm-cr-fg); } } }
+  .mec-dot { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cal-side { display: flex; flex-direction: column; gap: 14px; }
   .legend-list { display: flex; flex-direction: column; gap: 8px; }
   .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--tx2); }
-  .legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0;
-    &.lg-bajo { background: #0A1A0A; border: 1px solid #4ADE80; } &.lg-medio { background: #2C1A00; border: 1px solid #FBB834; } &.lg-alto { background: #2C0A12; border: 1px solid #FB7185; } }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0;
+    &.lg-bajo { background: var(--adm-em-bg); border: 1px solid var(--adm-em-fg); } &.lg-medio { background: var(--adm-am-bg); border: 1px solid var(--adm-am-fg); } &.lg-alto { background: var(--adm-cr-bg); border: 1px solid var(--adm-cr-fg); } }
   .legend-sep { height: 1px; background: var(--bd); margin: 10px 0; }
   .day-detail h4 { font-size: 13px; font-weight: 700; margin: 0 0 10px; }
   .mec-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--bd2); font-size: 12px;
     &:last-child { border-bottom: none; }
     .mec-name { display: flex; align-items: center; gap: 8px; font-weight: 600; }
-    .mec-cnt { font-family: var(--fm); font-weight: 700; color: var(--cr); } }
+    .mec-cnt { font-family: var(--fm); font-weight: 700; color: var(--cr-tx); } }
   .mec-av-sm { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; flex-shrink: 0; }
   .day-total { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--bd); font-size: 12px; color: var(--tx2); strong { color: var(--tx); } }
 }
@@ -1172,7 +1015,7 @@ ion-footer.admin-dark { background: #111111; }
   --backdrop-opacity: 0.55;
 
   .alert-wrapper {
-    border-radius: 22px;
+    border-radius: 8px;
     background: var(--ion-card-background);
     border: 1px solid var(--hairline);
     box-shadow: 0 18px 48px rgba(0, 0, 0, .28);
@@ -1182,8 +1025,8 @@ ion-footer.admin-dark { background: #111111; }
 
   .alert-head { padding: 22px 22px 6px; }
   .alert-title {
-    font-family: var(--font-display, 'Outfit', sans-serif);
-    font-size: 18px; font-weight: 800; letter-spacing: -.02em;
+    font-family: var(--font-display, 'Rajdhani', sans-serif);
+    font-size: 18px; font-weight: 800; letter-spacing: 0;
     color: var(--ion-text-color);
   }
   .alert-message {
@@ -1194,7 +1037,7 @@ ion-footer.admin-dark { background: #111111; }
   // Inputs (textarea de "rechazar", radios de "calificar").
   .alert-input-group { padding: 0 22px 14px; }
   .alert-input, textarea.alert-input {
-    border-radius: 12px; border: 1px solid var(--hairline);
+    border-radius: 2px; border: 1px solid var(--hairline);
     background: var(--n-50); color: var(--ion-text-color);
     padding: 10px 12px; font-size: 13.5px;
     &::placeholder { color: var(--n-400); }
@@ -1233,27 +1076,29 @@ ion-footer.admin-dark { background: #111111; }
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Alerts del panel admin (tema oscuro → forzar fondo claro).
+   Alerts del panel admin, con los colores del panel en el tema elegido.
    Se aplica con cssClass: 'alert-light' en AlertController.
    ═══════════════════════════════════════════════════════════ */
 .alert-light {
   .alert-wrapper {
-    background: #1a1a1a;
-    border: 1px solid rgba(255, 255, 255, .1);
-    border-radius: 16px;
-    box-shadow: 0 18px 48px rgba(0, 0, 0, .5);
+    background: var(--adm-ov);
+    border: 1px solid var(--adm-ov-linea);
+    border-radius: 2px;
+    box-shadow: 0 18px 48px var(--adm-sombra);
   }
-  .alert-title { color: #f5f5f5; font-weight: 800; }
-  .alert-message { color: #ccc; }
-  .alert-radio-label { color: #e5e5e5; }
-  [aria-checked="true"] .alert-radio-label { color: var(--cr, #E11D48); font-weight: 700; }
-  .alert-radio-icon { border-color: #555; }
-  [aria-checked="true"] .alert-radio-icon { border-color: var(--cr, #E11D48); }
-  [aria-checked="true"] .alert-radio-inner { background: var(--cr, #E11D48); }
-  .alert-button { color: var(--cr, #E11D48); }
-  .alert-button.alert-button-role-cancel { color: #999; }
-  .alert-button-group { border-top: 1px solid rgba(255, 255, 255, .1); }
-  .alert-button + .alert-button { border-left: 1px solid rgba(255, 255, 255, .1); }
+  .alert-title { color: var(--adm-tx); font-weight: 800; }
+  .alert-message { color: var(--adm-ov-msg); }
+  .alert-radio-label { color: var(--adm-ov-tx); }
+  [aria-checked="true"] .alert-radio-label { color: var(--text-accent); font-weight: 700; }
+  @at-root ion-alert#{&} .alert-radio-group [aria-checked="true"] .alert-radio-label { color: var(--text-accent); }
+  @at-root ion-alert#{&} .alert-radio-group { border-color: var(--adm-ov-linea); }
+  .alert-radio-icon { border-color: var(--adm-ov-radio); }
+  [aria-checked="true"] .alert-radio-icon { border-color: var(--cr, #E2231A); }
+  [aria-checked="true"] .alert-radio-inner { background: var(--cr, #E2231A); }
+  .alert-button { color: var(--text-accent); }
+  .alert-button.alert-button-role-cancel { color: var(--adm-ov-tenue); }
+  .alert-button-group { border-top: 1px solid var(--adm-ov-linea); }
+  .alert-button + .alert-button { border-left: 1px solid var(--adm-ov-linea); }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1264,43 +1109,43 @@ ion-footer.admin-dark { background: #111111; }
    ═══════════════════════════════════════════════════════════ */
 ion-action-sheet {
   --backdrop-opacity: 0.5;
-  --background: #1a1a1a;
-  --color: #e5e5e5;
-  --button-color: #e5e5e5;
+  --background: var(--adm-ov);
+  --color: var(--adm-ov-tx);
+  --button-color: var(--adm-ov-tx);
 
   .action-sheet-group {
-    background: #1a1a1a !important;
-    border: 1px solid rgba(255, 255, 255, .1);
-    border-radius: 20px;
+    background: var(--adm-ov) !important;
+    border: 1px solid var(--adm-ov-linea);
+    border-radius: 8px;
     margin: 0 8px 8px;
     overflow: hidden;
-    box-shadow: 0 14px 40px rgba(0, 0, 0, .4);
+    box-shadow: 0 14px 40px var(--adm-sombra);
   }
   .action-sheet-group-cancel { margin-bottom: max(8px, var(--ion-safe-area-bottom, 8px)); }
 
   .action-sheet-title {
-    color: #f5f5f5 !important;
-    font-family: var(--font-display, 'Outfit', sans-serif);
-    font-size: 15px; font-weight: 800; letter-spacing: -.01em;
+    color: var(--adm-tx) !important;
+    font-family: var(--font-display, 'Rajdhani', sans-serif);
+    font-size: 15px; font-weight: 800; letter-spacing: 0;
     padding-top: 18px; padding-bottom: 6px;
   }
   .action-sheet-sub-title {
-    color: #999 !important;
+    color: var(--adm-ov-tenue) !important;
     font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em;
   }
 
   .action-sheet-button {
-    color: #e5e5e5 !important;
+    color: var(--adm-ov-tx) !important;
     font-size: 15px; font-weight: 600;
     min-height: 56px;
   }
-  .action-sheet-button + .action-sheet-button { border-top: 1px solid rgba(255, 255, 255, .08); }
+  .action-sheet-button + .action-sheet-button { border-top: 1px solid var(--adm-ov-linea); }
   .action-sheet-button.ion-activated,
-  .action-sheet-button:hover { background: rgba(255, 255, 255, .06) !important; }
-  .action-sheet-icon { color: var(--cr, #E11D48) !important; font-size: 21px; }
+  .action-sheet-button:hover { background: var(--adm-ov-hover) !important; }
+  .action-sheet-icon { color: var(--cr, #E2231A) !important; font-size: 21px; }
 
   .action-sheet-button.action-sheet-destructive { color: var(--ion-color-danger) !important; }
-  .action-sheet-group-cancel .action-sheet-button { color: #bbb !important; font-weight: 800; }
+  .action-sheet-group-cancel .action-sheet-button { color: var(--adm-tx2) !important; font-weight: 800; }
 }
 
 // Loading (LoadingController) con el look del portal: caja temática y legible en
@@ -1312,7 +1157,7 @@ ion-action-sheet {
   color: var(--ion-text-color);
 
   .loading-wrapper {
-    border-radius: 18px;
+    border-radius: 8px;
     border: 1px solid var(--hairline);
     box-shadow: 0 18px 48px rgba(0, 0, 0, .3);
     padding: 20px 24px;
@@ -1329,7 +1174,7 @@ ion-action-sheet {
   font-family: var(--font-display);
   font-size: 28px;
   font-weight: 800;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
   color: var(--ion-text-color);
   margin: 18px 4px 12px;
 }
@@ -1398,7 +1243,7 @@ html { zoom: var(--app-zoom, 1); }
 :focus-visible {
   outline: 2px solid var(--ion-color-primary);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 2px;
 }
 
 /* Respeta la preferencia del sistema de reducir el movimiento. */
@@ -1411,63 +1256,6 @@ html { zoom: var(--app-zoom, 1); }
   }
 }
 
-/* Aviso de Motiq hacia el personal del taller: mantenimiento, función nueva, lo que
-   haga falta avisar. Arriba y no abajo (al revés que .net-banner): son dos avisos
-   con dueños distintos — este lo escribe Motiq, el de abajo lo genera el navegador —
-   y si compartieran posición uno taparía al otro cuando coinciden. */
-// Altura fija (una sola línea, con elipsis si el mensaje es largo): así el corrimiento
-// de ion-router-outlet de abajo puede ser un número fijo y no algo que se recalcula
-// según cuánto texto tenga CADA aviso.
-$aviso-alto: 40px;
-
-.aviso-sistema {
-  position: fixed; left: 0; right: 0; top: 0; z-index: 10001;
-  display: flex; align-items: center; gap: 8px;
-  height: $aviso-alto;
-  padding: 0 44px 0 14px;
-  color: #fff; font-size: 12.5px; font-weight: 700;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-
-  > ion-icon { font-size: 16px; flex-shrink: 0; }
-  span { flex: 1; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-  button {
-    position: absolute; right: 8px; top: 0; bottom: 0;
-    display: flex; align-items: center;
-    background: none; border: 0; color: inherit; cursor: pointer; padding: 0 10px;
-    ion-icon { font-size: 18px; display: block; }
-  }
-
-  &.aviso-info { background: #1f2937; }
-  &.aviso-mantenimiento { background: #b45309; }
-  &.aviso-urgente { background: #b91c1c; }
-}
-
-// ion-router-outlet de Ionic ya se posiciona con position:absolute + inset:0 (es lo
-// que le permite meterse debajo de un toolbar en cualquier página); alcanza con
-// correr su `top` para que la franja empuje el contenido en vez de taparlo — sin
-// tocar los cuatro shells del personal (admin/recepción/mecánico/tabs) uno por uno.
-ion-app.con-aviso-sistema ion-router-outlet {
-  top: #{$aviso-alto};
-}
-
-/* Botón global "reportar un problema": discreto hasta que hace falta.
-   Abajo a la izquierda quedaba tapado por la barra lateral fija del panel del
-   taller (admin-shell y compañía ya ocupan esa esquina con el pie de sesión), así
-   que va a la derecha — y más arriba de donde vive un FAB normal (56px + margen),
-   para apilarse arriba del botón de "nueva orden"/"nueva cita" en vez de pisarlo. */
-.reportar-falla {
-  position: fixed; right: 16px; bottom: 84px; z-index: 9998;
-  width: 42px; height: 42px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  background: rgba(31, 41, 55, 0.82); color: #fff;
-  border: 0; cursor: pointer; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
-  opacity: 0.5; transition: opacity 0.15s, transform 0.15s;
-
-  ion-icon { font-size: 19px; display: block; }
-  &:hover, &:focus-visible { opacity: 1; transform: scale(1.06); }
-}
-
 /* Banner global "sin conexión". */
 .net-banner {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 10000;
@@ -1477,6 +1265,40 @@ ion-app.con-aviso-sistema ion-router-outlet {
   background: #1f2937; color: #fff; font-size: 12.5px; font-weight: 700;
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.25);
   ion-icon { font-size: 16px; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Piezas del panel que usa más de una pantalla
+   ═══════════════════════════════════════════════════════════ */
+// Texto solo para lectores de pantalla (etiquetas de campos sin título visible).
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+// Aviso en franja: rd (algo salió mal o falta plata), am (ojo antes de seguir),
+// in (esperando a alguien). --interno: el chico, dentro de una tarjeta o un cuadro.
+.adm-aviso {
+  display: flex; align-items: flex-start; gap: 12px;
+  margin: 0; padding: 14px 18px; border-radius: 8px;
+  font-size: 13.5px; line-height: 1.5;
+  ion-icon { flex: 0 0 auto; margin-top: 1px; font-size: 20px; }
+  &.rd { background: var(--adm-rd-bg); color: var(--adm-rd-fg); }
+  &.am { background: var(--adm-am-bg); color: var(--adm-am-fg); }
+  &.in { background: var(--adm-in-bg); color: var(--adm-in-fg); }
+  &--interno { gap: 8px; padding: 10px 12px; border-radius: 2px; font-size: 13px; ion-icon { font-size: 18px; } }
+}
+
+// Menú desplegable (ion-popover con class="adm-menu-pop" y adentro .adm-menu).
+// Se monta como capa: usa los colores del panel directo (--adm-*).
+ion-popover.adm-menu-pop { --width: 290px; --background: var(--adm-sur); --box-shadow: 0 10px 30px var(--adm-sombra); }
+.adm-menu { padding: 6px 0; background: var(--adm-sur); }
+.adm-menu-it {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; min-height: 44px; padding: 0 14px;
+  border: none; background: none; text-align: left; cursor: pointer;
+  font: 500 13.5px 'Inter', system-ui, sans-serif; color: var(--adm-tx);
+  ion-icon { flex-shrink: 0; font-size: 17px; color: var(--adm-tx2); }
+  &:hover, &:focus-visible { background: var(--adm-sur2); }
+  &.peligro { color: var(--adm-cr-fg); ion-icon { color: inherit; } }
+  &.peligro:not(:first-child) { margin-top: 4px; border-top: 1px solid var(--adm-bd); }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1492,10 +1314,14 @@ ion-modal.adm-modal {
   --width: 92%;
   --max-width: 520px;
   --height: auto;
-  --border-radius: 24px;
-  --background: #111111;
-  --box-shadow: 0 20px 60px rgba(0, 0, 0, .55);
+  --border-radius: 8px;
+  --background: var(--adm-sur);
+  --box-shadow: 0 20px 60px var(--adm-sombra);
 }
+
+// Un modal abierto desde código (ModalController) recibe el componente con la clase
+// .ion-page, que es absoluta: con el alto automático de arriba quedaba en 0 de alto.
+ion-modal.adm-modal-auto .ion-page { position: relative; display: block; contain: content; }
 
 .adm-modal-box {
   background: var(--sur);
@@ -1510,7 +1336,7 @@ ion-modal.adm-modal {
     .cd-title { margin: 0; }
     .amb-x {
       background: none; border: none; color: var(--tx3); cursor: pointer;
-      padding: 4px; line-height: 0; border-radius: 8px;
+      padding: 4px; line-height: 0; border-radius: 2px;
       &:hover { color: var(--tx); background: var(--sur2); }
       ion-icon { font-size: 20px; }
     }
@@ -1547,7 +1373,7 @@ ion-modal.adm-modal {
     width: 100%;
     padding: 8px 30px 8px 32px;
     border: 1px solid var(--bd);
-    border-radius: 8px;
+    border-radius: 2px;
     background: var(--sur2);
     color: var(--tx);
     font-size: 12px;
@@ -1566,4 +1392,242 @@ ion-modal.adm-modal {
     &:hover { color: var(--tx); }
     ion-icon { font-size: 15px; }
   }
+}
+
+/* Avisos antes de cambiar el estado de una orden (detalle de la orden): el texto
+   llega con saltos de línea y viñetas; sin esto se juntaba en un solo párrafo. */
+.avisos-cambio-alert .alert-message {
+  white-space: pre-line;
+  text-align: left;
+}
+
+/* Mensajes (admin, recepción y mecánico): con un chat abierto, la página deja de
+   desplazarse ([scrollY]="false" en su ion-content) y el chat ocupa todo el alto.
+   Solo se desplazan los mensajes; la cabecera y la barra de envío quedan fijas. */
+.chat-pantalla {
+  height: 100%;
+  box-sizing: border-box;
+  padding-bottom: 0 !important;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  app-chat-hilo { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  app-chat-hilo .ch { flex: 1 1 auto; }
+}
+
+/* ===== Portal del cliente en escritorio =====
+   Desde 992 px el portal deja de verse como una app de celular estirada: el
+   menú pasa a una columna fija a la izquierda (app-portal-nav, en
+   app.component) y la barra de pestañas de abajo se esconde. Por debajo de
+   ese ancho no cambia nada. Lo que hace cada pantalla con el ancho extra está
+   en su propio .scss, bajo "Escritorio". */
+app-portal-nav { display: none; }
+@media (min-width: 992px) {
+  ion-app.con-nav-portal {
+    --portal-nav-ancho: 256px;
+    > app-portal-nav {
+      display: block; position: absolute; top: 0; bottom: 0; left: 0; z-index: 5;
+      width: var(--portal-nav-ancho);
+    }
+    > ion-router-outlet { left: var(--portal-nav-ancho); }
+    ion-tab-bar { display: none; }
+    /* La campana y el perfil ya están en el menú lateral. */
+    app-portal-actions { display: none; }
+    /* "Volver al sitio web" también: sobra el botón del perfil. */
+    app-volver-web:not([estilo="enlace"]) { display: none; }
+  }
+  /* Lo mismo en el panel, que desde este ancho tiene su menú siempre a la vista. */
+  app-admin-perfil app-volver-web:not([estilo="enlace"]) { display: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Campo con error (shared/errores.ts → marcarCampo): cuando el servidor dice en
+   qué campo está el problema, se marca en rojo y el mensaje va debajo. Sirve igual
+   en el panel (.fg, .ig) que en las pantallas con ion-item.
+   ═══════════════════════════════════════════════════════════ */
+.campo-error {
+  input, select, textarea { border-color: var(--ion-color-danger) !important; box-shadow: 0 0 0 3px rgba(var(--ion-color-danger-rgb), .15); }
+  --border-color: var(--ion-color-danger);
+  --highlight-color-focused: var(--ion-color-danger);
+  animation: campo-error-sacudir .35s ease-in-out;
+}
+ion-item.campo-error { --border-width: 0 0 2px 0; }
+.campo-error-msg {
+  margin-top: 5px; font-size: 12px; font-weight: 600; line-height: 1.35;
+  color: var(--ion-color-danger);
+  ion-item & { width: 100%; padding-bottom: 6px; }
+}
+:root.tema-oscuro .campo-error-msg { color: var(--ion-color-danger-tint); }
+@media (prefers-color-scheme: dark) { :root:not(.tema-claro) .campo-error-msg { color: var(--ion-color-danger-tint); } }
+@keyframes campo-error-sacudir {
+  0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); }
+}
+@media (prefers-reduced-motion: reduce) { .campo-error { animation: none; } }
+
+/* ═══════════════════════════════════════════════════════════
+   Estándar de pantallas — el mismo diseño en el panel, recepción, el taller y el
+   portal del cliente. Son las piezas del Resumen ejecutivo y de Clientes, sacadas
+   acá para que cualquier pantalla las use igual. Van dentro de .admin-dark (los
+   colores --sur, --bd, --tx… de cada tema).
+   ═══════════════════════════════════════════════════════════ */
+.admin-dark {
+  // Página: ancho completo hasta 1240 px, alineada como el panel.
+  .pg { max-width: 1240px; margin: 0 auto; padding: 22px 18px 64px; }
+  @media (max-width: 600px) { .pg { padding: 16px 14px 48px; } }
+
+  // Encabezado: fecha o antetítulo, título, una línea de contexto y acciones.
+  .pg-cab {
+    display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px; margin-bottom: 18px;
+    h1 { margin: 2px 0; font-family: var(--fd); font-size: 28px; font-weight: 700; line-height: 1.1; color: var(--tx); }
+    p { margin: 0; font-size: 13.5px; color: var(--tx3); }
+  }
+  .pg-ante {
+    font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--cr-tx);
+    &::first-letter { text-transform: uppercase; }
+  }
+  .pg-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; ion-icon { font-size: 15px; } }
+
+  // Cifras: tarjeta con barra de color a la izquierda e ícono (--acento).
+  .pg-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+  @media (min-width: 992px) { .pg-kpis { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); } }
+  .pg-kpi {
+    --acento: var(--cr);
+    position: relative; display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 16px 16px 14px;
+    background: var(--sur); border: 1px solid var(--bd); border-radius: 8px; overflow: hidden; text-align: left;
+    &::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--acento); }
+    &.em { --acento: var(--em); } &.in { --acento: var(--in); } &.am { --acento: var(--am); }
+  }
+  button.pg-kpi { font: inherit; color: inherit; cursor: pointer; &:hover { border-color: var(--bd2); } }
+  .pg-kpi-icono {
+    position: absolute; top: 14px; right: 14px; display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: 8px; color: var(--acento);
+    background: color-mix(in srgb, var(--acento) 14%, transparent);
+    ion-icon { font-size: 18px; }
+  }
+  .pg-kpi-label { padding-right: 40px; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--tx3); }
+  .pg-kpi-val { margin-top: 4px; font-family: var(--fd); font-size: 30px; font-weight: 700; line-height: 1.05; color: var(--tx); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .pg-kpi-sub { font-size: 12px; color: var(--tx3); &.alerta { color: var(--am); font-weight: 600; } }
+
+  // Tarjeta (.cd) con cabecera: título a la izquierda, cuenta o acción a la derecha.
+  .pg-card { display: flex; flex-direction: column; min-width: 0; margin-bottom: 14px; }
+  .pg-card-cab {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px;
+    .cd-title { margin: 0; ion-icon { vertical-align: -2px; margin-right: 2px; } }
+  }
+  .pg-cuenta { font-size: 12px; color: var(--tx3); }
+  .pg-num {
+    min-width: 22px; height: 22px; padding: 0 7px; box-sizing: border-box; border-radius: 11px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--cr); color: #fff; font-size: 11.5px; font-weight: 800;
+  }
+
+  // Filas de tarjetas: una columna; desde 992 px, de a dos.
+  .pg-fila { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; margin-bottom: 14px; align-items: start; > .pg-card { margin-bottom: 0; } }
+  @media (min-width: 992px) {
+    .pg-fila { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pg-fila--7-5 { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+    .pg-fila--8-4 { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); }
+  }
+
+  // Vacío: una línea punteada que dice qué pasa (no una caja enorme).
+  .pg-vacio {
+    display: flex; align-items: center; gap: 8px; padding: 14px;
+    border: 1px dashed var(--bd2); border-radius: 2px; font-size: 13px; line-height: 1.45; color: var(--tx3);
+    ion-icon { font-size: 18px; flex-shrink: 0; }
+  }
+
+  // Pestañas grandes (Activas / Completadas…), las de Gestión de citas.
+  .pg-tabs {
+    display: flex; gap: 4px; margin-bottom: 14px; padding: 4px; background: var(--sur2); border-radius: 2px;
+    button {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px;
+      border: none; border-radius: 2px; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 700;
+      background: transparent; color: var(--tx2);
+      ion-icon { font-size: 16px; }
+      &.on { background: var(--cr); color: #fff; }
+      .pg-tab-n { padding: 0 6px; border-radius: 9px; background: rgba(0, 0, 0, .12); font-size: 11px; }
+    }
+  }
+
+  // Buscador, el de Clientes.
+  .pg-buscar {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 11px 16px;
+    background: var(--sur); border: 1px solid var(--bd); border-radius: 2px; transition: border-color .15s;
+    &:focus-within { border-color: var(--cr); }
+    ion-icon { font-size: 18px; color: var(--tx3); flex-shrink: 0; }
+    input {
+      flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--tx); font-size: 14px; font-family: inherit;
+      &::placeholder { color: var(--tx3); }
+      &::-webkit-search-cancel-button { display: none; }
+    }
+    .pg-buscar-x { display: flex; padding: 0; border: none; background: none; color: var(--tx3); cursor: pointer; }
+  }
+
+  // Filtros con número (Todos 14 · Aprobación 5…).
+  .pg-filtros {
+    display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto; scrollbar-width: none;
+    &::-webkit-scrollbar { display: none; }
+    .filter-btn { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; }
+    .filter-btn span { opacity: .75; font-variant-numeric: tabular-nums; }
+  }
+
+  // Lista dentro de una tarjeta: renglones separados por una línea.
+  .pg-lista { display: flex; flex-direction: column; }
+  .pg-item {
+    display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--bd);
+    &:first-child { border-top: 0; padding-top: 0; }
+    &:last-child { padding-bottom: 0; }
+  }
+  .pg-item-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
+    strong { font-size: 14px; font-weight: 700; color: var(--tx); }
+    span { font-size: 12.5px; color: var(--tx3); overflow-wrap: anywhere; } }
+  .pg-item-acc { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; flex-shrink: 0; .btn-sm { min-height: 34px; } }
+}
+
+// Insignias de estado (.pill) dentro del estándar: los mismos colores que las
+// etiquetas del panel (.bg-*), con el texto que pasa 4,5:1 en los dos temas.
+.admin-dark {
+  .pill { border-radius: 2px; font-weight: 700; }
+  .pill.rose   { background: var(--adm-cr-bg); color: var(--adm-cr-fg); }
+  .pill.green  { background: var(--adm-em-bg); color: var(--adm-em-fg); }
+  .pill.amber  { background: var(--adm-am-bg); color: var(--adm-am-fg); }
+  .pill.indigo { background: var(--adm-in-bg); color: var(--adm-in-fg); }
+  .pill.gris   { background: var(--sur2); color: var(--tx2); }
+}
+// Renglones en el celular: las acciones bajan debajo del texto en vez de apretarlo.
+@media (max-width: 560px) {
+  .admin-dark .pg-item { flex-wrap: wrap; }
+  .admin-dark .pg-item-acc { flex-basis: 100%; justify-content: flex-start; }
+}
+// Filtros dentro del estándar: el gris del texto sin elegir daba 4,36:1 sobre el
+// fondo del panel; --tx2 pasa en los dos temas.
+.admin-dark .chip-filtro:not(.on) { color: var(--tx2); border-color: var(--bd); background: var(--sur); }
+
+// Calendario del mes (agendas de recepción y del mecánico): grilla de 7 columnas,
+// el día de hoy y el elegido en rojo, y el color de cada día según su carga.
+.admin-dark {
+  .pg-cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin-bottom: 4px; }
+  .pg-cal-dows { margin-bottom: 6px; }
+  .pg-cal-dow { padding: 2px 0; text-align: center; font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--tx3); }
+  .pg-cal-dia {
+    aspect-ratio: 1 / 1; min-height: 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    border: 1px solid var(--bd); border-radius: 2px; background: var(--sur); color: var(--tx); font: inherit; cursor: pointer;
+    &:hover:not(:disabled) { border-color: var(--bd2); }
+    &.vacio { background: transparent; border-color: transparent; cursor: default; }
+    &.flujo-bajo, &.flujo-completo { background: color-mix(in srgb, var(--em) 10%, var(--sur)); .pg-cal-n { color: var(--em); } }
+    &.flujo-medio, &.flujo-proceso { background: color-mix(in srgb, var(--am) 12%, var(--sur)); .pg-cal-n { color: var(--am); } }
+    &.flujo-alto { background: color-mix(in srgb, var(--cr) 12%, var(--sur)); .pg-cal-n { color: var(--cr-tx); } }
+    &.flujo-agendado { background: color-mix(in srgb, var(--in) 10%, var(--sur)); .pg-cal-n { color: var(--in); } }
+    &.hoy { border-color: var(--cr); .pg-cal-num { color: var(--cr-tx); font-weight: 800; } }
+    &.sel { border-color: var(--cr); box-shadow: 0 0 0 2px color-mix(in srgb, var(--cr) 30%, transparent); }
+  }
+  .pg-cal-num { font-size: 13px; font-weight: 700; }
+  .pg-cal-n { padding: 1px 5px; border-radius: 2px; background: var(--sur); font-size: 10px; font-weight: 800; line-height: 1.2; }
+  .pg-cal-ley {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; margin-top: 10px;
+    span { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--tx3); }
+    i { width: 10px; height: 10px; border-radius: 2px; }
+    .em { background: var(--em); } .am { background: var(--am); } .cr { background: var(--cr); } .in { background: var(--in); }
+  }
+  .pg-cal-nav { display: flex; gap: 6px; .btn { min-width: 40px; } }
 }

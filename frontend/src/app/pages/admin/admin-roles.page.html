@@ -1,0 +1,104 @@
+<ion-header>
+  <ion-toolbar class="admin-topbar">
+    <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+    <ion-title>Roles</ion-title>
+    <app-admin-actions slot="end"></app-admin-actions>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="admin-dark">
+  <div class="admin roles">
+    <div class="cd mb roles-intro">
+      <span class="cd-title"><ion-icon name="key-outline"></ion-icon> Qué puede hacer cada rol</span>
+      <p>Cada empleado tiene un <strong>rol</strong>, que dice qué puede hacer, y una <strong>sucursal</strong>, que dice qué ve: con una sucursal asignada ve solo las citas, órdenes, alertas y mecánicos de esa sucursal. Los clientes se comparten entre las dos. Las dos cosas se eligen en <a routerLink="/admin/empleados">Gestión de empleados</a>.</p>
+      <p>Podés crear roles propios a partir de <strong>Mostrador</strong> o de <strong>Taller</strong>, y quitarle casillas a Recepción y a Mecánico. Un rol propio nunca puede más que el de fábrica de su base, y el sistema lo respeta en cada acción, no solo en los botones.</p>
+      <button type="button" class="btn btn-cr roles-nuevo" (click)="nuevo()" *ngIf="editando !== 'nuevo' && !cargando">
+        <ion-icon name="add-outline"></ion-icon> Nuevo rol
+      </button>
+    </div>
+
+    <div *ngIf="cargando" class="sk-dark" style="height:220px"></div>
+
+    <!-- Rol nuevo -->
+    <div class="cd mb rol abierto" *ngIf="editando === 'nuevo'">
+      <div class="rol-cab rol-cab--editor"><div class="rol-info"><strong>Nuevo rol</strong>
+        <span>Arranca con lo mismo que el rol de fábrica de esa base: quitale lo que no deba hacer.</span></div></div>
+      <ng-container *ngTemplateOutlet="editor; context: { propio: true, nuevo: true }"></ng-container>
+    </div>
+
+    <div class="cd mb rol" *ngFor="let r of roles" [class.abierto]="abierto === r.id">
+      <button type="button" class="rol-cab" (click)="alternar(r.id)" [attr.aria-expanded]="abierto === r.id">
+        <div class="rol-info">
+          <strong>{{ r.nombre }} <span class="rol-etq" *ngIf="!r.de_fabrica">Propio</span></strong>
+          <span>{{ bases[r.base] }} · {{ r.empleados }} empleado{{ r.empleados === 1 ? '' : 's' }} activo{{ r.empleados === 1 ? '' : 's' }}</span>
+          <span class="rol-desc" *ngIf="r.descripcion">{{ r.descripcion }}</span>
+        </div>
+        <ion-icon [name]="abierto === r.id ? 'chevron-up' : 'chevron-down'"></ion-icon>
+      </button>
+
+      <!-- Editando este rol -->
+      <ng-container *ngIf="editando === r.id">
+        <ng-container *ngTemplateOutlet="editor; context: { propio: !r.de_fabrica, nuevo: false }"></ng-container>
+      </ng-container>
+
+      <!-- Viéndolo -->
+      <ng-container *ngIf="abierto === r.id && editando !== r.id">
+        <div class="rol-casillas">
+          <div class="grupo" *ngFor="let g of catalogo">
+            <div class="grupo-tit">{{ g.grupo }} <span>{{ cuantas(r, g) }}/{{ g.permisos.length }}</span></div>
+            <div class="casilla" *ngFor="let p of g.permisos" [class.si]="tiene(r, p.id)">
+              <ion-icon [name]="tiene(r, p.id) ? 'checkmark-circle' : 'close-circle-outline'"></ion-icon>
+              {{ p.nombre }}
+            </div>
+          </div>
+          <div class="grupo">
+            <div class="grupo-tit">Sitio web</div>
+            <div class="casilla nota">{{ webInfo[r.clave] || 'Según cada persona' }}</div>
+          </div>
+        </div>
+        <div class="rol-acciones" *ngIf="r.editable">
+          <button type="button" class="btn btn-cr" (click)="editar(r)"><ion-icon name="create-outline"></ion-icon> {{ r.de_fabrica ? 'Cambiar casillas' : 'Editar rol' }}</button>
+          <button type="button" class="btn btn-ou" *ngIf="r.de_fabrica" (click)="restablecer(r)">Volver a lo de fábrica</button>
+          <button type="button" class="btn btn-rd" *ngIf="r.borrable" (click)="eliminar(r)"><ion-icon name="trash-outline"></ion-icon> Eliminar</button>
+        </div>
+        <p class="rol-fijo" *ngIf="!r.editable">{{ r.clave === 'admin' ? 'Administración puede todo y no se cambia.' : 'Este rol se arma por persona, en Gestión de empleados.' }}</p>
+      </ng-container>
+    </div>
+  </div>
+
+  <!-- El editor, para un rol nuevo o uno existente -->
+  <ng-template #editor let-propio="propio" let-nuevo="nuevo">
+    <div class="rol-editor">
+      <div class="fg-fila" *ngIf="propio">
+        <div class="fg"><label>Nombre *</label>
+          <input [(ngModel)]="borrador.nombre" name="nombre" maxlength="60" placeholder="Ej: Atención al cliente"></div>
+        <div class="fg" *ngIf="nuevo"><label>Parte del sistema *</label>
+          <select [ngModel]="borrador.base" (ngModelChange)="cambiarBase($event)" name="base">
+            <option *ngFor="let b of basesElegibles" [value]="b">{{ bases[b] }}</option>
+          </select>
+          <div class="hint">{{ borrador.base === 'taller' ? 'Usa la pantalla del mecánico.' : 'Usa la pantalla de recepción.' }}</div>
+        </div>
+      </div>
+      <div class="fg" *ngIf="propio"><label>Descripción (opcional)</label>
+        <input [(ngModel)]="borrador.descripcion" name="descripcion" maxlength="200" placeholder="Qué hace esta persona"></div>
+
+      <div class="rol-casillas rol-casillas--editor" data-campo="permisos">
+        <div class="grupo" *ngFor="let g of gruposDelBorrador()">
+          <div class="grupo-tit">{{ g.grupo }}</div>
+          <label class="casilla casilla--elige" *ngFor="let p of g.permisos" [class.si]="marcado(p.id)" [class.fija]="estado(p.id) === 'fija'">
+            <input type="checkbox" [checked]="marcado(p.id)" [disabled]="estado(p.id) === 'fija'" (change)="alternarCasilla(p.id)">
+            <span>{{ p.nombre }}<small *ngIf="estado(p.id) === 'fija'"> · siempre</small></span>
+          </label>
+        </div>
+      </div>
+      <p class="rol-nota">Las marcadas como «siempre» van en todo rol de {{ (bases[borrador.base] || '').toLowerCase() }}: sin ellas la pantalla no sirve, o el sistema todavía no las puede controlar por separado.</p>
+
+      <div class="rol-acciones">
+        <button type="button" class="btn btn-ou" (click)="cancelar()" [disabled]="guardando">Cancelar</button>
+        <button type="button" class="btn btn-cr" (click)="guardar()" [disabled]="guardando">
+          {{ guardando ? 'Guardando…' : (nuevo ? 'Crear rol' : 'Guardar cambios') }}
+        </button>
+      </div>
+    </div>
+  </ng-template>
+</ion-content>

@@ -1,48 +1,119 @@
-.cli-page { max-width: 760px; margin: 0 auto; padding: 14px 16px 80px; }
+// Colores del panel (.admin-dark): siguen el tema claro u oscuro elegido.
+// En el celular cada cliente es una tarjeta; desde 900 px, una fila con columnas.
+.cli-page { max-width: 1080px; margin: 0 auto; padding: 18px 16px 80px; }
+
+.cli-cab {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 14px;
+  h1 { margin: 0; font-family: var(--fd); font-size: 26px; font-weight: 700; line-height: 1.1; color: var(--tx); }
+  p { margin: 4px 0 0; font-size: 13px; color: var(--tx3); }
+  .btn { flex-shrink: 0; }
+  @media (max-width: 520px) { .btn { padding-left: 12px; padding-right: 12px; } }
+}
 
 .cli-search {
   display: flex; align-items: center; gap: 10px;
-  background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .1);
-  border-radius: 14px; padding: 11px 16px; margin-bottom: 16px;
-  ion-icon { font-size: 18px; color: #888; flex-shrink: 0; }
+  background: var(--sur); border: 1px solid var(--bd);
+  border-radius: 2px; padding: 11px 16px; margin-bottom: 12px;
+  transition: border-color .15s;
+  &:focus-within { border-color: var(--cr); }
+  ion-icon { font-size: 18px; color: var(--tx3); flex-shrink: 0; }
   input {
-    flex: 1; background: none; border: none; outline: none; color: #f5f5f5;
+    flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--tx);
     font-size: 14px; font-family: inherit;
-    &::placeholder { color: #666; }
+    &::placeholder { color: var(--tx3); }
+    &::-webkit-search-cancel-button { display: none; }
   }
-  .cli-clear { background: none; border: none; cursor: pointer; padding: 0; color: #666;
+  .cli-clear { background: none; border: none; cursor: pointer; padding: 0; color: var(--tx3);
     ion-icon { font-size: 20px; } }
 }
 
+.cli-filtros {
+  display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto; scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+  .chip-filtro { flex-shrink: 0; }
+  span { margin-left: 4px; opacity: .7; font-variant-numeric: tabular-nums; }
+}
+
 .cli-list { display: flex; flex-direction: column; gap: 8px; }
+.cli-tabla-cab { display: none; }
 
 .cli-card {
-  display: flex; align-items: center; gap: 14px;
-  background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .08);
-  border-radius: 16px; padding: 14px 16px; cursor: pointer;
-  transition: border-color .2s, background .2s;
-  &:hover { border-color: rgba(var(--ion-color-primary-rgb), .2); background: rgba(255, 255, 255, .06); }
-  &:active { transform: scale(.99); }
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'quien acciones' 'chips chips';
+  align-items: center; gap: 8px 12px;
+  background: var(--sur); border: 1px solid var(--bd); border-left: 3px solid transparent;
+  border-radius: 2px; padding: 14px 14px 14px 13px; cursor: pointer;
+  transition: border-color .15s, background .15s;
+  &:hover { border-color: var(--bd2); border-left-color: var(--cr); background: var(--sur2); }
+  &:focus-visible { outline: 2px solid var(--cr); outline-offset: 2px; }
 }
+.cli-quien { grid-area: quien; display: flex; align-items: center; gap: 12px; min-width: 0; }
+.cli-chips { grid-area: chips; display: flex; flex-wrap: wrap; gap: 6px; padding-left: 56px; &:empty { display: none; } }
+.cli-acciones { grid-area: acciones; display: flex; align-items: center; gap: 4px; }
+.cli-solo-esc { display: none; }
 
 .cli-av {
   width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(var(--ion-color-primary-rgb), .12); color: var(--ion-color-primary, var(--ion-color-primary));
-  font-size: 15px; font-weight: 800;
+  background: rgba(226, 35, 26, .12); color: var(--text-accent);
+  font-family: var(--fd); font-size: 16px; font-weight: 700; letter-spacing: .02em;
 }
 
 .cli-info {
-  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;
-  strong { font-size: 15px; font-weight: 700; color: #f5f5f5; }
-  span { font-size: 12.5px; color: #999; display: flex; align-items: center; gap: 5px;
-    ion-icon { font-size: 13px; } }
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
+  strong { font-size: 15px; font-weight: 700; color: var(--tx); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  span { font-size: 12.5px; color: var(--tx3); display: flex; align-items: center; gap: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    ion-icon { font-size: 13px; flex-shrink: 0; } }
+  .cli-mail { display: block; }
 }
 
-.cli-chev { font-size: 18px; color: #555; flex-shrink: 0; }
+.cli-dato { font-size: 13px; color: var(--tx2); font-variant-numeric: tabular-nums; }
+
+.cli-chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+  border: 1px solid var(--bd2); border-radius: 2px;
+  font-size: 11px; font-weight: 600; color: var(--tx3); white-space: nowrap;
+  ion-icon { font-size: 12px; }
+  &.ok { border-color: var(--em); color: var(--em); }
+  &.regalo { border-color: var(--am); color: var(--am); }
+}
+
+.cli-accion {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 2px; border: 1px solid transparent;
+  background: none; color: var(--tx3); cursor: pointer; text-decoration: none;
+  ion-icon { font-size: 17px; }
+  &:hover { border-color: var(--bd2); color: var(--tx); background: var(--sur); }
+  &.wa:hover { color: #25d366; border-color: #25d366; }
+  &:focus-visible { outline: 2px solid var(--cr); outline-offset: 1px; }
+}
+.cli-chev { font-size: 18px; color: var(--tx3); flex-shrink: 0; margin-left: 2px; }
 
 .cli-empty {
-  text-align: center; padding: 48px 24px; color: #666;
-  ion-icon { font-size: 48px; opacity: .4; display: block; margin: 0 auto 12px; }
-  p { font-size: 14px; margin: 0; }
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  text-align: center; padding: 48px 24px; color: var(--tx3);
+  border: 1px dashed var(--bd2); border-radius: 2px;
+  ion-icon { font-size: 40px; opacity: .5; margin-bottom: 4px; }
+  strong { font-size: 15px; color: var(--tx2); }
+  p { font-size: 13px; margin: 0 0 8px; }
+}
+
+// ── Escritorio: una fila con columnas ──
+@media (min-width: 900px) {
+  .cli-tabla-cab,
+  .cli-card {
+    display: grid;
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr) 110px;
+    grid-template-areas: none;
+    align-items: center; gap: 14px;
+  }
+  .cli-tabla-cab {
+    padding: 0 14px 2px 16px;
+    span { font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--tx3); }
+  }
+  .cli-card { padding: 12px 14px 12px 13px; gap: 14px; }
+  .cli-quien, .cli-chips, .cli-acciones { grid-area: auto; }
+  .cli-chips { padding-left: 0; &:empty { display: flex; } }
+  .cli-acciones { justify-content: flex-end; }
+  .cli-solo-esc { display: block; }
+  .cli-solo-cel { display: none !important; }
 }

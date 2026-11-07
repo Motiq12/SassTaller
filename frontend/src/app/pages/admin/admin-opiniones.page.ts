@@ -1,9 +1,9 @@
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { AdminService } from '../../services/admin.service';
-import { fechaCorta } from '../../shared/utils/csv.util';
+import { fechaCorta } from '../../shared/csv.util';
 
 @Component({
   standalone: false,
@@ -12,9 +12,6 @@ import { fechaCorta } from '../../shared/utils/csv.util';
   styleUrls: ['./admin-opiniones.page.scss'],
 })
 export class AdminOpinionesPage implements OnInit, OnDestroy {
-  private admin = inject(AdminService);
-  private router = inject(Router);
-
   private destroy$ = new Subject<void>();
   opiniones: any[] = [];
   tecnicos: { id: number; nombre: string }[] = [];
@@ -25,6 +22,8 @@ export class AdminOpinionesPage implements OnInit, OnDestroy {
   // Filtros: estrella (null = todas) y mecánico (null = todos).
   filtroEstrella: number | null = null;
   filtroEmpleado: number | null = null;
+
+  constructor(private admin: AdminService, private router: Router) {}
 
   ngOnInit() { this.cargar(); }
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
@@ -60,6 +59,6 @@ export class AdminOpinionesPage implements OnInit, OnDestroy {
   get hayFiltro(): boolean { return this.filtroEstrella !== null || this.filtroEmpleado !== null; }
 
   esBaja(cal: any): boolean { return Number(cal) <= 2; }
-  abrirOpinion(o: any) { if (o?.orden_id) this.router.navigate(['/detalle-orden', o.orden_id]); }
+  abrirOpinion(o: any) { if (o?.orden_id) this.router.navigate(['/admin/detalle-orden', o.orden_id]); }
   fechaCortaOp(f: any): string { return fechaCorta(f); }
 }

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { PortalService } from '../../services/portal.service';
 
 // Acceso a "Mi Perfil" y "Notificaciones" desde el encabezado de cada pantalla del portal.
@@ -28,14 +28,14 @@ import { PortalService } from '../../services/portal.service';
       min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box;
       display: flex; align-items: center; justify-content: center;
       font-size: 10px; font-weight: 800; line-height: 1;
-      color: #fff; background: var(--ion-color-danger, #e11d48);
-      border-radius: 999px; border: 1.5px solid var(--ion-toolbar-background, #fff);
+      color: #fff; background: var(--ion-color-danger, #e2231a);
+      border-radius: 2px; border: 1.5px solid var(--ion-toolbar-background, #fff);
       pointer-events: none;
     }
   `],
 })
 export class PortalActionsComponent implements OnInit {
-  portal = inject(PortalService);
+  constructor(public portal: PortalService) {}
 
   // Cada vez que una pantalla con esta barra se monta, refresca el contador.
   ngOnInit() { this.portal.refrescarContador(); }

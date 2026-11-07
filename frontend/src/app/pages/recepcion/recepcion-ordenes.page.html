@@ -1,121 +1,117 @@
 <ion-header>
-  <ion-toolbar>
+  <ion-toolbar class="admin-topbar">
     <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
     <ion-title>Órdenes</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
+<ion-content class="admin-dark">
   <ion-refresher slot="fixed" (ionRefresh)="cargar($event)">
     <ion-refresher-content pullingIcon="chevron-down" refreshingSpinner="crescent"></ion-refresher-content>
   </ion-refresher>
 
-  <div class="rec">
-    <div class="segment">
-      <button class="seg-btn" [class.on]="vista==='activas'" (click)="vista='activas'; cambiarVista()">Activas</button>
-      <button class="seg-btn" [class.on]="vista==='completadas'" (click)="vista='completadas'; cambiarVista()">Completadas</button>
+  <div class="pg">
+    <header class="pg-cab">
+      <div>
+        <h1>Órdenes de trabajo</h1>
+        <p>{{ ordenesVista.length }} {{ vista === 'activas' ? 'en el taller' : 'completadas' }}</p>
+      </div>
+    </header>
+
+    <div class="pg-tabs">
+      <button [class.on]="vista==='activas'" (click)="vista='activas'; cambiarVista()"><ion-icon name="construct-outline"></ion-icon> Activas</button>
+      <button [class.on]="vista==='completadas'" (click)="vista='completadas'; cambiarVista()"><ion-icon name="checkmark-done-outline"></ion-icon> Completadas</button>
     </div>
 
     <!-- Filtros: búsqueda + chips de etapa -->
-    <div class="ord-search" *ngIf="!cargando && ordenes.length">
+    <div class="pg-buscar" *ngIf="!cargando && ordenes.length">
       <ion-icon name="search-outline"></ion-icon>
-      <input [(ngModel)]="busqueda" placeholder="Buscar número, cliente o placa…" autocapitalize="off" autocomplete="off" />
-      <button *ngIf="busqueda" (click)="busqueda=''" aria-label="Limpiar"><ion-icon name="close-circle"></ion-icon></button>
+      <input [(ngModel)]="busqueda" placeholder="Buscar número, cliente o placa…" autocapitalize="off" autocomplete="off" aria-label="Buscar orden" />
+      <button class="pg-buscar-x" *ngIf="busqueda" (click)="busqueda=''" aria-label="Limpiar"><ion-icon name="close-circle"></ion-icon></button>
     </div>
-    <div class="ord-chips" *ngIf="!cargando && ordenes.length">
-      <button class="ord-chip" [class.on]="!estadoFiltro" (click)="estadoFiltro=''">Todas <span>{{ totalSinEtapa }}</span></button>
-      <button class="ord-chip" *ngFor="let c of chipsConteo" [class.on]="estadoFiltro===c.estado" (click)="setEstadoFiltro(c.estado)">
+    <div class="pg-filtros" *ngIf="!cargando && ordenes.length">
+      <button class="chip-filtro" [class.on]="!estadoFiltro" (click)="estadoFiltro=''">Todas <span>{{ totalSinEtapa }}</span></button>
+      <button class="chip-filtro" *ngFor="let c of chipsConteo" [class.on]="estadoFiltro===c.estado" (click)="setEstadoFiltro(c.estado)">
         {{ c.label }} <span>{{ c.n }}</span>
       </button>
     </div>
     <!-- Segunda fila: sucursal (si hay más de una) + prioridad + sin asignar -->
-    <div class="ord-chips" *ngIf="!cargando && ordenes.length && (sucursalesPresentes.length > 1 || prioridadesPresentes.length || haySinAsignar)">
+    <div class="pg-filtros" *ngIf="!cargando && ordenes.length && (sucursalesPresentes.length > 1 || prioridadesPresentes.length || haySinAsignar)">
       <ng-container *ngIf="sucursalesPresentes.length > 1">
-        <button class="ord-chip suc" *ngFor="let s of sucursalesPresentes" [class.on]="sucursalFiltro===s.id" (click)="setSucursalFiltro(s.id)">
+        <button class="chip-filtro" *ngFor="let s of sucursalesPresentes" [class.on]="sucursalFiltro===s.id" (click)="setSucursalFiltro(s.id)">
           <ion-icon name="location-outline"></ion-icon> {{ s.nombre }} <span>{{ s.n }}</span>
         </button>
       </ng-container>
-      <button class="ord-chip pri" *ngFor="let p of prioridadesPresentes" [class.on]="prioridadFiltro===p.valor" (click)="setPrioridadFiltro(p.valor)">
+      <button class="chip-filtro" *ngFor="let p of prioridadesPresentes" [class.on]="prioridadFiltro===p.valor" (click)="setPrioridadFiltro(p.valor)">
         <ion-icon name="flash-outline"></ion-icon> {{ p.label }} <span>{{ p.n }}</span>
       </button>
-      <button class="ord-chip warn" *ngIf="haySinAsignar" [class.on]="sinAsignar" (click)="setSinAsignar()">
+      <button class="chip-filtro" *ngIf="haySinAsignar" [class.on]="sinAsignar" (click)="setSinAsignar()">
         <ion-icon name="person-outline"></ion-icon> Sin asignar <span>{{ sinAsignarConteo }}</span>
       </button>
     </div>
-    <!-- Tercera fila: orden de la lista + limpiar filtros -->
-    <div class="ord-tools" *ngIf="!cargando && ordenes.length">
-      <div class="ord-sort">
-        <ion-icon name="swap-vertical-outline"></ion-icon>
+    <!-- Orden de la lista + limpiar filtros -->
+    <div class="ro-herr" *ngIf="!cargando && ordenes.length">
+      <div class="ro-orden" role="group" aria-label="Ordenar">
+        <ion-icon name="swap-vertical-outline" aria-hidden="true"></ion-icon>
         <button [class.on]="orden==='recientes'" (click)="orden='recientes'">Recientes</button>
         <button [class.on]="orden==='antiguas'" (click)="orden='antiguas'">Antiguas</button>
         <button [class.on]="orden==='prioridad'" (click)="orden='prioridad'">Prioridad</button>
       </div>
-      <button class="ord-clear" *ngIf="hayFiltros" (click)="limpiar()">
-        <ion-icon name="close-circle-outline"></ion-icon> Limpiar
+      <button class="btn btn-ou btn-sm" *ngIf="hayFiltros" (click)="limpiar()">
+        <ion-icon name="close-circle-outline"></ion-icon> Limpiar filtros
       </button>
     </div>
 
-    <!-- Skeleton -->
-    <div *ngIf="cargando" style="display:flex;flex-direction:column;gap:14px">
-      <div class="skeleton" style="height:230px"></div>
-      <div class="skeleton" style="height:230px"></div>
+    <!-- Cargando -->
+    <div class="ro-grid" *ngIf="cargando">
+      <div class="sk-dark" style="height:230px" *ngFor="let i of [1,2,3]"></div>
     </div>
 
-    <div class="orden-list" *ngIf="!cargando">
-      <div class="card orden-card" *ngFor="let o of ordenesVista">
-        <div class="oc-top tappable" (click)="abrirDetalle(o)">
-          <div class="oc-id">
-            <div class="oc-num mono">{{ o.numero_orden }}</div>
-            <div class="oc-title">{{ o.problema_reportado }}</div>
-          </div>
-          <span class="pill" [ngClass]="estadoPill[o.estado]">{{ estadoLabel[o.estado] || o.estado }}</span>
-          <ion-icon name="chevron-forward" class="oc-go"></ion-icon>
-        </div>
+    <div class="ro-grid" *ngIf="!cargando">
+      <article class="ro-card" *ngFor="let o of ordenesVista">
+        <button type="button" class="ro-abrir" (click)="abrirDetalle(o)" [attr.aria-label]="'Abrir ' + o.numero_orden">
+          <span class="ro-top">
+            <span class="ro-num mono">{{ o.numero_orden }}</span>
+            <span class="pill" [ngClass]="estadoPill[o.estado]">{{ estadoLabel[o.estado] || o.estado }}</span>
+          </span>
+          <span class="ro-moto"><ion-icon name="bicycle-outline"></ion-icon><strong>{{ o.marca }} {{ o.modelo }}</strong></span>
+          <span class="ro-linea"><ion-icon name="person-outline"></ion-icon> {{ o.cliente_nombre }} {{ o.cliente_apellido }}</span>
+          <span class="ro-problema" *ngIf="o.problema_reportado">{{ o.problema_reportado }}</span>
+          <span class="ro-pie">
+            <span *ngIf="o.tecnico_nombre"><ion-icon name="construct-outline"></ion-icon> {{ o.tecnico_nombre }}</span>
+            <span *ngIf="!o.tecnico_nombre" class="sin-tec"><ion-icon name="alert-circle-outline"></ion-icon> Sin mecánico</span>
+            <span *ngIf="o.sucursal_nombre"><ion-icon name="location-outline"></ion-icon> {{ o.sucursal_nombre }}</span>
+          </span>
+          <span class="ro-prog" aria-hidden="true"><span [style.width.%]="progresoPct(o.estado)"></span></span>
+        </button>
 
-        <div class="oc-meta">
-          <span><ion-icon name="person-outline"></ion-icon> {{ o.cliente_nombre }} {{ o.cliente_apellido }} · {{ o.marca }} {{ o.modelo }}</span>
-          <span *ngIf="o.tecnico_nombre"><ion-icon name="construct-outline"></ion-icon> Mecánico: {{ o.tecnico_nombre }}</span>
-          <span *ngIf="o.sucursal_nombre"><ion-icon name="location-outline"></ion-icon> {{ o.sucursal_nombre }}</span>
-        </div>
-
-        <!-- Barra de progreso -->
-        <div class="prog-wrap">
-          <div class="prog-track"><div class="prog-fill" [style.width.%]="progresoPct(o.estado)"></div></div>
-          <div class="prog-lbl">{{ progresoPct(o.estado) }}%</div>
-        </div>
-
-        <!-- Evidencias -->
-        <div class="ev-box">
-          <div class="ev-title"><ion-icon name="camera-outline"></ion-icon> Evidencias del mecánico ({{ o.total_fotos || 0 }})</div>
-          <div class="ev-grid">
-            <a class="ev-thumb" *ngFor="let f of fotos[o.id]" [href]="f.url" target="_blank">
-              <img [src]="f.url" alt="evidencia" />
-            </a>
-            <button class="ev-thumb add" (click)="subirFoto(o)" [disabled]="subiendo.has(o.id)">
+        <!-- Evidencias para mandarle al cliente -->
+        <div class="ro-ev">
+          <span class="ro-ev-tit"><ion-icon name="camera-outline"></ion-icon> Evidencias del mecánico ({{ o.total_fotos || 0 }})</span>
+          <div class="ro-ev-fotos">
+            <a class="ro-ev-foto" *ngFor="let f of fotos[o.id]" [href]="f.url" target="_blank" rel="noopener"><img [src]="f.url" alt="Evidencia" /></a>
+            <button class="ro-ev-foto ro-ev-mas" (click)="subirFoto(o)" [disabled]="subiendo.has(o.id)" aria-label="Agregar foto">
               <ion-icon [name]="subiendo.has(o.id) ? 'hourglass-outline' : 'add'"></ion-icon>
             </button>
           </div>
-          <textarea class="ev-nota" rows="2" [(ngModel)]="notas[o.id]"
-            placeholder="Nota para el cliente (opcional)… se incluye en el mensaje"></textarea>
-
-          <div class="ev-actions">
-            <button class="btn-upload" (click)="subirFoto(o)" [disabled]="subiendo.has(o.id)">
+          <textarea class="ro-ev-nota" rows="2" [(ngModel)]="notas[o.id]" aria-label="Nota para el cliente"
+            placeholder="Nota para el cliente (opcional)… va en el mensaje"></textarea>
+          <div class="ro-ev-acc">
+            <button class="btn btn-ou btn-sm" (click)="subirFoto(o)" [disabled]="subiendo.has(o.id)">
               <ion-icon name="cloud-upload-outline"></ion-icon> {{ subiendo.has(o.id) ? 'Subiendo…' : 'Subir fotos' }}
             </button>
-            <button class="btn-send" (click)="enviarAlCliente(o)">
-              <ion-icon name="logo-whatsapp"></ion-icon> Enviar a cliente
+            <button class="btn btn-em btn-sm" (click)="enviarAlCliente(o)">
+              <ion-icon name="logo-whatsapp"></ion-icon> Enviar al cliente
             </button>
           </div>
         </div>
-      </div>
+      </article>
 
-      <div class="empty-state" *ngIf="!ordenesVista.length">
+      <div class="pg-vacio ro-vacio" *ngIf="!ordenesVista.length">
         <ion-icon [name]="ordenes.length ? 'filter-outline' : 'clipboard-outline'"></ion-icon>
-        <p *ngIf="!ordenes.length">No hay órdenes {{ vista === 'activas' ? 'activas' : 'completadas' }}.</p>
-        <p *ngIf="ordenes.length">Ninguna orden coincide con el filtro.</p>
+        <ng-container *ngIf="!ordenes.length">No hay órdenes {{ vista === 'activas' ? 'activas' : 'completadas' }}.</ng-container>
+        <ng-container *ngIf="ordenes.length">Ninguna orden coincide con el filtro.</ng-container>
       </div>
     </div>
-
-    <div style="height:80px"></div>
   </div>
 </ion-content>

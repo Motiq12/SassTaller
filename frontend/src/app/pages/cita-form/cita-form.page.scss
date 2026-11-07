@@ -5,7 +5,7 @@
   margin-top: 6px;
   background: var(--sur2);
   border: 1px solid var(--bd);
-  border-radius: 10px;
+  border-radius: 2px;
   overflow: hidden auto;
   max-height: 220px;
 }
@@ -29,9 +29,9 @@
   span { color: var(--tx3); font-size: 12px; margin-left: 4px; }
 }
 
-// Pickers nativos de fecha/hora en modo oscuro (icono y popup claros).
-.fg input[type="date"],
-.fg input[type="time"] { color-scheme: dark; }
+
+// Borrar: aparte y en rojo, para no tocarlo sin querer.
+.cf-borrar { margin-top: 10px; padding: 12px; color: var(--rd); border-color: color-mix(in srgb, var(--rd) 40%, transparent); }
 
 // Icono alineado dentro del botón Guardar.
 .btn-block ion-icon { font-size: 16px; vertical-align: -3px; margin-right: 6px; }

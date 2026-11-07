@@ -28,7 +28,7 @@
 
   <!-- Buscador -->
   <div class="citas-search">
-    <ion-searchbar [(ngModel)]="busqueda" placeholder="Buscar cliente, placa o vehiculo…" debounce="300"></ion-searchbar>
+    <ion-searchbar [(ngModel)]="busqueda" placeholder="Buscar cliente, placa o moto…" debounce="300"></ion-searchbar>
   </div>
 
   <!-- Skeleton -->
@@ -61,12 +61,12 @@
               <ion-icon name="time-outline"></ion-icon>
               {{ formatHora(c.hora!) }}
             </div>
-            <div class="cc-vehiculo" *ngIf="c.marca">
+            <div class="cc-moto" *ngIf="c.marca">
               <ion-icon name="bicycle-outline"></ion-icon>
               {{ c.marca }} {{ c.modelo }}
               <span *ngIf="c.placa" class="cc-placa mono">· {{ c.placa }}</span>
             </div>
-            <div class="cc-servicio" *ngIf="c.tipo_servicio">{{ c.tipo_servicio }}</div>
+            <div class="cc-servicio" *ngIf="c.servicios || c.tipo_servicio">{{ c.servicios || c.tipo_servicio }}</div>
             <p class="cc-motivo" *ngIf="c.motivo">{{ c.motivo.length > 60 ? c.motivo.slice(0, 60) + '…' : c.motivo }}</p>
             <div class="cc-footer">
               <span *ngIf="c.tecnico_nombre" class="cc-tec">

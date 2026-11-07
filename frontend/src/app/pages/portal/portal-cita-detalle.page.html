@@ -1,5 +1,5 @@
 <ion-header>
-  <ion-toolbar>
+  <ion-toolbar class="admin-topbar">
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/portal/mis-citas" text=""></ion-back-button>
     </ion-buttons>
@@ -7,7 +7,7 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
+<ion-content class="admin-dark">
   <div class="det" *ngIf="cargando">
     <div class="skeleton" style="height:170px;margin-bottom:12px"></div>
     <div class="skeleton" style="height:240px"></div>
@@ -26,7 +26,7 @@
       </div>
 
       <div class="ck-main">
-        <div class="ck-vehiculo" [class.has-photo]="cita.moto_foto">
+        <div class="ck-moto" [class.has-photo]="cita.moto_foto">
           <img *ngIf="cita.moto_foto; else motoSvg" [src]="cita.moto_foto" [alt]="cita.marca + ' ' + cita.modelo">
           <ng-template #motoSvg>
             <svg viewBox="0 0 64 40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -42,7 +42,7 @@
       </div>
 
       <div class="ck-tele">
-        <div class="tl"><span class="tk">Servicio</span><span class="tv">{{ cita.tipo_servicio || cita.motivo }}</span></div>
+        <div class="tl"><span class="tk">Servicio</span><span class="tv">{{ cita.servicios || cita.tipo_servicio || cita.motivo }}</span></div>
         <div class="tl" *ngIf="cita.numero_orden"><span class="tk">Orden</span><span class="tv mono">{{ cita.numero_orden }}</span></div>
         <div class="tl"><span class="tk">Fecha</span><span class="tv mono">{{ cita.fecha | date:'dd/MM/yy' }}<ng-container *ngIf="cita.hora"> · {{ cita.hora }}</ng-container></span></div>
         <div class="tl" *ngIf="orden?.fecha_estimada_entrega"><span class="tk">Entrega est.</span><span class="tv mono">{{ orden.fecha_estimada_entrega | date:'dd/MM/yy' }}</span></div>
@@ -58,7 +58,7 @@
       </div>
       <div class="tl-progress-bar" *ngIf="cita.estado !== 'cancelado'">
         <div class="tl-progress-fill" [style.width.%]="progPct"></div>
-        <div class="tl-vehiculo" [style.left.%]="progPct">
+        <div class="tl-moto" [style.left.%]="progPct">
           <ion-icon name="bicycle"></ion-icon>
         </div>
       </div>
@@ -96,23 +96,27 @@
 
             <!-- ═══ ZONA DE FRICCIÓN CERO: el presupuesto emerge y rompe la línea ═══ -->
             <div class="budget" *ngIf="e.estado === 'activo' && esperandoAprobacion">
-              <div class="bud-head"><ion-icon name="document-text-outline"></ion-icon> PRESUPUESTO POR APROBAR</div>
+              <div class="bud-head"><ion-icon name="document-text-outline"></ion-icon> {{ esAdicional ? 'TRABAJO ADICIONAL POR APROBAR' : 'PRESUPUESTO POR APROBAR' }}</div>
               <div class="bud-lines" *ngIf="orden">
                 <div class="bl" *ngFor="let r of orden.repuestos">
-                  <span>{{ r.nombre }}<ng-container *ngIf="r.cantidad > 1"> ×{{ r.cantidad }}</ng-container></span>
+                  <span>{{ r.nombre }}<ng-container *ngIf="r.cantidad > 1"> ×{{ r.cantidad }}</ng-container><ng-container *ngIf="r.adicional"> · nuevo</ng-container></span>
                   <span class="mono">{{ (r.cantidad * r.costo_unitario) | currency:'CRC':'symbol-narrow':'1.0-0' }}</span>
                 </div>
                 <div class="bl"><span>Mano de obra</span><span class="mono">{{ (orden.costo_mano_obra || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</span></div>
                 <div class="bl" *ngIf="orden.descuento > 0"><span>Descuento</span><span class="mono">− {{ orden.descuento | currency:'CRC':'symbol-narrow':'1.0-0' }}</span></div>
+                <ng-container *ngIf="esAdicional">
+                  <div class="bl"><span>Ya aprobado</span><span class="mono">{{ (orden.total_aprobado || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</span></div>
+                  <div class="bl"><span>Adicional</span><span class="mono">+ {{ montoAdicional | currency:'CRC':'symbol-narrow':'1.0-0' }}</span></div>
+                </ng-container>
               </div>
               <div class="bud-total">
-                <span class="bt-k">Total a pagar</span>
+                <span class="bt-k">{{ esAdicional ? 'Nuevo total' : 'Total a pagar' }}</span>
                 <span class="bt-v mono">{{ total | currency:'CRC':'symbol-narrow':'1.0-0' }}</span>
               </div>
               <button class="bud-cta" (click)="aprobar()" [disabled]="procesando">
-                <ion-icon name="checkmark-circle"></ion-icon> APROBAR Y COMENZAR
+                <ion-icon name="checkmark-circle"></ion-icon> {{ esAdicional ? 'APROBAR ADICIONAL' : 'APROBAR Y COMENZAR' }}
               </button>
-              <button class="bud-rej" (click)="rechazar()" [disabled]="procesando">Rechazar presupuesto</button>
+              <button class="bud-rej" (click)="rechazar()" [disabled]="procesando">{{ esAdicional ? 'No quiero el adicional' : 'Rechazar presupuesto' }}</button>
             </div>
           </div>
         </div>
@@ -122,7 +126,7 @@
     <!-- Cancelada: estado terminal -->
     <section class="card cancel-card" *ngIf="cancelada">
       <ion-icon name="close-circle-outline"></ion-icon>
-      <div><strong>Cita cancelada</strong><p>Esta cita fue cancelada. Si necesitás reprogramar, agendá una nueva.</p></div>
+      <div><strong>Cita cancelada</strong><p>Esta cita fue cancelada. Si necesitas reprogramar, agenda una nueva.</p></div>
     </section>
 
     <!-- Diagnóstico del taller -->

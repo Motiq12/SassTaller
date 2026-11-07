@@ -1,10 +1,10 @@
 // Utilidades compartidas de órdenes de trabajo y su puente con las citas.
-//
-// Multi-tenant: todas reciben el `db` scopeado (req.db) como primer argumento. No hay
-// pool global acá a propósito — si una llamada llega sin db, falla en vez de operar
-// sobre las órdenes de otro taller.
-const { notificarCambioEstado } = require('./notificaciones');
+const { pool } = require('../db/pool');
+const { notificarCambioEstado, notificarPresupuestoListo, notificarMecanico } = require('./notificaciones');
+const { necesitaReaprobacion, ESTADOS_TRAS_APROBACION } = require('./reglas-orden');
 const { getConfig } = require('./configuracion');
+const { fechaLocalISO, horaLocal } = require('./fecha');
+const { minutosRapidosValidos } = require('./agenda');
 
 // Mapeo del flujo rico de la orden → flujo simple de la cita (lo que ve el cliente).
 const MAP_ORDEN_A_CITA = {
@@ -18,22 +18,42 @@ const MAP_ORDEN_A_CITA = {
   cancelada: 'cancelado',
 };
 
-// Genera numero_orden OT-YYYY-XXXX con un contador atómico por año Y POR TALLER.
+// Le crea su cita a una orden abierta sin agendar (cliente que llegó sin cita, u
+// orden creada en administración). El cliente solo ve citas en el portal: sin esto
+// la orden no le aparecía. La moto ya está en el taller, así que nace "en revisión"
+// y con la llegada marcada. Sin tipo de servicio: el portal muestra entonces el
+// problema que se anotó ("Ruido en la cadena"), que dice más que una categoría.
+// Corre dentro de la transacción de la orden (`conn`).
+// Devuelve el id de la cita; quien llama avisa al cliente después del commit.
+async function crearCitaDeOrden(conn, o) {
+  const config = await getConfig();
+  const offset = Number(config.zona_horaria_offset) || -6;
+  const [r] = await conn.query(
+    `INSERT INTO citas (cliente_id, moto_id, usuario_id, tecnico_id, sucursal_id, fecha, hora, motivo,
+                        estado, fecha_inicio, hora_llegada, orden_id, creada_por_orden, duracion_min)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'en_revision', NOW(), NOW(), ?, 1, ?)`,
+    [
+      o.cliente_id, o.moto_id, o.usuario_id || null, o.tecnico_id || null, o.sucursal_id || null,
+      fechaLocalISO(offset), horaLocal(offset), o.problema_reportado, o.orden_id,
+      // Servicio rápido (20, 30 o 40 min): ocupa solo ese rato de la hora en que llegó.
+      minutosRapidosValidos(o.duracion_min) ? Number(o.duracion_min) : null,
+    ]
+  );
+  return r.insertId;
+}
+
+// Genera numero_orden OT-YYYY-XXXX con un contador atómico por año.
 // El INSERT y el SELECT corren en la MISMA conexión (LAST_INSERT_ID es por conexión).
-//
-// El contador es por taller porque la numeración es un correlativo visible para el
-// cliente: si fuera global, el taller B empezaría en OT-2026-0043 solo porque el
-// taller A ya emitió 42 órdenes. La PK (tenant_id, anio) lo garantiza en la base.
-async function generarNumeroOrden(db) {
+async function generarNumeroOrden() {
   const year = new Date().getFullYear();
-  const conn = await db.conexion();
+  const conn = await pool.getConnection();
   try {
     await conn.query(
-      `INSERT INTO orden_contadores (tenant_id, anio, ultimo) VALUES (@tenant, ?, LAST_INSERT_ID(1))
+      `INSERT INTO orden_contadores (anio, ultimo) VALUES (?, LAST_INSERT_ID(1))
        ON DUPLICATE KEY UPDATE ultimo = LAST_INSERT_ID(ultimo + 1)`,
       [year]
     );
-    const [[{ n }]] = await conn.sinScope('SELECT LAST_INSERT_ID() AS n');
+    const [[{ n }]] = await conn.query('SELECT LAST_INSERT_ID() AS n');
     return `OT-${year}-${String(n).padStart(4, '0')}`;
   } finally {
     conn.release();
@@ -42,13 +62,11 @@ async function generarNumeroOrden(db) {
 
 // Refleja el estado de una orden en su cita vinculada (si existe). Nunca lanza:
 // si algo falla, lo loguea y sigue (no debe romper el cambio de estado de la orden).
-async function sincronizarCitaDesdeOrden(db, ordenId, ordenEstado) {
+async function sincronizarCitaDesdeOrden(ordenId, ordenEstado) {
   try {
     const estadoCita = MAP_ORDEN_A_CITA[ordenEstado];
     if (!estadoCita) return;
-    const [[cita]] = await db.query(
-      'SELECT id, estado FROM citas WHERE orden_id = ? AND tenant_id = @tenant LIMIT 1', [ordenId]
-    );
+    const [[cita]] = await pool.query('SELECT id, estado FROM citas WHERE orden_id = ? LIMIT 1', [ordenId]);
     if (!cita || cita.estado === estadoCita) return; // sin cita o sin cambio real
 
     const sets = ['estado = ?'];
@@ -62,16 +80,15 @@ async function sincronizarCitaDesdeOrden(db, ordenId, ordenEstado) {
     }
     if (estadoCita === 'entregado') {
       sets.push('fecha_fin = NOW()');
-      const [[o]] = await db.query(
-        `SELECT (costo_mano_obra + costo_repuestos - descuento) AS total
-         FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant`,
+      const [[o]] = await pool.query(
+        'SELECT (costo_mano_obra + costo_repuestos - descuento) AS total FROM ordenes_trabajo WHERE id = ?',
         [ordenId]
       );
       if (o) { sets.push('monto = ?'); params.push(Number(o.total) || 0); }
     }
     params.push(cita.id);
-    await db.query(`UPDATE citas SET ${sets.join(', ')} WHERE id = ? AND tenant_id = @tenant`, params);
-    await notificarCambioEstado(db, cita.id, estadoCita);
+    await pool.query(`UPDATE citas SET ${sets.join(', ')} WHERE id = ?`, params);
+    await notificarCambioEstado(cita.id, estadoCita);
   } catch (err) {
     console.error('⚠️  No se pudo sincronizar la cita desde la orden:', err.message);
   }
@@ -84,15 +101,14 @@ async function sincronizarCitaDesdeOrden(db, ordenId, ordenEstado) {
 // entregas; luego sincroniza la cita vinculada. Compartido por el cierre de admin y
 // la entrega de recepción para no duplicar la lógica de fidelización.
 // Devuelve { notFound } | { estadoInvalido, estadoActual } | { cortesiaGanada }.
-async function cerrarOrden(db, ordenId, datos = {}, opciones = {}) {
+async function cerrarOrden(ordenId, datos = {}, opciones = {}) {
   const { metodo_pago, garantia_dias, observaciones_finales } = datos;
   const { soloDesdeListaEntrega = false } = opciones;
-  const conn = await db.conexion();
+  const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
     const [[orden]] = await conn.query(
-      `SELECT estado, cliente_id, visita_contada FROM ordenes_trabajo
-       WHERE id = ? AND tenant_id = @tenant FOR UPDATE`,
+      'SELECT estado, cliente_id, visita_contada FROM ordenes_trabajo WHERE id = ? FOR UPDATE',
       [ordenId]
     );
     if (!orden) { await conn.rollback(); return { notFound: true }; }
@@ -103,34 +119,28 @@ async function cerrarOrden(db, ordenId, datos = {}, opciones = {}) {
     }
     await conn.query(
       `UPDATE ordenes_trabajo SET estado='entregada', metodo_pago=?, garantia_dias=?,
-       observaciones_finales=?, fecha_entrega_real=NOW() WHERE id=? AND tenant_id = @tenant`,
+       observaciones_finales=?, fecha_entrega_real=NOW() WHERE id=?`,
       [metodo_pago || null, garantia_dias || 0, observaciones_finales || null, ordenId]
     );
+    // La entrega termina la etapa en curso (normalmente "lista para entrega"): sin
+    // esto su tiempo quedaba abierto para siempre en el registro de tiempos.
+    await conn.query('UPDATE orden_tiempos SET fin = NOW() WHERE orden_id = ? AND fin IS NULL', [ordenId]);
 
     let cortesiaGanada = false;
     if (!orden.visita_contada) {
-      await conn.query(
-        'UPDATE ordenes_trabajo SET visita_contada = 1 WHERE id = ? AND tenant_id = @tenant', [ordenId]
-      );
-      await conn.query(
-        'UPDATE clientes SET visitas = visitas + 1 WHERE id = ? AND tenant_id = @tenant', [orden.cliente_id]
-      );
-      const [[cli]] = await conn.query(
-        'SELECT visitas FROM clientes WHERE id = ? AND tenant_id = @tenant', [orden.cliente_id]
-      );
-      const config = await getConfig(db);
+      await conn.query('UPDATE ordenes_trabajo SET visita_contada = 1 WHERE id = ?', [ordenId]);
+      await conn.query('UPDATE clientes SET visitas = visitas + 1 WHERE id = ?', [orden.cliente_id]);
+      const [[cli]] = await conn.query('SELECT visitas FROM clientes WHERE id = ?', [orden.cliente_id]);
+      const config = await getConfig();
       const visitasParaCortesia = Number(config.visitas_para_cortesia) || 7;
       if (cli && cli.visitas > 0 && cli.visitas % visitasParaCortesia === 0) {
-        await conn.query(
-          'UPDATE clientes SET cortesia_disponible = 1 WHERE id = ? AND tenant_id = @tenant',
-          [orden.cliente_id]
-        );
+        await conn.query('UPDATE clientes SET cortesia_disponible = 1 WHERE id = ?', [orden.cliente_id]);
         cortesiaGanada = true;
       }
     }
 
     await conn.commit();
-    await sincronizarCitaDesdeOrden(db, ordenId, 'entregada');
+    await sincronizarCitaDesdeOrden(ordenId, 'entregada');
     return { cortesiaGanada };
   } catch (err) {
     await conn.rollback();
@@ -147,39 +157,137 @@ const ETAPAS_TIEMPO = ['recepcion', 'diagnostico', 'esperando_aprobacion', 'espe
 // la etapa actual, abre el de la nueva, actualiza el estado y sincroniza la cita.
 // Se usa al aprobar/rechazar el presupuesto, para que la orden no quede "esperando
 // aprobación" después de que el cliente ya decidió. No-op si el estado no cambia.
-async function avanzarEstadoOrden(db, ordenId, nuevoEstado) {
-  const [[o]] = await db.query(
-    'SELECT estado FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant', [ordenId]
-  );
+async function avanzarEstadoOrden(ordenId, nuevoEstado) {
+  const [[o]] = await pool.query('SELECT estado FROM ordenes_trabajo WHERE id = ?', [ordenId]);
   if (!o || o.estado === nuevoEstado) return;
   if (ETAPAS_TIEMPO.includes(o.estado)) {
-    await db.query(
-      `UPDATE orden_tiempos SET fin = NOW()
-       WHERE orden_id = ? AND etapa = ? AND fin IS NULL AND tenant_id = @tenant`,
-      [ordenId, o.estado]
-    );
+    await pool.query('UPDATE orden_tiempos SET fin = NOW() WHERE orden_id = ? AND etapa = ? AND fin IS NULL', [ordenId, o.estado]);
   }
-  await db.query(
-    'UPDATE ordenes_trabajo SET estado = ? WHERE id = ? AND tenant_id = @tenant', [nuevoEstado, ordenId]
-  );
+  await pool.query('UPDATE ordenes_trabajo SET estado = ? WHERE id = ?', [nuevoEstado, ordenId]);
   if (ETAPAS_TIEMPO.includes(nuevoEstado)) {
-    await db.query(
-      'INSERT INTO orden_tiempos (tenant_id, orden_id, etapa) VALUES (@tenant, ?, ?)',
-      [ordenId, nuevoEstado]
-    );
+    await pool.query('INSERT INTO orden_tiempos (orden_id, etapa) VALUES (?, ?)', [ordenId, nuevoEstado]);
   }
-  await sincronizarCitaDesdeOrden(db, ordenId, nuevoEstado);
+  await sincronizarCitaDesdeOrden(ordenId, nuevoEstado);
 }
 
 // Estado al que pasa una orden recién aprobada: si tiene repuestos por conseguir
 // (no "disponible") va a esperando_repuestos; si no, directo a en_reparacion.
-async function estadoTrasAprobacion(db, ordenId) {
-  const [[{ pendientes }]] = await db.query(
-    `SELECT COUNT(*) AS pendientes FROM orden_repuestos
-     WHERE orden_id = ? AND estado <> 'disponible' AND tenant_id = @tenant`,
+async function estadoTrasAprobacion(ordenId) {
+  const [[{ pendientes }]] = await pool.query(
+    "SELECT COUNT(*) AS pendientes FROM orden_repuestos WHERE orden_id = ? AND estado <> 'disponible'",
     [ordenId]
   );
   return pendientes > 0 ? 'esperando_repuestos' : 'en_reparacion';
 }
 
-module.exports = { generarNumeroOrden, MAP_ORDEN_A_CITA, sincronizarCitaDesdeOrden, cerrarOrden, avanzarEstadoOrden, estadoTrasAprobacion };
+// Total que se le cobraría hoy al cliente (mano de obra + repuestos − descuento).
+async function totalOrden(ordenId) {
+  const [[o]] = await pool.query(
+    'SELECT (costo_mano_obra + costo_repuestos - descuento) AS total FROM ordenes_trabajo WHERE id = ?',
+    [ordenId]
+  );
+  return o ? Number(o.total) || 0 : 0;
+}
+
+// 1 si lo que se agregue ahora a la orden va por encima de un presupuesto que el
+// cliente ya aprobó alguna vez (el portal se lo muestra marcado como adicional), 0
+// si no. También cuenta mientras espera que apruebe un adicional anterior.
+async function esAdicional(ordenId) {
+  const [[o]] = await pool.query('SELECT total_aprobado FROM ordenes_trabajo WHERE id = ?', [ordenId]);
+  return o && o.total_aprobado !== null ? 1 : 0;
+}
+
+// El cliente aprobó (desde el portal o de palabra en el mostrador): se guarda cuánto
+// aprobó, para saber después si algo que se agregue le sube la cuenta, y la orden
+// pasa a trabajo (o a esperar repuestos).
+async function registrarAprobacion(ordenId) {
+  await pool.query(
+    `UPDATE ordenes_trabajo
+        SET aprobacion_cliente = 'aprobado', motivo_rechazo = NULL,
+            aprobado_por_cliente = 1, fecha_aprobacion = NOW(),
+            total_aprobado = costo_mano_obra + costo_repuestos - descuento
+      WHERE id = ?`,
+    [ordenId]
+  );
+  await avanzarEstadoOrden(ordenId, await estadoTrasAprobacion(ordenId));
+}
+
+// Después de cualquier cambio de costo (repuestos, mano de obra, descuento). Si el
+// cliente ya había aprobado y la cuenta le subió, la orden vuelve a "Esperando
+// aprobación" y se le avisa que hay un adicional. Devuelve true si pasó eso.
+async function revisarAdicional(ordenId, totalAntes) {
+  const [[o]] = await pool.query(
+    `SELECT estado, aprobacion_cliente, total_aprobado,
+            (costo_mano_obra + costo_repuestos - descuento) AS total
+       FROM ordenes_trabajo WHERE id = ?`,
+    [ordenId]
+  );
+  if (!o) return false;
+  const pide = necesitaReaprobacion({
+    estado: o.estado,
+    aprobacion: o.aprobacion_cliente,
+    totalAprobado: o.total_aprobado === null ? null : Number(o.total_aprobado),
+    totalAntes,
+    totalDespues: Number(o.total),
+  });
+  if (!pide) return false;
+  await pool.query(
+    "UPDATE ordenes_trabajo SET aprobacion_cliente = 'pendiente', motivo_rechazo = NULL WHERE id = ?",
+    [ordenId]
+  );
+  await avanzarEstadoOrden(ordenId, 'esperando_aprobacion');
+  await notificarPresupuestoListo(ordenId, { adicional: true });
+  return true;
+}
+
+// El cliente rechazó solo el adicional: lo que ya había aprobado sigue en pie, la
+// orden vuelve a la etapa en que estaba antes de pedirle la aprobación, y el
+// mecánico y recepción se enteran para quitar lo que no aprobó antes de facturar.
+// No se usa estadoTrasAprobacion: el repuesto rechazado sigue en la lista sin
+// conseguir y mandaría la orden a "Esperando repuestos" por algo que no se va a comprar.
+async function registrarRechazoAdicional(ordenId, motivo) {
+  await pool.query(
+    "UPDATE ordenes_trabajo SET aprobacion_cliente = 'aprobado', motivo_rechazo = ? WHERE id = ?",
+    [motivo, ordenId]
+  );
+  const [[previa]] = await pool.query(
+    `SELECT etapa FROM orden_tiempos
+      WHERE orden_id = ? AND etapa <> 'esperando_aprobacion'
+      ORDER BY inicio DESC, id DESC LIMIT 1`,
+    [ordenId]
+  );
+  const volverA = previa && ESTADOS_TRAS_APROBACION.includes(previa.etapa)
+    ? previa.etapa
+    : await estadoTrasAprobacion(ordenId);
+  await avanzarEstadoOrden(ordenId, volverA);
+  try {
+    const [[o]] = await pool.query(
+      'SELECT numero_orden, tecnico_id, recepcionista_id, sucursal_id FROM ordenes_trabajo WHERE id = ?',
+      [ordenId]
+    );
+    if (!o) return;
+    const texto = `El cliente rechazó el adicional de la orden ${o.numero_orden}`
+      + (motivo ? `: «${String(motivo).slice(0, 200)}»` : '')
+      + '. Quitá lo que no aprobó antes de facturar.';
+    await notificarMecanico(o.tecnico_id, texto);
+    // mensajes_internos exige un remitente del personal: el que recibió la moto o,
+    // si no hay, el mecánico.
+    const remitente = o.recepcionista_id || o.tecnico_id;
+    if (remitente) {
+      await pool.query(
+        `INSERT INTO mensajes_internos (remitente_id, destino_rol, mensaje, orden_id, tipo, sucursal_id)
+         VALUES (?, 'recepcion', ?, ?, 'sistema', ?)`,
+        [remitente, texto, ordenId, o.sucursal_id || null]
+      );
+    }
+  } catch (err) {
+    console.error('⚠️  No se pudo avisar el rechazo del adicional:', err.message);
+  }
+}
+
+module.exports = {
+  generarNumeroOrden, MAP_ORDEN_A_CITA, sincronizarCitaDesdeOrden, cerrarOrden,
+  crearCitaDeOrden,
+  avanzarEstadoOrden, estadoTrasAprobacion,
+  totalOrden, esAdicional, registrarAprobacion, revisarAdicional, registrarRechazoAdicional,
+};

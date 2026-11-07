@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -7,11 +7,11 @@ import { AdminService } from '../../services/admin.service';
 import { DashboardService } from '../../services/dashboard.service';
 import { OrdenesService } from '../../services/ordenes.service';
 import { ESTADO_CONFIG, EstadoOrden } from '../../models/orden.model';
-import { descargarCSV, fechaCorta } from '../../shared/utils/csv.util';
-import { generarPDF, formatMoneda, formatPct, escapeHtml } from '../../shared/utils/pdf.util';
+import { descargarCSV, fechaCorta } from '../../shared/csv.util';
+import { generarPDF, formatMoneda, formatPct, escapeHtml } from '../../shared/pdf.util';
 import { MarcaService } from '../../services/marca.service';
-import { CuentaService } from '../../services/cuenta.service';
-import { ArranqueComponent } from '../../shared/arranque.component';
+import { hoyCR, ahoraTaller } from '../../utils/fecha-cita';
+import { AuthService } from '../../services/auth.service';
 
 type Sem = 'rojo' | 'amarillo' | 'verde' | 'gris';
 
@@ -22,19 +22,6 @@ type Sem = 'rojo' | 'amarillo' | 'verde' | 'gris';
   styleUrls: ['./admin-resumen.page.scss'],
 })
 export class AdminResumenPage implements OnInit, OnDestroy {
-  private admin = inject(AdminService);
-  private dash = inject(DashboardService);
-  private ordenes = inject(OrdenesService);
-  private toast = inject(ToastController);
-  private router = inject(Router);
-  private marcaSvc = inject(MarcaService);
-  private cuentaSvc = inject(CuentaService);
-
-  // Los pasos del arranque se completan en otras pantallas (config, empleados, nueva
-  // orden). Ionic solo dispara ionViewWillEnter en la página ruteada, no en los hijos,
-  // así que el refresco al volver acá lo tiene que empujar esta página.
-  @ViewChild(ArranqueComponent) arranque?: ArranqueComponent;
-
   private destroy$ = new Subject<void>();
   data: any = null;        // /api/admin/resumen (citas)
   op: any = null;          // /api/dashboard/resumen (órdenes/operativo)
@@ -52,7 +39,7 @@ export class AdminResumenPage implements OnInit, OnDestroy {
 
   // Estado del taller (órdenes) → etiqueta + color del punto + clase de badge.
   readonly estadoMap: Record<string, { label: string; dot: string; bg: string }> = {
-    recepcion:            { label: 'Recepción',            dot: '#FB7185', bg: 'bg-cr' },
+    recepcion:            { label: 'Recepción',            dot: '#F24A3D', bg: 'bg-cr' },
     diagnostico:          { label: 'Diagnóstico',          dot: '#FBB834', bg: 'bg-am' },
     esperando_aprobacion: { label: 'Esperando aprobación', dot: '#818CF8', bg: 'bg-in' },
     esperando_repuestos:  { label: 'Esperando repuestos',  dot: '#A3A3A3', bg: 'bg-n' },
@@ -64,9 +51,58 @@ export class AdminResumenPage implements OnInit, OnDestroy {
     esperando_repuestos: 'Esperando repuestos', en_reparacion: 'En reparación', lista_entrega: 'Lista para entrega',
   };
 
+  // ── Encabezado ──
+  get nombre(): string { return (this.auth.getUsuario()?.nombre || '').trim().split(/\s+/)[0] || 'equipo'; }
+  // La hora del taller (Costa Rica), no la de la computadora.
+  get saludo(): string {
+    const h = ahoraTaller().getUTCHours();
+    return h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
+  }
+  get fechaLarga(): string {
+    return new Date(`${hoyCR()}T12:00:00Z`).toLocaleDateString('es-CR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+  }
+
+  // Lo que pide atención: cada aviso lleva adonde se resuelve.
+  get avisos(): { texto: string; grave: boolean; accion: () => void }[] {
+    const a: { texto: string; grave: boolean; accion: () => void }[] = [];
+    const atrasadas = Number(this.op?.motos_atrasadas) || 0;
+    if (atrasadas) a.push({ texto: `${atrasadas} orden${atrasadas === 1 ? '' : 'es'} atrasada${atrasadas === 1 ? '' : 's'}`, grave: true,
+      accion: () => { this.filtroSemaforo = 'rojo'; document.getElementById('semaforo')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } });
+    const bajas = Number(this.opResumen?.bajas) || 0;
+    if (bajas) a.push({ texto: `${bajas} reseña${bajas === 1 ? '' : 's'} de 1 o 2 estrellas`, grave: true, accion: () => this.router.navigate(['/admin/opiniones']) });
+    const repuestos = Number(this.op?.repuestos_pendientes) || 0;
+    if (repuestos) a.push({ texto: `${repuestos} repuesto${repuestos === 1 ? '' : 's'} pendiente${repuestos === 1 ? '' : 's'}`, grave: false, accion: () => this.verOrdenes() });
+    return a;
+  }
+  verOrdenes() { this.router.navigate(['/admin/citas']); }
+
+  // ── Estado del taller ──
+  get totalTaller(): number { return (this.op?.ordenes_por_estado || []).reduce((n: number, e: any) => n + (Number(e.total) || 0), 0); }
+  get textoEstados(): string {
+    return (this.op?.ordenes_por_estado || []).map((e: any) => `${this.estadoMap[e.estado]?.label || e.estado} ${e.total}`).join(', ');
+  }
+  filasCitas(e: any): { label: string; n: number; color: string }[] {
+    return [
+      { label: 'Agendadas', n: Number(e.agendadas) || 0, color: 'var(--in)' },
+      { label: 'En proceso', n: Number(e.en_proceso) || 0, color: 'var(--am)' },
+      { label: 'Completadas', n: Number(e.completadas) || 0, color: 'var(--em)' },
+      { label: 'Canceladas', n: Number(e.canceladas) || 0, color: 'var(--rd)' },
+    ];
+  }
+
+  constructor(
+    private auth: AuthService,
+    private admin: AdminService,
+    private dash: DashboardService,
+    private ordenes: OrdenesService,
+    private toast: ToastController,
+    private router: Router,
+    private marcaSvc: MarcaService,
+  ) {}
+
   ngOnInit() { this.cargar(); }
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
-  ionViewWillEnter() { this.cargar(); this.arranque?.cargar(); this.cuentaSvc.cargar().subscribe(); }
+  ionViewWillEnter() { this.cargar(); }
 
   cargar(ev?: any) {
     this.cargando = true;
@@ -91,7 +127,7 @@ export class AdminResumenPage implements OnInit, OnDestroy {
   get opinionesOrdenadas(): any[] {
     return [...this.opiniones].sort((a, b) => (this.esBaja(a.calificacion) ? 0 : 1) - (this.esBaja(b.calificacion) ? 0 : 1));
   }
-  abrirOpinion(o: any) { if (o?.orden_id) this.router.navigate(['/detalle-orden', o.orden_id]); }
+  abrirOpinion(o: any) { if (o?.orden_id) this.router.navigate(['/admin/detalle-orden', o.orden_id]); }
   fechaCortaOp(f: any): string { return fechaCorta(f); }
 
   // ── Citas (mes) ──
@@ -132,10 +168,10 @@ export class AdminResumenPage implements OnInit, OnDestroy {
   get countVerde(): number { return this.atrasos.filter(a => this.semaforo(a.dias_restantes) === 'verde').length; }
 
   iniciales(nombre: string): string { return (nombre || '?').trim().charAt(0).toUpperCase(); }
-  abrirOrden(id: number) { this.router.navigate(['/detalle-orden', id]); }
+  abrirOrden(id: number) { this.router.navigate(['/admin/detalle-orden', id]); }
 
   // ── Exportación CSV (Excel) ──
-  private hoy() { return new Date().toISOString().slice(0, 10); }
+  private hoy() { return hoyCR(); }
   private estadoTexto(e?: string) { return ESTADO_CONFIG[e as EstadoOrden]?.label ?? e ?? ''; }
 
   exportarOrdenes() {
@@ -145,13 +181,13 @@ export class AdminResumenPage implements OnInit, OnDestroy {
         const filas = res.data.map((o: any) => ({
           numero_orden: o.numero_orden, estado: this.estadoTexto(o.estado),
           cliente: `${o.cliente_nombre || ''} ${o.cliente_apellido || ''}`.trim(),
-          vehiculo: `${o.marca || ''} ${o.modelo || ''}`.trim(), placa: o.placa || '',
+          moto: `${o.marca || ''} ${o.modelo || ''}`.trim(), placa: o.placa || '',
           tecnico: o.tecnico_nombre || '', ingreso: fechaCorta(o.fecha_ingreso),
-          total: (o.costo_mano_obra || 0) + (o.costo_repuestos || 0) - (o.descuento || 0),
+          total: Number(o.costo_mano_obra || 0) + Number(o.costo_repuestos || 0) - Number(o.descuento || 0),
         }));
         descargarCSV(`ordenes_${this.hoy()}`, [
           { key: 'numero_orden', label: 'Orden' }, { key: 'estado', label: 'Estado' },
-          { key: 'cliente', label: 'Cliente' }, { key: 'vehiculo', label: 'Vehiculo' }, { key: 'placa', label: 'Placa' },
+          { key: 'cliente', label: 'Cliente' }, { key: 'moto', label: 'Moto' }, { key: 'placa', label: 'Placa' },
           { key: 'tecnico', label: 'Técnico' }, { key: 'ingreso', label: 'Ingreso' }, { key: 'total', label: 'Total' },
         ], filas);
         this.exportando = false; this.aviso(`${filas.length} órdenes exportadas`);
@@ -166,12 +202,12 @@ export class AdminResumenPage implements OnInit, OnDestroy {
       next: res => {
         const filas = res.data.map((o: any) => ({
           numero_orden: o.numero_orden, cliente: `${o.cliente_nombre || ''} ${o.cliente_apellido || ''}`.trim(),
-          vehiculo: `${o.marca || ''} ${o.modelo || ''}`.trim(), entrega: fechaCorta(o.fecha_entrega_real),
+          moto: `${o.marca || ''} ${o.modelo || ''}`.trim(), entrega: fechaCorta(o.fecha_entrega_real),
           metodo_pago: o.metodo_pago || '',
-          total: (o.costo_mano_obra || 0) + (o.costo_repuestos || 0) - (o.descuento || 0),
+          total: Number(o.costo_mano_obra || 0) + Number(o.costo_repuestos || 0) - Number(o.descuento || 0),
         }));
         descargarCSV(`facturacion_${this.hoy()}`, [
-          { key: 'numero_orden', label: 'Orden' }, { key: 'cliente', label: 'Cliente' }, { key: 'vehiculo', label: 'Vehiculo' },
+          { key: 'numero_orden', label: 'Orden' }, { key: 'cliente', label: 'Cliente' }, { key: 'moto', label: 'Moto' },
           { key: 'entrega', label: 'Entrega' }, { key: 'metodo_pago', label: 'Método de pago' }, { key: 'total', label: 'Total' },
         ], filas);
         this.exportando = false; this.aviso(`${filas.length} facturas exportadas`);

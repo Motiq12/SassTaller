@@ -1,136 +1,17 @@
-.rec { max-width: 980px; margin: 0 auto; padding: 14px 16px 0; }
+// Agenda de recepción. Encabezado, filtros, tarjetas y botones: el estándar del
+// panel (global.scss). Acá, solo las citas del día.
 
-.card {
-  background: var(--ion-card-background); border: 1px solid var(--hairline);
-  border-radius: 24px; box-shadow: var(--shadow-sm); padding: 16px;
-}
+// La grilla del mes es la del kit (global.scss: .pg-cal-*).
 
-/* Cabecera del mes */
-.cal-head {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  margin: 4px 0 14px;
-  h2 { font-size: 19px; font-weight: 800; letter-spacing: -0.02em; font-family: var(--font-display, inherit); }
+// ── Citas del día ──
+.pg-card-cab .pg-cuenta { display: block; margin-top: 2px; }
+.ra-cita { align-items: flex-start; }
+.ra-cita-abrir {
+  flex: 1; min-width: 0; display: flex; align-items: flex-start; gap: 10px; padding: 0;
+  border: none; background: none; cursor: pointer; font: inherit; color: inherit; text-align: left;
+  &:hover strong { text-decoration: underline; }
+  .pg-item-txt span ion-icon { font-size: 13px; vertical-align: -2px; }
 }
-.cal-nav {
-  display: flex; align-items: center; gap: 6px;
-  button {
-    display: inline-flex; align-items: center; justify-content: center;
-    min-width: 34px; height: 34px; padding: 0 10px; border-radius: 10px;
-    border: 1px solid var(--hairline); background: var(--ion-card-background); color: var(--n-500);
-    font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
-    ion-icon { font-size: 17px; }
-    &.hoy { color: var(--text-accent); }
-    &:active { transform: scale(.95); }
-  }
-}
-
-/* Filtro de sede */
-.ag-chips {
-  display: flex; gap: 6px; overflow-x: auto; margin-bottom: 14px; scrollbar-width: none;
-  &::-webkit-scrollbar { display: none; }
-}
-.ag-chip {
-  flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
-  padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700;
-  border: 1px solid var(--hairline); background: var(--ion-card-background); color: var(--n-500);
-  ion-icon { font-size: 13px; }
-  &.on { background: var(--ion-color-primary); color: #fff; border-color: transparent; }
-  &:active { transform: scale(.97); }
-}
-
-/* Layout: una columna en móvil, calendario + panel en escritorio */
-.cal-layout { display: grid; gap: 14px; grid-template-columns: 1fr; align-items: start; }
-@media (min-width: 920px) {
-  .cal-layout { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
-}
-
-/* Grilla del calendario */
-.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-.cal-dows { margin-bottom: 6px; }
-.cal-dow {
-  text-align: center; font-size: 10.5px; font-weight: 800; letter-spacing: .04em;
-  color: var(--n-400); text-transform: uppercase; padding: 2px 0;
-}
-.cal-day {
-  position: relative; aspect-ratio: 1 / 1; min-height: 40px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  border: 1px solid var(--hairline); border-radius: 12px;
-  background: var(--ion-card-background); color: var(--ion-text-color);
-  font-family: inherit; cursor: pointer;
-  transition: transform .12s var(--ease, ease), border-color .15s;
-  &:active { transform: scale(.95); }
-  &.empty { background: transparent; border-color: transparent; cursor: default; }
-  .d-num { font-size: 13px; font-weight: 700; }
-  .d-cnt {
-    font-size: 10px; font-weight: 800; line-height: 1;
-    padding: 1px 5px; border-radius: 999px; background: var(--n-100); color: var(--n-500);
-  }
-  &.flujo-bajo  { background: rgba(16, 185, 129, .10); .d-cnt { background: rgba(16, 185, 129, .18); color: var(--emerald-700); } }
-  &.flujo-medio { background: rgba(245, 158, 11, .12); .d-cnt { background: rgba(245, 158, 11, .20); color: var(--amber-700); } }
-  &.flujo-alto  { background: rgba(var(--ion-color-primary-rgb), .12);  .d-cnt { background: rgba(var(--ion-color-primary-rgb), .18);  color: var(--text-accent); } }
-  &.today { border-color: var(--ion-color-primary); .d-num { color: var(--text-accent); } }
-  &.sel { border-color: var(--ion-color-primary); box-shadow: 0 0 0 2px rgba(var(--ion-color-primary-rgb), .25); }
-}
-
-.cal-legend {
-  display: flex; gap: 14px; justify-content: center; margin-top: 12px;
-  span { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--n-400); font-weight: 600; }
-  i.lg { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-  i.bajo { background: rgba(16, 185, 129, .5); }
-  i.medio { background: rgba(245, 158, 11, .55); }
-  i.alto { background: rgba(var(--ion-color-primary-rgb), .5); }
-}
-
-/* Panel del día */
-.day-head {
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 12px;
-  h3 { font-size: 15px; font-weight: 800; letter-spacing: -0.01em; font-family: var(--font-display, inherit); }
-  .day-sub { font-size: 12px; color: var(--n-400); margin-top: 2px; }
-}
-.day-add {
-  flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px;
-  background: var(--ion-color-primary); color: #fff; border: none; cursor: pointer;
-  font-family: inherit; font-size: 12.5px; font-weight: 700; padding: 8px 12px; border-radius: 10px;
-  ion-icon { font-size: 15px; }
-  &:active { transform: scale(.97); }
-}
-
-.cita-list { display: flex; flex-direction: column; }
-.cita-row {
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 11px 2px; border-bottom: 1px solid var(--hairline); cursor: pointer;
-  &:last-child { border-bottom: none; }
-  &:active { opacity: .65; }
-}
-.ci-hora { flex-shrink: 0; width: 44px; font-size: 13px; font-weight: 700; color: var(--text-accent); padding-top: 1px; }
-.ci-info {
-  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;
-  strong { font-size: 13.5px; font-weight: 700; overflow-wrap: anywhere; }
-}
-.ci-vehiculo {
-  font-size: 12px; color: var(--n-500); display: inline-flex; align-items: center; gap: 5px; overflow-wrap: anywhere;
-  ion-icon { font-size: 13px; flex-shrink: 0; }
-}
-.ci-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; align-items: center; }
-.badge {
-  display: inline-flex; align-items: center; gap: 3px;
-  font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 999px;
-  ion-icon { font-size: 12px; }
-}
-.badge.llego { background: var(--emerald-50); color: var(--emerald-700); }
-.badge.sin { background: var(--amber-100); color: var(--amber-700); }
-.badge.noshow { background: var(--rose-100, #ffe4e6); color: var(--rose-700, var(--ion-color-primary-shade)); }
-.ci-wa {
-  flex-shrink: 0; width: 34px; height: 34px; border-radius: 10px; border: none; cursor: pointer;
-  background: rgba(37, 211, 102, .14); color: #25d366;
-  display: flex; align-items: center; justify-content: center;
-  ion-icon { font-size: 18px; }
-  &:active { transform: scale(.92); }
-}
-
-.cita-empty {
-  text-align: center; padding: 30px 16px; color: var(--n-400);
-  ion-icon { font-size: 40px; opacity: .4; display: block; margin: 0 auto 8px; }
-  p { font-size: 13px; margin-bottom: 12px; }
-  .day-add { margin: 0 auto; }
-}
+.ra-hora { flex-shrink: 0; width: 44px; padding-top: 1px; font-size: 13px; font-weight: 700; color: var(--cr-tx); }
+.ra-badges { display: flex !important; flex-wrap: wrap; gap: 6px; margin-top: 4px; .bg { gap: 3px; align-items: center; } }
+.ra-wa { width: 40px; padding: 0; flex-shrink: 0; ion-icon { font-size: 17px; } }

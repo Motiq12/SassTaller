@@ -29,7 +29,7 @@ const apiLimiter = rateLimit({
   max: porProceso(cupo('RATE_API_MAX', 600)),       // 600 req/min por IP en total (~10/seg)
   standardHeaders: true,      // expone RateLimit-* headers
   legacyHeaders: false,
-  message: { error: 'Demasiadas solicitudes. Esperá un momento e intentá de nuevo.' },
+  message: { error: 'Demasiadas solicitudes. Espera un momento e intenta de nuevo.' },
 });
 
 // Autenticación: login/registro/recuperar. Estricto porque son el blanco de
@@ -39,7 +39,7 @@ const authLimiter = rateLimit({
   max: porProceso(cupo('RATE_AUTH_MAX', 30)),        // 30 intentos por IP en la ventana, en total
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Demasiados intentos. Esperá unos minutos e intentá de nuevo.' },
+  message: { error: 'Demasiados intentos. Espera unos minutos e intenta de nuevo.' },
 });
 
 const adminLimiter = rateLimit({
@@ -47,7 +47,29 @@ const adminLimiter = rateLimit({
   max: porProceso(cupo('RATE_ADMIN_MAX', 120)),
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Demasiadas solicitudes al panel admin. Esperá un momento.' },
+  message: { error: 'Demasiadas solicitudes al panel admin. Espera un momento.' },
 });
 
-module.exports = { apiLimiter, authLimiter, adminLimiter };
+// Consultas que llegan desde el sitio web (formulario público, sin sesión). Una
+// persona real manda una, quizás dos; sin tope, un robot llenaría la bandeja del
+// taller. El sitio muestra el mensaje tal cual.
+const consultasLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,   // 1 hora
+  max: porProceso(cupo('RATE_CONSULTAS_MAX', 6)),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Ya recibimos varias consultas desde tu conexión. Escríbenos por WhatsApp o intenta en una hora.' },
+});
+
+// Reseñas que se dejan desde el sitio web (también públicas y sin sesión). Una
+// persona deja una, quizás dos si se equivocó; sin tope, un robot llenaría de
+// basura la lista de pendientes por aprobar. El sitio muestra el mensaje tal cual.
+const resenasLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,   // 1 hora
+  max: porProceso(cupo('RATE_RESENAS_MAX', 5)),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Ya recibimos varias reseñas desde tu conexión. Intenta de nuevo en una hora.' },
+});
+
+module.exports = { apiLimiter, authLimiter, adminLimiter, consultasLimiter, resenasLimiter };

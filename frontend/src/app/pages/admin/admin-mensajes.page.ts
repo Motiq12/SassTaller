@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -14,9 +14,6 @@ import { ChatContacto } from '../../services/mensajeria.service';
   styleUrls: ['./admin-mensajes.page.scss'],
 })
 export class AdminMensajesPage implements OnInit, OnDestroy {
-  private rec = inject(RecepcionService);
-  private toast = inject(ToastController);
-
   private destroy$ = new Subject<void>();
 
   vista: 'mecanicos' | 'clientes' | 'taller' = 'taller';
@@ -31,6 +28,8 @@ export class AdminMensajesPage implements OnInit, OnDestroy {
   // Chat interno (la lógica vive en los componentes compartidos).
   chatAbierto: ChatContacto | null = null;
   verAvisos = false;
+
+  constructor(private rec: RecepcionService, private toast: ToastController) {}
 
   ngOnInit() { this.cargar(); }
   ionViewWillEnter() { this.cargar(); }
@@ -47,6 +46,7 @@ export class AdminMensajesPage implements OnInit, OnDestroy {
 
   abrirChat(c: ChatContacto) { this.chatAbierto = c; this.verAvisos = false; }
   cerrarChat() { this.chatAbierto = null; this.verAvisos = false; }
+  get enChat(): boolean { return this.vista === 'taller' && (!!this.chatAbierto || this.verAvisos); }
 
   enviarNotificacion() {
     if (!this.form.cliente_id || !this.form.titulo.trim() || !this.form.mensaje.trim()) {

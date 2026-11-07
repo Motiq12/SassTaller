@@ -1,4 +1,5 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { AlertController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -13,10 +14,6 @@ interface Servicio { id: number; nombre: string; activo: number; orden: number; 
   styleUrls: ['./admin-servicios.page.scss'],
 })
 export class AdminServiciosPage implements OnInit, OnDestroy {
-  private admin = inject(AdminService);
-  private toast = inject(ToastController);
-  private alert = inject(AlertController);
-
   private destroy$ = new Subject<void>();
   servicios: Servicio[] = [];
   cargando = true;
@@ -27,8 +24,26 @@ export class AdminServiciosPage implements OnInit, OnDestroy {
   editandoId: number | null = null;
   nombre = '';
 
-  ngOnInit() { this.cargar(); }
-  ionViewWillEnter() { this.cargar(); }
+  // Llegó desde «Servicios en el sitio» con «Renombrar o eliminar»: se muestra
+  // ya filtrado en ese servicio, con un enlace para volver.
+  desdeSitio = false;
+
+  constructor(
+    private admin: AdminService,
+    private toast: ToastController,
+    private alert: AlertController,
+    private route: ActivatedRoute,
+  ) {}
+
+  ngOnInit() { this.leerParametros(); this.cargar(); }
+  ionViewWillEnter() { this.leerParametros(); this.cargar(); }
+
+  private leerParametros() {
+    const q = this.route.snapshot.queryParamMap;
+    this.desdeSitio = q.get('desde') === 'sitio';
+    const buscar = q.get('buscar');
+    if (buscar) this.busqueda = buscar;
+  }
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
 
   cargar(ev?: any) {

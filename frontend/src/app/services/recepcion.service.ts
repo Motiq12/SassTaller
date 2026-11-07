@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
@@ -13,9 +13,8 @@ export interface ResumenRecepcion {
 
 @Injectable({ providedIn: 'root' })
 export class RecepcionService {
-  private http = inject(HttpClient);
-
   private url = `${environment.apiUrl}/recepcion`;
+  constructor(private http: HttpClient) {}
 
   // Inicio
   getResumen(): Observable<{ data: ResumenRecepcion }> {
@@ -104,15 +103,15 @@ export class RecepcionService {
   getServicios(): Observable<{ data: string[] }> {
     return this.http.get<{ data: string[] }>(`${this.url}/servicios`);
   }
-  getDisponibilidad(fecha: string, sucursalId?: number | null): Observable<{ data: { horas: string[]; max: number; ocupacion: Record<string, number> } }> {
+  getDisponibilidad(fecha: string, sucursalId?: number | null): Observable<{ data: { horas: string[]; max: number; ocupacion: Record<string, number>; bloqueadas?: Record<string, string>; pasadas?: string[] } }> {
     const params: any = { fecha };
     if (sucursalId) params.sucursal_id = sucursalId;
     return this.http.get<{ data: any }>(`${this.url}/disponibilidad`, { params });
   }
   getMotos(clienteId: number): Observable<{ data: any[] }> {
-    return this.http.get<{ data: any[] }>(`${environment.apiUrl}/vehiculos`, { params: { cliente_id: clienteId } as any });
+    return this.http.get<{ data: any[] }>(`${environment.apiUrl}/motos`, { params: { cliente_id: clienteId } as any });
   }
-  crearCita(data: { cliente_id: number; moto_id: number | null; fecha: string; hora: string; motivo: string; tipo_servicio: string | null; tecnico_id: number | null; sucursal_id?: number | null }): Observable<{ data: any }> {
+  crearCita(data: { cliente_id: number; moto_id: number | null; fecha: string; hora: string; motivo: string; servicios: string[]; tecnico_id: number | null; sucursal_id?: number | null; duracion_horas?: number }): Observable<{ data: any }> {
     return this.http.post<{ data: any }>(`${environment.apiUrl}/citas`, data);
   }
 
@@ -120,7 +119,7 @@ export class RecepcionService {
   getSucursales(): Observable<{ data: any[] }> {
     return this.http.get<{ data: any[] }>(`${this.url}/sucursales`);
   }
-  crearOrden(data: { cliente_id: number; moto_id: number; problema_reportado: string; sucursal_id?: number | null; kilometraje_ingreso?: number | null; prioridad?: string }): Observable<{ data: any }> {
+  crearOrden(data: { cliente_id: number; moto_id: number; problema_reportado: string; sucursal_id?: number | null; kilometraje_ingreso?: number | null; prioridad?: string; duracion_min?: number | null }): Observable<{ data: any }> {
     return this.http.post<{ data: any }>(`${environment.apiUrl}/ordenes`, data);
   }
 
@@ -140,8 +139,9 @@ export class RecepcionService {
   }
 
   // Puente cita ↔ orden: crea (o recupera) la orden de trabajo de una cita.
-  crearOrdenDesdeCita(citaId: number): Observable<{ data: { orden_id: number; numero_orden: string } }> {
-    return this.http.post<{ data: any }>(`${this.url}/citas/${citaId}/crear-orden`, {});
+  // motoId: para una cita agendada sin moto (se le asigna también a la cita).
+  crearOrdenDesdeCita(citaId: number, motoId?: number | null): Observable<{ data: { orden_id: number; numero_orden: string } }> {
+    return this.http.post<{ data: any }>(`${this.url}/citas/${citaId}/crear-orden`, motoId ? { moto_id: motoId } : {});
   }
 
   // Check-in de mostrador: marca / deshace la llegada del cliente.

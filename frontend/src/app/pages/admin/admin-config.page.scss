@@ -1,47 +1,127 @@
 // ────────────────────────────────────────────────
 // Admin Config — component-scoped styles
 // Relies on global .admin-dark variables: --sur, --sur2, --sur3, --bd, --bd2,
-// --tx, --tx2, --tx3, --cr, --em, --am, --rd
+// --tx, --tx2, --tx3, --cr, --em, --am, --rd, --fd
+//
+// En el celular cada parte va en una sola columna. Desde 992 px (cuando el menú del
+// panel queda fijo al costado) se reparte en columnas y el botón de guardar queda en
+// una barra fija abajo, para no tener que bajar a buscarlo.
 // ────────────────────────────────────────────────
 
-// Logo preview row
-.config-logo-preview {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
+// Encabezado de cada parte: en el celular solo la descripción (el título ya está
+// en la barra de arriba).
+.cfg-cab {
+  margin: 0 0 16px;
+
+  .cfg-migas, h1 { display: none; }
+
+  p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--tx3); max-width: 72ch; }
 }
 
-.config-logo {
-  width: 64px;
-  height: 64px;
-  object-fit: contain;
-  background: var(--sur2);
-  border-radius: 10px;
-  border: 1px solid var(--bd);
+.cfg-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
 }
 
-// Upload box (logo / image)
-.config-upload {
-  border: 2px dashed var(--bd2);
-  border-radius: 12px;
-  padding: 20px;
-  text-align: center;
-  cursor: pointer;
-  display: block;
-  text-transform: none;
-  letter-spacing: 0;
+.cfg-lado { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+
+// Barra de guardar
+.cfg-pie {
+  margin-top: 18px;
+  .btn { width: 100%; justify-content: center; }
+}
+.cfg-pie-nota { display: none; font-size: 12.5px; color: var(--tx3); }
+
+// Nota suelta dentro de una tarjeta (fuera de un .fg)
+.cd > .hint { font-size: 12px; line-height: 1.5; color: var(--tx3); }
+
+// Full-width action buttons
+.config-btn-full {
+  width: 100%;
+  justify-content: center;
 }
 
-.config-upload-icon {
-  font-size: 24px;
-  margin-bottom: 4px;
-}
-
-.config-upload-hint {
+.config-add-title {
   font-size: 12px;
-  color: var(--tx3);
+  font-weight: 700;
+  color: var(--tx2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
+
+// Contador junto a un título
+.cfg-cuenta {
+  display: inline-block; min-width: 20px; margin-left: 6px; padding: 1px 6px;
+  border: 1px solid var(--bd2); border-radius: 2px;
+  font-size: 10px; text-align: center; color: var(--tx2); letter-spacing: 0;
+}
+
+// Ensure consistent input sizing in .fg (supplement global)
+.fg {
+  input,
+  select,
+  textarea {
+    padding: 10px 12px;
+    border-radius: 2px;
+    font-size: 14px;
+  }
+}
+
+// Form validation feedback
+.fg.error {
+  input,
+  select,
+  textarea {
+    border-color: var(--ion-color-danger);
+  }
+}
+
+// ── Información del taller ──
+.cfg-logo {
+  display: flex; align-items: center; justify-content: center;
+  height: 140px; padding: 16px;
+  background: var(--sur2); border: 1px dashed var(--bd2); border-radius: 2px;
+
+  img { max-width: 80%; max-height: 100%; object-fit: contain; }
+}
+.cfg-logo-vacio { font-size: 12px; color: var(--tx3); }
+
+.cfg-logo-acciones {
+  display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 8px;
+  label.btn { cursor: pointer; text-transform: uppercase; letter-spacing: inherit; }
+  ion-icon { font-size: 15px; }
+}
+
+// Notas de costado ("Dónde se usa", "Cómo llegan")
+.cfg-nota p {
+  margin: 0 0 10px; font-size: 13px; line-height: 1.55; color: var(--tx2);
+  &:last-child { margin-bottom: 0; }
+}
+
+// Cada uso con su cuadrito: verde si el dato está cargado, ámbar si falta.
+.cfg-usos {
+  list-style: none; margin: 0; padding: 0;
+
+  li {
+    position: relative; padding: 10px 0 10px 18px; border-top: 1px solid var(--bd);
+    display: flex; flex-direction: column; gap: 2px;
+    &:first-child { border-top: 0; padding-top: 0; &::before { top: 5px; } }
+    &::before {
+      content: ''; position: absolute; left: 0; top: 15px;
+      width: 8px; height: 8px; border-radius: 1px; background: var(--am);
+    }
+    &.listo::before { background: var(--em); }
+    &.neutro::before { background: var(--bd2); }
+  }
+  strong { font-size: 13px; color: var(--tx); }
+  span { font-size: 12px; line-height: 1.5; color: var(--tx3); }
+  a { color: var(--cr); font-weight: 600; }
+}
+
+// ── Horario ──
+.cfg-semana-cab { display: none; }
 
 // Schedule day row
 .config-schedule-day {
@@ -54,18 +134,13 @@
   flex-wrap: wrap;
   padding: 8px;
   background: var(--sur2);
-  border-radius: 10px;
+  border-radius: 2px;
   margin-bottom: 8px;
   border: 1px solid transparent;
-  transition: border-color .2s, transform .15s;
+  transition: border-color .2s, opacity .2s;
 
-  &:hover {
-    border-color: rgba(var(--ion-color-primary-rgb), .15);
-  }
-
-  &:active {
-    transform: scale(.99);
-  }
+  &:hover { border-color: rgba(226, 35, 26, .15); }
+  &.cerrado { opacity: .5; }
 }
 
 .config-day-label {
@@ -81,21 +156,19 @@
 .config-time-input {
   padding: 6px 10px;
   border: 1px solid var(--bd);
-  border-radius: 8px;
+  border-radius: 2px;
   background: var(--sur3);
   color: var(--tx);
   font-size: 12px;
   font-family: inherit;
   outline: none;
 
-  &:focus {
-    border-color: var(--cr);
-  }
+  &:focus { border-color: var(--cr); }
 }
 
-.config-time-sep {
-  color: var(--tx3);
-}
+.config-time-sep { color: var(--tx3); }
+
+.cfg-horas { display: none; font-size: 12px; color: var(--tx3); font-variant-numeric: tabular-nums; }
 
 // Checkbox toggle label inside schedule rows
 .config-toggle-label {
@@ -107,179 +180,243 @@
   color: var(--tx2);
   text-transform: none;
   letter-spacing: 0;
+  cursor: pointer;
+  input { width: 16px; height: 16px; accent-color: var(--cr); }
 }
 
-// Sucursal card
-.config-branch-card {
-  padding: 10px;
-  background: var(--sur2);
-  border-radius: 12px;
-  margin-bottom: 8px;
-  border: 1px solid transparent;
-  transition: border-color .2s, transform .15s;
+// Resumen de la semana: tres números grandes
+.cfg-resumen {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;
 
-  &:hover {
-    border-color: rgba(var(--ion-color-primary-rgb), .15);
+  > div {
+    display: flex; flex-direction: column; gap: 2px; padding: 14px 12px;
+    background: var(--sur); border: 1px solid var(--bd); border-radius: 8px;
   }
+  strong { font-family: var(--fd); font-size: 30px; font-weight: 700; line-height: 1; color: var(--tx); font-variant-numeric: tabular-nums; }
+  span { font-size: 11px; line-height: 1.35; color: var(--tx3); }
+}
 
-  &:active {
-    transform: scale(.99);
+// ── Bloquear horario ──
+.bloq-todo {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 14px;
+  font-size: 13px; font-weight: 600; color: var(--tx2); cursor: pointer;
+  input { width: 16px; height: 16px; accent-color: var(--cr); }
+}
+.bloq-item {
+  display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: start; gap: 12px;
+  padding: 10px 12px; background: var(--sur2); border: 1px solid var(--bd); border-radius: 2px; margin-bottom: 8px;
+}
+// La hojita de calendario
+.bloq-fecha {
+  display: flex; flex-direction: column; align-items: center;
+  border: 1px solid var(--bd2); border-radius: 2px; overflow: hidden; background: var(--sur);
+  span { width: 100%; padding: 2px 0; background: var(--cr); color: #fff; font-size: 9px; font-weight: 800; letter-spacing: .08em; text-align: center; text-transform: uppercase; }
+  strong { padding: 3px 0 4px; font-family: var(--fd); font-size: 20px; font-weight: 700; line-height: 1; color: var(--tx); }
+}
+.bloq-info {
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+  strong { font-size: 13px; color: var(--tx); text-transform: capitalize; }
+  span { font-size: 12px; color: var(--tx3); }
+  .bloq-motivo { color: var(--tx2); }
+  .bloq-aviso { color: var(--am); font-weight: 600; }
+}
+
+// Feriados que se repiten
+.cfg-feriados { margin-top: 18px; }
+.bloq-info strong.sin-capital { text-transform: none; }
+.cfg-sugerido {
+  display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-top: 1px solid var(--bd);
+  font-size: 13px; color: var(--tx2); cursor: pointer; text-transform: none; letter-spacing: 0;
+  &:first-of-type { border-top: 0; }
+  input { width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; accent-color: var(--cr); }
+  strong { color: var(--tx); }
+}
+.cfg-sugeridos-btn { margin-top: 10px; }
+.config-add-title { margin-bottom: 8px; }
+.cfg-otro { margin-top: 22px; }
+
+// Lista vacía
+.cfg-vacio {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 28px 12px; text-align: center;
+  ion-icon { font-size: 30px; color: var(--tx3); margin-bottom: 4px; }
+  strong { font-size: 13px; color: var(--tx2); }
+  span { font-size: 12px; color: var(--tx3); }
+}
+
+// ── Sucursales ──
+.cfg-sedes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(290px, 100%), 1fr));
+  gap: 18px;
+  align-items: stretch;
+}
+.cfg-sede {
+  display: flex; flex-direction: column;
+  &.inactiva .fg { opacity: .6; }
+}
+.cfg-sede--nueva { background: transparent; border-style: dashed; border-color: var(--bd2); }
+.cfg-sede-cab {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px;
+}
+.cfg-sede-icono {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 2px; background: var(--sur2); color: var(--cr);
+  ion-icon { font-size: 18px; }
+}
+.cfg-sede--nueva .cfg-sede-cab { justify-content: flex-start; }
+.cfg-estado {
+  padding: 3px 8px; border: 1px solid var(--bd2); border-radius: 2px;
+  font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--tx3);
+  &.on { border-color: var(--em); color: var(--em); }
+  &.medio { border-color: var(--am); color: var(--am); }
+  &.mal { border-color: var(--rd); color: var(--rd); }
+}
+
+// ── Respaldos ──
+.cfg-resp-estado {
+  border-top: 3px solid var(--bd2);
+  &--on { border-top-color: var(--em); }
+  &--medio { border-top-color: var(--am); }
+  &--mal { border-top-color: var(--rd); }
+  h2 { margin: 12px 0 2px; font-family: var(--fd); font-size: 24px; font-weight: 700; line-height: 1.15; color: var(--tx); }
+  .cfg-resumen { margin-top: 14px; > div { background: var(--sur2); } }
+  .cfg-prueba code, .cfg-nota code { font-size: 12px; }
+}
+.cfg-resp-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.cfg-resp-fecha { margin: 0; font-size: 13px; color: var(--tx3); &::first-letter { text-transform: uppercase; } }
+
+.cfg-fila {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 14px;
+  padding: 9px 0; border-top: 1px solid var(--bd); font-size: 13px; color: var(--tx2);
+  &:first-child { border-top: 0; padding-top: 0; }
+  em { margin-left: 6px; font-style: normal; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--em); }
+}
+.cfg-fila-fecha { color: var(--tx); &::first-letter { text-transform: uppercase; } }
+.cfg-fila-candado {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--em);
+  &.no { color: var(--am); }
+}
+.cfg-tabla + .hint { margin-top: 12px; }
+
+.cfg-hist {
+  display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-top: 1px solid var(--bd);
+  &:first-of-type { border-top: 0; padding-top: 0; }
+  > ion-icon { font-size: 18px; color: var(--em); margin-top: 1px; &.mal { color: var(--rd); } }
+  div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  strong { font-size: 13px; color: var(--tx); &::first-letter { text-transform: uppercase; } }
+  span { font-size: 12px; color: var(--tx3); }
+  .cfg-hist-error { color: var(--rd); word-break: break-word; }
+}
+.cfg-prueba.medio { border-left-color: var(--am); }
+.cfg-prueba code { padding: 1px 4px; background: var(--sur3); border-radius: 2px; }
+
+// ── Mensajes al cliente ──
+.cfg-mensajes-ayuda, .cfg-mensajes { margin-bottom: 18px; }
+.cfg-mensajes-ayuda code, .cfg-mensajes code, .cfg-datos code {
+  padding: 1px 5px; border-radius: 2px; background: var(--sur2); font-size: 12px; color: var(--tx);
+}
+.cfg-mensaje {
+  padding: 16px 0; border-top: 1px solid var(--bd);
+  &:first-of-type { border-top: 0; padding-top: 0; }
+}
+.cfg-mensaje-cab {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;
+  strong { font-size: 14px; color: var(--tx); margin-right: auto; }
+}
+.cfg-mensaje-cuerpo {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px;
+  textarea { width: 100%; resize: vertical; line-height: 1.5; }
+}
+.cfg-datos {
+  display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px;
+  span { font-size: 11.5px; color: var(--tx3); }
+}
+// Cómo se ve en WhatsApp: una burbuja verde clara (fija, como la de la app).
+.cfg-burbuja {
+  align-self: start; padding: 10px 12px; border-radius: 8px 8px 8px 2px;
+  background: #dcf8c6; color: #111b21; font-size: 13px; line-height: 1.45;
+  white-space: pre-line; word-break: break-word; box-shadow: 0 1px 1px rgba(0, 0, 0, .12);
+}
+.cfg-correo-muestra {
+  align-self: start; padding: 12px 14px; border-radius: 8px; background: #171717; border: 1px solid #262626;
+  strong { display: block; margin-bottom: 4px; font-size: 15px; color: #fafafa; }
+  span { font-size: 13px; line-height: 1.55; color: #a3a3a3; white-space: pre-line; }
+}
+
+// ── Textos del portal ──
+// Vista previa del inicio del portal (fondo claro fijo, como el portal en tema claro).
+.cfg-portal-muestra {
+  align-self: start; padding: 14px; border-radius: 8px; background: #f4f5f7; border: 1px solid var(--bd);
+}
+.cfg-portal-hola { display: block; margin-bottom: 10px; font-family: var(--fd); font-size: 22px; font-weight: 700; color: #14171c; }
+.cfg-portal-aviso {
+  display: flex; gap: 10px; padding: 12px 14px; background: #fff; border: 1px solid #e5e7eb; border-left: 3px solid var(--cr); border-radius: 8px;
+  ion-icon { flex-shrink: 0; font-size: 18px; color: var(--cr); margin-top: 1px; }
+  strong { display: block; font-size: 14px; color: #14171c; margin-bottom: 2px; }
+  p { margin: 0; font-size: 13px; line-height: 1.5; color: #323845; white-space: pre-line; }
+}
+.cfg-portal-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 12px; }
+.cfg-mensaje-cab strong + .config-pago-x { margin-left: auto; }
+
+// ── Seguridad del personal ──
+.cfg-persona {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px;
+  padding: 11px 0; border-top: 1px solid var(--bd);
+  &:first-of-type { border-top: 0; padding-top: 0; }
+  &.inactiva { opacity: .55; }
+  @media (max-width: 520px) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    .btn { grid-column: 1 / -1; justify-self: start; }
   }
 }
+.cfg-persona-info {
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+  strong { font-size: 13.5px; color: var(--tx); }
+  span { font-size: 12px; color: var(--tx3); }
+  .cfg-persona-nota { color: var(--am); }
+}
+.cfg-yo {
+  margin-left: 4px; padding: 0 5px; border: 1px solid var(--bd2); border-radius: 2px;
+  font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--tx3);
+}
+.cfg-cerrar-todas { margin-top: 14px; }
+.cd > .hint + .hint { margin-top: 8px; }
 
-.config-branch-header {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 6px;
+// ── Correo de envío ──
+.cfg-remitente {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px;
+  padding: 12px 14px; margin-bottom: 12px;
+  background: var(--sur2); border: 1px solid var(--bd); border-radius: 2px;
+  strong { font-size: 14px; color: var(--tx); word-break: break-all; }
+}
+.cfg-correo-texto { margin: 0 0 14px; font-size: 13px; line-height: 1.55; color: var(--tx2); }
+.cfg-pasos {
+  margin: 0; padding-left: 20px;
+  li { margin-bottom: 10px; font-size: 13px; line-height: 1.55; color: var(--tx2); &:last-child { margin-bottom: 0; } }
+  strong { color: var(--tx); }
+  code { padding: 1px 5px; border-radius: 2px; background: var(--sur2); font-size: 12px; color: var(--tx); word-break: break-all; }
+}
+.cfg-prueba {
+  margin: 12px 0 0; padding: 10px 12px; border-left: 3px solid var(--em);
+  background: var(--sur2); font-size: 12.5px; line-height: 1.5; color: var(--tx2);
+  &.mal { border-left-color: var(--rd); }
+}
+.cfg-sede-pie {
+  display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px;
+  margin-top: auto; padding-top: 6px;
 }
 
-.config-branch-fields {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+// ── Entrega y cobro ──
+.cfg-con-unidad {
+  display: flex; align-items: center; gap: 10px;
+  input { width: 120px; }
+  span { font-size: 13px; color: var(--tx3); }
 }
 
-// Inline input for branch cards (name, address, phone)
-.config-branch-input {
-  flex: 1;
-  min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--bd);
-  border-radius: 12px;
-  background: var(--sur3);
-  color: var(--tx);
-  font-size: 13px;
-  font-family: inherit;
-  outline: none;
-
-  &:focus {
-    border-color: var(--cr);
-  }
-
-  &--name {
-    font-weight: 700;
-  }
-
-  &--full {
-    width: 100%;
-    margin-bottom: 6px;
-  }
-}
-
-// "Add branch" dashed box
-.config-add-box {
-  border: 2px dashed var(--bd2);
-  border-radius: 12px;
-  padding: 12px;
-  margin-top: 4px;
-}
-
-.config-add-title {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--tx2);
-  margin-bottom: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.config-add-input {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--bd);
-  border-radius: 12px;
-  background: var(--sur3);
-  color: var(--tx);
-  font-size: 13px;
-  font-family: inherit;
-  margin-bottom: 6px;
-  outline: none;
-
-  &:focus {
-    border-color: var(--cr);
-  }
-
-  &:last-of-type {
-    margin-bottom: 8px;
-  }
-}
-
-// Notification toggle row
-.config-notif-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  font-size: 13px;
-  // Separa la lista del botón "Guardar" (antes quedaba pegado/encimado).
-  margin-bottom: 16px;
-}
-
-.config-notif-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;            // aire entre la etiqueta y el toggle
-  min-height: 34px;     // altura pareja: el toggle de Ionic no aprieta la fila
-  text-transform: none;
-  letter-spacing: 0;
-
-  // El toggle mantiene su tamaño aunque la etiqueta sea larga (no se encima).
-  ion-toggle {
-    flex-shrink: 0;
-  }
-
-  &--disabled {
-    opacity: 0.55;
-  }
-}
-
-.config-notif-note {
-  color: var(--tx3);
-  font-style: normal;
-}
-
-// Full-width action buttons
-.config-btn-full {
-  width: 100%;
-  justify-content: center;
-}
-
-// Divider
-.config-divider {
-  height: 1px;
-  background: var(--bd);
-  margin: 16px 0;
-}
-
-// Hint below section title
-.config-hint {
-  margin: -4px 0 12px;
-}
-
-// Form validation feedback
-.fg.error {
-  input,
-  select,
-  textarea {
-    border-color: var(--ion-color-danger);
-  }
-}
-
-// Ensure consistent input sizing in .fg (supplement global)
-.fg {
-  input,
-  select,
-  textarea {
-    padding: 10px 12px;
-    border-radius: 12px;
-    font-size: 14px;
-  }
-}
-
-// Formas de pago: filas editables con su botón de quitar.
 .config-pago-nota { margin-bottom: 10px; }
 
+// Formas de pago: filas editables con su botón de quitar.
 .config-pago-row {
   display: flex;
   align-items: center;
@@ -287,20 +424,15 @@
   margin-bottom: 8px;
 
   input { flex: 1; min-width: 0; }
+}
 
-  .config-pago-x {
-    flex-shrink: 0;
-    background: none;
-    border: 1px solid var(--bd);
-    border-radius: 10px;
-    color: var(--tx3);
-    cursor: pointer;
-    padding: 8px;
-    line-height: 0;
-    &:hover:not(:disabled) { color: var(--rd); border-color: var(--rd); }
-    &:disabled { opacity: .4; cursor: default; }
-    ion-icon { font-size: 16px; }
-  }
+// Botón chico con ícono (quitar, subir, bajar): formas de pago y condiciones del portal.
+.config-pago-x {
+  flex-shrink: 0; background: none; border: 1px solid var(--bd); border-radius: 2px;
+  color: var(--tx3); cursor: pointer; padding: 8px; line-height: 0;
+  &:hover:not(:disabled) { color: var(--rd); border-color: var(--rd); }
+  &:disabled { opacity: .4; cursor: default; }
+  ion-icon { font-size: 16px; }
 }
 
 .config-pago-add {
@@ -311,31 +443,87 @@
   ion-icon { font-size: 15px; }
 }
 
-/* Color de marca: el selector nativo y el hex editan el mismo valor — uno para
-   elegir a ojo, otro para pegar el color exacto del manual de marca. */
-.color-fila {
-  display: flex;
-  align-items: center;
-  gap: .5rem;
+// ── Notificaciones ──
+.cfg-aviso {
+  display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 14px;
+  padding: 14px 0; border-top: 1px solid var(--bd);
+  text-transform: none; letter-spacing: 0; cursor: pointer;
+  &:first-child { border-top: 0; padding-top: 0; }
+  &:last-child { padding-bottom: 0; }
+
+  // El toggle mantiene su tamaño aunque la etiqueta sea larga (no se encima).
+  ion-toggle { flex-shrink: 0; }
+
+  &.apagado .cfg-aviso-icono, &.apagado strong, &.apagado .cfg-aviso-texto > span { opacity: .55; }
+}
+.cfg-aviso-icono {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 2px; background: var(--sur2); color: var(--cr);
+  ion-icon { font-size: 18px; }
+}
+.cfg-aviso-texto {
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+  strong { font-size: 14px; color: var(--tx); }
+  span { font-size: 12.5px; line-height: 1.45; color: var(--tx3); }
+  em { font-size: 12px; font-style: normal; font-weight: 600; color: var(--am); }
 }
 
-.color-picker {
-  width: 46px;
-  height: 38px;
-  padding: 2px;
-  border-radius: 8px;
-  cursor: pointer;
+// ────────────────────────────────────────────────
+// Escritorio
+// ────────────────────────────────────────────────
+@media (min-width: 992px) {
+  .cfg-cab {
+    margin: 6px 0 22px;
+    .cfg-migas {
+      display: block; font-size: 11px; font-weight: 800; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--cr);
+    }
+    h1 {
+      display: block; margin: 2px 0 6px;
+      font-family: var(--fd); font-size: 30px; font-weight: 700; line-height: 1.1; color: var(--tx);
+    }
+    p { font-size: 13.5px; }
+  }
+
+  .cfg-grid--lado { grid-template-columns: minmax(0, 1fr) 340px; }
+  .cfg-grid--mitades { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cfg-grid--entrega { grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); }
+
+  // La barra de guardar queda fija abajo mientras se baja por la página.
+  .cfg-pie {
+    position: sticky; bottom: 16px; z-index: 2;
+    display: flex; justify-content: flex-end;
+    margin-top: 22px; padding: 12px 14px;
+    background: var(--sur); border: 1px solid var(--bd); border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+    justify-content: space-between; align-items: center; gap: 16px;
+    .btn { width: auto; min-width: 220px; }
+    .cfg-pie-nota { display: block; }
+  }
+
+  // El horario como tabla: día, abre, a, cierra, horas, abierto.
+  .cfg-semana-cab,
+  .config-schedule-day {
+    display: grid;
+    // Las horas no bajan de 112 px: más angostas, el campo corta los minutos.
+    grid-template-columns: 92px minmax(112px, 1fr) 10px minmax(112px, 1fr) 52px 80px;
+    align-items: center; gap: 10px;
+  }
+  .cfg-semana-cab {
+    padding: 0 9px 8px;
+    span { font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--tx3); }
+  }
+  .config-schedule-day { flex-wrap: nowrap; padding: 8px 9px; }
+  .config-day-label { width: auto; font-size: 13px; }
+  .config-time-input { width: 100%; padding: 8px 10px; font-size: 13px; }
+  .config-time-sep { text-align: center; }
+  .cfg-horas { display: block; }
+  .config-toggle-label { margin-left: 0; font-size: 12px; }
+
+  .cfg-mensaje-cuerpo { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
 }
 
-.color-hex {
-  flex: 1;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  text-transform: lowercase;
-}
-
-.color-ayuda {
-  display: block;
-  margin-top: .35rem;
-  opacity: .65;
-  font-size: .78rem;
+// El horario como tabla pide ~560 px: al lado de la capacidad recién entra desde 1200.
+@media (min-width: 1200px) {
+  .cfg-grid--horario { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); }
 }

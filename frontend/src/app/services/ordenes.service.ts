@@ -1,17 +1,18 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { limpiarParams } from '../shared/params.util';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { Orden, OrdenAvance, OrdenRepuesto, OrdenFoto, EstadoOrden } from '../models/orden.model';
+import { Orden, OrdenAvance, OrdenRepuesto, OrdenFoto, EstadoOrden, OrdenEliminada } from '../models/orden.model';
 
 @Injectable({ providedIn: 'root' })
 export class OrdenesService {
-  private http = inject(HttpClient);
-
   private url = `${environment.apiUrl}/ordenes`;
+  constructor(private http: HttpClient) {}
 
-  getAll(params?: { estado?: string; tecnico_id?: number; fecha_desde?: string; fecha_hasta?: string }): Observable<{ data: Orden[] }> {
-    return this.http.get<{ data: Orden[] }>(this.url, { params: params as any });
+  // q: buscador (número de orden, cliente, teléfono, cédula, placa, moto o problema).
+  getAll(params?: { estado?: string; tecnico_id?: number; fecha_desde?: string; fecha_hasta?: string; q?: string }): Observable<{ data: Orden[] }> {
+    return this.http.get<{ data: Orden[] }>(this.url, { params: limpiarParams(params) });
   }
 
   getById(id: number): Observable<{ data: Orden }> {
@@ -26,8 +27,27 @@ export class OrdenesService {
     return this.http.put<{ data: Orden }>(`${this.url}/${id}`, data);
   }
 
-  cambiarEstado(id: number, estado: EstadoOrden): Observable<any> {
-    return this.http.patch(`${this.url}/${id}/estado`, { estado });
+  // "Editar orden": datos de ingreso (problema, moto, sede, prioridad, kilometraje…).
+  editarDatos(id: number, datos: Partial<Orden>): Observable<{ message: string }> {
+    return this.http.patch<{ message: string }>(`${this.url}/${id}/datos`, datos);
+  }
+
+  // Solo administración. El motivo queda en el registro de órdenes eliminadas.
+  eliminar(id: number, motivo: string): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.url}/${id}`, { body: { motivo } });
+  }
+
+  getEliminadas(): Observable<{ data: OrdenEliminada[] }> {
+    return this.http.get<{ data: OrdenEliminada[] }>(`${this.url}/eliminadas`);
+  }
+
+  // confirmar: true después de que la persona vio los avisos del backend (409).
+  // motivo: al cancelar, por qué.
+  cambiarEstado(id: number, estado: EstadoOrden, confirmar = false, motivo?: string): Observable<any> {
+    const body: Record<string, unknown> = { estado };
+    if (confirmar) body['confirmar'] = true;
+    if (motivo) body['motivo'] = motivo;
+    return this.http.patch(`${this.url}/${id}/estado`, body);
   }
 
   asignarTecnico(id: number, tecnico_id: number | null): Observable<any> {

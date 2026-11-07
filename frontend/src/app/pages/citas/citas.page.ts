@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 import { AlertController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -7,6 +7,7 @@ import { CitasService } from '../../services/citas.service';
 import { DashboardService } from '../../services/dashboard.service';
 import { AuthService } from '../../services/auth.service';
 import { Cita } from '../../models/cita.model';
+import { hoyCR, sumarDias } from '../../utils/fecha-cita';
 
 @Component({ standalone: false,
   selector: 'app-citas',
@@ -14,19 +15,12 @@ import { Cita } from '../../models/cita.model';
   styleUrls: ['./citas.page.scss'],
 })
 export class CitasPage implements OnInit, OnDestroy {
-  private citaSvc = inject(CitasService);
-  private dashSvc = inject(DashboardService);
-  auth = inject(AuthService);
-  private router = inject(Router);
-  private alert = inject(AlertController);
-  private toast = inject(ToastController);
-
   private destroy$ = new Subject<void>();
   citas: Cita[] = [];
   tecnicos: any[] = [];
   cargando = true;
   filtroEstado = '';
-  fechaHoy = new Date().toISOString().split('T')[0];
+  fechaHoy = hoyCR();
 
   readonly estadoLabel: Record<string, string> = {
     agendado: 'Agendado',
@@ -46,6 +40,15 @@ export class CitasPage implements OnInit, OnDestroy {
   };
 
   busqueda = '';
+
+  constructor(
+    private citaSvc: CitasService,
+    private dashSvc: DashboardService,
+    public auth: AuthService,
+    private router: Router,
+    private alert: AlertController,
+    private toast: ToastController
+  ) {}
 
   get esAdmin(): boolean { return this.auth.tieneRol('admin'); }
 
@@ -71,9 +74,9 @@ export class CitasPage implements OnInit, OnDestroy {
 
   private etiquetaFecha(fecha: string): string {
     if (!fecha) return '';
-    const hoy = new Date().toISOString().slice(0, 10);
-    const manana = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-    const ayer = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const hoy = hoyCR();
+    const manana = sumarDias(hoy, 1);
+    const ayer = sumarDias(hoy, -1);
     if (fecha === hoy) return 'Hoy';
     if (fecha === manana) return 'Mañana';
     if (fecha === ayer) return 'Ayer';

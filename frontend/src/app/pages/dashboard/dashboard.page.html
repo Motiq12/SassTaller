@@ -1,14 +1,14 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>{{ (marca.marca$ | async)?.nombre_taller }}</ion-title>
+    <ion-title>MS Motos</ion-title>
     <ion-buttons slot="end">
-      <ion-button [routerLink]="['/admin']" title="Panel admin">
+      <ion-button [routerLink]="['/admin']" title="Panel admin" aria-label="Panel admin">
         <ion-icon slot="icon-only" name="grid-outline"></ion-icon>
       </ion-button>
-      <ion-button [routerLink]="['/garantias']" title="Garantías">
+      <ion-button [routerLink]="['/garantias']" title="Garantías" aria-label="Garantías">
         <ion-icon slot="icon-only" name="shield-checkmark-outline"></ion-icon>
       </ion-button>
-      <ion-button [routerLink]="['/promociones']" title="Promociones" *ngIf="auth.tieneRol('admin')">
+      <ion-button [routerLink]="['/promociones']" title="Promociones" *ngIf="auth.tieneRol('admin')" aria-label="Promociones">
         <ion-icon slot="icon-only" name="pricetags-outline"></ion-icon>
       </ion-button>
       <ion-button (click)="logout()">

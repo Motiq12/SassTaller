@@ -1,12 +1,14 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
-import { Router } from '@angular/router';
-import { AlertController, ToastController } from '@ionic/angular';
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { Location } from '@angular/common';
+import { AlertController, ModalController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PortalService } from '../../services/portal.service';
 import { AccesibilidadService } from '../../services/accesibilidad.service';
 import { BiometriaService } from '../../services/biometria.service';
-import { comprimirImagen } from '../../shared/utils/image.util';
+import { GrupoPerfil } from '../../shared/perfil/perfil-lista.base';
+import { recortarFoto } from '../../shared/perfil/recortar-foto.component';
 
 @Component({
   standalone: false,
@@ -15,13 +17,6 @@ import { comprimirImagen } from '../../shared/utils/image.util';
   styleUrls: ['./portal-perfil.page.scss'],
 })
 export class PortalPerfilPage implements OnInit, OnDestroy {
-  portal = inject(PortalService);
-  a11y = inject(AccesibilidadService);
-  private bio = inject(BiometriaService);
-  private router = inject(Router);
-  private toast = inject(ToastController);
-  private alert = inject(AlertController);
-
   private destroy$ = new Subject<void>();
   perfil: any = null;
   cuenta = { nombre: '', apellido: '', telefono: '', email: '' };
@@ -51,6 +46,123 @@ export class PortalPerfilPage implements OnInit, OnDestroy {
   cooldown = 0;
   private timer: any = null;
 
+  constructor(
+    public portal: PortalService,
+    public a11y: AccesibilidadService,
+    private bio: BiometriaService,
+    private router: Router,
+    private route: ActivatedRoute,
+    private location: Location,
+    private modal: ModalController,
+    private toast: ToastController,
+    private alert: AlertController,
+  ) {}
+
+  // ── La lista, como Mi perfil del panel (shared/perfil) ──
+  // Qué sección está abierta va en la dirección (?ver=<id>). Desde 1200 px se ven la
+  // lista y la sección lado a lado; más angosto, una cosa a la vez.
+  seccion: string | null = null;
+  escritorio = false;
+  private mq?: MediaQueryList;
+  private alCambiarAncho = (e: MediaQueryListEvent) => { this.escritorio = e.matches; };
+  private desdeLista = false;
+
+  get grupos(): GrupoPerfil[] {
+    return [
+      { titulo: 'Tu cuenta', items: [
+        { id: 'datos', nombre: 'Datos personales', icono: 'person-outline' },
+        { id: 'foto', nombre: 'Foto de perfil', icono: 'image-outline' },
+        { id: 'contrasena', nombre: 'Contraseña', icono: 'lock-closed-outline' },
+        ...(this.bioDisponible ? [{ id: 'bio', nombre: 'Huella o Face ID', icono: 'finger-print-outline' }] : []),
+      ] },
+      { titulo: 'Preferencias', items: [
+        { id: 'avisos', nombre: 'Avisos', icono: 'notifications-outline' },
+        { id: 'apariencia', nombre: 'Apariencia', icono: 'color-palette-outline' },
+      ] },
+      { titulo: 'Más', items: [
+        { id: 'legal', nombre: 'Términos y privacidad', icono: 'document-text-outline' },
+        { id: 'cuenta', nombre: 'Eliminar cuenta', icono: 'trash-outline' },
+      ] },
+    ];
+  }
+
+  private get ids(): string[] { return this.grupos.reduce((ids: string[], g) => ids.concat(g.items.map(i => i.id)), []); }
+
+  // En escritorio, sin ninguna elegida se muestra la primera.
+  get vista(): string | null { return this.seccion || (this.escritorio ? 'datos' : null); }
+
+  abrir(id: string) {
+    this.desdeLista = true;
+    this.router.navigate([], { relativeTo: this.route, queryParams: { ver: id } });
+  }
+
+  // En el celular, volver a la lista. Si se llegó desde ella, es "atrás" de verdad.
+  volverALista() {
+    if (this.desdeLista) { this.desdeLista = false; this.location.back(); return; }
+    this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+  }
+
+  // Lo que se ve a la derecha de cada fila.
+  get valores(): Record<string, string> {
+    const p = this.perfil || {};
+    const avisos = (this.notif.avances ? 1 : 0) + (this.notif.recordatorios ? 1 : 0);
+    return {
+      datos: p.email_pendiente ? 'Confirma tu correo' : (p.telefono || ''),
+      foto: p.foto ? 'Puesta' : 'Sin foto',
+      contrasena: p.tiene_password ? 'Puesta' : p.con_google ? 'Entras con Google' : 'Sin contraseña',
+      bio: this.bioActivado ? 'Activado' : 'Desactivado',
+      avisos: avisos === 2 ? 'Todos' : avisos === 1 ? '1 de 2' : 'Apagados',
+      apariencia: this.a11y.temas.find(t => t.id === this.a11y.tema)?.nombre || '',
+    };
+  }
+
+  get estados(): Record<string, string> {
+    return { datos: this.perfil?.email_pendiente ? 'aviso' : '', bio: this.bioActivado ? 'ok' : '' };
+  }
+
+  get chips(): string[] { return ['Cliente', ...(this.perfil?.con_google ? ['Con Google'] : [])]; }
+  get nombreCompleto(): string { return `${this.perfil?.nombre || ''} ${this.perfil?.apellido || ''}`.trim(); }
+
+  // ¿Cambió algo de los datos? Sin cambios, el botón queda apagado.
+  get cuentaCambiada(): boolean {
+    const p = this.perfil || {};
+    return this.cuenta.nombre.trim() !== (p.nombre || '') || this.cuenta.apellido.trim() !== (p.apellido || '')
+      || this.cuenta.telefono.trim() !== (p.telefono || '') || this.cuenta.email.trim().toLowerCase() !== String(p.email || '').toLowerCase();
+  }
+
+  iconoTema(id: string): string { return id === 'claro' ? 'sunny-outline' : id === 'oscuro' ? 'moon-outline' : 'contrast-outline'; }
+
+  // ── Contraseña ──
+  pass = { actual: '', nueva: '' };
+  verActual = false;
+  verNueva = false;
+  guardandoPass = false;
+
+  // Solo orienta; la que manda es la regla del servidor (mínimo 8).
+  get fuerza(): { nivel: number; texto: string } {
+    const p = this.pass.nueva || '';
+    if (p.length < 8) return { nivel: 1, texto: `Le faltan ${8 - p.length} caracteres` };
+    const variedad = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter(r => r.test(p)).length;
+    if (p.length >= 14 || (p.length >= 10 && variedad >= 3)) return { nivel: 3, texto: 'Fuerte' };
+    return { nivel: 2, texto: 'Aceptable: más larga es más segura' };
+  }
+
+  cambiarPassword() {
+    if (this.guardandoPass || !this.pass.actual || this.pass.nueva.length < 8) return;
+    this.guardandoPass = true;
+    this.portal.updateMiPassword({ actual: this.pass.actual, nueva: this.pass.nueva }).pipe(takeUntil(this.destroy$)).subscribe({
+      next: () => {
+        this.guardandoPass = false;
+        this.pass = { actual: '', nueva: '' };
+        this.aviso('Contraseña cambiada');
+      },
+      // El motivo (contraseña actual incorrecta, etc.) lo muestra el interceptor y marca el campo.
+      error: () => { this.guardandoPass = false; },
+    });
+  }
+
+  pedirFoto(input: HTMLInputElement) { if (!this.subiendoFoto) input.click(); }
+
   // Niveles de tamaño de texto (accesibilidad).
   readonly nivelesTexto = [
     { i: 0, etiqueta: 'A', nombre: 'Normal' },
@@ -68,7 +180,7 @@ export class PortalPerfilPage implements OnInit, OnDestroy {
     const al = await this.alert.create({
       cssClass: 'portal-alert',
       header: 'Activar huella / Face ID',
-      message: 'Confirmá tu contraseña para guardar el acceso rápido de forma segura en este dispositivo.',
+      message: 'Confirma tu contraseña para guardar el acceso rápido de forma segura en este dispositivo.',
       inputs: [{ name: 'password', type: 'password', placeholder: 'Tu contraseña', cssClass: 'alert-input' }],
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
@@ -79,7 +191,7 @@ export class PortalPerfilPage implements OnInit, OnDestroy {
   }
 
   private confirmarActivarBio(email: string, password: string) {
-    if (!password) { this.aviso('Ingresá tu contraseña', 'warning'); return; }
+    if (!password) { this.aviso('Ingresa tu contraseña', 'warning'); return; }
     if (this.bioProcesando) return;
     this.bioProcesando = true;
     // 1) Verificar credenciales con el backend (no guardamos una contraseña inválida).
@@ -143,7 +255,17 @@ export class PortalPerfilPage implements OnInit, OnDestroy {
     });
   }
 
-  ngOnInit() { this.cargar(); this.cargarBio(); }
+  ngOnInit() {
+    this.mq = window.matchMedia('(min-width: 1200px)');
+    this.escritorio = this.mq.matches;
+    this.mq.addEventListener('change', this.alCambiarAncho);
+    this.route.queryParamMap.pipe(takeUntil(this.destroy$)).subscribe(q => {
+      const v = q.get('ver');
+      this.seccion = v && this.ids.includes(v) ? v : null;
+    });
+    this.cargar();
+    this.cargarBio();
+  }
   ionViewWillEnter() { this.cargar(); this.cargarBio(); }
 
   // Estado de la biometría (en web siempre queda oculto: disponible() devuelve false).
@@ -186,17 +308,21 @@ export class PortalPerfilPage implements OnInit, OnDestroy {
 
   async guardarCuenta() {
     if (!this.cuenta.nombre.trim() || !this.cuenta.apellido.trim()) { this.aviso('Nombre y apellido son requeridos', 'warning'); return; }
-    if (!this.cuenta.telefono.trim()) { this.aviso('El teléfono es requerido: es como te avisamos que tu vehiculo está lista', 'warning'); return; }
+    if (!this.cuenta.telefono.trim()) { this.aviso('El teléfono es requerido: es como te avisamos que tu moto está lista', 'warning'); return; }
     if (!this.cuenta.email.trim()) { this.aviso('El correo es requerido', 'warning'); return; }
 
     // El correo es con lo que se entra y con lo que se recupera la cuenta: cambiarlo
     // exige la contraseña, así que una sesión abierta que quede en manos de otro no
     // alcanza para mudar la cuenta y dejar afuera al dueño.
+    if (this.cambiaCorreo && !this.perfil?.tiene_password) {
+      this.aviso('Para cambiar el correo primero crea una contraseña (Mi perfil → Contraseña).', 'warning');
+      return;
+    }
     if (this.cambiaCorreo) {
       const al = await this.alert.create({
         cssClass: 'portal-alert',
         header: 'Cambiar tu correo',
-        message: `Te vamos a enviar un código a ${this.cuenta.email.trim()} para confirmar que es tuyo. Hasta entonces seguís entrando con el correo actual.`,
+        message: `Te vamos a enviar un código a ${this.cuenta.email.trim()} para confirmar que es tuyo. Hasta entonces sigues entrando con el correo actual.`,
         inputs: [{ name: 'password', type: 'password', placeholder: 'Tu contraseña', cssClass: 'alert-input' }],
         buttons: [
           { text: 'Cancelar', role: 'cancel' },
@@ -210,7 +336,7 @@ export class PortalPerfilPage implements OnInit, OnDestroy {
   }
 
   private enviarCuenta(password?: string) {
-    if (this.cambiaCorreo && !password) { this.aviso('Ingresá tu contraseña', 'warning'); return; }
+    if (this.cambiaCorreo && !password) { this.aviso('Ingresa tu contraseña', 'warning'); return; }
     this.guardando = true;
     this.portal.updateMiPerfil({
       nombre: this.cuenta.nombre.trim(),
@@ -220,7 +346,8 @@ export class PortalPerfilPage implements OnInit, OnDestroy {
       ...(password ? { password } : {}),
     }).pipe(takeUntil(this.destroy$)).subscribe({
       next: r => {
-        this.perfil = r.data;
+        // Se conserva lo que la respuesta no trae (si tiene contraseña, si entra con Google).
+        this.perfil = { ...this.perfil, ...r.data };
         // El correo del formulario vuelve al vigente: el nuevo todavía no manda.
         this.cuenta.email = r.data.email || '';
         // Refleja el nombre en el saludo del inicio.
@@ -239,11 +366,11 @@ export class PortalPerfilPage implements OnInit, OnDestroy {
   // —— Confirmación del correo nuevo ——
   confirmarCorreo() {
     const codigo = this.codigoCorreo.trim();
-    if (codigo.length < 6) { this.aviso('Ingresá el código de 6 dígitos', 'warning'); return; }
+    if (codigo.length < 6) { this.aviso('Ingresa el código de 6 dígitos', 'warning'); return; }
     this.confirmandoCorreo = true;
     this.portal.confirmarCambioCorreo(codigo).pipe(takeUntil(this.destroy$)).subscribe({
       next: r => {
-        this.perfil = r.data;
+        this.perfil = { ...this.perfil, ...r.data };
         this.cuenta.email = r.data.email || '';
         this.codigoCorreo = '';
         this.confirmandoCorreo = false;
@@ -321,9 +448,11 @@ export class PortalPerfilPage implements OnInit, OnDestroy {
     const file = input.files?.[0];
     input.value = ''; // permite re-elegir el mismo archivo
     if (!file) return;
-    this.subiendoFoto = true;
     try {
-      const dataUrl = await comprimirImagen(file, { maxLado: 400, calidad: 0.8 });
+      // Primero se encuadra (y sale ya en 400 px), como en el panel; cancelar no sube nada.
+      const dataUrl = await recortarFoto(this.modal, file);
+      if (!dataUrl) return;
+      this.subiendoFoto = true;
       this.portal.actualizarFotoPerfil(dataUrl).pipe(takeUntil(this.destroy$)).subscribe({
         next: r => {
           this.perfil = { ...this.perfil, foto: r.data.foto };
@@ -356,7 +485,7 @@ export class PortalPerfilPage implements OnInit, OnDestroy {
     const al = await this.alert.create({
       cssClass: 'portal-alert',
       header: 'Eliminar cuenta',
-      message: 'Se desactivará tu acceso al portal y se cerrará la sesión. Tu historial de servicios queda en el taller. ¿Querés continuar?',
+      message: 'Se desactivará tu acceso al portal y se cerrará la sesión. Tu historial de servicios queda en el taller. ¿Quieres continuar?',
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         { text: 'Eliminar', role: 'destructive', cssClass: 'portal-alert-danger', handler: () => this.confirmarEliminar() },
@@ -378,7 +507,10 @@ export class PortalPerfilPage implements OnInit, OnDestroy {
     });
   }
 
-  ngOnDestroy() { this.pararCooldown(); this.destroy$.next(); this.destroy$.complete(); }
+  ngOnDestroy() {
+    this.mq?.removeEventListener('change', this.alCambiarAncho);
+    this.pararCooldown(); this.destroy$.next(); this.destroy$.complete();
+  }
 
   logout() {
     this.portal.logout();

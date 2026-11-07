@@ -1,46 +1,47 @@
+// Estándar de diseño: colores del panel (.admin-dark en global.scss), que siguen el tema.
 .ofertas { max-width: 720px; margin: 0 auto; padding: 12px 16px 0; }
 
 .intro {
   margin: 6px 2px 16px;
-  h2 { font-family: var(--font-display); font-size: 24px; font-weight: 800; letter-spacing: -0.03em; margin: 0 0 4px; }
-  p { font-size: 13px; color: var(--n-500); margin: 0; }
+  h2 { font-family: var(--font-display); font-size: 24px; font-weight: 800; letter-spacing: 0; margin: 0 0 4px; }
+  p { font-size: 13px; color: var(--tx3); margin: 0; }
 }
 
 /* Programa de fidelidad: tarjeta destacada de cortesía */
 .reward-hero {
   position: relative; overflow: hidden; margin-bottom: 16px;
-  border-radius: 22px; padding: 18px 18px 16px;
-  background: linear-gradient(135deg, var(--rose-50), var(--amber-100));
-  border: 1px solid var(--hairline);
+  border-radius: 8px; padding: 18px 18px 16px;
+  background: linear-gradient(135deg, var(--adm-cr-bg), var(--adm-am-bg));
+  border: 1px solid var(--bd);
 
   .rh-tag { display: inline-flex; align-items: center; gap: 6px;
     font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em;
-    color: var(--rose-700);  // AA sobre tarjeta clara (gradiente rose/amber)
+    color: var(--adm-cr-fg);  // AA sobre tarjeta clara (gradiente rose/amber)
     ion-icon { font-size: 15px; } }
-  h3 { font-family: var(--font-display); font-size: 18px; font-weight: 800; letter-spacing: -0.02em;
-    margin: 10px 0 4px; color: #0a0a0a;
-    strong { color: var(--rose-700); } }  // AA sobre tarjeta clara
-  .rh-sub { font-size: 12.5px; color: #525252; margin: 0 0 14px; line-height: 1.5; }
+  h3 { font-family: var(--font-display); font-size: 18px; font-weight: 800; letter-spacing: 0;
+    margin: 10px 0 4px; color: var(--tx);
+    strong { color: var(--adm-cr-fg); } }  // AA sobre tarjeta clara
+  .rh-sub { font-size: 12.5px; color: var(--tx2); margin: 0 0 14px; line-height: 1.5; }
 
   .rh-blocks { display: flex; gap: 6px; }
-  .rb { flex: 1; height: 16px; border-radius: 6px; background: rgba(255, 255, 255, 0.55);
+  .rb { flex: 1; height: 16px; border-radius: 2px; background: rgba(255, 255, 255, 0.55);
     display: flex; align-items: center; justify-content: center;
     &.on { background: var(--ion-color-primary); }
-    &.gift { background: rgba(255, 255, 255, 0.75); color: var(--amber-700); height: 26px; flex: 0 0 34px; border-radius: 9px;
+    &.gift { background: rgba(255, 255, 255, 0.75); color: var(--am); height: 26px; flex: 0 0 34px; border-radius: 2px;
       ion-icon { font-size: 15px; }
       &.on { background: #fcd34d; color: #92400e; } } }
 
-  .rh-foot { margin-top: 12px; font-size: 11.5px; font-weight: 700; color: #525252; }
+  .rh-foot { margin-top: 12px; font-size: 11.5px; font-weight: 700; color: var(--tx2); }
 
   // Historial de cortesías canjeadas (toggle + lista).
   .rh-hist-tog { margin-top: 12px; width: 100%; background: rgba(255, 255, 255, 0.5); border: none; cursor: pointer;
-    border-radius: 12px; padding: 9px 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    border-radius: 2px; padding: 9px 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     font-family: inherit; font-size: 12px; font-weight: 800; color: #7c2d12;
     ion-icon { font-size: 15px; } &:active { transform: scale(.99); } }
-  .rh-hist { margin-top: 8px; background: rgba(255, 255, 255, 0.55); border-radius: 12px; padding: 4px 12px; }
+  .rh-hist { margin-top: 8px; background: rgba(255, 255, 255, 0.55); border-radius: 2px; padding: 4px 12px; }
   .rh-hist-row { display: flex; align-items: center; gap: 8px; padding: 9px 0; font-size: 12.5px; color: #3f2d1a;
     & + .rh-hist-row { border-top: 1px solid rgba(0, 0, 0, 0.07); }
-    ion-icon { font-size: 16px; color: var(--amber-700); flex-shrink: 0; }
+    ion-icon { font-size: 16px; color: var(--am); flex-shrink: 0; }
     .rhh-desc { flex: 1; font-weight: 600; min-width: 0; }
     .rhh-fecha { font-size: 11px; color: #78350f; flex-shrink: 0; } }
 
@@ -55,8 +56,8 @@
 }
 
 .of {
-  background: var(--ion-card-background); border: 1px solid var(--hairline);
-  border-radius: 22px; box-shadow: var(--shadow-sm); overflow: hidden; cursor: pointer;
+  background: var(--sur); border: 1px solid var(--bd);
+  border-radius: 8px; overflow: hidden; cursor: pointer;
   transition: box-shadow .2s, transform .2s; margin-bottom: 14px;
   &.open { box-shadow: var(--shadow-md); }
   &:active { transform: scale(.99); }
@@ -67,30 +68,30 @@
   .of-img-ph {
     aspect-ratio: 16 / 9; display: flex; align-items: center; justify-content: center;
     ion-icon { font-size: 40px; opacity: .4; }
-    background: linear-gradient(135deg, var(--rose-50), var(--n-100));
-    &.ph-0 { background: linear-gradient(135deg, var(--rose-50), var(--amber-100)); }
-    &.ph-1 { background: linear-gradient(135deg, var(--emerald-50), var(--indigo-50)); }
-    &.ph-2 { background: linear-gradient(135deg, var(--amber-100), var(--rose-50)); }
-    &.ph-3 { background: linear-gradient(135deg, var(--indigo-50), var(--n-100)); }
+    background: linear-gradient(135deg, var(--adm-cr-bg), var(--sur2));
+    &.ph-0 { background: linear-gradient(135deg, var(--adm-cr-bg), var(--adm-am-bg)); }
+    &.ph-1 { background: linear-gradient(135deg, var(--adm-em-bg), var(--adm-in-bg)); }
+    &.ph-2 { background: linear-gradient(135deg, var(--adm-am-bg), var(--adm-cr-bg)); }
+    &.ph-3 { background: linear-gradient(135deg, var(--adm-in-bg), var(--sur2)); }
   }
 
   .of-b { padding: 14px 18px 16px; }
   .of-h { display: flex; align-items: center; justify-content: space-between; gap: 10px;
     strong { font-size: 16px; font-weight: 800; line-height: 1.3; } }
-  .bg { font-size: 11px; font-weight: 800; padding: 5px 12px; border-radius: 999px; flex-shrink: 0;
-    background: var(--rose-50); color: var(--rose-700); }
+  .bg { font-size: 11px; font-weight: 800; padding: 5px 12px; border-radius: 2px; flex-shrink: 0;
+    background: var(--adm-cr-bg); color: var(--adm-cr-fg); }
 
-  .of-desc { margin: 6px 0 0; font-size: 13px; color: var(--n-500); line-height: 1.5;
+  .of-desc { margin: 6px 0 0; font-size: 13px; color: var(--tx3); line-height: 1.5;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
   .of-detail-btn {
     margin-top: 10px; display: inline-flex; align-items: center; gap: 6px;
-    background: none; border: 1.5px solid var(--hairline); border-radius: 10px;
+    background: none; border: 1.5px solid var(--bd); border-radius: 2px;
     padding: 8px 16px; cursor: pointer; font-family: inherit;
-    font-size: 13px; font-weight: 700; color: var(--text-accent);
-    transition: all .2s;
+    font-size: 13px; font-weight: 700; color: var(--cr-tx);
+    transition: background-color .2s, border-color .2s, color .2s, box-shadow .2s, transform .2s, opacity .2s;
     ion-icon { font-size: 16px; }
-    &:hover { border-color: var(--ion-color-primary); background: rgba(var(--ion-color-primary-rgb), .05); }
+    &:hover { border-color: var(--ion-color-primary); background: rgba(226, 35, 26, .05); }
   }
 }
 
@@ -105,8 +106,8 @@
 
 .ofv-content {
   position: relative; max-width: 600px; width: 100%; max-height: 90vh;
-  overflow-y: auto; border-radius: 22px;
-  background: var(--ion-card-background); border: 1px solid var(--hairline);
+  overflow-y: auto; border-radius: 8px;
+  background: var(--sur); border: 1px solid var(--bd);
   box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
   animation: slideUp .3s ease;
 }
@@ -122,27 +123,49 @@
 }
 
 .ofv-img {
-  width: 100%; display: block; border-radius: 22px 22px 0 0;
+  width: 100%; display: block; border-radius: 8px 8px 0 0;
+  // Entera en la pantalla del celular, sin tener que desplazar para verla.
+  max-height: 75vh; object-fit: contain; background: #000;
 }
 
 .ofv-info {
   padding: 20px 22px 24px;
   .ofv-head { display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    h3 { font-family: var(--font-display); font-size: 20px; font-weight: 800; margin: 0; letter-spacing: -.02em; } }
-  .ofv-price { font-size: 22px; font-weight: 800; color: var(--ion-color-primary); margin: 8px 0 0; }
-  .ofv-desc { margin: 10px 0 0; font-size: 14px; color: var(--n-500); line-height: 1.6; }
+    h3 { font-family: var(--font-display); font-size: 20px; font-weight: 800; margin: 0; letter-spacing: 0; } }
+  .ofv-price { font-size: 22px; font-weight: 800; color: var(--cr-tx); margin: 8px 0 0; }
+  .ofv-desc { margin: 10px 0 0; font-size: 14px; color: var(--tx3); line-height: 1.6; }
 }
 
 .ofv-loading {
   display: flex; align-items: center; justify-content: center;
-  padding: 40px; color: var(--ion-color-primary);
+  padding: 40px; color: var(--cr-tx);
 }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: none; } }
 
 .empty-state {
-  text-align: center; padding: 50px 24px; color: var(--n-400);
+  text-align: center; padding: 50px 24px; color: var(--tx3);
   ion-icon { font-size: 52px; opacity: .4; display: block; margin: 0 auto 12px; }
   p { font-size: 14px; }
+}
+
+/* Escritorio: las promociones en tres columnas; lo demás ocupa la fila entera. */
+@media (min-width: 1200px) {
+  .ofertas {
+    max-width: 1120px; padding: 20px 32px 0;
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 16px; align-items: start;
+    > :not(.of) { grid-column: 1 / -1; }
+  }
+  .reward-hero { max-width: 760px; }
+}
+
+// Una promoción que es solo una imagen (la que el taller diseña con el precio y
+// el texto puestos): va entera, sin recortar, porque lo importante está escrito
+// en la imagen.
+.of.of-solo .of-img {
+  aspect-ratio: auto;
+  height: auto;
+  object-fit: contain;
 }

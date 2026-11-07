@@ -4,31 +4,12 @@ import { PrecargaPorRol } from './shared/precarga-por-rol';
 import { AuthGuard } from './guards/auth.guard';
 import { RolHomeGuard } from './guards/rol-home.guard';
 import { RolGuard } from './guards/rol.guard';
-import { InicioGuard } from './guards/inicio.guard';
+import { PanelAdminGuard } from './guards/panel-admin.guard';
 
 const routes: Routes = [
-  // La raíz es la landing pública. InicioGuard manda a su panel a quien ya tenga
-  // sesión, así que un cliente no ve el folleto de venta cada vez que abre la app.
-  {
-    path: '',
-    pathMatch: 'full',
-    canActivate: [InicioGuard],
-    loadChildren: () => import('./pages/landing/landing.module').then(m => m.LandingPageModule),
-  },
+  { path: '', redirectTo: 'tabs', pathMatch: 'full' },
   // Login unificado (personal + clientes): vive en /portal/login. /login redirige ahí.
   { path: 'login', redirectTo: 'portal/login', pathMatch: 'full' },
-  // Alta de un taller nuevo en el SaaS. Pública y sin guard a propósito: quien entra
-  // acá todavía no tiene cuenta ni taller — crearlos es justamente lo que viene a hacer.
-  {
-    path: 'registro-taller',
-    loadChildren: () => import('./pages/registro-taller/registro-taller.module').then(m => m.RegistroTallerPageModule),
-  },
-  // Panel de la plataforma. Va suelto, sin AuthGuard: no es un rol más dentro de un
-  // taller sino una sesión aparte, con su propio token y su propio guard.
-  {
-    path: 'motiq',
-    loadChildren: () => import('./pages/motiq/motiq.module').then(m => m.MotiqPageModule),
-  },
   {
     path: 'portal',
     loadChildren: () => import('./pages/portal/portal.module').then(m => m.PortalPageModule),
@@ -51,9 +32,10 @@ const routes: Routes = [
     loadChildren: () => import('./pages/recepcion/recepcion.module').then(m => m.RecepcionPageModule),
   },
   {
+    // El panel es del admin, pero la sección "Sitio web" también la usan el rol
+    // `contenido` y quien tenga permisos web (ver PanelAdminGuard).
     path: 'admin',
-    canActivate: [AuthGuard, RolGuard],
-    data: { roles: ['admin'] },
+    canActivate: [AuthGuard, PanelAdminGuard],
     loadChildren: () => import('./pages/admin/admin.module').then(m => m.AdminPageModule),
   },
   {
@@ -83,19 +65,23 @@ const routes: Routes = [
     loadChildren: () => import('./pages/cliente-detalle/cliente-detalle.module').then(m => m.ClienteDetallePageModule),
   },
   {
-    path: 'vehiculo-form',
-    canActivate: [AuthGuard],
-    loadChildren: () => import('./pages/vehiculo-form/vehiculo-form.module').then(m => m.VehiculoFormPageModule),
+    path: 'moto-form',
+    // Registrar y editar motos: mostrador y administración (el servidor también lo exige).
+    canActivate: [AuthGuard, RolGuard],
+    data: { roles: ['admin', 'recepcion'] },
+    loadChildren: () => import('./pages/moto-form/moto-form.module').then(m => m.MotoFormPageModule),
   },
   {
-    path: 'vehiculo-form/:id',
-    canActivate: [AuthGuard],
-    loadChildren: () => import('./pages/vehiculo-form/vehiculo-form.module').then(m => m.VehiculoFormPageModule),
+    path: 'moto-form/:id',
+    // Registrar y editar motos: mostrador y administración (el servidor también lo exige).
+    canActivate: [AuthGuard, RolGuard],
+    data: { roles: ['admin', 'recepcion'] },
+    loadChildren: () => import('./pages/moto-form/moto-form.module').then(m => m.MotoFormPageModule),
   },
   {
-    path: 'vehiculo-historial/:id',
+    path: 'moto-historial/:id',
     canActivate: [AuthGuard],
-    loadChildren: () => import('./pages/vehiculo-historial/vehiculo-historial.module').then(m => m.VehiculoHistorialPageModule),
+    loadChildren: () => import('./pages/moto-historial/moto-historial.module').then(m => m.MotoHistorialPageModule),
   },
   {
     path: 'cita-form',
@@ -117,7 +103,8 @@ const routes: Routes = [
   },
   {
     path: 'factura/:id',
-    canActivate: [AuthGuard],
+    canActivate: [AuthGuard, RolGuard],
+    data: { roles: ['admin', 'recepcion'] },
     loadChildren: () => import('./pages/factura/factura.module').then(m => m.FacturaPageModule),
   },
   {

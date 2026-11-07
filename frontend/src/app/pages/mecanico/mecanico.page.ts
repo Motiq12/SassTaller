@@ -1,10 +1,11 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 import { AlertController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { MecanicoService, ResumenMecanico } from '../../services/mecanico.service';
 import { AuthService } from '../../services/auth.service';
+import { hoyCR } from '../../utils/fecha-cita';
 
 @Component({
   standalone: false,
@@ -13,18 +14,12 @@ import { AuthService } from '../../services/auth.service';
   styleUrls: ['./mecanico.page.scss'],
 })
 export class MecanicoPage implements OnInit, OnDestroy {
-  private mecanico = inject(MecanicoService);
-  private auth = inject(AuthService);
-  private router = inject(Router);
-  private alert = inject(AlertController);
-  private toast = inject(ToastController);
-
   private destroy$ = new Subject<void>();
   resumen?: ResumenMecanico;
   citas: any[] = [];
   cargando = true;
   notasAbiertas = new Set<number>();
-  hoy = new Date().toISOString().slice(0, 10);
+  hoy = hoyCR();
 
   readonly estados = ['agendado', 'en_revision', 'en_mantenimiento', 'listo', 'entregado', 'cancelado'];
   readonly estadoLabel: Record<string, string> = {
@@ -36,13 +31,14 @@ export class MecanicoPage implements OnInit, OnDestroy {
     cancelado: 'Cancelado',
   };
   // Clase del badge (coincide con el SCSS .st-badge.<x>).
-  readonly estadoBadge: Record<string, string> = {
-    agendado: 'agendado',
-    en_revision: 'revision',
-    en_mantenimiento: 'mantenimiento',
-    listo: 'listo',
-    entregado: 'entregado',
-    cancelado: 'cancelado',
+  // Color de la etiqueta de estado (.pill del estándar: los colores del panel).
+  readonly estadoPill: Record<string, string> = {
+    agendado: 'indigo',
+    en_revision: 'amber',
+    en_mantenimiento: 'rose',
+    listo: 'green',
+    entregado: 'gris',
+    cancelado: 'gris',
   };
   readonly progreso: Record<string, number> = {
     agendado: 10, en_revision: 35, en_mantenimiento: 65, listo: 85, entregado: 100, cancelado: 0,
@@ -50,6 +46,14 @@ export class MecanicoPage implements OnInit, OnDestroy {
   // Caja de cotización de la orden vinculada.
   readonly cotizLabel: Record<string, string> = { aprobado: 'Aprobada', rechazado: 'Rechazada', pendiente: 'Pendiente' };
   readonly cotizPill: Record<string, string> = { aprobado: 'green', rechazado: 'rose', pendiente: 'amber' };
+
+  constructor(
+    private mecanico: MecanicoService,
+    private auth: AuthService,
+    private router: Router,
+    private alert: AlertController,
+    private toast: ToastController
+  ) {}
 
   ngOnInit() { this.cargar(); }
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
@@ -71,19 +75,23 @@ export class MecanicoPage implements OnInit, OnDestroy {
   }
 
   // En el Inicio se muestran las citas de hoy + cualquier trabajo activo (no se esconde nada en curso).
+  // Por eso la tarjeta se llama "Hoy y en curso" y no "Citas de hoy": la cifra "Citas hoy"
+  // de arriba cuenta solo las de hoy, y los dos números no coincidían.
   get citasHoy(): any[] {
-    return this.citas.filter(c =>
-      c.fecha?.slice(0, 10) === this.hoy || ['en_revision', 'en_mantenimiento'].includes(c.estado)
-    );
+    return this.citas.filter(c => this.esDeHoy(c) || ['en_revision', 'en_mantenimiento'].includes(c.estado));
   }
+
+  // Los trabajos de otro día llevan la fecha delante de la hora.
+  esDeHoy(c: any): boolean { return c.fecha?.slice(0, 10) === this.hoy; }
+  // "27/10" sacado del texto: el pipe date leería "2026-10-27" como medianoche UTC,
+  // que en Costa Rica cae el día anterior.
+  diaMes(fecha?: string): string { const f = (fecha || '').slice(0, 10); return f ? `${f.slice(8, 10)}/${f.slice(5, 7)}` : ''; }
 
   progresoPct(estado: string): number { return this.progreso[estado] ?? 0; }
 
   toggleNotas(id: number) {
     this.notasAbiertas.has(id) ? this.notasAbiertas.delete(id) : this.notasAbiertas.add(id);
   }
-
-  necesitaMonto(_estado: string): boolean { return false; }
 
   // Transiciones válidas del flujo de la cita (espejo del backend utils/transiciones.js).
   // El <select> ofrece solo el estado actual + sus siguientes, para no pedir saltos que
@@ -101,34 +109,16 @@ export class MecanicoPage implements OnInit, OnDestroy {
     return [actual, ...(this.siguientesCita[actual] || [])];
   }
 
-  // Cambio desde el <select>: si pide monto, lo pregunta; si se cancela, la vista revierte sola.
+  // Cambio desde el <select>. El mecánico no anota montos: el cobro lo registra recepción al entregar.
   onEstadoChange(cita: any, nuevo: string) {
     if (!nuevo || nuevo === cita.estado) return;
     this.cambiarEstado(cita, nuevo);
   }
 
-  async cambiarEstado(cita: any, estado: string) {
-    if (this.necesitaMonto(estado)) {
-      const al = await this.alert.create({
-        header: this.estadoLabel[estado],
-        message: 'Monto cobrado por el servicio (₡)',
-        inputs: [{ name: 'monto', type: 'number', value: cita.monto || '', placeholder: '0' }],
-        buttons: [
-          { text: 'Cancelar', role: 'cancel' },
-          { text: 'Guardar', handler: (data) => this.aplicarEstado(cita, estado, data.monto) },
-        ],
-      });
-      await al.present();
-      return;
-    }
-    this.aplicarEstado(cita, estado);
-  }
-
-  private aplicarEstado(cita: any, estado: string, monto?: any) {
-    this.mecanico.cambiarEstado(cita.id, estado, monto !== undefined ? Number(monto) || 0 : undefined).pipe(takeUntil(this.destroy$)).subscribe({
+  cambiarEstado(cita: any, estado: string) {
+    this.mecanico.cambiarEstado(cita.id, estado).pipe(takeUntil(this.destroy$)).subscribe({
       next: async () => {
         cita.estado = estado;
-        if (monto !== undefined) cita.monto = Number(monto) || 0;
         this.mecanico.getResumen().pipe(takeUntil(this.destroy$)).subscribe({ next: r => this.resumen = r.data });
         const t = await this.toast.create({ message: 'Estado actualizado', duration: 1400, color: 'success' });
         await t.present();

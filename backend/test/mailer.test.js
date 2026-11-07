@@ -16,7 +16,7 @@ test('enviarCodigoReset sin API key devuelve true y no usa fetch', async () => {
 
   try {
     const { enviarCodigoReset } = require('../src/services/mailer');
-    const ok = await enviarCodigoReset('user@correo.com', 'Ana', '123456', { nombre: 'Autos del Valle', slug: 'autos-del-valle' });
+    const ok = await enviarCodigoReset('user@correo.com', 'Ana', '123456');
     assert.equal(ok, true);
     assert.equal(fetchLlamado, false, 'no debe contactar a Resend sin API key');
   } finally {
@@ -81,7 +81,7 @@ test('el codigo de cambio va al correo nuevo y el aviso al viejo', async () => {
 
   try {
     const { enviarCodigoCambioCorreo, enviarAvisoCambioCorreo } = require('../src/services/mailer');
-    await enviarCodigoCambioCorreo('nuevo@correo.com', 'Ana', '482913', { nombre: 'Autos del Valle', slug: 'autos-del-valle' });
+    await enviarCodigoCambioCorreo('nuevo@correo.com', 'Ana', '482913');
     await enviarAvisoCambioCorreo('viejo@correo.com', 'Ana', 'nuevo@correo.com');
 
     const [codigo, aviso] = enviados;
@@ -115,13 +115,12 @@ test('la cabecera usa el logo solo si hay dominio publico', async () => {
 
     delete process.env.RAILWAY_PUBLIC_DOMAIN;
     delete process.env.APP_URL;
-    await enviarCodigoLogin('a@b.com', 'Ana', '111111', { nombre: 'Autos del Valle', slug: 'autos-del-valle' });
+    await enviarCodigoLogin('a@b.com', 'Ana', '111111');
     assert.ok(!ultimo.html.includes('<img'), 'sin dominio publico no debe haber <img>');
-    // La cabecera lleva el nombre de SU taller, no uno fijo del sistema.
-    assert.ok(ultimo.html.includes('Autos del Valle'), ultimo.html.slice(0, 200));
+    assert.ok(ultimo.html.includes('MS Motos') || ultimo.html.includes('Taller MS'));
 
     process.env.APP_URL = 'https://ejemplo.test/';
-    await enviarCodigoLogin('a@b.com', 'Ana', '111111', { nombre: 'Autos del Valle', slug: 'autos-del-valle' });
+    await enviarCodigoLogin('a@b.com', 'Ana', '111111');
     assert.ok(ultimo.html.includes('<img'), 'con dominio publico debe llevar el logo');
     // Apunta al endpoint, no al archivo del bundle: sirve el logo configurado por el
     // taller (guardado como data URL, inservible dentro de un correo) y si no hay,

@@ -1,13 +1,16 @@
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { ToastController, ActionSheetController, AlertController } from '@ionic/angular';
 import { Subject, interval } from 'rxjs';
 import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 import { RecepcionService, ResumenRecepcion } from '../../services/recepcion.service';
 import { AuthService } from '../../services/auth.service';
-import { abrirWhatsApp, mensajeCita } from '../../shared/utils/whatsapp.util';
+import { EntregaService } from '../../services/entrega.service';
+import { OrdenDesdeCitaService } from '../../services/orden-desde-cita.service';
+import { abrirWhatsApp, motoDe } from '../../shared/whatsapp.util';
+import { MensajesService } from '../../services/mensajes.service';
 import { alertaIcono, alertaColor, alertaTexto, haceTexto } from '../../shared/recepcion-alertas';
-import { ahoraTaller } from '../../shared/utils/fecha-cita.util';
+import { ahoraTaller } from '../../utils/fecha-cita';
 
 @Component({
   standalone: false,
@@ -16,13 +19,6 @@ import { ahoraTaller } from '../../shared/utils/fecha-cita.util';
   styleUrls: ['./recepcion.page.scss'],
 })
 export class RecepcionPage implements OnInit, OnDestroy {
-  private rec = inject(RecepcionService);
-  private auth = inject(AuthService);
-  private router = inject(Router);
-  private toast = inject(ToastController);
-  private actionSheet = inject(ActionSheetController);
-  private alertCtrl = inject(AlertController);
-
   private destroy$ = new Subject<void>();
   resumen?: ResumenRecepcion;
   citas: any[] = [];
@@ -30,6 +26,7 @@ export class RecepcionPage implements OnInit, OnDestroy {
   listas: any[] = [];   // órdenes listas para entregar
   cargando = true;
   entregando: number | null = null;
+  entregandoCita: number | null = null;
 
   // Buscador rápido (cliente / placa).
   buscarTexto = '';
@@ -63,7 +60,20 @@ export class RecepcionPage implements OnInit, OnDestroy {
   // Modo "trabajar los sin confirmar": muestra solo las citas por venir sin confirmar.
   soloSinConfirmar = false;
 
+  constructor(
+    private rec: RecepcionService,
+    private auth: AuthService,
+    private router: Router,
+    private toast: ToastController,
+    private actionSheet: ActionSheetController,
+    private alertCtrl: AlertController,
+    private entrega: EntregaService,
+    private ordenCita: OrdenDesdeCitaService,
+    private mensajes: MensajesService
+  ) {}
+
   ngOnInit() {
+    this.mensajes.precargar();
     this.cargar();
     interval(30000).pipe(takeUntil(this.destroy$)).subscribe(() => this.refrescarSilencioso());
     // Buscador con debounce: ≥2 caracteres consulta clientes; vacío limpia resultados.
@@ -118,6 +128,13 @@ export class RecepcionPage implements OnInit, OnDestroy {
   }
   setSucursalFiltro(v: number | '') { this.sucursalFiltro = v; }
   toggleSinConfirmar() { this.soloSinConfirmar = !this.soloSinConfirmar; }
+
+  // `grupos` se arma de nuevo en cada detección de cambios (y la pantalla refresca
+  // seguido: los contadores de espera). Sin trackBy, Angular recreaba todas las filas
+  // cada vez, y un toque en "Marcar llegada", "Crear orden" o "Entregar" podía caer
+  // en un botón que ya no existía y perderse.
+  porClave(_: number, g: { key: string }) { return g.key; }
+  porId(_: number, c: { id: number }) { return c.id; }
 
   // —— Fila viva del mostrador ——
   // Agrupa las citas de hoy por su momento en el flujo. Mutuamente excluyentes y
@@ -183,15 +200,14 @@ export class RecepcionPage implements OnInit, OnDestroy {
   // —— WhatsApp ——
   // Abre WhatsApp con el mensaje según el estado de la cita (recordatorio / lista / seguimiento).
   async whatsappCita(c: any) {
-    if (!abrirWhatsApp(c.cliente_telefono, mensajeCita(c))) {
+    if (!abrirWhatsApp(c.cliente_telefono, this.mensajes.deCita(c))) {
       const t = await this.toast.create({ message: 'Este cliente no tiene teléfono cargado', duration: 2200, color: 'warning' });
       await t.present();
     }
   }
   // Avisar por WhatsApp que una orden está lista para retirar.
   async whatsappLista(o: any) {
-    const vehiculo = [o.marca, o.modelo].filter(Boolean).join(' ') || 'tu vehiculo';
-    const msg = `Hola ${o.cliente_nombre} 👋, tu ${vehiculo} ya está lista para retirar (orden ${o.numero_orden}). ¡Te esperamos! 🏍️`;
+    const msg = this.mensajes.armar('orden_lista', { nombre: o.cliente_nombre, moto: motoDe(o), orden: o.numero_orden });
     if (!abrirWhatsApp(o.cliente_telefono, msg)) {
       const t = await this.toast.create({ message: 'Este cliente no tiene teléfono cargado', duration: 2200, color: 'warning' });
       await t.present();
@@ -206,8 +222,12 @@ export class RecepcionPage implements OnInit, OnDestroy {
   }
 
   // —— Alertas accionables ——
-  alertaClickable(a: any): boolean { return !!a.orden_id; }
-  abrirAlerta(a: any) { if (a.orden_id) this.router.navigate(['/detalle-orden', a.orden_id]); }
+  alertaClickable(a: any): boolean { return !!a.orden_id || (a.tipo === 'sin_entregar' && !!a.cita_id); }
+  abrirAlerta(a: any) {
+    if (a.orden_id) { this.router.navigate(['/detalle-orden', a.orden_id]); return; }
+    // Una cita sin orden lista hace días: se entrega desde la misma alerta.
+    if (a.tipo === 'sin_entregar' && a.cita_id) this.entregarCita({ id: a.cita_id, estado: 'listo', monto: a.monto });
+  }
 
   get nombre(): string { return this.auth.getUsuario()?.nombre || 'Recepción'; }
   get primerNombre(): string { return this.nombre.split(' ')[0]; }
@@ -236,56 +256,33 @@ export class RecepcionPage implements OnInit, OnDestroy {
   // —— Entrega + cobro desde el mostrador ——
   totalOrden(o: any): number { return Number(o.total ?? (Number(o.costo_mano_obra || 0) + Number(o.costo_repuestos || 0) - Number(o.descuento || 0))); }
 
-  // Paso 1: elegir método de pago (action sheet con el total a cobrar).
+  // Entregar una orden lista (diálogo compartido: forma de pago, garantía y factura).
   async entregar(o: any) {
     if (this.entregando) return;
-    const total = this.totalOrden(o);
-    const metodos = [
-      { text: 'Efectivo', val: 'efectivo', icon: 'cash-outline' },
-      { text: 'Tarjeta', val: 'tarjeta', icon: 'card-outline' },
-      { text: 'SINPE Móvil', val: 'sinpe', icon: 'phone-portrait-outline' },
-      { text: 'Transferencia', val: 'transferencia', icon: 'swap-horizontal-outline' },
-    ];
-    const sheet = await this.actionSheet.create({
-      header: `Cobrar ₡${total.toLocaleString('es-CR')} · ${o.numero_orden}`,
-      subHeader: 'Método de pago',
-      buttons: [
-        ...metodos.map(m => ({ text: m.text, icon: m.icon, handler: () => { this.confirmarEntrega(o, m.val); } })),
-        { text: 'Cancelar', icon: 'close', role: 'cancel' },
-      ],
-    });
-    await sheet.present();
-  }
-
-  // Paso 2: confirmar el cierre y registrar la entrega.
-  private async confirmarEntrega(o: any, metodo_pago: string) {
     this.entregando = o.id;
-    this.rec.entregarOrden(o.id, { metodo_pago, garantia_dias: 30 }).pipe(takeUntil(this.destroy$)).subscribe({
-      next: async (r) => {
-        this.entregando = null;
-        this.listas = this.listas.filter(x => x.id !== o.id);
-        if (this.resumen && this.resumen.ordenes_activas > 0) this.resumen.ordenes_activas--;
-        await this.ofrecerFactura(o, r.cortesia_ganada);
-      },
-      error: async (err) => {
-        this.entregando = null;
-        const t = await this.toast.create({ message: err.error?.error || 'No se pudo entregar la orden', duration: 2600, color: 'danger' });
-        await t.present();
-      },
-    });
+    const ok = await this.entrega.entregarOrden({ id: o.id, numero_orden: o.numero_orden, total: this.totalOrden(o), estado: 'lista_entrega' });
+    this.entregando = null;
+    if (ok) {
+      this.listas = this.listas.filter(x => x.id !== o.id);
+      if (this.resumen && this.resumen.ordenes_activas > 0) this.resumen.ordenes_activas--;
+    }
   }
 
-  // Tras entregar: ofrece abrir la factura (y avisa la cortesía si la ganó).
-  private async ofrecerFactura(o: any, cortesia: boolean) {
-    const al = await this.alertCtrl.create({
-      header: 'Orden entregada',
-      message: cortesia ? '¡El cliente ganó una cortesía! ¿Abrir la factura?' : '¿Abrir la factura?',
-      buttons: [
-        { text: 'Ahora no', role: 'cancel' },
-        { text: 'Ver factura', handler: () => this.router.navigate(['/factura', o.id]) },
-      ],
-    });
-    await al.present();
+  // Una cita sin orden (servicio rápido) ya atendida: se entrega desde el mostrador.
+  // Antes solo la podía cerrar el mecánico, y si se le olvidaba quedaba "Lista".
+  // Las casillas de su rol (Equipo → Roles): lo que no puede, no se le ofrece.
+  puede(permiso: string): boolean { return this.auth.puede(permiso); }
+
+  puedeEntregarCita(c: any): boolean {
+    return this.auth.puede('ordenes.entregar') && !c.orden_id && c.estado !== 'entregado' && c.estado !== 'cancelado' && (c.estado !== 'agendado' || !!c.hora_llegada);
+  }
+
+  async entregarCita(c: { id: number; estado?: string; monto?: any }) {
+    if (this.entregandoCita) return;
+    this.entregandoCita = c.id;
+    const ok = await this.entrega.entregarCita(c);
+    this.entregandoCita = null;
+    if (ok) this.cargar();
   }
 
   // Ícono / color / texto de cada evento del taller (compartido con la campana del header).
@@ -295,25 +292,18 @@ export class RecepcionPage implements OnInit, OnDestroy {
   hace = haceTexto;
 
   // Crea la orden de trabajo de una cita y abre su pantalla.
-  crearOrden(c: any) {
+  // Mismo paso a paso que en administración (OrdenDesdeCitaService): si la cita se
+  // agendó sin moto, la pide en vez de fallar.
+  async crearOrden(c: any) {
     if (this.creandoOrden) return;
     this.creandoOrden = c.id;
-    this.rec.crearOrdenDesdeCita(c.id).pipe(takeUntil(this.destroy$)).subscribe({
-      next: async (r) => {
-        this.creandoOrden = null;
-        c.orden_id = r.data.orden_id;
-        c.numero_orden = r.data.numero_orden;
-        if (c.estado === 'agendado') c.estado = 'en_revision';
-        const t = await this.toast.create({ message: `Orden ${r.data.numero_orden} creada`, duration: 1600, color: 'success' });
-        await t.present();
-        this.router.navigate(['/detalle-orden', r.data.orden_id]);
-      },
-      error: async (err) => {
-        this.creandoOrden = null;
-        const t = await this.toast.create({ message: err.error?.error || 'No se pudo crear la orden', duration: 2400, color: 'danger' });
-        await t.present();
-      },
-    });
+    const o = await this.ordenCita.crear({ id: c.id, cliente_id: c.cliente_id, fecha: c.fecha, moto_id: c.moto_id, cliente_nombre: c.cliente_nombre });
+    this.creandoOrden = null;
+    if (!o) return;
+    c.orden_id = o.orden_id;
+    c.numero_orden = o.numero_orden;
+    if (c.estado === 'agendado') c.estado = 'en_revision';
+    this.router.navigate(['/detalle-orden', o.orden_id]);
   }
 
   verOrden(c: any) { this.router.navigate(['/detalle-orden', c.orden_id]); }

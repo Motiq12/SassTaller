@@ -1,6 +1,7 @@
 // Migraciones idempotentes que corren al arrancar el servidor.
 // Seguras de ejecutar en cada deploy: solo aplican el cambio si falta.
 const { pool } = require('./pool');
+const { ROLES_FABRICA } = require('../utils/permisos');
 
 async function ensureSchema() {
   try {
@@ -49,7 +50,7 @@ async function ensureSchema() {
     // Fotos del portal (data URL base64, igual que orden_fotos/promos): avatar del
     // cliente y foto de cada moto. MEDIUMTEXT aguanta imágenes comprimidas (~16 MB máx).
     await addColumnIfMissing('clientes', 'foto', 'MEDIUMTEXT NULL');
-    await addColumnIfMissing('vehiculos', 'foto', 'MEDIUMTEXT NULL');
+    await addColumnIfMissing('motos', 'foto', 'MEDIUMTEXT NULL');
 
     // Preferencias de notificación por cliente (el cliente decide si quiere recibirlas).
     // notif_avances: avisos de cambio de estado de sus servicios (aplicado hoy).
@@ -111,6 +112,9 @@ async function ensureSchema() {
     // que se confirma. Así un error de tipeo no deja al cliente encerrado afuera — el
     // correo anterior sigue siendo el válido para entrar y para recuperar la contraseña.
     await addColumnIfMissing('clientes', 'email_pendiente', 'VARCHAR(150) NULL');
+    // Entrar con Google: la cuenta de Google unida al cliente (el `sub` del token).
+    await addColumnIfMissing('clientes', 'google_sub', 'VARCHAR(64) NULL');
+    await crearIndiceSiFalta('clientes', 'uq_clientes_google_sub', '(google_sub)', { unico: true });
     // Los códigos de verificación ahora sirven para dos cosas distintas ('registro' y
     // 'cambio'); sin distinguirlas, pedir uno invalidaría el otro.
     await addColumnIfMissing('email_verify_codes', 'proposito', "VARCHAR(20) NOT NULL DEFAULT 'registro'");
@@ -181,6 +185,9 @@ async function ensureSchema() {
     await addColumnIfMissing('citas', 'comentario_satisfaccion', 'TEXT NULL');
     await addColumnIfMissing('citas', 'fecha_inicio', 'TIMESTAMP NULL');
     await addColumnIfMissing('citas', 'fecha_fin', 'TIMESTAMP NULL');
+    // Forma de pago de una cita sin orden que se entrega en el mostrador (las órdenes
+    // ya la guardan en ordenes_trabajo.metodo_pago).
+    await addColumnIfMissing('citas', 'metodo_pago', 'VARCHAR(30) NULL');
     // El cliente confirma que asistirá a su cita agendada (señal de no-show para el taller).
     await addColumnIfMissing('citas', 'confirmada_cliente', 'TINYINT(1) DEFAULT 0');
     // Check-in en mostrador: momento en que el cliente llegó al taller (antes de crear la orden).
@@ -277,27 +284,24 @@ async function ensureSchema() {
     // una conversación se busca como A→B y como B→A.
     await crearIndiceSiFalta('mensajes_internos', 'idx_msg_par', '(remitente_id, destino_id, created_at)');
     await crearIndiceSiFalta('mensajes_internos', 'idx_msg_par_inv', '(destino_id, remitente_id, created_at)');
+    // Los avisos (broadcast) se filtran por rol y se ordenan por fecha.
+    // En una base nueva la columna `tipo` todavía no existe acá (se agrega más abajo,
+    // en "Mensajería interna v2"): se intenta sin abortar y se repite después de crearla.
+    await tryStep('idx_msg_broadcast', () =>
+      crearIndiceSiFalta('mensajes_internos', 'idx_msg_broadcast', '(tipo, destino_rol, created_at)'));
 
     // Placa única a nivel de base (no solo en la app). Columna generada normalizada
     // (sin espacios/guiones, mayúsculas) + índice único. Se guarda cada paso por
     // separado para que, si hay placas duplicadas heredadas, el índice falle sin
     // abortar el resto de la migración (la validación de la app sigue cubriendo).
-    await tryStep('vehiculos.placa_norm', () =>
+    await tryStep('motos.placa_norm', () =>
       addColumnIfMissing(
-        'vehiculos', 'placa_norm',
+        'motos', 'placa_norm',
         "VARCHAR(32) AS (UPPER(REPLACE(REPLACE(placa,' ',''),'-',''))) STORED"
       )
     );
-    // La placa es única DENTRO de cada taller, no en todo el SaaS: que otro taller
-    // atienda esa moto no es asunto de este. El índice global anterior
-    // (uq_vehiculos_placa_norm) se elimina si sobrevive de una versión previa —si no,
-    // este mismo arranque volvería a imponer unicidad entre talleres y el segundo
-    // que registre la placa recibiría un choque que no le corresponde.
-    await tryStep('uq_vehiculos_tenant', () =>
-      crearIndiceSiFalta('vehiculos', 'uq_vehiculos_tenant', '(tenant_id, placa_norm)', { unico: true })
-    );
-    await tryStep('quitar uq_vehiculos_placa_norm global', () =>
-      borrarIndiceSiExiste('vehiculos', 'uq_vehiculos_placa_norm')
+    await tryStep('uq_motos_placa_norm', () =>
+      crearIndiceSiFalta('motos', 'uq_motos_placa_norm', '(placa_norm)', { unico: true })
     );
 
     // Panel del mecánico v2: perfil profesional (lo edita el propio técnico).
@@ -419,18 +423,25 @@ async function ensureSchema() {
     await addColumnIfMissing('configuracion', 'garantia_dias', 'INT DEFAULT 30');
     // Formas de pago del cierre de orden. JSON [{valor, etiqueta}]; NULL = las de fábrica.
     await addColumnIfMissing('configuracion', 'metodos_pago', 'JSON NULL');
+    // Datos de facturación: van en el encabezado y el pie del comprobante de la orden.
+    await addColumnIfMissing('configuracion', 'razon_social', 'VARCHAR(150) NULL');
+    await addColumnIfMissing('configuracion', 'cedula_juridica', 'VARCHAR(30) NULL');
+    await addColumnIfMissing('configuracion', 'nota_factura', 'VARCHAR(300) NULL');
+    // Contraseñas del personal (utils/contrasena.js): largo mínimo y si piden letras y números.
+    await addColumnIfMissing('configuracion', 'pass_min_largo', 'TINYINT UNSIGNED DEFAULT 8');
+    await addColumnIfMissing('configuracion', 'pass_variedad', 'TINYINT(1) DEFAULT 0');
+    // Mensajes al cliente reescritos por el taller (utils/plantillas.js). NULL = los de fábrica.
+    await addColumnIfMissing('configuracion', 'plantillas', 'JSON NULL');
+    // Textos del portal que escribe el taller (utils/textos-portal.js). NULL = los de fábrica.
+    await addColumnIfMissing('configuracion', 'portal_textos', 'JSON NULL');
     // Siembra la fila única con valores por defecto (idempotente: INSERT IGNORE).
     // Horarios: 0=Dom … 6=Sáb. L-V 08-17, Sáb 08-13, Dom cerrado.
     await tryStep('seed configuracion', () =>
       pool.query(
-        // Configuración del primer taller (tenant 1). El nombre va genérico: decía
-        // "MS Motos", y como es un INSERT IGNORE solo pega en instalaciones nuevas —
-        // o sea que cualquiera que montara Motiq desde cero arrancaba con el nombre
-        // del taller original. Lo cambia en su configuración al entrar.
         `INSERT IGNORE INTO configuracion
-           (tenant_id, id, nombre_taller, telefono, email, direccion,
+           (id, nombre_taller, telefono, email, direccion,
             max_citas_hora, dias_anticipacion, duracion_cita_min, horarios)
-         VALUES (1, 1, 'Mi taller', '', '', '', 2, 30, 90, ?)`,
+         VALUES (1, 'MS Motos', '', '', '', 2, 30, 90, ?)`,
         [JSON.stringify([
           { dia: 0, abre: '08:00', cierra: '13:00', activo: 0 },
           { dia: 1, abre: '08:00', cierra: '17:00', activo: 1 },
@@ -460,12 +471,7 @@ async function ensureSchema() {
       )
     `);
     await tryStep('seed sucursales', () =>
-      // Primera sucursal del tenant 1, con nombre genérico. Antes sembraba "Liberia"
-      // y "Cañas", que son las sedes reales del taller de donde salió este sistema:
-      // en una instalación nueva aparecían dos locales inventados que el dueño tenía
-      // que borrar. Los talleres que se dan de alta crean la suya en el onboarding.
-      // El id 1 se mantiene fijo porque el backfill de datos viejos lo asume.
-      pool.query("INSERT IGNORE INTO sucursales (tenant_id, id, nombre, orden) VALUES (1, 1, 'Principal', 1)")
+      pool.query("INSERT IGNORE INTO sucursales (id, nombre, orden) VALUES (1, 'Liberia', 1), (2, 'Cañas', 2)")
     );
 
     // Catálogo de servicios editable desde el panel. Antes vivía hardcodeado en
@@ -475,54 +481,50 @@ async function ensureSchema() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS servicios (
         id         INT AUTO_INCREMENT PRIMARY KEY,
-        tenant_id  INT NOT NULL,
         nombre     VARCHAR(120) NOT NULL,
         activo     TINYINT(1) NOT NULL DEFAULT 1,
         orden      INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        -- El nombre es único por taller: dos talleres pueden ofrecer "Cambio de aceite".
-        UNIQUE KEY uq_servicios_tenant (tenant_id, nombre)
+        UNIQUE KEY uq_servicio_nombre (nombre)
       )
     `);
     // Semilla con los dos catálogos que estaban dispersos, unificados. Sin esto, al
-    // desplegar el portal se quedaría sin nada que ofrecer. INSERT IGNORE + UNIQUE
-    // lo hace idempotente y respeta cualquier edición posterior del taller.
-    // El catálogo es POR TALLER, así que la semilla se cruza contra tenants en vez de
-    // insertar filas sueltas: cada taller existente arranca con la lista completa y
-    // puede editarla sin afectar a los demás. INSERT IGNORE contra el único
-    // (tenant_id, nombre) lo mantiene idempotente y respeta ediciones posteriores.
-    await tryStep('seed servicios', () =>
-      pool.query(
-        `INSERT IGNORE INTO servicios (tenant_id, nombre, orden)
-         SELECT t.id, v.nombre, v.orden
-         FROM tenants t
-         JOIN (
-                     SELECT 'Cambio de aceite y filtros' AS nombre, 1 AS orden
-           UNION ALL SELECT 'Revisión completa', 2
-           UNION ALL SELECT 'Cambio de pastillas de freno', 3
-           UNION ALL SELECT 'Kit de transmisión (cadena y piñones)', 4
-           UNION ALL SELECT 'Diagnóstico electrónico', 5
-           UNION ALL SELECT 'Cambio de neumáticos', 6
-           UNION ALL SELECT 'Mantenimiento preventivo', 7
-           UNION ALL SELECT 'Sistema eléctrico', 8
-           UNION ALL SELECT 'Afinamiento', 9
-           UNION ALL SELECT 'Otro', 99
-         ) v`
-      )
-    );
-    // Los servicios que ya se usaron en citas pero no están en la semilla (nombres
-    // viejos del formulario de recepción) se incorporan para no perder trazabilidad.
-    await tryStep('incorporar servicios historicos', () =>
-      pool.query(
-        `INSERT IGNORE INTO servicios (nombre, orden)
-         SELECT DISTINCT TRIM(tipo_servicio), 50 FROM citas
-         WHERE tipo_servicio IS NOT NULL AND TRIM(tipo_servicio) <> ''`
-      )
-    );
+    // desplegar el portal se quedaría sin nada que ofrecer.
+    // Solo con la tabla vacía (una base nueva). Antes corría en cada arranque y,
+    // como compara por nombre, si el taller renombraba un servicio de fábrica
+    // ("Afinamiento" → "Afinado") el próximo despliegue volvía a crear el nombre
+    // viejo y quedaban los dos. Lo mismo con los nombres de citas viejas.
+    const [[{ nServicios }]] = await pool.query('SELECT COUNT(*) AS nServicios FROM servicios');
+    if (!Number(nServicios)) {
+      await tryStep('seed servicios', () =>
+        pool.query(
+          `INSERT IGNORE INTO servicios (nombre, orden) VALUES
+             ('Cambio de aceite y filtros', 1),
+             ('Revisión completa', 2),
+             ('Cambio de pastillas de freno', 3),
+             ('Kit de transmisión (cadena y piñones)', 4),
+             ('Diagnóstico electrónico', 5),
+             ('Cambio de neumáticos', 6),
+             ('Mantenimiento preventivo', 7),
+             ('Sistema eléctrico', 8),
+             ('Afinamiento', 9),
+             ('Otro', 99)`
+        )
+      );
+      // Los servicios que ya se usaron en citas pero no están en la semilla (nombres
+      // viejos del formulario de recepción) se incorporan para no perder trazabilidad.
+      await tryStep('incorporar servicios historicos', () =>
+        pool.query(
+          `INSERT IGNORE INTO servicios (nombre, orden)
+           SELECT DISTINCT TRIM(tipo_servicio), 50 FROM citas
+           WHERE tipo_servicio IS NOT NULL AND TRIM(tipo_servicio) <> ''`
+        )
+      );
+    }
 
-    // Columna sucursal_id, sin FK (igual que citas.tecnico_id/orden_id): las claves
-    // foráneas vienen en el volcado de backend/db/. NULL en usuarios = "atiende ambas".
+    // Columna sucursal_id (sin FK aquí, igual que citas.tecnico_id/orden_id; las FK van
+    // solo en schema.sql para instalación limpia). NULL en usuarios = "atiende ambas".
     await addColumnIfMissing('citas', 'sucursal_id', 'INT NULL');
     await addColumnIfMissing('ordenes_trabajo', 'sucursal_id', 'INT NULL');
     await addColumnIfMissing('usuarios', 'sucursal_id', 'INT NULL');
@@ -548,14 +550,25 @@ async function ensureSchema() {
       console.log('🔧 Migración: orden_repuestos.estado → +solicitado');
     }
 
+    // Adicionales: cuánto aprobó el cliente, para volver a pedirle aprobación si la
+    // cuenta sube con el trabajo ya en marcha, y qué repuestos se sumaron después.
+    // Las órdenes que ya estaban aprobadas toman como aprobado el total que tienen hoy.
+    const [[conTotalAprobado]] = await pool.query(
+      `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ordenes_trabajo' AND COLUMN_NAME = 'total_aprobado'`
+    );
+    await addColumnIfMissing('ordenes_trabajo', 'total_aprobado', 'DECIMAL(10,2) NULL');
+    if (!conTotalAprobado.n) {
+      await pool.query(
+        "UPDATE ordenes_trabajo SET total_aprobado = costo_mano_obra + costo_repuestos - descuento WHERE aprobacion_cliente = 'aprobado'"
+      );
+    }
+    await addColumnIfMissing('orden_repuestos', 'adicional', 'TINYINT(1) NOT NULL DEFAULT 0');
+
     // Mensajería interna v2: foto, vínculo a orden y soporte de broadcast.
     await addColumnIfMissing('mensajes_internos', 'foto', 'MEDIUMTEXT NULL');
     await addColumnIfMissing('mensajes_internos', 'orden_id', 'INT NULL');
     await addColumnIfMissing('mensajes_internos', 'tipo', "VARCHAR(20) NOT NULL DEFAULT 'directo'");
-    // Los avisos (broadcast) se filtran por rol y se ordenan por fecha. El índice va
-    // aquí y no junto a los demás de mensajería porque necesita que `tipo` ya exista:
-    // en una base nueva se creaba antes que la columna y abortaba el resto de la
-    // migración (en bases ya migradas el error no aparecía).
     await crearIndiceSiFalta('mensajes_internos', 'idx_msg_broadcast', '(tipo, destino_rol, created_at)');
 
     // Mensajería interna v3: sucursal (para filtrar por sede) y lectura POR USUARIO.
@@ -588,255 +601,420 @@ async function ensureSchema() {
     await tryStep('fk ordenes.sucursal_id', () => addFkIfMissing('ordenes_trabajo', 'fk_ordenes_sucursal', 'sucursal_id', 'sucursales', 'id'));
     await tryStep('fk usuarios.sucursal_id', () => addFkIfMissing('usuarios', 'fk_usuarios_sucursal', 'sucursal_id', 'sucursales', 'id'));
 
-    // ---- Plataforma (migraciones 004 y 005) ----
-    // Van acá y no solo en migrations/*.sql para que una base que ya existía se ponga
-    // al día sola al arrancar. Sin esto, quien no reimporte el volcado arranca sin
-    // estas tablas y el panel de Motiq revienta al primer request.
-    //
-    // plataforma_admins NO es una tabla de taller: no lleva tenant_id, y su correo es
-    // único global. Es la diferencia de fondo con `usuarios`, donde el mismo correo
-    // puede repetirse en talleres distintos.
-    await tryStep('tabla plataforma_admins', () => pool.query(
-      `CREATE TABLE IF NOT EXISTS plataforma_admins (
-         id            INT AUTO_INCREMENT PRIMARY KEY,
-         nombre        VARCHAR(120) NOT NULL,
-         email         VARCHAR(150) NOT NULL,
-         password_hash VARCHAR(255) NOT NULL,
-         activo        TINYINT(1) NOT NULL DEFAULT 1,
-         ultimo_acceso DATETIME NULL,
-         created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-         updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-         UNIQUE KEY uq_plataforma_email (email)
-       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
-    ));
-    await addColumnIfMissing('tenants', 'motivo_estado', 'VARCHAR(200) NULL');
-    await addColumnIfMissing('tenants', 'trial_hasta', 'DATE NULL');
-    await crearIndiceSiFalta('tenants', 'idx_tenants_estado', '(estado)');
+    // El cliente solo ve CITAS en el portal (el avance de la orden se le muestra dentro
+    // de su cita). Una orden abierta sin cita (cliente que llegó sin agendar, u orden
+    // creada en administración) no le aparecía. Ahora toda orden tiene su cita:
+    // creada_por_orden = 1 marca las que se crearon solas para eso, y se borran junto
+    // con la orden si esta se elimina.
+    await addColumnIfMissing('citas', 'creada_por_orden', 'TINYINT(1) NOT NULL DEFAULT 0');
+    await tryStep('citas para órdenes sin cita', citasParaOrdenesSinCita);
 
-    // El espacio de trabajo de cada administrador de Motiq (migración 008). Los datos
-    // del SaaS son compartidos —los dos administran todo—, pero los pendientes, los
-    // talleres que cada uno sigue y lo que hizo cada uno son suyos.
-    await tryStep('tabla motiq_tareas', () => pool.query(
-      `CREATE TABLE IF NOT EXISTS motiq_tareas (
-         id         INT AUTO_INCREMENT PRIMARY KEY,
-         admin_id   INT NOT NULL,
-         texto      VARCHAR(300) NOT NULL,
-         tenant_id  INT NULL,
-         vence_el   DATE NULL,
-         hecha      TINYINT(1) NOT NULL DEFAULT 0,
-         hecha_en   DATETIME NULL,
-         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-         INDEX idx_tareas_admin (admin_id, hecha, vence_el),
-         FOREIGN KEY (admin_id) REFERENCES plataforma_admins(id) ON DELETE CASCADE
-       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
-    ));
-    await tryStep('tabla motiq_seguidos', () => pool.query(
-      `CREATE TABLE IF NOT EXISTS motiq_seguidos (
-         admin_id   INT NOT NULL,
-         tenant_id  INT NOT NULL,
-         nota       VARCHAR(300) NULL,
-         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-         PRIMARY KEY (admin_id, tenant_id),
-         FOREIGN KEY (admin_id) REFERENCES plataforma_admins(id) ON DELETE CASCADE
-       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
-    ));
-    // El tenant_id de la bitácora NO lleva clave foránea: cuando se borra un taller,
-    // su línea tiene que sobrevivir. Es justo la que hay que poder leer después.
-    await tryStep('tabla motiq_bitacora', () => pool.query(
-      `CREATE TABLE IF NOT EXISTS motiq_bitacora (
-         id          INT AUTO_INCREMENT PRIMARY KEY,
-         admin_id    INT NULL,
-         admin_email VARCHAR(150) NULL,
-         accion      VARCHAR(40) NOT NULL,
-         tenant_id   INT NULL,
-         tenant_slug VARCHAR(120) NULL,
-         detalle     VARCHAR(300) NULL,
-         created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-         INDEX idx_bitacora_admin (admin_id, created_at),
-         INDEX idx_bitacora_fecha (created_at)
-       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
-    ));
-
-    // Los límites y el precio de cada plan (migración 009), editables desde el panel
-    // de Motiq. Antes vivían solo como constantes en utils/limites.js; esta tabla les
-    // da un valor que se puede cambiar sin tocar código ni redesplegar. utils/limites.js
-    // sigue siendo la fuente de verdad de la FORMA de un plan (qué campos tiene) — acá
-    // solo se guardan los valores, y si la tabla está vacía o no existe, ese archivo
-    // sigue funcionando con sus valores de siempre.
-    await tryStep('tabla planes_config', () => pool.query(
-      `CREATE TABLE IF NOT EXISTS planes_config (
-         plan              VARCHAR(20) PRIMARY KEY,
-         precio_mensual    INT NOT NULL DEFAULT 0,
-         limite_usuarios   INT NULL,
-         limite_sucursales INT NULL,
-         marca_propia      TINYINT(1) NOT NULL DEFAULT 0,
-         reportes_dias     INT NULL,
-         updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
-    ));
-    // Semilla con los mismos valores que utils/limites.js trae de fábrica. INSERT IGNORE
-    // para que solo pegue la primera vez: una instalación donde alguien ya editó el
-    // precio del plan Pro no puede volver a "gratis" cada vez que el server reinicia.
-    await tryStep('semilla planes_config', () => pool.query(
-      `INSERT IGNORE INTO planes_config (plan, precio_mensual, limite_usuarios, limite_sucursales, marca_propia, reportes_dias) VALUES
-         ('trial',  0, NULL, NULL, 1, NULL),
-         ('gratis', 0, 2,    1,    0, 30),
-         ('pro',    0, NULL, NULL, 1, NULL)`
-    ));
-
-    // Avisos de la plataforma hacia el personal de los talleres (migración 010):
-    // mantenimiento programado, una función nueva, lo que sea que Motiq necesite
-    // avisar. NO es mensajeria_internos — esa es de un taller hacia su propia gente
-    // y va scopeada por tenant_id (ver backend/src/routes/mensajeria.routes.js); esta
-    // tabla es deliberadamente global y sin tenant_id: la escribe Motiq, la lee
-    // cualquier taller.
-    await tryStep('tabla avisos_plataforma', () => pool.query(
-      `CREATE TABLE IF NOT EXISTS avisos_plataforma (
-         id          INT AUTO_INCREMENT PRIMARY KEY,
-         mensaje     VARCHAR(500) NOT NULL,
-         tipo        ENUM('info','mantenimiento','urgente') NOT NULL DEFAULT 'info',
-         activo      TINYINT(1) NOT NULL DEFAULT 1,
-         vence_el    DATETIME NULL,
-         admin_id    INT NULL,
-         admin_email VARCHAR(150) NULL,
-         created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-         updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-         INDEX idx_avisos_activo (activo, created_at)
-       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
-    ));
-    // migración 011: instalaciones que ya tenían avisos_plataforma sin vence_el.
-    await addColumnIfMissing('avisos_plataforma', 'vence_el', 'DATETIME NULL');
-
-    // Fallas que reporta el PERSONAL de un taller hacia Motiq (migración 012) — al
-    // revés de avisos_plataforma, que va de Motiq hacia los talleres. tenant_id NO
-    // lleva clave foránea, mismo motivo que motiq_bitacora: si el taller se da de
-    // baja, el reporte tiene que sobrevivir, y por eso se guarda también una foto del
-    // nombre y el slug (tenant_nombre/tenant_slug) en vez de depender de un JOIN que
-    // dejaría de encontrar la fila.
-    await tryStep('tabla reportes_falla', () => pool.query(
-      `CREATE TABLE IF NOT EXISTS reportes_falla (
-         id             INT AUTO_INCREMENT PRIMARY KEY,
-         tenant_id      INT NULL,
-         tenant_nombre  VARCHAR(150) NULL,
-         tenant_slug    VARCHAR(120) NULL,
-         usuario_id     INT NULL,
-         usuario_nombre VARCHAR(120) NULL,
-         usuario_email  VARCHAR(150) NULL,
-         usuario_rol    VARCHAR(20) NULL,
-         descripcion    TEXT NOT NULL,
-         pantalla       VARCHAR(200) NULL,
-         estado         ENUM('nuevo','revisando','resuelto','descartado') NOT NULL DEFAULT 'nuevo',
-         nota_interna   VARCHAR(500) NULL,
-         created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-         updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-         INDEX idx_reportes_estado (estado, created_at)
-       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
-    ));
-
-    // Quien pide una demo desde la landing. Tampoco lleva tenant_id: todavía no es
-    // un taller del sistema, es alguien de afuera preguntando.
-    await tryStep('tabla contactos_demo', () => pool.query(
-      `CREATE TABLE IF NOT EXISTS contactos_demo (
-         id           INT AUTO_INCREMENT PRIMARY KEY,
-         nombre       VARCHAR(120) NOT NULL,
-         email        VARCHAR(150) NOT NULL,
-         telefono     VARCHAR(40)  NULL,
-         empresa      VARCHAR(150) NULL,
-         volumen      VARCHAR(40)  NULL,
-         mensaje      TEXT NULL,
-         estado       ENUM('nuevo','contactado','cerrado','descartado') NOT NULL DEFAULT 'nuevo',
-         nota_interna VARCHAR(500) NULL,
-         origen       VARCHAR(80) NULL,
-         created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-         updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-         INDEX idx_contactos_estado (estado, created_at)
-       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
-    ));
-
-    // Datos de ejemplo: un taller que está evaluando el sistema no puede juzgar una
-    // lista vacía, pero los datos de mentira tienen que poder irse de un botón. La
-    // marca va en la fila y no en una tabla aparte porque el borrado tiene que ser
-    // exacto — "todo lo creado ese día" se llevaría por delante lo que cargó de verdad.
-    for (const tabla of ['clientes', 'vehiculos', 'ordenes_trabajo', 'citas']) {
-      await addColumnIfMissing(tabla, 'es_ejemplo', 'TINYINT(1) NOT NULL DEFAULT 0');
+    // Roles del personal con sus casillas (utils/permisos.js). Los cuatro de fábrica se
+    // crean una vez con lo que cada rol podía hacer antes; si ya están, no se tocan
+    // (más adelante se podrán editar desde el panel).
+    // La pantalla de roles compara usuarios.rol con roles.clave, y MySQL no compara
+    // textos de dos collations distintas ("Illegal mix of collations"). Por eso la
+    // tabla no fija una: se crea con la de la base y después se iguala a la que tenga
+    // usuarios.rol (ver igualarColacionDeRoles). Fijar utf8mb4_unicode_ci servía en una
+    // base local, pero en producción usuarios usa utf8mb4_0900_ai_ci y la pantalla
+    // Equipo → Roles fallaba.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS roles (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        clave VARCHAR(30) NULL,
+        nombre VARCHAR(60) NOT NULL,
+        base ENUM('administracion','mostrador','taller','web') NOT NULL,
+        descripcion VARCHAR(200) NULL,
+        permisos TEXT NULL,
+        de_fabrica TINYINT(1) NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_roles_clave (clave)
+      ) DEFAULT CHARSET=utf8mb4`);
+    await tryStep('roles: misma collation que usuarios', igualarColacionDeRoles);
+    // El rol propio de cada empleado (roles.id). NULL = el de fábrica de su usuarios.rol.
+    // Sin clave foránea a propósito: si se borra un rol, quien lo tenía vuelve solo al de
+    // fábrica (middleware/permisos.js), en vez de trabarse el borrado.
+    await addColumnIfMissing('usuarios', 'rol_id', 'INT NULL');
+    // Seguridad del personal (utils/sesiones.js): los tokens firmados antes de este
+    // momento (ms) ya no valen; y cuándo entró por última vez.
+    await addColumnIfMissing('usuarios', 'sesiones_desde_ms', 'BIGINT NULL');
+    await addColumnIfMissing('usuarios', 'ultimo_ingreso', 'TIMESTAMP NULL');
+    for (const r of ROLES_FABRICA) {
+      await pool.query(
+        'INSERT IGNORE INTO roles (clave, nombre, base, descripcion, permisos, de_fabrica) VALUES (?, ?, ?, ?, ?, 1)',
+        [r.clave, r.nombre, r.base, r.descripcion, JSON.stringify(r.permisos)]
+      );
     }
 
-    // Si el taller cerró a mano el checklist de arranque. Es lo ÚNICO que se guarda de
-    // él: los cuatro pasos se derivan de los datos (¿tiene logo?, ¿hay más de un
-    // usuario?, ¿hay alguna orden?), porque un progreso guardado aparte puede terminar
-    // diciendo que algo está hecho cuando ya no lo está.
-    await addColumnIfMissing('configuracion', 'arranque_oculto', 'TINYINT(1) NOT NULL DEFAULT 0');
+    // Registro de cada respaldo de la base (Configuración → Respaldos): cuándo, si
+    // salió bien y qué tenía. Se guardan los últimos 200 (jobs/respaldo.js).
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS respaldos_registro (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        origen ENUM('automatico','panel') NOT NULL DEFAULT 'automatico',
+        ok TINYINT(1) NOT NULL,
+        clave VARCHAR(255) NULL,
+        bytes BIGINT NULL,
+        tablas INT NULL,
+        filas INT NULL,
+        segundos INT NULL,
+        cifrado TINYINT(1) NULL,
+        error VARCHAR(500) NULL,
+        usuario_id INT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) DEFAULT CHARSET=utf8mb4`);
 
-    // Correo del personal verificado.
-    //
-    // Por defecto 1, no 0: los usuarios que ya existían se crearon cuando esto no se
-    // pedía, y marcarlos a todos como sin verificar les pondría un aviso en pantalla
-    // por algo que nunca se les pidió. Los nuevos dueños de taller salen con 0 desde
-    // el alta (ver utils/onboarding).
-    await addColumnIfMissing('usuarios', 'email_verificado', 'TINYINT(1) NOT NULL DEFAULT 1');
+    // Duración de la cita en horas (la cambia administración): ocupa su lugar en cada
+    // hora que dura. 24 = todo el día (hasta el cierre). Ver utils/agenda.js.
+    await addColumnIfMissing('citas', 'duracion_horas', 'TINYINT UNSIGNED NOT NULL DEFAULT 1');
 
-    // Códigos de verificación del PERSONAL. Tabla aparte de email_verify_codes a
-    // propósito: esa tiene cliente_id NOT NULL con clave foránea a clientes, y meter
-    // ahí un usuario obligaría a aflojar esa restricción —la que hoy garantiza que
-    // ningún código quede huérfano— para ahorrarse una tabla de seis columnas.
-    await tryStep('tabla usuario_verify_codes', () => pool.query(
-      `CREATE TABLE IF NOT EXISTS usuario_verify_codes (
-         id         INT AUTO_INCREMENT PRIMARY KEY,
-         tenant_id  INT NOT NULL,
-         usuario_id INT NOT NULL,
-         code_hash  VARCHAR(255) NOT NULL,
-         expires_at DATETIME NOT NULL,
-         used       TINYINT(1) NOT NULL DEFAULT 0,
-         attempts   INT NOT NULL DEFAULT 0,
-         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-         KEY idx_uvc_usuario (usuario_id),
-         KEY idx_uvc_tenant (tenant_id),
-         CONSTRAINT fk_uvc_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id),
-         CONSTRAINT fk_uvc_tenant  FOREIGN KEY (tenant_id)  REFERENCES tenants (id)
-       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
-    ));
+    // Horas o días bloqueados por administración: no se ofrecen para agendar.
+    // Sin sucursal = las dos sedes; sin horas = el día entero.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS bloqueos_horario (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        sucursal_id INT NULL,
+        fecha_desde DATE NOT NULL,
+        fecha_hasta DATE NOT NULL,
+        hora_desde TIME NULL,
+        hora_hasta TIME NULL,
+        motivo VARCHAR(150) NOT NULL,
+        creado_por INT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_bloqueos_fechas (fecha_desde, fecha_hasta)
+      )`);
 
-    // ── Índices: el taller va PRIMERO ────────────────────────────────────────
-    //
-    // Toda consulta del sistema lleva `tenant_id = ?` (lo obliga el guard de
-    // tenant-db). Un índice que arranca por `fecha` o por `nombre` deja a MySQL
-    // entrar por ahí y descartar después las filas de los otros talleres: con dos
-    // clientes no se nota, con doscientos cada taller paga el costo de leer la
-    // agenda de todos.
-    //
-    // Se crea el nuevo ANTES de borrar el viejo, siempre: si el índice respalda una
-    // clave foránea, InnoDB rechaza el DROP mientras no haya otro que la cubra.
-    const reindexar = [
-      ['citas',             'idx_citas_tenant_fecha',      '(tenant_id, fecha, hora)',                    'idx_citas_fecha_hora'],
-      ['clientes',          'idx_clientes_tenant_nombre',  '(tenant_id, activo, nombre, apellido)',       'idx_clientes_activo_nombre'],
-      ['mensajes_internos', 'idx_msg_tenant_broadcast',    '(tenant_id, tipo, destino_rol, created_at)',  'idx_msg_broadcast'],
-      ['mensajes_internos', 'idx_msg_tenant_sucursal',     '(tenant_id, sucursal_id)',                    'idx_msg_sucursal'],
-      ['mensaje_lecturas',  'idx_ml_tenant_usuario',       '(tenant_id, usuario_id)',                     'idx_ml_usuario'],
-      ['web_vitals',        'idx_wv_tenant_metrica',       '(tenant_id, metrica, created_at)',            'idx_wv_metrica'],
-      ['web_vitals',        'idx_wv_tenant_ruta',          '(tenant_id, ruta)',                           'idx_wv_ruta'],
-      // Restos del renombre motos → vehículos: el índice se sigue llamando `moto_id`
-      // aunque la columna es `vehiculo_id`. Respaldan una FK, así que el orden
-      // crear-y-después-borrar no es una preferencia de estilo: sin él, el DROP falla.
-      ['citas',             'idx_citas_vehiculo',          '(vehiculo_id)',                               'moto_id'],
-      ['ordenes_trabajo',   'idx_ordenes_vehiculo',        '(vehiculo_id)',                               'moto_id'],
-    ];
-    for (const [tabla, nuevo, columnas, viejo] of reindexar) {
-      await tryStep(`índice ${nuevo}`, async () => {
-        await crearIndiceSiFalta(tabla, nuevo, columnas);
-        await borrarIndiceSiExiste(tabla, viejo);
-      });
-    }
+    // Feriados que se repiten todos los años (mes y día): la agenda los bloquea enteros.
+    // Sin sucursal = todas las sedes. Ver utils/feriados.js.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS feriados (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        mes TINYINT UNSIGNED NOT NULL,
+        dia TINYINT UNSIGNED NOT NULL,
+        nombre VARCHAR(80) NOT NULL,
+        sucursal_id INT NULL,
+        creado_por INT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_feriados_fecha (mes, dia)
+      ) DEFAULT CHARSET=utf8mb4`);
 
-    // Claves foráneas duplicadas en `citas`: quedaron dos constraints sobre la misma
-    // columna (el de nombre automático de MySQL y otro con nombre propio, agregado por
-    // una migración posterior). No rompen nada, pero InnoDB comprueba las dos en cada
-    // alta y cada cambio de cita.
-    await quitarFkDuplicadas('citas', 'tecnico_id');
-    await quitarFkDuplicadas('citas', 'sucursal_id');
+    // Órdenes eliminadas: quién, cuándo y por qué, con una copia de lo principal
+    // (la orden y lo que colgaba de ella se borran de verdad).
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ordenes_eliminadas (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        orden_id INT NOT NULL,
+        numero_orden VARCHAR(30) NOT NULL,
+        estado VARCHAR(30) NOT NULL,
+        cliente_id INT NULL,
+        cliente_nombre VARCHAR(200) NULL,
+        moto VARCHAR(200) NULL,
+        problema_reportado TEXT NULL,
+        total DECIMAL(10,2) NOT NULL DEFAULT 0,
+        fecha_ingreso DATETIME NULL,
+        motivo VARCHAR(500) NOT NULL,
+        eliminada_por INT NULL,
+        eliminada_por_nombre VARCHAR(150) NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_oe_created (created_at)
+      )`);
+
+    // Mi perfil del personal: preferencias propias (pantalla de inicio, sede, avisos
+    // que no quiere ver) y la firma que sale en las facturas que emite.
+    await addColumnIfMissing('usuarios', 'preferencias', 'TEXT NULL');
+    await addColumnIfMissing('usuarios', 'firma', 'MEDIUMTEXT NULL');
+    // Cada ingreso del personal es una sesión con su dispositivo (utils/sesiones.js):
+    // la persona ve dónde está conectada y puede cerrar una sola.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS sesiones_personal (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        usuario_id INT NOT NULL,
+        sid CHAR(32) NOT NULL,
+        agente VARCHAR(255) NULL,
+        ip VARCHAR(64) NULL,
+        creada TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        ultima_vez TIMESTAMP NULL,
+        vence TIMESTAMP NULL,
+        cerrada TIMESTAMP NULL,
+        UNIQUE KEY uq_sesiones_sid (sid),
+        INDEX idx_sesiones_usuario (usuario_id)
+      ) DEFAULT CHARSET=utf8mb4`);
+    // Lo que cada quien hizo con su cuenta (ingresos, contraseña, dos pasos, sesiones).
+    // El resto de "Mi actividad" sale de las tablas que ya guardan quién hizo qué.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS actividad_personal (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        usuario_id INT NOT NULL,
+        accion VARCHAR(40) NOT NULL,
+        detalle VARCHAR(300) NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_actividad_usuario (usuario_id, created_at)
+      ) DEFAULT CHARSET=utf8mb4`);
   } catch (err) {
     console.error('⚠️  Auto-migración falló:', err.code || err.message);
   }
+  // Va aparte, fuera del try de arriba: si algún paso viejo falla, las tablas del
+  // sitio web se crean igual (sin ellas, la sección "Sitio web" del panel no anda).
+  await ensureSchemaSitioWeb();
+}
+
+// Le crea su cita a cada orden que no tiene (ver arriba). Idempotente: solo toca
+// órdenes sin cita, y no las canceladas (el portal no muestra las citas canceladas).
+// La fecha y la hora de la cita son las de ingreso de la orden, en la hora del taller:
+// se calculan desde UNIX_TIMESTAMP para no depender de la zona de la sesión de MySQL.
+// Deja la tabla roles con la misma collation que usuarios.rol, para poder comparar
+// usuarios.rol con roles.clave. Solo hace algo si son distintas, así que en cada
+// arranque normal no toca nada. La tabla tiene cuatro filas: convertirla es instantáneo.
+async function igualarColacionDeRoles() {
+  const colacionDe = async (tabla, columna) => {
+    const [[fila]] = await pool.query(
+      `SELECT COLLATION_NAME AS c FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+      [tabla, columna]
+    );
+    return fila && fila.c;
+  };
+  const deseada = await colacionDe('usuarios', 'rol');
+  const actual = await colacionDe('roles', 'clave');
+  // El nombre viene de information_schema, no del usuario; igual se valida antes de
+  // ponerlo en el SQL, porque no puede ir como parámetro.
+  if (!deseada || !actual || deseada === actual || !/^utf8mb4_[a-z0-9_]+$/.test(deseada)) return;
+  await pool.query(`ALTER TABLE roles CONVERT TO CHARACTER SET utf8mb4 COLLATE ${deseada}`);
+  console.log(`🔧 Migración: roles pasa de ${actual} a ${deseada} (la de usuarios.rol)`);
+}
+
+async function citasParaOrdenesSinCita() {
+  const [[cfg]] = await pool.query('SELECT zona_horaria_offset FROM configuracion LIMIT 1');
+  const offset = Number(cfg?.zona_horaria_offset) || -6;
+  const local = `DATE_ADD('1970-01-01 00:00:00', INTERVAL (UNIX_TIMESTAMP(o.fecha_ingreso) + ${offset * 3600}) SECOND)`;
+  const [r] = await pool.query(`
+    INSERT INTO citas (cliente_id, moto_id, usuario_id, tecnico_id, sucursal_id, fecha, hora, motivo, tipo_servicio,
+                       estado, monto, fecha_inicio, fecha_listo, fecha_fin, hora_llegada, orden_id, creada_por_orden)
+    SELECT o.cliente_id, o.moto_id, o.recepcionista_id, o.tecnico_id, o.sucursal_id,
+           DATE(${local}), TIME(${local}), o.problema_reportado, NULL,
+           CASE o.estado WHEN 'recepcion' THEN 'en_revision' WHEN 'diagnostico' THEN 'en_revision'
+             WHEN 'esperando_aprobacion' THEN 'en_revision' WHEN 'esperando_repuestos' THEN 'en_revision'
+             WHEN 'en_reparacion' THEN 'en_mantenimiento' WHEN 'lista_entrega' THEN 'listo'
+             ELSE 'entregado' END,
+           IF(o.estado = 'entregada', o.costo_mano_obra + o.costo_repuestos - o.descuento, 0),
+           o.fecha_ingreso,
+           IF(o.estado IN ('lista_entrega', 'entregada'), COALESCE(o.fecha_entrega_real, o.updated_at), NULL),
+           IF(o.estado = 'entregada', COALESCE(o.fecha_entrega_real, o.updated_at), NULL),
+           o.fecha_ingreso, o.id, 1
+    FROM ordenes_trabajo o
+    WHERE o.estado <> 'cancelada'
+      AND NOT EXISTS (SELECT 1 FROM citas c WHERE c.orden_id = o.id)`);
+  if (r.affectedRows) console.log(`🔧 Migración: ${r.affectedRows} cita(s) creadas para órdenes sin cita`);
+}
+
+async function ensureSchemaSitioWeb() {
+  // ── Administración del sitio web (msmotors-web) ──
+  // El contenido del sitio (catálogo de motos, promoción) se edita desde el panel
+  // y vive aquí. Cada "Publicar" guarda una foto completa del contenido en
+  // web_publicaciones, que es lo único que lee el sitio al construirse: lo que se
+  // edita y todavía no se publicó queda como pendiente, sin llegar al público.
+  await tryStep('sitio web: rol contenido', async () => {
+    const [[col]] = await pool.query(
+      `SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios' AND COLUMN_NAME = 'rol'`
+    );
+    if (col && !col.COLUMN_TYPE.includes('contenido')) {
+      await pool.query(
+        "ALTER TABLE usuarios MODIFY COLUMN rol ENUM('recepcion','tecnico','admin','contenido') NOT NULL DEFAULT 'tecnico'"
+      );
+      console.log('🔧 Migración: usuarios.rol → +contenido');
+    }
+  });
+  // Qué apartados del sitio web puede tocar un empleado que no es admin (JSON).
+  await tryStep('sitio web: permisos', () => addColumnIfMissing('usuarios', 'permisos_web', 'TEXT NULL'));
+  // Sin FK a usuarios en estas tablas, a propósito: borrar a un empleado no debe
+  // trabarse por haber editado el sitio, y el historial guarda su nombre aparte.
+  await tryStep('sitio web: tablas', async () => {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS web_motos (
+        id           INT AUTO_INCREMENT PRIMARY KEY,
+        slug         VARCHAR(80)  NOT NULL,
+        nombre       VARCHAR(120) NOT NULL,
+        tipo         VARCHAR(30)  NOT NULL,
+        estado       ENUM('nueva','usada') NOT NULL DEFAULT 'nueva',
+        precio       DECIMAL(12,2) NULL,
+        moneda       ENUM('CRC','USD') NOT NULL DEFAULT 'CRC',
+        resumen      VARCHAR(200) NULL,
+        descripcion  TEXT NULL,
+        foto         VARCHAR(500) NULL,
+        foto_alt     VARCHAR(200) NULL,
+        specs        TEXT NULL,
+        stock        TEXT NULL,
+        ingreso      DATE NULL,
+        orden        INT NOT NULL DEFAULT 0,
+        visible      TINYINT(1) NOT NULL DEFAULT 1,
+        updated_by   INT NULL,
+        created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_web_motos_slug (slug)
+      )`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS web_ajustes (
+        clave       VARCHAR(50) PRIMARY KEY,
+        valor       MEDIUMTEXT NULL,
+        updated_by  INT NULL,
+        updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS web_publicaciones (
+        id             INT AUTO_INCREMENT PRIMARY KEY,
+        contenido      MEDIUMTEXT NOT NULL,
+        publicado_por  INT NULL,
+        publicado_por_nombre VARCHAR(100) NULL,
+        created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS web_historial (
+        id              INT AUTO_INCREMENT PRIMARY KEY,
+        usuario_id      INT NULL,
+        usuario_nombre  VARCHAR(100) NULL,
+        accion          VARCHAR(30)  NOT NULL,
+        entidad         VARCHAR(30)  NOT NULL,
+        entidad_id      INT NULL,
+        descripcion     VARCHAR(500) NOT NULL,
+        created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_web_historial_fecha (created_at)
+      )`);
+  });
+
+  // v2: varias fotos por moto (lista de direcciones; la primera es la principal).
+  await tryStep('sitio web: fotos por moto', () => addColumnIfMissing('web_motos', 'fotos', 'TEXT NULL'));
+  // Fotos subidas desde el panel. Se guardan en la base (ya achicadas en el
+  // teléfono, ~200 KB) y se sirven aparte en /api/sitio/fotos/:id, con caché
+  // larga: nunca viajan dentro de un listado.
+  await tryStep('sitio web: tabla de fotos', () => pool.query(`
+    CREATE TABLE IF NOT EXISTS web_fotos (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      clave       CHAR(24) NOT NULL,
+      mime        VARCHAR(30) NOT NULL,
+      ancho       INT NULL,
+      alto        INT NULL,
+      bytes       MEDIUMBLOB NOT NULL,
+      subida_por  INT NULL,
+      created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_web_fotos_clave (clave)
+    )`));
+  // Lo que la gente pide desde el sitio (cotizar una moto, contacto, repuestos).
+  // Antes el formulario iba a un correo que nunca se configuró: no le llegaba a nadie.
+  await tryStep('sitio web: consultas', () => pool.query(`
+    CREATE TABLE IF NOT EXISTS web_consultas (
+      id             INT AUTO_INCREMENT PRIMARY KEY,
+      tipo           VARCHAR(20)  NOT NULL DEFAULT 'cotizacion',
+      nombre         VARCHAR(100) NOT NULL,
+      telefono       VARCHAR(30)  NULL,
+      email          VARCHAR(150) NULL,
+      moto           VARCHAR(150) NULL,
+      sucursal       VARCHAR(60)  NULL,
+      mensaje        TEXT NULL,
+      estado         ENUM('nueva','atendida','descartada') NOT NULL DEFAULT 'nueva',
+      notas          TEXT NULL,
+      atendida_por   VARCHAR(100) NULL,
+      atendida_at    TIMESTAMP NULL,
+      created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_web_consultas_estado (estado, created_at)
+    )`));
+  // Para poder volver a una publicación anterior: además de lo que lee el sitio,
+  // cada publicación guarda las filas tal como estaban en el panel.
+  await tryStep('sitio web: publicaciones restaurables', () => addColumnIfMissing('web_publicaciones', 'datos', 'MEDIUMTEXT NULL'));
+  await tryStep('sitio web: publicaciones descripción', () => addColumnIfMissing('web_publicaciones', 'nota', 'VARCHAR(200) NULL'));
+
+  // v3: los datos del negocio que muestra el sitio (teléfono, WhatsApp, dirección
+  // y horario de cada sede, correo, redes) se guardan aparte, en web_ajustes
+  // ('negocio'): son del sitio web. De `sucursales` y `configuracion` del
+  // sistema solo se LEEN los nombres de las sedes y el horario de citas.
+  // v3: la bandeja de consultas como herramienta de ventas: a quién le toca,
+  // cuándo volver a contactar, y el cliente del sistema si se creó desde aquí.
+  await tryStep('sitio web: consultas asignadas', async () => {
+    await addColumnIfMissing('web_consultas', 'asignada_a', 'INT NULL');
+    await addColumnIfMissing('web_consultas', 'asignada_nombre', 'VARCHAR(100) NULL');
+    await addColumnIfMissing('web_consultas', 'seguimiento', 'DATE NULL');
+    await addColumnIfMissing('web_consultas', 'cliente_id', 'INT NULL');
+    await addColumnIfMissing('web_consultas', 'cedula', 'VARCHAR(20) NULL');
+    await crearIndiceSiFalta('web_consultas', 'idx_web_consultas_seguimiento', '(seguimiento)');
+  });
+
+  // v4: motos elegidas a mano para la tira "Nuevo ingreso" del inicio del sitio
+  // (cuando esa tira se arma a mano en vez de por fecha de ingreso).
+  await tryStep('sitio web: moto destacada', () => addColumnIfMissing('web_motos', 'destacada', 'TINYINT(1) NOT NULL DEFAULT 0'));
+
+  // Reseñas que la gente deja en el sitio. Tenían su propia base y su propia
+  // API; viven aquí, con el resto del sitio, para que haya una sola base y se
+  // aprueben desde el panel. Entran como 'pendiente': nada se muestra hasta que
+  // alguien del taller lo aprueba.
+  await tryStep('sitio web: reseñas', () => pool.query(`
+    CREATE TABLE IF NOT EXISTS web_resenas (
+      id            INT AUTO_INCREMENT PRIMARY KEY,
+      nombre        VARCHAR(100) NOT NULL,
+      calificacion  TINYINT UNSIGNED NOT NULL,
+      comentario    TEXT NOT NULL,
+      estado        ENUM('pendiente','aprobada','oculta') NOT NULL DEFAULT 'pendiente',
+      revisada_por  VARCHAR(100) NULL,
+      revisada_at   TIMESTAMP NULL,
+      created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_web_resenas_estado (estado, created_at)
+    )`));
+  // Verificación: el teléfono de quien deja la reseña (no se publica) y, si
+  // coincide con un cliente del sistema, cuál. Con cliente, la reseña sale en el
+  // sitio como «Cliente verificado».
+  await tryStep('sitio web: reseñas teléfono', () => addColumnIfMissing('web_resenas', 'telefono', 'VARCHAR(30) NULL'));
+  await tryStep('sitio web: reseñas cliente', () => addColumnIfMissing('web_resenas', 'cliente_id', 'INT NULL'));
+
+  // Servicio rápido de Ingresar ahora: cuántos minutos dura (20, 30 o 40). NULL = normal, por horas.
+  await tryStep('citas: minutos del servicio rápido', () => addColumnIfMissing('citas', 'duracion_min', 'SMALLINT UNSIGNED NULL'));
+
+  // Eventos de seguridad (utils/eventos-seguridad.js): logins fallidos, cambios de rol,
+  // cuentas desactivadas… Los lee el vigilante de n8n por /api/monitor/seguridad.
+  await tryStep('eventos_seguridad', () => pool.query(`
+    CREATE TABLE IF NOT EXISTS eventos_seguridad (
+      id         INT AUTO_INCREMENT PRIMARY KEY,
+      tipo       VARCHAR(40) NOT NULL,
+      email      VARCHAR(190) NULL,
+      ip         VARCHAR(64) NULL,
+      usuario_id INT NULL,
+      actor_id   INT NULL,
+      detalle    VARCHAR(300) NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_eventos_seguridad_fecha (created_at),
+      INDEX idx_eventos_seguridad_tipo (tipo, created_at)
+    ) DEFAULT CHARSET=utf8mb4`));
+
+  // Varios servicios por cita (el cliente marca "Cambio de aceite" y "Frenos"). Cada
+  // uno va en su fila, para que los reportes cuenten cada servicio y el aviso de
+  // mantenimiento los reconozca. `citas.tipo_servicio` sigue con el primero (lo que ya
+  // lo leía no cambia) y `citas.servicios` guarda el texto para mostrar
+  // ("Cambio de aceite + Frenos"); los dos los escribe solo utils/servicios-cita.js.
+  await tryStep('cita_servicios', () => pool.query(`
+    CREATE TABLE IF NOT EXISTS cita_servicios (
+      id       INT AUTO_INCREMENT PRIMARY KEY,
+      cita_id  INT NOT NULL,
+      servicio VARCHAR(100) NOT NULL,
+      orden    TINYINT UNSIGNED NOT NULL DEFAULT 0,
+      INDEX idx_cita_servicios_cita (cita_id),
+      INDEX idx_cita_servicios_servicio (servicio),
+      FOREIGN KEY (cita_id) REFERENCES citas(id) ON DELETE CASCADE
+    )`));
+  await tryStep('citas: texto de los servicios', () => addColumnIfMissing('citas', 'servicios', 'VARCHAR(600) NULL'));
+  // Las citas de antes tenían un solo servicio: pasa a la tabla y al texto. Solo toca
+  // las que todavía no tienen filas, así que correrlo en cada arranque no repite nada.
+  await tryStep('cita_servicios: citas de antes', async () => {
+    await pool.query(`
+      INSERT INTO cita_servicios (cita_id, servicio, orden)
+      SELECT c.id, TRIM(c.tipo_servicio), 0 FROM citas c
+      WHERE c.tipo_servicio IS NOT NULL AND TRIM(c.tipo_servicio) <> ''
+        AND NOT EXISTS (SELECT 1 FROM cita_servicios cs WHERE cs.cita_id = c.id)`);
+    await pool.query(`
+      UPDATE citas SET servicios = TRIM(tipo_servicio)
+      WHERE servicios IS NULL AND tipo_servicio IS NOT NULL AND TRIM(tipo_servicio) <> ''`);
+  });
+
+  // Por qué se canceló una orden (lo pide la pantalla al cancelar; se ve en la orden).
+  await tryStep('ordenes: motivo de cancelación', () => addColumnIfMissing('ordenes_trabajo', 'motivo_cancelacion', 'VARCHAR(300) NULL'));
 }
 
 // Ejecuta un paso aislado: si falla, lo loguea y sigue (no aborta la migración).
@@ -845,47 +1023,6 @@ async function tryStep(label, fn) {
     await fn();
   } catch (err) {
     console.error(`⚠️  Migración (${label}) omitida:`, err.code || err.message);
-  }
-}
-
-// Borra un índice solo si existe (idempotente). Hace falta para retirar índices que
-// una versión anterior creó y que ya no corresponden — por ejemplo los únicos
-// globales que multi-tenancy convirtió en compuestos con tenant_id.
-async function borrarIndiceSiExiste(tabla, nombre) {
-  const [[existe]] = await pool.query(
-    `SELECT COUNT(*) AS n FROM information_schema.STATISTICS
-     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?`,
-    [tabla, nombre]
-  );
-  if (existe.n) {
-    await pool.query(`DROP INDEX ${nombre} ON ${tabla}`);
-    console.log(`🔧 Migración: índice ${nombre} en ${tabla} eliminado`);
-  }
-}
-
-// Deja UNA sola clave foránea por columna, borrando las repetidas.
-//
-// Se busca por columna y no por nombre a propósito: `citas_ibfk_4` es un nombre que
-// pone MySQL solo, y en una base creada por otro camino puede corresponder a otra
-// columna. Borrar por nombre funcionaría en la base de hoy y sacaría la única FK de
-// otra columna en la de mañana.
-//
-// Se conserva la de nombre explícito (`fk_...`) y se van las automáticas: son las que
-// no volvería a crear ninguna migración.
-async function quitarFkDuplicadas(tabla, columna) {
-  const [filas] = await pool.query(
-    `SELECT CONSTRAINT_NAME AS nombre FROM information_schema.KEY_COLUMN_USAGE
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?
-        AND REFERENCED_TABLE_NAME IS NOT NULL
-      ORDER BY (CONSTRAINT_NAME LIKE 'fk\\_%') DESC`,
-    [tabla, columna]
-  );
-  // La primera de la lista es la que se queda (la de nombre explícito, si hay).
-  for (const f of filas.slice(1)) {
-    await tryStep(`FK duplicada ${f.nombre}`, async () => {
-      await pool.query(`ALTER TABLE ${tabla} DROP FOREIGN KEY ${f.nombre}`);
-      console.log(`🔧 Migración: FK duplicada ${f.nombre} en ${tabla}.${columna} eliminada`);
-    });
   }
 }
 

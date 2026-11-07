@@ -1,7 +1,7 @@
 <ion-header>
   <ion-toolbar class="admin-topbar">
     <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
-    <ion-title>Resumen Ejecutivo</ion-title>
+    <ion-title>Resumen ejecutivo</ion-title>
     <app-admin-actions slot="end"></app-admin-actions>
   </ion-toolbar>
 </ion-header>
@@ -9,238 +9,255 @@
 <ion-content class="admin-dark">
   <ion-refresher slot="fixed" (ionRefresh)="cargar($event)"><ion-refresher-content></ion-refresher-content></ion-refresher>
 
-  <!-- Skeleton loader -->
-  <div class="admin-skeleton" *ngIf="cargando">
-    <div class="sk-kpi-grid">
-      <div class="skeleton sk-kpi"></div>
-      <div class="skeleton sk-kpi"></div>
-      <div class="skeleton sk-kpi"></div>
-      <div class="skeleton sk-kpi"></div>
-    </div>
-    <div class="sk-g2">
-      <div class="skeleton sk-card"></div>
-      <div class="skeleton sk-card"></div>
-    </div>
-    <div class="sk-g2">
-      <div class="skeleton sk-card"></div>
-      <div class="skeleton sk-card"></div>
-    </div>
-    <div class="skeleton sk-card"></div>
-  </div>
-
-  <div class="admin" *ngIf="!cargando">
-    <!-- Estado de la cuenta y primeros pasos. Van ARRIBA de los KPIs: para un taller
-         recién registrado los números están todos en cero y lo único accionable de la
-         pantalla es esto. -->
-    <app-correo-aviso></app-correo-aviso>
-    <app-cuenta-franja></app-cuenta-franja>
-    <app-arranque></app-arranque>
-
-    <!-- KPIs principales -->
-    <div class="kpi-grid">
-      <div class="kpi cr"><div class="kpi-label">En taller</div><div class="kpi-val">{{ op?.motos_activas ?? 0 }}</div></div>
-      <div class="kpi am"><div class="kpi-label">Atrasadas</div><div class="kpi-val">{{ op?.motos_atrasadas ?? 0 }}</div></div>
-      <div class="kpi em"><div class="kpi-label">Facturación del mes</div><div class="kpi-val mono">{{ (op?.facturacion_mes_total || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</div></div>
-      <div class="kpi in"><div class="kpi-label">Tasa de éxito</div><div class="kpi-val">{{ data?.tasa_exito ?? 0 }}%</div></div>
-    </div>
-
-    <!-- Facturación | KPI operativo -->
-    <div class="g2">
-      <div class="cd">
-        <span class="cd-title"><ion-icon name="wallet-outline"></ion-icon> Facturación</span>
-        <div class="fact-today">
-          <div class="kpi-val mono fact-val">{{ (op?.facturacion_hoy || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</div>
-          <div class="fact-sub">Total de hoy</div>
-        </div>
-        <div class="stat-grid">
-          <div class="stat-box">
-            <div class="stat-label">Semanal</div><strong class="mono stat-val">{{ (op?.facturacion_semana || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</strong>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Mensual</div><strong class="mono stat-val">{{ (op?.facturacion_mes || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</strong>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Citas hoy</div><strong class="mono stat-val">{{ (op?.ingresos_citas_hoy || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</strong>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Citas mes</div><strong class="mono stat-val">{{ (op?.ingresos_citas_mes || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</strong>
-          </div>
-        </div>
+  <div class="res">
+    <!-- Encabezado: saludo, fecha y exportar -->
+    <header class="res-cab">
+      <div>
+        <span class="res-fecha">{{ fechaLarga }}</span>
+        <h1>{{ saludo }}, {{ nombre }}</h1>
+        <p>Así va el taller este mes.</p>
       </div>
-
-      <div class="cd">
-        <span class="cd-title"><ion-icon name="trending-up-outline"></ion-icon> KPI</span>
-        <div class="kpi-detail-grid">
-          <div class="kpi-detail-box">
-            <div class="kpi-detail-label">Ticket promedio</div>
-            <div class="mono kpi-detail-val">{{ (op?.ticket_promedio || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</div>
-          </div>
-          <div class="kpi-detail-box">
-            <div class="kpi-detail-label">Reparación prom.</div>
-            <div class="mono kpi-detail-val">{{ op?.tiempo_promedio_horas || 0 }}h</div>
-          </div>
-          <div class="kpi-detail-box">
-            <div class="kpi-detail-label">Conversión</div>
-            <div class="mono kpi-detail-val">{{ op?.conversion_pct ?? 0 }}%</div>
-          </div>
-          <div class="kpi-detail-box">
-            <div class="kpi-detail-label">Satisfacción</div>
-            <div class="mono kpi-detail-val">{{ op?.satisfaccion_promedio ? (op.satisfaccion_promedio + '★') : '—' }}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Estado del taller | Semáforo de entregas -->
-    <div class="g2">
-      <div class="cd">
-        <span class="cd-title"><ion-icon name="construct-outline"></ion-icon> Estado del taller</span>
-        <div *ngFor="let e of op?.ordenes_por_estado" class="estado-row">
-          <span class="estado-dot" [style.background]="estadoMap[e.estado]?.dot || '#A3A3A3'"></span>
-          <span class="estado-label">{{ estadoMap[e.estado]?.label || e.estado }}</span>
-          <span class="bg" [ngClass]="estadoMap[e.estado]?.bg || 'bg-n'">{{ e.total }}</span>
-        </div>
-        <div class="empty" *ngIf="!op?.ordenes_por_estado?.length"><ion-icon name="construct-outline"></ion-icon><p>Sin órdenes activas.</p></div>
-      </div>
-
-      <div class="cd">
-        <span class="cd-title"><ion-icon name="speedometer-outline"></ion-icon> Semáforo de entregas</span>
-        <div class="filter-bar">
-          <button class="filter-btn" [class.on]="filtroSemaforo==='rojo'" (click)="filtroSemaforo='rojo'">Atrasado · {{ countRojo }}</button>
-          <button class="filter-btn" [class.on]="filtroSemaforo==='amarillo'" (click)="filtroSemaforo='amarillo'">Por vencer · {{ countAmarillo }}</button>
-          <button class="filter-btn" [class.on]="filtroSemaforo==='verde'" (click)="filtroSemaforo='verde'">A tiempo · {{ countVerde }}</button>
-        </div>
-        <div *ngFor="let a of atrasosFiltrados" (click)="abrirOrden(a.id)" class="sem-row">
-          <div class="sem-detail">
-            <div class="mono sem-orden">{{ a.numero_orden }}</div>
-            <div class="sem-vehiculo">{{ a.marca }} {{ a.modelo }}</div>
-          </div>
-          <span class="bg" [ngClass]="semBadge[semaforo(a.dias_restantes)]">{{ semaforoTexto(a.dias_restantes) }}</span>
-        </div>
-        <div class="empty" *ngIf="!atrasosFiltrados.length"><ion-icon name="checkmark-circle-outline"></ion-icon><p>Sin órdenes en este estado.</p></div>
-      </div>
-    </div>
-
-    <!-- Opiniones recientes (reseñas reales del cliente) -->
-    <div class="cd mb">
-      <div class="op-head">
-        <span class="cd-title"><ion-icon name="chatbox-ellipses-outline"></ion-icon> Opiniones recientes</span>
-        <div class="op-resumen" *ngIf="opResumen?.total">
-          <span class="op-prom mono">{{ opResumen?.promedio }}<ion-icon name="star"></ion-icon></span>
-          <span class="op-total">{{ opResumen?.total }} reseña{{ opResumen?.total === 1 ? '' : 's' }}</span>
-          <span class="bg bg-rd" *ngIf="opResumen?.bajas">{{ opResumen?.bajas }} baja{{ opResumen?.bajas === 1 ? '' : 's' }}</span>
-        </div>
-      </div>
-
-      <div class="op-row" *ngFor="let o of opinionesOrdenadas"
-           [class.op-baja]="esBaja(o.calificacion)"
-           [class.op-clickable]="o.orden_id" (click)="abrirOpinion(o)">
-        <div class="op-main">
-          <div class="op-stars">
-            <ion-icon *ngFor="let n of estrellas" [name]="n <= o.calificacion ? 'star' : 'star-outline'"
-                      [class.on]="n <= o.calificacion"></ion-icon>
-          </div>
-          <div class="op-cliente">{{ o.cliente_nombre }} {{ o.cliente_apellido }}</div>
-          <p class="op-comentario" *ngIf="o.comentario">"{{ o.comentario }}"</p>
-          <p class="op-comentario op-sincom" *ngIf="!o.comentario">Sin comentario</p>
-        </div>
-        <div class="op-meta">
-          <span class="op-vehiculo" *ngIf="o.marca">{{ o.marca }} {{ o.modelo }}</span>
-          <span class="mono op-orden" *ngIf="o.numero_orden">{{ o.numero_orden }}</span>
-          <span class="op-fecha">{{ fechaCortaOp(o.fecha) }}<ng-container *ngIf="o.tecnico_nombre"> · {{ o.tecnico_nombre }}</ng-container></span>
-        </div>
-      </div>
-
-      <div class="empty" *ngIf="!opiniones.length">
-        <ion-icon name="chatbox-ellipses-outline"></ion-icon>
-        <p>Todavía no hay calificaciones de clientes.</p>
-      </div>
-    </div>
-
-    <!-- Top servicios | Estado de citas -->
-    <div class="g21">
-      <div class="cd">
-        <span class="cd-title"><ion-icon name="trophy-outline"></ion-icon> Top servicios del mes</span>
-        <div class="bar-item" *ngFor="let s of data?.top_servicios">
-          <div class="bar-head"><span>{{ s.servicio }}</span><strong>{{ s.total }} citas</strong></div>
-          <div class="bar-track"><div class="bar-fill" [style.width.%]="pct(s.total, maxServicio)"></div></div>
-        </div>
-        <div class="empty" *ngIf="!cargando && !data?.top_servicios?.length"><ion-icon name="construct-outline"></ion-icon><p>Sin citas este mes.</p></div>
-      </div>
-
-      <div class="cd">
-        <span class="cd-title"><ion-icon name="stats-chart-outline"></ion-icon> Estado de citas</span>
-        <ng-container *ngIf="data?.estado_citas as e">
-          <div class="bar-item"><div class="bar-head"><span>Agendadas</span><strong class="mono">{{ e.agendadas }} — {{ pct(e.agendadas, e.total) }}%</strong></div><div class="bar-track"><div class="bar-fill bar-fill-indigo" [style.width.%]="pct(e.agendadas, e.total)"></div></div></div>
-          <div class="bar-item"><div class="bar-head"><span>En proceso</span><strong class="mono">{{ e.en_proceso }} — {{ pct(e.en_proceso, e.total) }}%</strong></div><div class="bar-track"><div class="bar-fill bar-fill-amber" [style.width.%]="pct(e.en_proceso, e.total)"></div></div></div>
-          <div class="bar-item"><div class="bar-head"><span>Completadas</span><strong class="mono">{{ e.completadas }} — {{ pct(e.completadas, e.total) }}%</strong></div><div class="bar-track"><div class="bar-fill bar-fill-emerald" [style.width.%]="pct(e.completadas, e.total)"></div></div></div>
-          <div class="bar-item"><div class="bar-head"><span>Canceladas</span><strong class="mono">{{ e.canceladas }} — {{ pct(e.canceladas, e.total) }}%</strong></div><div class="bar-track"><div class="bar-fill bar-fill-danger" [style.width.%]="pct(e.canceladas, e.total)"></div></div></div>
-        </ng-container>
-      </div>
-    </div>
-
-    <!-- Tiempo por etapa | Técnicos -->
-    <div class="g2">
-      <div class="cd">
-        <span class="cd-title"><ion-icon name="timer-outline"></ion-icon> Tiempo por etapa</span>
-        <div class="bar-item" *ngFor="let t of tiempos">
-          <div class="bar-head"><span>{{ etapaLabel[t.etapa] || t.etapa }}</span><strong class="mono">{{ t.horas_promedio || 0 }}h</strong></div>
-          <div class="bar-track"><div class="bar-fill" [style.width.%]="pct(t.horas_promedio, maxTiempo)"></div></div>
-        </div>
-        <div class="empty" *ngIf="!tiempos.length"><ion-icon name="time-outline"></ion-icon><p>Sin datos de etapas.</p></div>
-      </div>
-
-      <div class="cd">
-        <span class="cd-title"><ion-icon name="people-outline"></ion-icon> Técnicos</span>
-        <div class="emp-row" *ngFor="let t of tecnicos">
-          <div class="emp-av in">{{ iniciales(t.nombre) }}</div>
-          <div class="emp-info"><strong>{{ t.nombre }}</strong><span>{{ t.ordenes_completadas || 0 }} completadas · {{ t.horas_promedio || 0 }}h prom.</span></div>
-        </div>
-        <div class="empty" *ngIf="!tecnicos.length"><ion-icon name="people-outline"></ion-icon><p>Sin técnicos activos.</p></div>
-      </div>
-    </div>
-
-    <!-- Ingresos por servicio -->
-    <div class="cd mb">
-      <span class="cd-title"><ion-icon name="cash-outline"></ion-icon> Desglose de ingresos por servicio (mes)</span>
-      <div class="tbl-wrap">
-        <table class="tbl">
-          <thead><tr><th>Servicio</th><th>Citas</th><th>Ingreso</th><th>% del total</th><th>Prom./cita</th></tr></thead>
-          <tbody>
-            <tr *ngFor="let r of data?.ingresos_por_servicio">
-              <td class="tbl-bold">{{ r.servicio }}</td>
-              <td class="mono">{{ r.citas }}</td>
-              <td class="mono tbl-em">{{ (r.ingreso || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</td>
-              <td><div>{{ pct(r.ingreso, totalIngreso) }}%</div><div class="pct-bar"><div class="pct-fill" [style.width.%]="pct(r.ingreso, totalIngreso)"></div></div></td>
-              <td class="mono">{{ (r.promedio || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</td>
-            </tr>
-            <tr *ngIf="data?.ingresos_por_servicio?.length" class="tbl-total">
-              <td class="tbl-total-label">TOTAL</td><td></td>
-              <td class="mono tbl-total-val">{{ totalIngreso | currency:'CRC':'symbol-narrow':'1.0-0' }}</td>
-              <td><strong>100%</strong></td><td></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="empty" *ngIf="!cargando && !data?.ingresos_por_servicio?.length"><ion-icon name="cash-outline"></ion-icon><p>Sin ingresos registrados este mes.</p></div>
-    </div>
-
-    <!-- Exportar -->
-    <div class="cd mb">
-      <span class="cd-title"><ion-icon name="document-text-outline"></ion-icon> Generar reporte PDF</span>
-      <div class="export-row">
-        <button class="btn btn-cr" (click)="exportarPDF()" [disabled]="cargando">
-          <ion-icon name="document-text-outline"></ion-icon> Resumen ejecutivo PDF
+      <div class="res-cab-acciones">
+        <button type="button" class="btn btn-ou btn-sm" (click)="exportarPDF()" [disabled]="cargando">
+          <ion-icon name="document-text-outline"></ion-icon> Reporte PDF
         </button>
+        <details class="res-exportar" #menuCsv>
+          <summary class="btn btn-ou btn-sm"><ion-icon name="download-outline"></ion-icon> Exportar Excel <ion-icon name="chevron-down" class="res-exportar-chev"></ion-icon></summary>
+          <div class="res-exportar-menu">
+            <button type="button" (click)="exportarOrdenes(); menuCsv.open = false" [disabled]="exportando"><ion-icon name="document-text-outline"></ion-icon> Órdenes</button>
+            <button type="button" (click)="exportarFacturacion(); menuCsv.open = false" [disabled]="exportando"><ion-icon name="cash-outline"></ion-icon> Facturación</button>
+            <button type="button" (click)="exportarProductividad(); menuCsv.open = false" [disabled]="exportando"><ion-icon name="people-outline"></ion-icon> Productividad</button>
+          </div>
+        </details>
       </div>
-    </div>
-    <div class="cd mb">
-      <span class="cd-title"><ion-icon name="download-outline"></ion-icon> Exportar a Excel (CSV)</span>
-      <div class="export-row">
-        <button class="btn btn-ou" (click)="exportarOrdenes()" [disabled]="exportando">Órdenes</button>
-        <button class="btn btn-cr" (click)="exportarFacturacion()" [disabled]="exportando">Facturación</button>
-        <button class="btn btn-ou" (click)="exportarProductividad()" [disabled]="exportando">Productividad</button>
+    </header>
+
+    <!-- Cargando -->
+    <ng-container *ngIf="cargando">
+      <div class="res-kpis">
+        <div class="sk-dark" style="height:118px" *ngFor="let i of [1,2,3,4]"></div>
       </div>
-    </div>
+      <div class="sk-dark" style="height:56px;margin-bottom:16px"></div>
+      <div class="res-fila res-fila--7-5">
+        <div class="sk-dark" style="height:260px"></div><div class="sk-dark" style="height:260px"></div>
+      </div>
+    </ng-container>
+
+    <ng-container *ngIf="!cargando">
+      <!-- Cifras principales -->
+      <section class="res-kpis">
+        <div class="res-kpi" style="--acento: var(--cr)">
+          <span class="res-kpi-icono"><ion-icon name="construct-outline"></ion-icon></span>
+          <span class="res-kpi-label">En el taller</span>
+          <strong class="res-kpi-val">{{ op?.motos_activas ?? 0 }}</strong>
+          <span class="res-kpi-sub" [class.alerta]="op?.motos_atrasadas">
+            {{ op?.motos_atrasadas ? op.motos_atrasadas + ' atrasada' + (op.motos_atrasadas === 1 ? '' : 's') : 'Ninguna atrasada' }}
+          </span>
+        </div>
+        <div class="res-kpi" style="--acento: var(--em)">
+          <span class="res-kpi-icono"><ion-icon name="wallet-outline"></ion-icon></span>
+          <span class="res-kpi-label">Facturación del mes</span>
+          <strong class="res-kpi-val mono">{{ (op?.facturacion_mes_total || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</strong>
+          <span class="res-kpi-sub">Órdenes y citas, sin contar dos veces</span>
+        </div>
+        <div class="res-kpi" style="--acento: var(--in)">
+          <span class="res-kpi-icono"><ion-icon name="calendar-outline"></ion-icon></span>
+          <span class="res-kpi-label">Citas del mes</span>
+          <strong class="res-kpi-val">{{ data?.total_citas ?? 0 }}</strong>
+          <span class="res-kpi-sub">{{ data?.estado_citas?.en_proceso ?? 0 }} en proceso · {{ data?.estado_citas?.agendadas ?? 0 }} agendadas</span>
+        </div>
+        <div class="res-kpi" style="--acento: var(--am)">
+          <span class="res-kpi-icono"><ion-icon name="trophy-outline"></ion-icon></span>
+          <span class="res-kpi-label">Tasa de éxito</span>
+          <strong class="res-kpi-val">{{ data?.tasa_exito ?? 0 }}%</strong>
+          <span class="res-kpi-sub">Citas entregadas frente a canceladas</span>
+        </div>
+      </section>
+
+      <!-- Lo que pide atención -->
+      <section class="res-avisos" [class.tranquilo]="!avisos.length">
+        <ion-icon [name]="avisos.length ? 'alert-circle-outline' : 'checkmark-circle-outline'" class="res-avisos-icono"></ion-icon>
+        <ng-container *ngIf="avisos.length; else todoBien">
+          <strong>Pide atención</strong>
+          <button type="button" class="res-aviso" *ngFor="let a of avisos" [class.grave]="a.grave" (click)="a.accion()">
+            {{ a.texto }} <ion-icon name="arrow-forward"></ion-icon>
+          </button>
+        </ng-container>
+        <ng-template #todoBien><span>Todo en orden: ninguna orden atrasada, ninguna reseña baja y ningún repuesto esperando.</span></ng-template>
+      </section>
+
+      <!-- Facturación | Indicadores -->
+      <div class="res-fila res-fila--7-5">
+        <section class="cd res-card">
+          <div class="res-card-cab"><span class="cd-title"><ion-icon name="wallet-outline"></ion-icon> Facturación</span></div>
+          <div class="res-fact">
+            <div class="res-fact-col">
+              <span class="res-fact-tit">Órdenes entregadas</span>
+              <div class="res-fact-fila"><span>Hoy</span><strong class="mono">{{ (op?.facturacion_hoy || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</strong></div>
+              <div class="res-fact-fila"><span>Esta semana</span><strong class="mono">{{ (op?.facturacion_semana || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</strong></div>
+              <div class="res-fact-fila"><span>Este mes</span><strong class="mono">{{ (op?.facturacion_mes || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</strong></div>
+            </div>
+            <div class="res-fact-col">
+              <span class="res-fact-tit">Citas cobradas</span>
+              <div class="res-fact-fila"><span>Hoy</span><strong class="mono">{{ (op?.ingresos_citas_hoy || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</strong></div>
+              <div class="res-fact-fila"><span>Este mes</span><strong class="mono">{{ (op?.ingresos_citas_mes || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</strong></div>
+              <div class="res-fact-fila"><span>Entregadas en el mes</span><strong class="mono">{{ op?.citas_entregadas_mes ?? 0 }}</strong></div>
+            </div>
+          </div>
+          <div class="res-fact-total">
+            <span>Total del mes</span>
+            <strong class="mono">{{ (op?.facturacion_mes_total || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</strong>
+          </div>
+          <p class="res-nota">Una orden que salió de una cita cuenta por la cita: el total no la suma dos veces.</p>
+        </section>
+
+        <section class="cd res-card">
+          <div class="res-card-cab"><span class="cd-title"><ion-icon name="pulse-outline"></ion-icon> Indicadores</span></div>
+          <div class="res-ind">
+            <div><ion-icon name="receipt-outline"></ion-icon><span>Ticket promedio</span><strong class="mono">{{ (op?.ticket_promedio || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</strong></div>
+            <div><ion-icon name="timer-outline"></ion-icon><span>Ingreso a entrega</span><strong class="mono">{{ op?.tiempo_promedio_horas || 0 }} h</strong></div>
+            <div><ion-icon name="checkmark-done-outline"></ion-icon><span>Diagnóstico a reparación</span><strong class="mono">{{ op?.conversion_pct ?? 0 }}%</strong></div>
+            <div><ion-icon name="star-outline"></ion-icon><span>Satisfacción</span><strong class="mono">{{ op?.satisfaccion_promedio ? op.satisfaccion_promedio + ' ★' : '—' }}</strong></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Estado del taller | Semáforo -->
+      <div class="res-fila">
+        <section class="cd res-card">
+          <div class="res-card-cab">
+            <span class="cd-title"><ion-icon name="construct-outline"></ion-icon> Estado del taller</span>
+            <span class="res-cuenta">{{ totalTaller }} activa{{ totalTaller === 1 ? '' : 's' }}</span>
+          </div>
+          <ng-container *ngIf="op?.ordenes_por_estado?.length; else sinOrdenes">
+            <div class="res-barra" role="img" [attr.aria-label]="'Órdenes por estado: ' + textoEstados">
+              <span *ngFor="let e of op.ordenes_por_estado" [style.flex-grow]="e.total" [style.background]="estadoMap[e.estado]?.dot || '#A3A3A3'" [title]="(estadoMap[e.estado]?.label || e.estado) + ': ' + e.total"></span>
+            </div>
+            <div class="res-estados">
+              <div *ngFor="let e of op.ordenes_por_estado" class="res-estado">
+                <span class="res-punto" [style.background]="estadoMap[e.estado]?.dot || '#A3A3A3'"></span>
+                <span class="res-estado-nom">{{ estadoMap[e.estado]?.label || e.estado }}</span>
+                <strong class="mono">{{ e.total }}</strong>
+                <span class="res-estado-pct">{{ pct(e.total, totalTaller) }}%</span>
+              </div>
+            </div>
+          </ng-container>
+          <ng-template #sinOrdenes><div class="res-vacio"><ion-icon name="construct-outline"></ion-icon> Sin órdenes activas.</div></ng-template>
+        </section>
+
+        <section class="cd res-card" id="semaforo">
+          <div class="res-card-cab"><span class="cd-title"><ion-icon name="speedometer-outline"></ion-icon> Semáforo de entregas</span></div>
+          <div class="res-seg" role="tablist">
+            <button type="button" role="tab" [class.on]="filtroSemaforo==='rojo'" [attr.aria-selected]="filtroSemaforo==='rojo'" (click)="filtroSemaforo='rojo'"><span class="res-punto rojo"></span> Atrasadas <b>{{ countRojo }}</b></button>
+            <button type="button" role="tab" [class.on]="filtroSemaforo==='amarillo'" [attr.aria-selected]="filtroSemaforo==='amarillo'" (click)="filtroSemaforo='amarillo'"><span class="res-punto amarillo"></span> Por vencer <b>{{ countAmarillo }}</b></button>
+            <button type="button" role="tab" [class.on]="filtroSemaforo==='verde'" [attr.aria-selected]="filtroSemaforo==='verde'" (click)="filtroSemaforo='verde'"><span class="res-punto verde"></span> A tiempo <b>{{ countVerde }}</b></button>
+          </div>
+          <div class="res-lista">
+            <button type="button" class="res-sem" *ngFor="let a of atrasosFiltrados.slice(0, 6)" (click)="abrirOrden(a.id)">
+              <span class="res-sem-texto">
+                <strong class="mono">{{ a.numero_orden }}</strong>
+                <span>{{ a.marca }} {{ a.modelo }}<ng-container *ngIf="a.cliente_nombre"> · {{ a.cliente_nombre }} {{ a.cliente_apellido }}</ng-container></span>
+              </span>
+              <span class="bg" [ngClass]="semBadge[semaforo(a.dias_restantes)]">{{ semaforoTexto(a.dias_restantes) }}</span>
+            </button>
+            <button type="button" class="res-ver-mas" *ngIf="atrasosFiltrados.length > 6" (click)="verOrdenes()">Ver las {{ atrasosFiltrados.length }} en Gestión de citas <ion-icon name="arrow-forward"></ion-icon></button>
+          </div>
+          <div class="res-vacio" *ngIf="!atrasosFiltrados.length"><ion-icon name="checkmark-circle-outline"></ion-icon> Ninguna orden en este grupo.</div>
+        </section>
+      </div>
+
+      <!-- Opiniones -->
+      <section class="cd res-card res-ancha">
+        <div class="res-card-cab">
+          <span class="cd-title"><ion-icon name="chatbox-ellipses-outline"></ion-icon> Opiniones recientes</span>
+          <div class="res-op-resumen" *ngIf="opResumen?.total">
+            <span class="res-op-prom mono">{{ opResumen?.promedio }} <ion-icon name="star"></ion-icon></span>
+            <span>{{ opResumen?.total }} reseña{{ opResumen?.total === 1 ? '' : 's' }}</span>
+            <span class="bg bg-rd" *ngIf="opResumen?.bajas">{{ opResumen?.bajas }} baja{{ opResumen?.bajas === 1 ? '' : 's' }}</span>
+          </div>
+        </div>
+        <div class="res-ops" *ngIf="opiniones.length">
+          <div class="res-op" *ngFor="let o of opinionesOrdenadas.slice(0, 6)" [class.baja]="esBaja(o.calificacion)" [class.clic]="o.orden_id" (click)="abrirOpinion(o)">
+            <div class="res-op-estrellas">
+              <ion-icon *ngFor="let n of estrellas" [name]="n <= o.calificacion ? 'star' : 'star-outline'" [class.on]="n <= o.calificacion"></ion-icon>
+            </div>
+            <p class="res-op-txt" [class.sin]="!o.comentario">{{ o.comentario ? '«' + o.comentario + '»' : 'Sin comentario' }}</p>
+            <span class="res-op-quien"><strong>{{ o.cliente_nombre }} {{ o.cliente_apellido }}</strong> · {{ fechaCortaOp(o.fecha) }}<ng-container *ngIf="o.tecnico_nombre"> · {{ o.tecnico_nombre }}</ng-container></span>
+          </div>
+        </div>
+        <div class="res-vacio" *ngIf="!opiniones.length"><ion-icon name="chatbox-ellipses-outline"></ion-icon> Todavía no hay calificaciones de clientes. Salen cuando el cliente califica una cita entregada desde el portal.</div>
+      </section>
+
+      <!-- Servicios | Estado de citas -->
+      <div class="res-fila res-fila--7-5">
+        <section class="cd res-card">
+          <div class="res-card-cab"><span class="cd-title"><ion-icon name="trophy-outline"></ion-icon> Servicios más pedidos del mes</span></div>
+          <div class="res-barras" *ngIf="data?.top_servicios?.length">
+            <div class="res-bar" *ngFor="let s of data?.top_servicios; let i = index">
+              <div class="res-bar-cab"><span><b>{{ i + 1 }}</b> {{ s.servicio }}</span><strong class="mono">{{ s.total }}</strong></div>
+              <div class="res-bar-pista"><div [style.width.%]="pct(s.total, maxServicio)"></div></div>
+            </div>
+          </div>
+          <div class="res-vacio" *ngIf="!data?.top_servicios?.length"><ion-icon name="construct-outline"></ion-icon> Sin citas este mes.</div>
+        </section>
+
+        <section class="cd res-card">
+          <div class="res-card-cab"><span class="cd-title"><ion-icon name="stats-chart-outline"></ion-icon> Citas del mes por estado</span></div>
+          <div class="res-barras" *ngIf="data?.estado_citas as e">
+            <div class="res-bar" *ngFor="let f of filasCitas(e)">
+              <div class="res-bar-cab"><span>{{ f.label }}</span><strong class="mono">{{ f.n }} <small>{{ pct(f.n, e.total) }}%</small></strong></div>
+              <div class="res-bar-pista"><div [style.width.%]="pct(f.n, e.total)" [style.background]="f.color"></div></div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Tiempo por etapa | Técnicos -->
+      <div class="res-fila">
+        <section class="cd res-card">
+          <div class="res-card-cab"><span class="cd-title"><ion-icon name="timer-outline"></ion-icon> Tiempo promedio por etapa</span></div>
+          <div class="res-barras" *ngIf="tiempos.length">
+            <div class="res-bar" *ngFor="let t of tiempos">
+              <div class="res-bar-cab"><span>{{ etapaLabel[t.etapa] || t.etapa }}</span><strong class="mono">{{ t.horas_promedio || 0 }} h</strong></div>
+              <div class="res-bar-pista"><div [style.width.%]="pct(t.horas_promedio, maxTiempo)"></div></div>
+            </div>
+          </div>
+          <div class="res-vacio" *ngIf="!tiempos.length"><ion-icon name="time-outline"></ion-icon> Todavía no hay órdenes con etapas cerradas.</div>
+        </section>
+
+        <section class="cd res-card">
+          <div class="res-card-cab"><span class="cd-title"><ion-icon name="people-outline"></ion-icon> Mecánicos</span></div>
+          <div class="res-lista" *ngIf="tecnicos.length">
+            <div class="res-tec" *ngFor="let t of tecnicos">
+              <span class="res-tec-av">{{ iniciales(t.nombre) }}</span>
+              <span class="res-tec-texto"><strong>{{ t.nombre }}</strong><span>{{ t.horas_promedio || 0 }} h promedio de ingreso a entrega</span></span>
+              <span class="res-tec-n"><strong class="mono">{{ t.ordenes_completadas || 0 }}</strong><span>completadas</span></span>
+            </div>
+          </div>
+          <div class="res-vacio" *ngIf="!tecnicos.length"><ion-icon name="people-outline"></ion-icon> Sin mecánicos activos.</div>
+        </section>
+      </div>
+
+      <!-- Ingresos por servicio -->
+      <section class="cd res-card res-ancha">
+        <div class="res-card-cab"><span class="cd-title"><ion-icon name="cash-outline"></ion-icon> Ingresos de citas por servicio (mes)</span></div>
+        <div class="tbl-wrap" *ngIf="data?.ingresos_por_servicio?.length">
+          <table class="res-tabla">
+            <thead><tr><th>Servicio</th><th class="num">Citas</th><th class="num">Ingreso</th><th>Parte del total</th><th class="num">Promedio</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let r of data?.ingresos_por_servicio">
+                <td class="nom">{{ r.servicio }}</td>
+                <td class="num mono">{{ r.citas }}</td>
+                <td class="num mono fuerte">{{ (r.ingreso || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</td>
+                <td><div class="res-parte"><div class="res-bar-pista"><div [style.width.%]="pct(r.ingreso, totalIngreso)"></div></div><span class="mono">{{ pct(r.ingreso, totalIngreso) }}%</span></div></td>
+                <td class="num mono">{{ (r.promedio || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</td>
+              </tr>
+            </tbody>
+            <tfoot><tr><td>Total</td><td></td><td class="num mono">{{ totalIngreso | currency:'CRC':'symbol-narrow':'1.0-0' }}</td><td></td><td></td></tr></tfoot>
+          </table>
+        </div>
+        <div class="res-vacio" *ngIf="!data?.ingresos_por_servicio?.length"><ion-icon name="cash-outline"></ion-icon> Sin citas cobradas este mes.</div>
+      </section>
+    </ng-container>
   </div>
 </ion-content>

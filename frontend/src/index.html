@@ -3,21 +3,31 @@
 
 <head>
   <meta charset="utf-8" />
-  <title>Motiq · Gestión de talleres</title>
+  <title>MS Motos · Taller</title>
 
   <base href="/" />
 
   <meta name="color-scheme" content="light dark" />
+  <!-- Tema elegido en Mi perfil (claro u oscuro; sin nada, sigue al dispositivo).
+       Va aquí, antes de los estilos, para que la pantalla no parpadee al abrir.
+       La misma clave la usa AccesibilidadService. -->
+  <script>
+    try {
+      var tema = localStorage.getItem('tallerms_tema');
+      if (tema === 'claro' || tema === 'oscuro') document.documentElement.classList.add('tema-' + tema);
+    } catch (e) { /* sin localStorage: automático */ }
+  </script>
 
-  <!-- Fuentes (Outfit / Plus Jakarta Sans / JetBrains Mono): carga no bloqueante -->
+  <!-- Rajdhani e Inter van dentro de la app (global.scss). De Google Fonts solo
+       llega JetBrains Mono, la de las cifras, sin bloquear la carga. -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preload" as="style"
-    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500&display=swap"
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap"
     onload="this.onload=null;this.rel='stylesheet'" />
   <noscript>
     <link rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500&display=swap" />
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" />
   </noscript>
   <!-- Se permite el zoom con los dedos. El valor por defecto de Ionic lleva
        `user-scalable=no, maximum-scale=1`, que Lighthouse marca como falla de
@@ -27,14 +37,23 @@
   <meta name="format-detection" content="telephone=no" />
   <meta name="msapplication-tap-highlight" content="no" />
 
-  <link rel="icon" type="image/png" href="assets/logo/motiq-iso.png" />
-  <meta name="theme-color" content="#1e3a5f" />
+  <link rel="icon" type="image/png" href="assets/logo/ms-iso.png" />
+  <meta name="theme-color" content="#E2231A" />
 
-  <!-- add to homescreen for ios -->
+  <!-- Instalada en la pantalla de inicio, la app abre SIN la barra de direcciones.
+       Hacen falta las dos cosas y por motivos distintos:
+       · Android/Chrome lo decide por `display: standalone` del manifiesto.
+       · iOS/Safari lo decide por `apple-mobile-web-app-capable`; el `mobile-web-app-capable`
+         de abajo es el nombre nuevo y estándar, pero Safari solo lo respeta en versiones
+         recientes, así que se dejan ambos.
+       Ojo: el atajo guarda estos valores el día que se agrega. Si ya está en la pantalla
+       de inicio, hay que borrarlo y volver a agregarlo para que tome el modo standalone. -->
+  <link rel="manifest" href="assets/manifest.webmanifest" />
   <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-  <meta name="apple-mobile-web-app-title" content="Motiq" />
-  <link rel="apple-touch-icon" href="assets/logo/motiq-iso.png" />
+  <meta name="apple-mobile-web-app-title" content="MS Motos" />
+  <link rel="apple-touch-icon" href="assets/logo/ms-iso.png" />
 
   <!-- Pantalla de arranque ("Pulso mínimo"): cubre el instante entre el HTML
        inicial y la primera pantalla real de Angular (tanto en web como justo
@@ -46,105 +65,53 @@
       inset: 0;
       z-index: 9999;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 22px;
-      background: #1e3a5f;
-      /* Fondo con un poco de profundidad: un halo apenas más claro arriba evita que
-         el azul plano se vea como una pantalla trabada. */
-      background-image: radial-gradient(120% 80% at 50% 12%, #26496f 0%, #1e3a5f 55%);
+      background: #E2231A;
       transition: opacity .35s ease;
     }
     #boot-splash.hide { opacity: 0; pointer-events: none; }
-
-    .boot-marca {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 14px;
-      opacity: 0;
-      transform: translateY(6px) scale(.98);
-      animation: boot-entrar .7s cubic-bezier(.2, .7, .3, 1) .06s forwards;
-    }
-
-    /* Placa clara detrás del isotipo: el logo es azul marino y sobre este fondo
-       desaparecería. Así alcanza UN solo archivo para el favicon, el ícono de la app
-       instalada y esta pantalla. */
-    .boot-mark {
-      width: 76px;
-      height: 76px;
-      background: #ffffff;
-      border-radius: 20px;
-      padding: 12px;
-      box-sizing: border-box;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, .28);
-      /* Oculto hasta que la imagen cargue de verdad: si el archivo no existe, el
-         navegador pinta su ícono de imagen rota, que es justo lo que no queremos
-         en la primera pantalla del producto. El script de abajo lo revela. */
-      display: none;
-    }
-
-    .boot-nombre {
-      font-family: 'Outfit', 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
-      font-size: 30px;
-      font-weight: 800;
-      letter-spacing: .01em;
-      color: #ffffff;
-      line-height: 1;
-    }
-
-    /* Barra indeterminada: no promete un porcentaje que no sabemos, solo comunica
-       que algo está pasando. Es más honesta que una rueda girando sin fin. */
-    .boot-barra {
-      position: relative;
-      width: 132px;
-      height: 3px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, .16);
-      overflow: hidden;
-      opacity: 0;
-      animation: boot-entrar .5s ease .28s forwards;
-    }
-    .boot-barra::after {
-      content: '';
+    .boot-glow {
       position: absolute;
-      inset: 0;
-      width: 42%;
-      border-radius: inherit;
-      background: #ffffff;
-      animation: boot-correr 1.15s cubic-bezier(.65, .05, .36, 1) infinite;
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 255, 255, .35), transparent 70%);
+      opacity: 0;
+      transform: scale(.7);
+      animation: boot-glow 1.6s ease-out forwards;
     }
-
-    @keyframes boot-entrar {
-      to { opacity: 1; transform: translateY(0) scale(1); }
+    .boot-mark {
+      position: relative;
+      width: 84px;
+      height: 84px;
+      opacity: 0;
+      transform: scale(.94);
+      animation: boot-mark 1.6s cubic-bezier(.2, .7, .3, 1) forwards;
     }
-    @keyframes boot-correr {
-      0%   { transform: translateX(-100%); }
-      100% { transform: translateX(238%); }
+    @keyframes boot-glow {
+      0%, 8% { opacity: 0; transform: scale(.7); }
+      30% { opacity: .7; transform: scale(1.15); }
+      55%, 100% { opacity: .25; transform: scale(1); }
     }
-
-    /* Recarga (misma sesión, ver script abajo): más corta — ya viste el arranque
-       completo hace un momento, no hace falta repetirlo entero. */
-    #boot-splash.recarga .boot-marca { animation-duration: .4s; }
-
+    @keyframes boot-mark {
+      0%, 6% { opacity: 0; transform: scale(.94); }
+      22%, 100% { opacity: 1; transform: scale(1); }
+    }
+    /* Recarga (misma sesión, ver script abajo): la animación corre más rápido —
+       ya viste el arranque completo hace un momento, no hace falta repetirlo entero. */
+    #boot-splash.recarga .boot-glow { animation-duration: .9s; }
+    #boot-splash.recarga .boot-mark { animation-duration: .9s; }
     @media (prefers-reduced-motion: reduce) {
-      .boot-marca, .boot-barra { animation-duration: .01ms !important; opacity: 1; transform: none; }
-      /* La barra deja de correr y queda como una línea de progreso quieta: el
-         movimiento continuo es justo lo que molesta a quien pide menos animación. */
-      .boot-barra::after { animation: none; width: 100%; opacity: .5; }
+      .boot-glow, .boot-mark { animation-duration: .01ms !important; }
     }
   </style>
 </head>
 
 <body>
   <div id="boot-splash" aria-hidden="true">
-    <div class="boot-marca">
-      <img class="boot-mark" src="assets/logo/motiq-iso.png" alt=""
-           onload="this.style.display='block'" onerror="this.remove()" />
-      <div class="boot-nombre">Motiq</div>
-    </div>
-    <div class="boot-barra"></div>
+    <div class="boot-glow"></div>
+    <img class="boot-mark" src="assets/logo/ms-iso-white.png" alt="" />
   </div>
   <script>
     (function () {

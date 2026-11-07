@@ -1,5 +1,4 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
-import { MarcaService } from '../../services/marca.service';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -8,7 +7,8 @@ import { AuthService } from '../../services/auth.service';
 import { DashboardService } from '../../services/dashboard.service';
 import { OrdenesService } from '../../services/ordenes.service';
 import { ESTADO_CONFIG, EstadoOrden } from '../../models/orden.model';
-import { descargarCSV, fechaCorta } from '../../shared/utils/csv.util';
+import { descargarCSV, fechaCorta } from '../../shared/csv.util';
+import { hoyCR } from '../../utils/fecha-cita';
 
 @Component({ standalone: false,
   selector: 'app-dashboard',
@@ -16,13 +16,6 @@ import { descargarCSV, fechaCorta } from '../../shared/utils/csv.util';
   styleUrls: ['./dashboard.page.scss'],
 })
 export class DashboardPage implements OnInit, OnDestroy {
-  auth = inject(AuthService);
-  private dashSvc = inject(DashboardService);
-  private ordenSvc = inject(OrdenesService);
-  private toast = inject(ToastController);
-  private router = inject(Router);
-  marca = inject(MarcaService);
-
   private destroy$ = new Subject<void>();
   resumen: any = null;
   tecnicos: any[] = [];
@@ -50,6 +43,14 @@ export class DashboardPage implements OnInit, OnDestroy {
   };
 
   exportando = false;
+
+  constructor(
+    public auth: AuthService,
+    private dashSvc: DashboardService,
+    private ordenSvc: OrdenesService,
+    private toast: ToastController,
+    private router: Router
+  ) {}
 
   ngOnInit() {
     this.cargar();
@@ -108,7 +109,7 @@ export class DashboardPage implements OnInit, OnDestroy {
   }
 
   // ===== Exportación de reportes a CSV (Excel) =====
-  private hoy() { return new Date().toISOString().slice(0, 10); }
+  private hoy() { return hoyCR(); }
 
   private estadoTexto(e?: string) { return ESTADO_CONFIG[e as EstadoOrden]?.label ?? e ?? ''; }
 
@@ -120,7 +121,7 @@ export class DashboardPage implements OnInit, OnDestroy {
           numero_orden: o.numero_orden,
           estado: this.estadoTexto(o.estado),
           cliente: `${o.cliente_nombre || ''} ${o.cliente_apellido || ''}`.trim(),
-          vehiculo: `${o.marca || ''} ${o.modelo || ''}`.trim(),
+          moto: `${o.marca || ''} ${o.modelo || ''}`.trim(),
           placa: o.placa || '',
           tecnico: o.tecnico_nombre || '',
           ingreso: fechaCorta(o.fecha_ingreso),
@@ -128,13 +129,13 @@ export class DashboardPage implements OnInit, OnDestroy {
           mano_obra: o.costo_mano_obra || 0,
           repuestos: o.costo_repuestos || 0,
           descuento: o.descuento || 0,
-          total: (o.costo_mano_obra || 0) + (o.costo_repuestos || 0) - (o.descuento || 0),
+          total: Number(o.costo_mano_obra || 0) + Number(o.costo_repuestos || 0) - Number(o.descuento || 0),
         }));
         descargarCSV(`ordenes_${this.hoy()}`, [
           { key: 'numero_orden', label: 'Orden' },
           { key: 'estado', label: 'Estado' },
           { key: 'cliente', label: 'Cliente' },
-          { key: 'vehiculo', label: 'Vehiculo' },
+          { key: 'moto', label: 'Moto' },
           { key: 'placa', label: 'Placa' },
           { key: 'tecnico', label: 'Técnico' },
           { key: 'ingreso', label: 'Ingreso' },
@@ -158,18 +159,18 @@ export class DashboardPage implements OnInit, OnDestroy {
         const filas = res.data.map(o => ({
           numero_orden: o.numero_orden,
           cliente: `${o.cliente_nombre || ''} ${o.cliente_apellido || ''}`.trim(),
-          vehiculo: `${o.marca || ''} ${o.modelo || ''}`.trim(),
+          moto: `${o.marca || ''} ${o.modelo || ''}`.trim(),
           entrega: fechaCorta(o.fecha_entrega_real),
           metodo_pago: o.metodo_pago || '',
           mano_obra: o.costo_mano_obra || 0,
           repuestos: o.costo_repuestos || 0,
           descuento: o.descuento || 0,
-          total: (o.costo_mano_obra || 0) + (o.costo_repuestos || 0) - (o.descuento || 0),
+          total: Number(o.costo_mano_obra || 0) + Number(o.costo_repuestos || 0) - Number(o.descuento || 0),
         }));
         descargarCSV(`facturacion_${this.hoy()}`, [
           { key: 'numero_orden', label: 'Orden' },
           { key: 'cliente', label: 'Cliente' },
-          { key: 'vehiculo', label: 'Vehiculo' },
+          { key: 'moto', label: 'Moto' },
           { key: 'entrega', label: 'Entrega' },
           { key: 'metodo_pago', label: 'Método de pago' },
           { key: 'mano_obra', label: 'Mano de obra' },

@@ -1,22 +1,39 @@
 const router = require('express').Router();
-// Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
-const { fail } = require('../utils/responder');
+const bcrypt = require('bcrypt');
+const { pool } = require('../db/pool');
+const { anotar } = require('../utils/actividad');
+const { filtrarAvisos } = require('../utils/preferencias');
+const { fail, invalido } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { soloRoles } = require('../middleware/roles');
-const { generarNumeroOrden, sincronizarCitaDesdeOrden, cerrarOrden, avanzarEstadoOrden, estadoTrasAprobacion } = require('../utils/ordenes');
+const { generarNumeroOrden, sincronizarCitaDesdeOrden, cerrarOrden, totalOrden, esAdicional, registrarAprobacion, revisarAdicional } = require('../utils/ordenes');
+const { ESTADOS_REPUESTO, estadoAlEditarRepuesto } = require('../utils/reglas-orden');
 const { getConfig, horasDisponibles } = require('../utils/configuracion');
+const { politica, problemaDeContrasena } = require('../utils/contrasena');
+const { agendaDia, horasPasadas } = require('../utils/agenda');
 const { getServicios } = require('../utils/servicios');
 const { getSucursales, tecnicoEnSucursal } = require('../utils/sucursales');
+const { cargarAlcance, soloSucursal, exigirSucursal, SUCURSAL_DE_ORDEN, SUCURSAL_DE_CITA } = require('../utils/alcance');
 const { notificarMecanico } = require('../utils/notificaciones');
 const { LEIDO_POR_MI, VISTO_POR_OTRO, marcarLeidos } = require('../utils/mensajes');
 const { fotoValida } = require('../utils/validar');
+const { exigirPermiso } = require('../middleware/permisos');
+const { hoySQL } = require('../utils/sql-fechas');
 
 // Panel de recepción: intermediaria entre cliente y mecánico.
 // Accesible a recepción y superiores.
-router.use(auth, requireRol('recepcion'));
-// Foto y contraseña propias: el mismo tramo que monta el panel del mecánico.
-router.use(require('./perfil-propio.routes'));
+// Solo mostrador y administración. Con requireRol('recepcion') pasaba también el
+// mecánico (la jerarquía es recepcion < tecnico < admin): podía armar y enviar
+// cotizaciones, tocar costos, abrir órdenes y avisar a clientes. Sus pantallas no
+// usan esta API: lo suyo está en /api/mecanico.
+router.use(auth, soloRoles('recepcion', 'admin'));
+// Quien tiene una sucursal ve solo lo de ella (utils/alcance.js): las listas se
+// filtran abajo, y una cita u orden de la otra sucursal da 404.
+router.use(cargarAlcance);
+router.use('/citas/:id', exigirSucursal(SUCURSAL_DE_CITA));
+router.use('/ordenes/:id', exigirSucursal(SUCURSAL_DE_ORDEN));
+router.use('/cotizaciones/:id', exigirSucursal(SUCURSAL_DE_ORDEN));
 
 // Estados de la orden que NO se consideran activos.
 const ORDEN_CERRADA = ['entregada', 'cancelada'];
@@ -26,34 +43,32 @@ const ORDEN_CERRADA = ['entregada', 'cancelada'];
 // ───────────────────────────────────────────────────────────
 router.get('/resumen', async (req, res) => {
   try {
-    const [[{ citas_hoy }]] = await req.db.query(
-      'SELECT COUNT(*) AS citas_hoy FROM citas WHERE fecha = CURDATE() AND tenant_id = @tenant'
+    // Hoy del taller, no el de la base (utils/sql-fechas.js).
+    const hoy = hoySQL((await getConfig()).zona_horaria_offset);
+    const [[{ citas_hoy }]] = await pool.query(
+      `SELECT COUNT(*) AS citas_hoy FROM citas WHERE fecha = ${hoy}${soloSucursal(req, 'sucursal_id')}`
     );
-    const [[{ ordenes_activas }]] = await req.db.query(
-      `SELECT COUNT(*) AS ordenes_activas FROM ordenes_trabajo
-       WHERE estado NOT IN ('entregada','cancelada') AND tenant_id = @tenant`
+    const [[{ ordenes_activas }]] = await pool.query(
+      `SELECT COUNT(*) AS ordenes_activas FROM ordenes_trabajo WHERE estado NOT IN ('entregada','cancelada')${soloSucursal(req, 'sucursal_id')}`
     );
-    const [[{ cotizaciones_pendientes }]] = await req.db.query(
-      `SELECT COUNT(*) AS cotizaciones_pendientes FROM ordenes_trabajo
-       WHERE estado = 'esperando_aprobacion' AND aprobacion_cliente = 'pendiente' AND tenant_id = @tenant`
+    const [[{ cotizaciones_pendientes }]] = await pool.query(
+      `SELECT COUNT(*) AS cotizaciones_pendientes FROM ordenes_trabajo WHERE estado = 'esperando_aprobacion' AND aprobacion_cliente = 'pendiente'${soloSucursal(req, 'sucursal_id')}`
     );
     // "Ocupado" = el técnico tiene trabajo activo en cualquiera de los dos mundos
     // (una cita en proceso hoy, o una orden de trabajo abierta). Misma población
     // que mecanicos_totales, así el cociente X/Y es coherente.
-    const [[{ mecanicos_ocupados }]] = await req.db.query(
+    const [[{ mecanicos_ocupados }]] = await pool.query(
       `SELECT COUNT(*) AS mecanicos_ocupados FROM usuarios u
-       WHERE u.rol = 'tecnico' AND u.activo = 1 AND u.tenant_id = @tenant AND (
+       WHERE u.rol = 'tecnico' AND u.activo = 1${soloSucursal(req, 'u.sucursal_id')} AND (
          EXISTS (SELECT 1 FROM citas c
-                 WHERE c.tecnico_id = u.id AND c.fecha = CURDATE()
-                   AND c.estado IN ('en_revision','en_mantenimiento') AND c.tenant_id = @tenant)
+                 WHERE c.tecnico_id = u.id AND c.fecha = ${hoy}
+                   AND c.estado IN ('en_revision','en_mantenimiento'))
          OR EXISTS (SELECT 1 FROM ordenes_trabajo o
-                    WHERE o.tecnico_id = u.id AND o.estado NOT IN ('entregada','cancelada')
-                      AND o.tenant_id = @tenant)
+                    WHERE o.tecnico_id = u.id AND o.estado NOT IN ('entregada','cancelada'))
        )`
     );
-    const [[{ mecanicos_totales }]] = await req.db.query(
-      `SELECT COUNT(*) AS mecanicos_totales FROM usuarios
-       WHERE rol = 'tecnico' AND activo = 1 AND tenant_id = @tenant`
+    const [[{ mecanicos_totales }]] = await pool.query(
+      `SELECT COUNT(*) AS mecanicos_totales FROM usuarios WHERE rol = 'tecnico' AND activo = 1${soloSucursal(req, 'sucursal_id')}`
     );
     res.json({
       data: {
@@ -74,20 +89,20 @@ router.get('/resumen', async (req, res) => {
 // ───────────────────────────────────────────────────────────
 router.get('/citas-hoy', async (req, res) => {
   try {
-    const [rows] = await req.db.query(
-      `SELECT ci.id, ci.fecha, TIME_FORMAT(ci.hora,'%H:%i') AS hora, ci.motivo, ci.tipo_servicio, ci.estado, ci.monto,
+    const [rows] = await pool.query(
+      `SELECT ci.id, ci.fecha, TIME_FORMAT(ci.hora,'%H:%i') AS hora, ci.motivo, ci.tipo_servicio, ci.servicios, ci.estado, ci.monto, ci.moto_id,
               ci.confirmada_cliente, ci.hora_llegada, ci.no_show, ci.orden_id, o.numero_orden,
               c.id AS cliente_id, c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.telefono AS cliente_telefono,
               m.marca, m.modelo, m.placa,
               t.nombre AS tecnico_nombre,
               ci.sucursal_id, s.nombre AS sucursal_nombre
        FROM citas ci
-       JOIN clientes c ON ci.cliente_id = c.id AND c.tenant_id = @tenant
-       LEFT JOIN vehiculos m ON ci.vehiculo_id = m.id AND m.tenant_id = @tenant
-       LEFT JOIN usuarios t ON ci.tecnico_id = t.id AND t.tenant_id = @tenant
-       LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id AND o.tenant_id = @tenant
-       LEFT JOIN sucursales s ON s.id = ci.sucursal_id AND s.tenant_id = @tenant
-       WHERE ci.tenant_id = @tenant AND ci.fecha = CURDATE() AND ci.estado <> 'cancelado'
+       JOIN clientes c ON ci.cliente_id = c.id
+       LEFT JOIN motos m ON ci.moto_id = m.id
+       LEFT JOIN usuarios t ON ci.tecnico_id = t.id
+       LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id
+       LEFT JOIN sucursales s ON s.id = ci.sucursal_id
+       WHERE ci.fecha = ${hoySQL((await getConfig()).zona_horaria_offset)} AND ci.estado <> 'cancelado'${soloSucursal(req, 'ci.sucursal_id')}
        ORDER BY ci.hora ASC`
     );
     res.json({ data: rows });
@@ -103,21 +118,21 @@ router.get('/agenda', async (req, res) => {
   try {
     const { desde, hasta } = req.query;
     if (!desde || !hasta) return res.status(400).json({ error: 'desde y hasta son requeridos' });
-    const [rows] = await req.db.query(
+    const [rows] = await pool.query(
       `SELECT ci.id, DATE_FORMAT(ci.fecha,'%Y-%m-%d') AS fecha, TIME_FORMAT(ci.hora,'%H:%i') AS hora,
-              ci.motivo, ci.tipo_servicio, ci.estado, ci.confirmada_cliente, ci.hora_llegada,
+              ci.motivo, ci.tipo_servicio, ci.servicios, ci.estado, ci.confirmada_cliente, ci.hora_llegada,
               ci.no_show, ci.orden_id, o.numero_orden,
               c.id AS cliente_id, c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.telefono AS cliente_telefono,
               m.marca, m.modelo, m.placa,
               t.nombre AS tecnico_nombre,
               ci.sucursal_id, s.nombre AS sucursal_nombre
        FROM citas ci
-       JOIN clientes c ON ci.cliente_id = c.id AND c.tenant_id = @tenant
-       LEFT JOIN vehiculos m ON ci.vehiculo_id = m.id AND m.tenant_id = @tenant
-       LEFT JOIN usuarios t ON ci.tecnico_id = t.id AND t.tenant_id = @tenant
-       LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id AND o.tenant_id = @tenant
-       LEFT JOIN sucursales s ON s.id = ci.sucursal_id AND s.tenant_id = @tenant
-       WHERE ci.tenant_id = @tenant AND ci.fecha BETWEEN ? AND ? AND ci.estado <> 'cancelado'
+       JOIN clientes c ON ci.cliente_id = c.id
+       LEFT JOIN motos m ON ci.moto_id = m.id
+       LEFT JOIN usuarios t ON ci.tecnico_id = t.id
+       LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id
+       LEFT JOIN sucursales s ON s.id = ci.sucursal_id
+       WHERE ci.fecha BETWEEN ? AND ? AND ci.estado <> 'cancelado'${soloSucursal(req, 'ci.sucursal_id')}
        ORDER BY ci.fecha ASC, ci.hora ASC`,
       [desde, hasta]
     );
@@ -128,44 +143,59 @@ router.get('/agenda', async (req, res) => {
 });
 
 // Crear (o recuperar) la orden de trabajo de una cita: activa el puente cita ↔ orden.
-router.post('/citas/:id/crear-orden', async (req, res) => {
+// Lo usan recepción (Inicio → citas de hoy) y administración (Gestión de citas →
+// Citas, cualquier fecha). Body opcional { moto_id }: una cita agendada sin moto
+// necesita una para la orden; la pantalla la pide (una del cliente, o una que se
+// registra en el momento) y se le asigna también a la cita.
+router.post('/citas/:id/crear-orden', exigirPermiso('ordenes.crear'), async (req, res) => {
   try {
-    const [[cita]] = await req.db.query(
-      `SELECT id, cliente_id, vehiculo_id, motivo, tecnico_id, sucursal_id, orden_id
-       FROM citas WHERE id = ? AND tenant_id = @tenant`,
+    const [[cita]] = await pool.query(
+      'SELECT id, cliente_id, moto_id, motivo, tecnico_id, sucursal_id, orden_id, estado FROM citas WHERE id = ?',
       [req.params.id]
     );
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
 
     // Idempotente: si ya tiene orden, la devuelve.
     if (cita.orden_id) {
-      const [[o]] = await req.db.query(
-        'SELECT id, numero_orden FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant', [cita.orden_id]
-      );
+      const [[o]] = await pool.query('SELECT id, numero_orden FROM ordenes_trabajo WHERE id = ?', [cita.orden_id]);
       if (o) return res.json({ data: { orden_id: o.id, numero_orden: o.numero_orden }, message: 'La cita ya tiene una orden' });
     }
-    if (!cita.vehiculo_id) return res.status(400).json({ error: 'La cita no tiene una moto asociada; no se puede crear la orden' });
+    if (['cancelado', 'entregado'].includes(cita.estado)) {
+      return res.status(409).json({ error: cita.estado === 'cancelado' ? 'La cita está cancelada' : 'La cita ya se entregó' });
+    }
+    let motoId = cita.moto_id;
+    if (req.body?.moto_id) {
+      const [[moto]] = await pool.query('SELECT id FROM motos WHERE id = ? AND cliente_id = ? AND activa = 1', [req.body.moto_id, cita.cliente_id]);
+      if (!moto) return invalido(res, 'moto_id', 'Esa moto no es de este cliente');
+      motoId = moto.id;
+    }
+    if (!motoId) {
+      return res.status(400).json({ error: 'La cita no tiene moto: elegí o registrá una para abrir la orden', campo: 'moto_id', codigo: 'sin_moto' });
+    }
 
-    const numero_orden = await generarNumeroOrden(req.db);
-    const conn = await req.db.conexion();
+    const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
+      // Si dos personas tocan "Crear orden" a la vez, la segunda espera aquí y
+      // recibe la orden que creó la primera, en vez de abrir otra. El número de
+      // orden se pide después, para que ese segundo clic no gaste uno.
+      const [[actual]] = await conn.query('SELECT orden_id FROM citas WHERE id = ? FOR UPDATE', [req.params.id]);
+      if (actual?.orden_id) {
+        await conn.rollback();
+        const [[o]] = await pool.query('SELECT id, numero_orden FROM ordenes_trabajo WHERE id = ?', [actual.orden_id]);
+        return res.json({ data: { orden_id: o.id, numero_orden: o.numero_orden }, message: 'La cita ya tiene una orden' });
+      }
+      const numero_orden = await generarNumeroOrden();
       const [result] = await conn.query(
         `INSERT INTO ordenes_trabajo
-          (tenant_id, numero_orden, vehiculo_id, cliente_id, sucursal_id, recepcionista_id, tecnico_id, problema_reportado, estado)
-         VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, 'diagnostico')`,
-        [numero_orden, cita.vehiculo_id, cita.cliente_id, cita.sucursal_id || null, req.usuario.id, cita.tecnico_id || null, cita.motivo || 'Orden generada desde la cita']
+          (numero_orden, moto_id, cliente_id, sucursal_id, recepcionista_id, tecnico_id, problema_reportado, estado)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'diagnostico')`,
+        [numero_orden, motoId, cita.cliente_id, cita.sucursal_id || null, req.usuario.id, cita.tecnico_id || null, cita.motivo || 'Orden generada desde la cita']
       );
-      await conn.query(
-        'INSERT INTO orden_tiempos (tenant_id, orden_id, etapa) VALUES (@tenant, ?, ?)',
-        [result.insertId, 'diagnostico']
-      );
-      await conn.query(
-        'UPDATE citas SET orden_id = ? WHERE id = ? AND tenant_id = @tenant',
-        [result.insertId, req.params.id]
-      );
+      await conn.query('INSERT INTO orden_tiempos (orden_id, etapa) VALUES (?, ?)', [result.insertId, 'diagnostico']);
+      await conn.query('UPDATE citas SET orden_id = ?, moto_id = ? WHERE id = ?', [result.insertId, motoId, req.params.id]);
       await conn.commit();
-      await sincronizarCitaDesdeOrden(req.db, result.insertId, 'diagnostico'); // cita → en_revision + notificación
+      await sincronizarCitaDesdeOrden(result.insertId, 'diagnostico'); // cita → en_revision + notificación
       res.status(201).json({ data: { orden_id: result.insertId, numero_orden }, message: 'Orden creada desde la cita' });
     } catch (e) {
       await conn.rollback();
@@ -180,10 +210,10 @@ router.post('/citas/:id/crear-orden', async (req, res) => {
 
 // Check-in de mostrador: marca que el cliente llegó (antes de crear la orden).
 // Solo aplica a citas agendadas y sin orden todavía. Idempotente.
-router.patch('/citas/:id/llegada', async (req, res) => {
+router.patch('/citas/:id/llegada', exigirPermiso('citas.agendar'), async (req, res) => {
   try {
-    const [[cita]] = await req.db.query(
-      'SELECT id, estado, orden_id, hora_llegada FROM citas WHERE id = ? AND tenant_id = @tenant',
+    const [[cita]] = await pool.query(
+      'SELECT id, estado, orden_id, hora_llegada FROM citas WHERE id = ?',
       [req.params.id]
     );
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
@@ -191,13 +221,9 @@ router.patch('/citas/:id/llegada', async (req, res) => {
       return res.status(400).json({ error: 'La cita ya está en proceso; no aplica marcar llegada' });
     }
     if (!cita.hora_llegada) {
-      await req.db.query(
-        'UPDATE citas SET hora_llegada = NOW() WHERE id = ? AND tenant_id = @tenant', [req.params.id]
-      );
+      await pool.query('UPDATE citas SET hora_llegada = NOW() WHERE id = ?', [req.params.id]);
     }
-    const [[r]] = await req.db.query(
-      'SELECT hora_llegada FROM citas WHERE id = ? AND tenant_id = @tenant', [req.params.id]
-    );
+    const [[r]] = await pool.query('SELECT hora_llegada FROM citas WHERE id = ?', [req.params.id]);
     res.json({ data: { hora_llegada: r.hora_llegada }, message: 'Llegada registrada' });
   } catch (err) {
     fail(res, err);
@@ -205,10 +231,10 @@ router.patch('/citas/:id/llegada', async (req, res) => {
 });
 
 // Deshacer la llegada (si se marcó por error).
-router.delete('/citas/:id/llegada', async (req, res) => {
+router.delete('/citas/:id/llegada', exigirPermiso('citas.agendar'), async (req, res) => {
   try {
-    const [result] = await req.db.query(
-      'UPDATE citas SET hora_llegada = NULL WHERE id = ? AND orden_id IS NULL AND tenant_id = @tenant',
+    const [result] = await pool.query(
+      'UPDATE citas SET hora_llegada = NULL WHERE id = ? AND orden_id IS NULL',
       [req.params.id]
     );
     if (!result.affectedRows) return res.status(400).json({ error: 'No se pudo deshacer la llegada' });
@@ -225,100 +251,133 @@ router.delete('/citas/:id/llegada', async (req, res) => {
 //   lista      → una orden quedó lista para entrega (llamar / cobrar)
 //   aprobacion → el cliente aprobó o rechazó el presupuesto
 //   cita_nueva → un cliente agendó una cita desde el portal (usuario_id NULL)
+//   sin_entregar → una orden o cita sin orden lista hace más de 2 días (va primero)
 // Antes esto espejaba la tabla `notificaciones` (texto en 2ª persona del cliente
 // + mensajes manuales sueltos), que no le sirve a la recepción.
 // ───────────────────────────────────────────────────────────
 router.get('/alertas', async (req, res) => {
   try {
-    const [fotos] = await req.db.query(
+    const [fotos] = await pool.query(
       `SELECT 'foto' AS tipo, f.created_at,
               o.numero_orden, o.id AS orden_id,
               m.marca, m.modelo,
               u.nombre AS tecnico_nombre
        FROM orden_fotos f
-       JOIN ordenes_trabajo o ON o.id = f.orden_id AND o.tenant_id = @tenant
-       JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
-       LEFT JOIN usuarios u ON u.id = o.tecnico_id AND u.tenant_id = @tenant
-       WHERE f.tenant_id = @tenant AND o.estado NOT IN ('entregada','cancelada')
+       JOIN ordenes_trabajo o ON o.id = f.orden_id
+       JOIN motos m ON m.id = o.moto_id
+       LEFT JOIN usuarios u ON u.id = o.tecnico_id
+       WHERE o.estado NOT IN ('entregada','cancelada')${soloSucursal(req, 'o.sucursal_id')}
          AND f.created_at >= NOW() - INTERVAL 24 HOUR
        ORDER BY f.created_at DESC LIMIT 10`
     );
     // Órdenes que entraron a "lista_entrega" en las últimas 24 h y siguen ahí
     // (la etapa abierta del registro de tiempos marca el momento exacto).
-    const [listas] = await req.db.query(
+    const [listas] = await pool.query(
       `SELECT 'lista' AS tipo, t.inicio AS created_at,
               o.numero_orden, o.id AS orden_id,
               c.nombre AS cliente_nombre, c.apellido AS cliente_apellido,
               m.marca, m.modelo
        FROM orden_tiempos t
-       JOIN ordenes_trabajo o ON o.id = t.orden_id AND o.tenant_id = @tenant
-       JOIN clientes c ON c.id = o.cliente_id AND c.tenant_id = @tenant
-       JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
-       WHERE t.tenant_id = @tenant AND t.etapa = 'lista_entrega' AND t.fin IS NULL
-         AND o.estado = 'lista_entrega'
+       JOIN ordenes_trabajo o ON o.id = t.orden_id
+       JOIN clientes c ON c.id = o.cliente_id
+       JOIN motos m ON m.id = o.moto_id
+       WHERE t.etapa = 'lista_entrega' AND t.fin IS NULL
+         AND o.estado = 'lista_entrega'${soloSucursal(req, 'o.sucursal_id')}
          AND t.inicio >= NOW() - INTERVAL 24 HOUR
        ORDER BY t.inicio DESC LIMIT 10`
     );
     // Decisión del cliente sobre el presupuesto (fecha_aprobacion se setea en ambas).
-    const [aprob] = await req.db.query(
+    const [aprob] = await pool.query(
       `SELECT 'aprobacion' AS tipo, o.fecha_aprobacion AS created_at,
               o.numero_orden, o.id AS orden_id, o.aprobacion_cliente AS decision,
               c.nombre AS cliente_nombre, c.apellido AS cliente_apellido,
               m.marca, m.modelo
        FROM ordenes_trabajo o
-       JOIN clientes c ON c.id = o.cliente_id AND c.tenant_id = @tenant
-       JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
-       WHERE o.tenant_id = @tenant AND o.aprobacion_cliente IN ('aprobado','rechazado')
+       JOIN clientes c ON c.id = o.cliente_id
+       JOIN motos m ON m.id = o.moto_id
+       WHERE o.aprobacion_cliente IN ('aprobado','rechazado')${soloSucursal(req, 'o.sucursal_id')}
          AND o.fecha_aprobacion >= NOW() - INTERVAL 24 HOUR
        ORDER BY o.fecha_aprobacion DESC LIMIT 10`
     );
     // Citas que el cliente agendó solo desde el portal (sin usuario de mostrador).
-    const [citasNuevas] = await req.db.query(
+    const [citasNuevas] = await pool.query(
       `SELECT 'cita_nueva' AS tipo, ci.created_at,
               ci.id AS cita_id, DATE_FORMAT(ci.fecha, '%d/%m') AS fecha_corta,
               TIME_FORMAT(ci.hora, '%H:%i') AS hora,
               c.nombre AS cliente_nombre, c.apellido AS cliente_apellido,
               m.marca, m.modelo
        FROM citas ci
-       JOIN clientes c ON c.id = ci.cliente_id AND c.tenant_id = @tenant
-       LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant
-       WHERE ci.tenant_id = @tenant AND ci.usuario_id IS NULL AND ci.estado <> 'cancelado'
+       JOIN clientes c ON c.id = ci.cliente_id
+       LEFT JOIN motos m ON m.id = ci.moto_id
+       WHERE ci.usuario_id IS NULL AND ci.estado <> 'cancelado'${soloSucursal(req, 'ci.sucursal_id')}
          AND ci.created_at >= NOW() - INTERVAL 24 HOUR
        ORDER BY ci.created_at DESC LIMIT 10`
     );
     // Citas que el cliente canceló desde el portal: el taller tiene que enterarse
     // para liberar/reasignar el espacio (antes la cita solo desaparecía de la agenda).
-    const [citasCanceladas] = await req.db.query(
+    const [citasCanceladas] = await pool.query(
       `SELECT 'cita_cancelada' AS tipo, ci.fecha_cancelacion AS created_at,
               ci.id AS cita_id, DATE_FORMAT(ci.fecha, '%d/%m') AS fecha_corta,
               TIME_FORMAT(ci.hora, '%H:%i') AS hora,
               c.nombre AS cliente_nombre, c.apellido AS cliente_apellido,
               m.marca, m.modelo
        FROM citas ci
-       JOIN clientes c ON c.id = ci.cliente_id AND c.tenant_id = @tenant
-       LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant
-       WHERE ci.tenant_id = @tenant AND ci.estado = 'cancelado' AND ci.fecha_cancelacion IS NOT NULL
+       JOIN clientes c ON c.id = ci.cliente_id
+       LEFT JOIN motos m ON m.id = ci.moto_id
+       WHERE ci.estado = 'cancelado' AND ci.fecha_cancelacion IS NOT NULL${soloSucursal(req, 'ci.sucursal_id')}
          AND ci.fecha_cancelacion >= NOW() - INTERVAL 24 HOUR
        ORDER BY ci.fecha_cancelacion DESC LIMIT 10`
     );
-    const [repSolicitados] = await req.db.query(
+    const [repSolicitados] = await pool.query(
       `SELECT 'repuesto' AS tipo, r.created_at,
               o.numero_orden, o.id AS orden_id,
               r.nombre AS repuesto_nombre, r.cantidad AS repuesto_cantidad,
               m.marca, m.modelo,
               u.nombre AS tecnico_nombre
        FROM orden_repuestos r
-       JOIN ordenes_trabajo o ON o.id = r.orden_id AND o.tenant_id = @tenant
-       JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
-       LEFT JOIN usuarios u ON u.id = o.tecnico_id AND u.tenant_id = @tenant
-       WHERE r.tenant_id = @tenant AND r.estado = 'solicitado'
+       JOIN ordenes_trabajo o ON o.id = r.orden_id
+       JOIN motos m ON m.id = o.moto_id
+       LEFT JOIN usuarios u ON u.id = o.tecnico_id
+       WHERE r.estado = 'solicitado'${soloSucursal(req, 'o.sucursal_id')}
          AND r.created_at >= NOW() - INTERVAL 24 HOUR
        ORDER BY r.created_at DESC LIMIT 10`
     );
-    const todas = [...fotos, ...listas, ...aprob, ...citasNuevas, ...citasCanceladas, ...repSolicitados]
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      .slice(0, 20);
-    res.json({ data: todas });
+    // Motos listas hace más de 2 días que nadie marcó como entregadas: o el cliente
+    // no ha pasado, o ya se la llevó y faltó marcarlo. Van primero y no vencen a las
+    // 24 h como las demás: siguen ahí hasta que se resuelvan.
+    const [olvidadasOrdenes] = await pool.query(
+      `SELECT 'sin_entregar' AS tipo, t.inicio AS created_at,
+              DATEDIFF(NOW(), t.inicio) AS dias,
+              o.numero_orden, o.id AS orden_id, NULL AS cita_id,
+              c.nombre AS cliente_nombre, c.apellido AS cliente_apellido,
+              m.marca, m.modelo
+       FROM orden_tiempos t
+       JOIN ordenes_trabajo o ON o.id = t.orden_id
+       JOIN clientes c ON c.id = o.cliente_id
+       JOIN motos m ON m.id = o.moto_id
+       WHERE t.etapa = 'lista_entrega' AND t.fin IS NULL
+         AND o.estado = 'lista_entrega'${soloSucursal(req, 'o.sucursal_id')}
+         AND t.inicio < NOW() - INTERVAL 2 DAY
+       ORDER BY t.inicio ASC LIMIT 10`
+    );
+    const [olvidadasCitas] = await pool.query(
+      `SELECT 'sin_entregar' AS tipo, COALESCE(ci.fecha_listo, TIMESTAMP(ci.fecha, ci.hora)) AS created_at,
+              DATEDIFF(NOW(), COALESCE(ci.fecha_listo, TIMESTAMP(ci.fecha, ci.hora))) AS dias,
+              NULL AS numero_orden, NULL AS orden_id, ci.id AS cita_id, ci.monto,
+              c.nombre AS cliente_nombre, c.apellido AS cliente_apellido,
+              m.marca, m.modelo
+       FROM citas ci
+       JOIN clientes c ON c.id = ci.cliente_id
+       LEFT JOIN motos m ON m.id = ci.moto_id
+       WHERE ci.estado = 'listo' AND ci.orden_id IS NULL${soloSucursal(req, 'ci.sucursal_id')}
+         AND COALESCE(ci.fecha_listo, TIMESTAMP(ci.fecha, ci.hora)) < NOW() - INTERVAL 2 DAY
+       ORDER BY created_at ASC LIMIT 10`
+    );
+    const recientes = [...fotos, ...listas, ...aprob, ...citasNuevas, ...citasCanceladas, ...repSolicitados]
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    // Sin los avisos que la persona apagó en Mi perfil.
+    const todas = await filtrarAvisos(req.usuario.id, 'recepcion', [...olvidadasOrdenes, ...olvidadasCitas, ...recientes]);
+    res.json({ data: todas.slice(0, 20) });
   } catch (err) {
     fail(res, err);
   }
@@ -332,10 +391,10 @@ router.get('/ordenes', async (req, res) => {
     // ?estado=completadas → entregadas/canceladas; lista_entrega → listas para entregar;
     // por defecto, activas.
     let filtro;
-    if (req.query.estado === 'lista_entrega') filtro = "o.tenant_id = @tenant AND o.estado = 'lista_entrega'";
-    else if (req.query.estado === 'completadas') filtro = "o.tenant_id = @tenant AND o.estado IN ('entregada','cancelada')";
-    else filtro = "o.tenant_id = @tenant AND o.estado NOT IN ('entregada','cancelada')";
-    const [rows] = await req.db.query(
+    if (req.query.estado === 'lista_entrega') filtro = "o.estado = 'lista_entrega'";
+    else if (req.query.estado === 'completadas') filtro = "o.estado IN ('entregada','cancelada')";
+    else filtro = "o.estado NOT IN ('entregada','cancelada')";
+    const [rows] = await pool.query(
       `SELECT o.id, o.numero_orden, o.estado, o.problema_reportado, o.prioridad,
               o.costo_mano_obra, o.costo_repuestos, o.descuento,
               (o.costo_mano_obra + o.costo_repuestos - o.descuento) AS total,
@@ -344,13 +403,13 @@ router.get('/ordenes', async (req, res) => {
               m.marca, m.modelo, m.placa,
               t.nombre AS tecnico_nombre,
               o.sucursal_id, s.nombre AS sucursal_nombre,
-              (SELECT COUNT(*) FROM orden_fotos WHERE orden_id = o.id AND tenant_id = @tenant) AS total_fotos
+              (SELECT COUNT(*) FROM orden_fotos WHERE orden_id = o.id) AS total_fotos
        FROM ordenes_trabajo o
-       JOIN clientes c ON o.cliente_id = c.id AND c.tenant_id = @tenant
-       JOIN vehiculos m ON o.vehiculo_id = m.id AND m.tenant_id = @tenant
-       LEFT JOIN usuarios t ON o.tecnico_id = t.id AND t.tenant_id = @tenant
-       LEFT JOIN sucursales s ON s.id = o.sucursal_id AND s.tenant_id = @tenant
-       WHERE ${filtro}
+       JOIN clientes c ON o.cliente_id = c.id
+       JOIN motos m ON o.moto_id = m.id
+       LEFT JOIN usuarios t ON o.tecnico_id = t.id
+       LEFT JOIN sucursales s ON s.id = o.sucursal_id
+       WHERE ${filtro}${soloSucursal(req, 'o.sucursal_id')}
        ORDER BY o.fecha_ingreso DESC`
     );
     res.json({ data: rows });
@@ -362,8 +421,8 @@ router.get('/ordenes', async (req, res) => {
 // 1.5 Fotos de una orden
 router.get('/ordenes/:id/fotos', async (req, res) => {
   try {
-    const [rows] = await req.db.query(
-      'SELECT * FROM orden_fotos WHERE orden_id = ? AND tenant_id = @tenant ORDER BY created_at ASC',
+    const [rows] = await pool.query(
+      'SELECT * FROM orden_fotos WHERE orden_id = ? ORDER BY created_at ASC',
       [req.params.id]
     );
     res.json({ data: rows });
@@ -373,33 +432,45 @@ router.get('/ordenes/:id/fotos', async (req, res) => {
 });
 
 // 1.6 Subir foto a una orden (data URL base64). Reusa la lógica de ordenes.routes.js.
-router.post('/ordenes/:id/fotos', async (req, res) => {
+router.post('/ordenes/:id/fotos', exigirPermiso('taller.fotos'), async (req, res) => {
   try {
     const { url, tipo, descripcion } = req.body;
     if (!url) return res.status(400).json({ error: 'Imagen requerida' });
     const tiposValidos = ['ingreso', 'diagnostico', 'avance', 'entrega'];
     const tipoFinal = tiposValidos.includes(tipo) ? tipo : 'avance';
-    const [result] = await req.db.query(
-      'INSERT INTO orden_fotos (tenant_id, orden_id, url, tipo, descripcion) VALUES (@tenant, ?, ?, ?, ?)',
+    const [result] = await pool.query(
+      'INSERT INTO orden_fotos (orden_id, url, tipo, descripcion) VALUES (?, ?, ?, ?)',
       [req.params.id, url, tipoFinal, descripcion || null]
     );
-    const [[nueva]] = await req.db.query('SELECT * FROM orden_fotos WHERE id = ? AND tenant_id = @tenant', [result.insertId]);
+    const [[nueva]] = await pool.query('SELECT * FROM orden_fotos WHERE id = ?', [result.insertId]);
     res.status(201).json({ data: nueva, message: 'Foto agregada' });
   } catch (err) {
     fail(res, err);
   }
 });
 
-// Entregar (cerrar) una orden lista para entrega: registra pago + garantía y la marca
-// entregada. Reusa la lógica transaccional de cierre (fidelización + sync de cita).
-// Recepción solo puede entregar órdenes que el mecánico ya dejó en 'lista_entrega'.
-router.post('/ordenes/:id/entregar', async (req, res) => {
+// Entregar (cerrar) una orden: registra pago + garantía y la marca entregada. Reusa
+// la lógica transaccional de cierre (fidelización + sync de cita).
+// Lo normal es que el mecánico ya la haya dejado en 'lista_entrega'. Si no, responde
+// 409 con requiere_confirmacion, y con forzar se entrega igual: pasa que el cliente
+// se lleva la moto antes de que alguien actualice el estado.
+// Entrega quien atiende al cliente (recepción o administración). El mecánico no: el
+// router deja pasar al técnico por jerarquía, y entregar es cobrar.
+router.post('/ordenes/:id/entregar', soloRoles('recepcion', 'admin'), exigirPermiso('ordenes.entregar'), async (req, res) => {
   try {
-    const { metodo_pago, garantia_dias, observaciones_finales } = req.body;
-    const r = await cerrarOrden(req.db, 
+    const { metodo_pago, garantia_dias, observaciones_finales, forzar } = req.body;
+    const [[actual]] = await pool.query('SELECT estado FROM ordenes_trabajo WHERE id = ?', [req.params.id]);
+    if (!actual) return res.status(404).json({ error: 'Orden no encontrada' });
+    if (ORDEN_CERRADA.includes(actual.estado)) {
+      return res.status(400).json({ error: actual.estado === 'entregada' ? 'La orden ya estaba entregada' : 'La orden está cancelada' });
+    }
+    if (actual.estado !== 'lista_entrega' && forzar !== true) {
+      return res.status(409).json({ error: 'La orden todavía no está lista para entrega', requiere_confirmacion: true, estado_actual: actual.estado });
+    }
+    const r = await cerrarOrden(
       req.params.id,
       { metodo_pago, garantia_dias, observaciones_finales },
-      { soloDesdeListaEntrega: true }
+      { soloDesdeListaEntrega: forzar !== true }
     );
     if (r.notFound) return res.status(404).json({ error: 'Orden no encontrada' });
     if (r.estadoInvalido) return res.status(400).json({ error: 'La orden todavía no está lista para entrega' });
@@ -421,7 +492,7 @@ router.get('/cotizaciones', async (req, res) => {
     } else if (req.query.estado === 'enviada') {
       filtroAprob = " AND o.aprobacion_cliente != 'pendiente'";
     }
-    const [rows] = await req.db.query(
+    const [rows] = await pool.query(
       `SELECT o.id, o.numero_orden, o.estado, o.aprobacion_cliente,
               o.costo_mano_obra, o.costo_repuestos, o.descuento,
               (o.costo_mano_obra + o.costo_repuestos - o.descuento) AS total,
@@ -429,11 +500,11 @@ router.get('/cotizaciones', async (req, res) => {
               m.marca, m.modelo, m.placa,
               t.nombre AS tecnico_nombre
        FROM ordenes_trabajo o
-       JOIN clientes c ON o.cliente_id = c.id AND c.tenant_id = @tenant
-       JOIN vehiculos m ON o.vehiculo_id = m.id AND m.tenant_id = @tenant
-       LEFT JOIN usuarios t ON o.tecnico_id = t.id AND t.tenant_id = @tenant
-       WHERE o.tenant_id = @tenant AND o.estado NOT IN ('entregada','cancelada')
-         AND (o.costo_mano_obra > 0 OR o.costo_repuestos > 0)${filtroAprob}
+       JOIN clientes c ON o.cliente_id = c.id
+       JOIN motos m ON o.moto_id = m.id
+       LEFT JOIN usuarios t ON o.tecnico_id = t.id
+       WHERE o.estado NOT IN ('entregada','cancelada')
+         AND (o.costo_mano_obra > 0 OR o.costo_repuestos > 0)${filtroAprob}${soloSucursal(req, 'o.sucursal_id')}
        ORDER BY o.created_at DESC`,
       params
     );
@@ -446,8 +517,8 @@ router.get('/cotizaciones', async (req, res) => {
 // Repuestos de una orden
 router.get('/cotizaciones/:id/repuestos', async (req, res) => {
   try {
-    const [rows] = await req.db.query(
-      'SELECT * FROM orden_repuestos WHERE orden_id = ? AND tenant_id = @tenant ORDER BY created_at ASC',
+    const [rows] = await pool.query(
+      'SELECT * FROM orden_repuestos WHERE orden_id = ? ORDER BY created_at ASC',
       [req.params.id]
     );
     res.json({ data: rows });
@@ -456,55 +527,64 @@ router.get('/cotizaciones/:id/repuestos', async (req, res) => {
   }
 });
 
+// Respuesta cuando un costo nuevo sube la cuenta de una orden ya aprobada.
+const MSG_REAPROBACION = 'La cuenta subió: la orden volvió a «Esperando aprobación» y se le avisó al cliente para que apruebe el adicional.';
+
 // Recalcula costo_repuestos de la orden a partir de sus piezas.
-async function recalcularRepuestos(db, ordenId) {
-  await db.query(
-    'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ? AND tenant_id = @tenant) WHERE id = ? AND tenant_id = @tenant',
+async function recalcularRepuestos(ordenId) {
+  await pool.query(
+    'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ?) WHERE id = ?',
     [ordenId, ordenId]
   );
 }
 
 // Agregar repuesto
-router.post('/cotizaciones/:id/repuestos', async (req, res) => {
+router.post('/cotizaciones/:id/repuestos', exigirPermiso('ordenes.costos'), async (req, res) => {
   try {
     const { nombre, cantidad, costo_unitario, estado } = req.body;
     if (!nombre) return res.status(400).json({ error: 'Nombre del repuesto requerido' });
-    const [result] = await req.db.query(
-      'INSERT INTO orden_repuestos (tenant_id, orden_id, nombre, cantidad, costo_unitario, estado) VALUES (@tenant, ?, ?, ?, ?, ?)',
-      [req.params.id, nombre, cantidad || 1, costo_unitario || 0, estado || 'pendiente']
+    if (estado && !ESTADOS_REPUESTO[estado]) return res.status(400).json({ error: 'Estado de repuesto inválido' });
+    const totalAntes = await totalOrden(req.params.id);
+    const [result] = await pool.query(
+      'INSERT INTO orden_repuestos (orden_id, nombre, cantidad, costo_unitario, estado, adicional) VALUES (?, ?, ?, ?, ?, ?)',
+      [req.params.id, nombre, cantidad || 1, costo_unitario || 0, estado || 'pendiente', await esAdicional(req.params.id)]
     );
-    await recalcularRepuestos(req.db, req.params.id);
-    const [[nuevo]] = await req.db.query('SELECT * FROM orden_repuestos WHERE id = ? AND tenant_id = @tenant', [result.insertId]);
-    res.status(201).json({ data: nuevo, message: 'Repuesto agregado' });
+    await recalcularRepuestos(req.params.id);
+    const reaprobacion = await revisarAdicional(req.params.id, totalAntes);
+    const [[nuevo]] = await pool.query('SELECT * FROM orden_repuestos WHERE id = ?', [result.insertId]);
+    res.status(201).json({ data: nuevo, reaprobacion, message: reaprobacion ? MSG_REAPROBACION : 'Repuesto agregado' });
   } catch (err) {
     fail(res, err);
   }
 });
 
 // Editar repuesto
-router.put('/cotizaciones/:id/repuestos/:rid', async (req, res) => {
+router.put('/cotizaciones/:id/repuestos/:rid', exigirPermiso('ordenes.costos'), async (req, res) => {
   try {
     const { nombre, cantidad, costo_unitario, estado } = req.body;
-    const [[existe]] = await req.db.query('SELECT id FROM orden_repuestos WHERE id = ? AND orden_id = ? AND tenant_id = @tenant', [req.params.rid, req.params.id]);
+    const [[existe]] = await pool.query('SELECT id, estado FROM orden_repuestos WHERE id = ? AND orden_id = ?', [req.params.rid, req.params.id]);
     if (!existe) return res.status(404).json({ error: 'Repuesto no encontrado' });
-    await req.db.query(
-      'UPDATE orden_repuestos SET nombre=?, cantidad=?, costo_unitario=?, estado=? WHERE id=? AND orden_id=? AND tenant_id = @tenant',
-      [nombre, cantidad || 1, costo_unitario || 0, estado || 'pendiente', req.params.rid, req.params.id]
+    if (estado && !ESTADOS_REPUESTO[estado]) return res.status(400).json({ error: 'Estado de repuesto inválido' });
+    const totalAntes = await totalOrden(req.params.id);
+    await pool.query(
+      'UPDATE orden_repuestos SET nombre=?, cantidad=?, costo_unitario=?, estado=? WHERE id=? AND orden_id=?',
+      [nombre, cantidad || 1, costo_unitario || 0, estadoAlEditarRepuesto(existe.estado, estado, costo_unitario), req.params.rid, req.params.id]
     );
-    await recalcularRepuestos(req.db, req.params.id);
-    const [[actualizado]] = await req.db.query('SELECT * FROM orden_repuestos WHERE id = ? AND tenant_id = @tenant', [req.params.rid]);
-    res.json({ data: actualizado, message: 'Repuesto actualizado' });
+    await recalcularRepuestos(req.params.id);
+    const reaprobacion = await revisarAdicional(req.params.id, totalAntes);
+    const [[actualizado]] = await pool.query('SELECT * FROM orden_repuestos WHERE id = ?', [req.params.rid]);
+    res.json({ data: actualizado, reaprobacion, message: reaprobacion ? MSG_REAPROBACION : 'Repuesto actualizado' });
   } catch (err) {
     fail(res, err);
   }
 });
 
 // Eliminar repuesto
-router.delete('/cotizaciones/:id/repuestos/:rid', async (req, res) => {
+router.delete('/cotizaciones/:id/repuestos/:rid', exigirPermiso('ordenes.costos'), async (req, res) => {
   try {
-    const [result] = await req.db.query('DELETE FROM orden_repuestos WHERE id=? AND orden_id=? AND tenant_id = @tenant', [req.params.rid, req.params.id]);
+    const [result] = await pool.query('DELETE FROM orden_repuestos WHERE id=? AND orden_id=?', [req.params.rid, req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ error: 'Repuesto no encontrado' });
-    await recalcularRepuestos(req.db, req.params.id);
+    await recalcularRepuestos(req.params.id);
     res.json({ message: 'Repuesto eliminado' });
   } catch (err) {
     fail(res, err);
@@ -512,20 +592,22 @@ router.delete('/cotizaciones/:id/repuestos/:rid', async (req, res) => {
 });
 
 // Actualizar mano de obra y descuento
-router.put('/cotizaciones/:id/costos', async (req, res) => {
+router.put('/cotizaciones/:id/costos', exigirPermiso('ordenes.costos'), async (req, res) => {
   try {
     const { costo_mano_obra, descuento } = req.body;
-    const [[orden]] = await req.db.query('SELECT id FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant', [req.params.id]);
+    const [[orden]] = await pool.query('SELECT id FROM ordenes_trabajo WHERE id = ?', [req.params.id]);
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
-    await req.db.query(
-      'UPDATE ordenes_trabajo SET costo_mano_obra = ?, descuento = ? WHERE id = ? AND tenant_id = @tenant',
+    const totalAntes = await totalOrden(req.params.id);
+    await pool.query(
+      'UPDATE ordenes_trabajo SET costo_mano_obra = ?, descuento = ? WHERE id = ?',
       [costo_mano_obra || 0, descuento || 0, req.params.id]
     );
-    const [[actualizada]] = await req.db.query(
-      'SELECT id, costo_mano_obra, costo_repuestos, descuento, (costo_mano_obra + costo_repuestos - descuento) AS total FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant',
+    const reaprobacion = await revisarAdicional(req.params.id, totalAntes);
+    const [[actualizada]] = await pool.query(
+      'SELECT id, costo_mano_obra, costo_repuestos, descuento, (costo_mano_obra + costo_repuestos - descuento) AS total FROM ordenes_trabajo WHERE id = ?',
       [req.params.id]
     );
-    res.json({ data: actualizada, message: 'Costos actualizados' });
+    res.json({ data: actualizada, reaprobacion, message: reaprobacion ? MSG_REAPROBACION : 'Costos actualizados' });
   } catch (err) {
     fail(res, err);
   }
@@ -534,7 +616,7 @@ router.put('/cotizaciones/:id/costos', async (req, res) => {
 // Armar una cotización completa en UNA transacción: asigna técnico (opcional),
 // inserta todas las piezas, fija mano de obra + descuento y recalcula los repuestos.
 // Si algo falla, no queda nada a medias (antes el front encadenaba varias llamadas).
-router.post('/cotizaciones/:id/armar', async (req, res) => {
+router.post('/cotizaciones/:id/armar', exigirPermiso('ordenes.costos'), async (req, res) => {
   const ordenId = req.params.id;
   const { tecnico_id, piezas, costo_mano_obra, descuento } = req.body;
 
@@ -548,38 +630,40 @@ router.post('/cotizaciones/:id/armar', async (req, res) => {
   }
 
   try {
-    const [[orden]] = await req.db.query('SELECT id, sucursal_id FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant', [ordenId]);
+    const [[orden]] = await pool.query('SELECT id, sucursal_id FROM ordenes_trabajo WHERE id = ?', [ordenId]);
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
 
     if (tecnico_id) {
-      const [[tec]] = await req.db.query(
-        "SELECT id FROM usuarios WHERE id = ? AND rol = 'tecnico' AND activo = 1 AND tenant_id = @tenant",
+      const [[tec]] = await pool.query(
+        "SELECT id FROM usuarios WHERE id = ? AND rol = 'tecnico' AND activo = 1",
         [tecnico_id]
       );
       if (!tec) return res.status(400).json({ error: 'El técnico no existe o está inactivo' });
-      if (!(await tecnicoEnSucursal(req.db, tecnico_id, orden.sucursal_id))) {
+      if (!(await tecnicoEnSucursal(tecnico_id, orden.sucursal_id))) {
         return res.status(400).json({ error: 'El mecánico no atiende en la sucursal de la orden' });
       }
     }
 
-    const conn = await req.db.conexion();
+    const totalAntes = await totalOrden(ordenId);
+    const adicional = await esAdicional(ordenId);
+    const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
       if (tecnico_id) {
-        await conn.query('UPDATE ordenes_trabajo SET tecnico_id = ? WHERE id = ? AND tenant_id = @tenant', [tecnico_id, ordenId]);
+        await conn.query('UPDATE ordenes_trabajo SET tecnico_id = ? WHERE id = ?', [tecnico_id, ordenId]);
       }
       for (const p of piezasValidas) {
         await conn.query(
-          "INSERT INTO orden_repuestos (tenant_id, orden_id, nombre, cantidad, costo_unitario, estado) VALUES (@tenant, ?, ?, ?, ?, 'pendiente')",
-          [ordenId, p.nombre, p.cantidad, p.costo_unitario]
+          "INSERT INTO orden_repuestos (orden_id, nombre, cantidad, costo_unitario, estado, adicional) VALUES (?, ?, ?, ?, 'pendiente', ?)",
+          [ordenId, p.nombre, p.cantidad, p.costo_unitario, adicional]
         );
       }
       await conn.query(
-        'UPDATE ordenes_trabajo SET costo_mano_obra = ?, descuento = ? WHERE id = ? AND tenant_id = @tenant',
+        'UPDATE ordenes_trabajo SET costo_mano_obra = ?, descuento = ? WHERE id = ?',
         [Number(costo_mano_obra) || 0, Number(descuento) || 0, ordenId]
       );
       await conn.query(
-        'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ? AND tenant_id = @tenant) WHERE id = ? AND tenant_id = @tenant',
+        'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ?) WHERE id = ?',
         [ordenId, ordenId]
       );
       await conn.commit();
@@ -590,40 +674,41 @@ router.post('/cotizaciones/:id/armar', async (req, res) => {
       conn.release();
     }
 
-    const [[cotizacion]] = await req.db.query(
-      'SELECT id, costo_mano_obra, costo_repuestos, descuento, (costo_mano_obra + costo_repuestos - descuento) AS total FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant',
+    const reaprobacion = await revisarAdicional(ordenId, totalAntes);
+    const [[cotizacion]] = await pool.query(
+      'SELECT id, costo_mano_obra, costo_repuestos, descuento, (costo_mano_obra + costo_repuestos - descuento) AS total FROM ordenes_trabajo WHERE id = ?',
       [ordenId]
     );
-    res.status(201).json({ data: cotizacion, message: 'Cotización guardada' });
+    res.status(201).json({ data: cotizacion, reaprobacion, message: reaprobacion ? MSG_REAPROBACION : 'Cotización guardada' });
   } catch (err) {
     fail(res, err);
   }
 });
 
 // Enviar cotización: la orden pasa a esperando aprobación del cliente.
-router.post('/cotizaciones/:id/enviar', async (req, res) => {
+router.post('/cotizaciones/:id/enviar', exigirPermiso('ordenes.costos'), async (req, res) => {
   try {
-    const [result] = await req.db.query(
-      "UPDATE ordenes_trabajo SET estado = 'esperando_aprobacion', aprobacion_cliente = 'pendiente', motivo_rechazo = NULL WHERE id = ? AND tenant_id = @tenant AND estado IN ('diagnostico','recepcion')",
+    const [result] = await pool.query(
+      "UPDATE ordenes_trabajo SET estado = 'esperando_aprobacion', aprobacion_cliente = 'pendiente', motivo_rechazo = NULL WHERE id = ? AND estado IN ('diagnostico','recepcion')",
       [req.params.id]
     );
     if (!result.affectedRows) {
       return res.status(400).json({ error: 'La orden no está en un estado que permita enviar la cotización' });
     }
     // Aviso en el feed del cliente (además del WhatsApp que abre la recepción).
-    const [[o]] = await req.db.query(
+    const [[o]] = await pool.query(
       `SELECT o.cliente_id, o.numero_orden, m.marca, m.modelo,
-              (SELECT id FROM citas WHERE orden_id = o.id AND tenant_id = @tenant LIMIT 1) AS cita_id
-       FROM ordenes_trabajo o JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant WHERE o.id = ? AND o.tenant_id = @tenant`,
+              (SELECT id FROM citas WHERE orden_id = o.id LIMIT 1) AS cita_id
+       FROM ordenes_trabajo o JOIN motos m ON m.id = o.moto_id WHERE o.id = ?`,
       [req.params.id]
     );
     // Preferencia del taller: avisar al cliente cuando la cotización está lista.
-    const config = await getConfig(req.db);
+    const config = await getConfig();
     if (o && config.notif_cotizacion) {
       const moto = [o.marca, o.modelo].filter(Boolean).join(' ') || 'tu moto';
-      await req.db.query(
-        "INSERT INTO notificaciones (tenant_id, cliente_id, cita_id, titulo, mensaje, tipo) VALUES (@tenant, ?, ?, ?, ?, 'presupuesto')",
-        [o.cliente_id, o.cita_id || null, `Presupuesto listo: ${moto}`, `Tu presupuesto (orden ${o.numero_orden}) está listo. Revisalo y aprobalo desde el portal.`]
+      await pool.query(
+        "INSERT INTO notificaciones (cliente_id, cita_id, titulo, mensaje, tipo) VALUES (?, ?, ?, ?, 'presupuesto')",
+        [o.cliente_id, o.cita_id || null, `Presupuesto listo: ${moto}`, `Tu presupuesto (orden ${o.numero_orden}) está listo. Revísalo y apruébalo desde el portal.`]
       );
     }
     res.json({ message: 'Cotización enviada al cliente' });
@@ -637,12 +722,12 @@ router.post('/cotizaciones/:id/enviar', async (req, res) => {
 // ───────────────────────────────────────────────────────────
 router.get('/clientes/:id/ordenes', async (req, res) => {
   try {
-    const [rows] = await req.db.query(
+    const [rows] = await pool.query(
       `SELECT o.id, o.numero_orden, o.estado, o.problema_reportado, o.sucursal_id,
               m.marca, m.modelo, m.placa
        FROM ordenes_trabajo o
-       JOIN vehiculos m ON o.vehiculo_id = m.id AND m.tenant_id = @tenant
-       WHERE o.tenant_id = @tenant AND o.cliente_id = ? AND o.estado NOT IN ('entregada','cancelada')
+       JOIN motos m ON o.moto_id = m.id
+       WHERE o.cliente_id = ? AND o.estado NOT IN ('entregada','cancelada')${soloSucursal(req, 'o.sucursal_id')}
        ORDER BY o.fecha_ingreso DESC`,
       [req.params.id]
     );
@@ -657,14 +742,16 @@ router.get('/clientes/:id/ordenes', async (req, res) => {
 // sin parámetro, todos (lo usa la mensajería interna, que no es por sede).
 router.get('/tecnicos', async (req, res) => {
   try {
-    let sql = "SELECT id, nombre, sucursal_id FROM usuarios WHERE tenant_id = @tenant AND rol = 'tecnico' AND activo = 1";
+    let sql = "SELECT id, nombre, sucursal_id FROM usuarios WHERE rol = 'tecnico' AND activo = 1";
     const params = [];
-    if (req.query.sucursal_id) {
+    // Quien tiene una sucursal ve los mecánicos de ella (y los de las dos).
+    const sucursal = req.sucursalAlcance || req.query.sucursal_id;
+    if (sucursal) {
       sql += ' AND (sucursal_id = ? OR sucursal_id IS NULL)';
-      params.push(req.query.sucursal_id);
+      params.push(sucursal);
     }
     sql += ' ORDER BY nombre';
-    const [rows] = await req.db.query(sql, params);
+    const [rows] = await pool.query(sql, params);
     res.json({ data: rows });
   } catch (err) {
     fail(res, err);
@@ -675,7 +762,7 @@ router.get('/tecnicos', async (req, res) => {
 // el taller ofrece hoy. Se administra desde el panel, en Servicios.
 router.get('/servicios', async (req, res) => {
   try {
-    res.json({ data: await getServicios(req.db) });
+    res.json({ data: await getServicios() });
   } catch (err) {
     fail(res, err);
   }
@@ -684,7 +771,9 @@ router.get('/servicios', async (req, res) => {
 // Sucursales activas (para elegir local al ingresar un cliente sin cita).
 router.get('/sucursales', async (req, res) => {
   try {
-    const data = await getSucursales(req.db, { soloActivas: true });
+    const todas = await getSucursales({ soloActivas: true });
+    // Quien tiene una sucursal solo puede abrir órdenes en ella.
+    const data = req.sucursalAlcance ? todas.filter((s) => Number(s.id) === req.sucursalAlcance) : todas;
     res.json({ data });
   } catch (err) {
     fail(res, err);
@@ -697,12 +786,12 @@ const SELECT_PERFIL = `
   SELECT u.id, u.nombre, u.email, u.telefono, u.rol, u.foto, u.sucursal_id, u.created_at,
          s.nombre AS sucursal_nombre
   FROM usuarios u
-  LEFT JOIN sucursales s ON s.id = u.sucursal_id AND s.tenant_id = @tenant
-  WHERE u.id = ? AND u.tenant_id = @tenant`;
+  LEFT JOIN sucursales s ON s.id = u.sucursal_id
+  WHERE u.id = ?`;
 
 router.get('/perfil', async (req, res) => {
   try {
-    const [[u]] = await req.db.query(SELECT_PERFIL, [req.usuario.id]);
+    const [[u]] = await pool.query(SELECT_PERFIL, [req.usuario.id]);
     if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
     res.json({ data: u });
   } catch (err) {
@@ -716,18 +805,49 @@ router.put('/perfil', async (req, res) => {
     if (!nombre || !nombre.trim() || !email || !email.trim()) {
       return res.status(400).json({ error: 'Nombre y correo son requeridos' });
     }
-    await req.db.query(
-      'UPDATE usuarios SET nombre = ?, email = ?, telefono = ? WHERE id = ? AND tenant_id = @tenant',
+    await pool.query(
+      'UPDATE usuarios SET nombre = ?, email = ?, telefono = ? WHERE id = ?',
       [nombre.trim(), email.trim(), (telefono || '').trim() || null, req.usuario.id]
     );
-    const [[u]] = await req.db.query(SELECT_PERFIL, [req.usuario.id]);
+    const [[u]] = await pool.query(SELECT_PERFIL, [req.usuario.id]);
     res.json({ data: u, message: 'Perfil actualizado' });
   } catch (err) {
     fail(res, err);
   }
 });
 
-// La foto y la contraseña propias las sirve el tramo compartido (montado arriba).
+// Foto de perfil (data URL base64) o null para quitarla.
+router.put('/perfil/foto', async (req, res) => {
+  try {
+    const { foto } = req.body;
+    if (!fotoValida(foto)) return res.status(400).json({ error: 'Imagen inválida' });
+    await pool.query('UPDATE usuarios SET foto = ? WHERE id = ?', [foto || null, req.usuario.id]);
+    if (foto) anotar(req.usuario.id, 'foto');
+    res.json({ data: { foto: foto || null }, message: foto ? 'Foto actualizada' : 'Foto eliminada' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+router.put('/perfil/password', async (req, res) => {
+  try {
+    const { actual, nueva } = req.body;
+    if (!actual || !nueva) return res.status(400).json({ error: 'Contraseña actual y nueva son requeridas' });
+    const [[u]] = await pool.query('SELECT password_hash, email, nombre FROM usuarios WHERE id = ?', [req.usuario.id]);
+    if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
+    // La política de Configuración → Seguridad (utils/contrasena.js).
+    const malaClave = problemaDeContrasena(nueva, politica(await getConfig()), u);
+    if (malaClave) return res.status(400).json({ error: malaClave, campo: 'nueva' });
+    const ok = await bcrypt.compare(String(actual), u.password_hash);
+    if (!ok) return res.status(400).json({ error: 'La contraseña actual no es correcta' });
+    const hash = await bcrypt.hash(String(nueva), 10);
+    await pool.query('UPDATE usuarios SET password_hash = ? WHERE id = ?', [hash, req.usuario.id]);
+    anotar(req.usuario.id, 'contrasena');
+    res.json({ message: 'Contraseña actualizada' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
 
 // Disponibilidad de horas para una fecha (agendar manual). Reusa la config del
 // taller: mismas horas/cupos que ve el cliente en el portal. El cupo se cuenta por
@@ -736,40 +856,35 @@ router.get('/disponibilidad', async (req, res) => {
   try {
     const { fecha, sucursal_id } = req.query;
     if (!fecha) return res.status(400).json({ error: 'Fecha requerida' });
-    const config = await getConfig(req.db);
-    const horas = horasDisponibles(fecha, config);
-    let sql = `SELECT TIME_FORMAT(hora, '%H:%i') AS hora, COUNT(*) AS n
-               FROM citas WHERE tenant_id = @tenant AND fecha = ? AND estado != 'cancelado'`;
-    const params = [fecha];
-    if (sucursal_id) { sql += ' AND sucursal_id = ?'; params.push(sucursal_id); }
-    sql += ' GROUP BY 1';
-    const [rows] = await req.db.query(sql, params);
-    const ocupacion = {};
-    for (const r of rows) ocupacion[r.hora] = r.n;
-    res.json({ data: { horas, max: config.max_citas_hora, ocupacion } });
+    const config = await getConfig();
+    // Cada cita cuenta en todas las horas que dura; `bloqueadas` = hora → motivo.
+    const dia = await agendaDia(fecha, Number(sucursal_id) || null, config);
+    // Las que ya empezaron (hoy) o todas (un día pasado): la pantalla no las deja elegir.
+    const pasadas = horasPasadas(String(fecha).slice(0, 10), dia.horas, config.zona_horaria_offset);
+    res.json({ data: { horas: dia.horas, max: config.max_citas_hora, ocupacion: dia.ocupacion, bloqueadas: dia.bloqueadas, pasadas } });
   } catch (err) {
     fail(res, err);
   }
 });
 
 // Asignar técnico a una orden (al crear/editar una cotización)
-router.patch('/ordenes/:id/tecnico', async (req, res) => {
+router.patch('/ordenes/:id/tecnico', exigirPermiso('ordenes.asignar'), async (req, res) => {
   try {
     const { tecnico_id } = req.body;
-    const [[orden]] = await req.db.query('SELECT id, sucursal_id FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant', [req.params.id]);
+    const [[orden]] = await pool.query('SELECT id, sucursal_id FROM ordenes_trabajo WHERE id = ?', [req.params.id]);
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
     if (tecnico_id) {
-      const [[tec]] = await req.db.query("SELECT id FROM usuarios WHERE id = ? AND rol = 'tecnico' AND activo = 1 AND tenant_id = @tenant", [tecnico_id]);
+      const [[tec]] = await pool.query("SELECT id FROM usuarios WHERE id = ? AND rol = 'tecnico' AND activo = 1", [tecnico_id]);
       if (!tec) return res.status(400).json({ error: 'El técnico no existe o está inactivo' });
-      if (!(await tecnicoEnSucursal(req.db, tecnico_id, orden.sucursal_id))) {
+      if (!(await tecnicoEnSucursal(tecnico_id, orden.sucursal_id))) {
         return res.status(400).json({ error: 'El mecánico no atiende en la sucursal de la orden' });
       }
     }
-    await req.db.query('UPDATE ordenes_trabajo SET tecnico_id = ? WHERE id = ? AND tenant_id = @tenant', [tecnico_id || null, req.params.id]);
-    await req.db.query('UPDATE citas SET tecnico_id = ? WHERE orden_id = ? AND tenant_id = @tenant', [tecnico_id || null, req.params.id]);
+    await pool.query('UPDATE ordenes_trabajo SET tecnico_id = ? WHERE id = ?', [tecnico_id || null, req.params.id]);
+    await pool.query('UPDATE citas SET tecnico_id = ? WHERE orden_id = ?', [tecnico_id || null, req.params.id]);
     if (tecnico_id) {
-      const [[o]] = await req.db.query('SELECT numero_orden, problema_reportado FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant', [req.params.id]);
-      if (o) await notificarMecanico(req.db, tecnico_id, `Te asignaron la orden ${o.numero_orden}: ${(o.problema_reportado || '').slice(0, 80)}`, req.usuario.id);
+      const [[o]] = await pool.query('SELECT numero_orden, problema_reportado FROM ordenes_trabajo WHERE id = ?', [req.params.id]);
+      if (o) await notificarMecanico(tecnico_id, `Te asignaron la orden ${o.numero_orden}: ${(o.problema_reportado || '').slice(0, 80)}`, req.usuario.id);
     }
     res.json({ message: 'Técnico asignado' });
   } catch (err) {
@@ -780,9 +895,9 @@ router.patch('/ordenes/:id/tecnico', async (req, res) => {
 // Marcar una cotización como aprobada por el cliente (atajo desde recepción, p. ej.
 // cuando aprueba verbalmente en el mostrador). Solo recepción/admin: no es una acción
 // que un técnico deba poder forjar en nombre del cliente.
-router.post('/cotizaciones/:id/aprobar', soloRoles('recepcion', 'admin'), async (req, res) => {
+router.post('/cotizaciones/:id/aprobar', soloRoles('recepcion', 'admin'), exigirPermiso('ordenes.costos'), async (req, res) => {
   try {
-    const [[orden]] = await req.db.query('SELECT id, estado FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant', [req.params.id]);
+    const [[orden]] = await pool.query('SELECT id, estado FROM ordenes_trabajo WHERE id = ?', [req.params.id]);
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
     // Igual que el endpoint del portal: solo se puede "aprobar" una orden que
     // efectivamente está esperando esa aprobación (evita marcar como aprobada, con
@@ -790,11 +905,7 @@ router.post('/cotizaciones/:id/aprobar', soloRoles('recepcion', 'admin'), async 
     if (orden.estado !== 'esperando_aprobacion') {
       return res.status(400).json({ error: 'La orden no está esperando aprobación' });
     }
-    await req.db.query(
-      "UPDATE ordenes_trabajo SET aprobacion_cliente = 'aprobado', aprobado_por_cliente = 1, fecha_aprobacion = NOW() WHERE id = ? AND tenant_id = @tenant",
-      [req.params.id]
-    );
-    await avanzarEstadoOrden(req.db, req.params.id, await estadoTrasAprobacion(req.db, req.params.id));
+    await registrarAprobacion(req.params.id);
     res.json({ message: 'Cotización aprobada' });
   } catch (err) {
     fail(res, err);
@@ -809,20 +920,20 @@ router.get('/clientes', async (req, res) => {
     const q = (req.query.q || '').trim();
     let sql = `
       SELECT c.id, c.nombre, c.apellido, c.telefono, c.email,
-             (SELECT COUNT(*) FROM vehiculos WHERE cliente_id = c.id AND activa = 1 AND tenant_id = @tenant) AS total_motos,
-             (SELECT COUNT(*) FROM citas WHERE cliente_id = c.id AND tenant_id = @tenant) AS total_citas
+             (SELECT COUNT(*) FROM motos WHERE cliente_id = c.id AND activa = 1) AS total_motos,
+             (SELECT COUNT(*) FROM citas WHERE cliente_id = c.id) AS total_citas
       FROM clientes c
-      WHERE c.tenant_id = @tenant AND c.activo = 1`;
+      WHERE c.activo = 1`;
     const params = [];
     if (q) {
       sql += ` AND (c.nombre LIKE ? OR c.apellido LIKE ? OR c.telefono LIKE ? OR c.email LIKE ? OR c.cedula LIKE ?
                OR CONCAT(c.nombre, " ", c.apellido) LIKE ?
-               OR EXISTS (SELECT 1 FROM vehiculos mm WHERE mm.cliente_id = c.id AND mm.activa = 1 AND mm.tenant_id = @tenant AND mm.placa LIKE ?))`;
+               OR EXISTS (SELECT 1 FROM motos mm WHERE mm.cliente_id = c.id AND mm.activa = 1 AND mm.placa LIKE ?))`;
       const like = `%${q}%`;
       params.push(like, like, like, like, like, like, like);
     }
     sql += ' ORDER BY c.nombre, c.apellido';
-    const [rows] = await req.db.query(sql, params);
+    const [rows] = await pool.query(sql, params);
     res.json({ data: rows });
   } catch (err) {
     fail(res, err);
@@ -836,19 +947,19 @@ router.get('/clientes', async (req, res) => {
 // Avances recientes registrados por los mecánicos en órdenes activas.
 router.get('/avances', async (req, res) => {
   try {
-    const [rows] = await req.db.query(
+    const [rows] = await pool.query(
       `SELECT a.id, a.descripcion, a.created_at,
               o.id AS orden_id, o.numero_orden, o.estado,
               c.id AS cliente_id, c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.telefono AS cliente_telefono,
               m.marca, m.modelo, m.placa,
               u.nombre AS tecnico_nombre, u.rol AS tecnico_rol,
-              (SELECT COUNT(*) FROM orden_fotos WHERE orden_id = o.id AND tenant_id = @tenant) AS total_fotos
+              (SELECT COUNT(*) FROM orden_fotos WHERE orden_id = o.id) AS total_fotos
        FROM orden_avances a
-       JOIN ordenes_trabajo o ON o.id = a.orden_id AND o.tenant_id = @tenant
-       JOIN clientes c ON c.id = o.cliente_id AND c.tenant_id = @tenant
-       JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
-       JOIN usuarios u ON u.id = a.usuario_id AND u.tenant_id = @tenant
-       WHERE a.tenant_id = @tenant
+       JOIN ordenes_trabajo o ON o.id = a.orden_id
+       JOIN clientes c ON c.id = o.cliente_id
+       JOIN motos m ON m.id = o.moto_id
+       JOIN usuarios u ON u.id = a.usuario_id
+       WHERE 1=1${soloSucursal(req, 'o.sucursal_id')}
        ORDER BY a.created_at DESC LIMIT 40`
     );
     res.json({ data: rows });
@@ -860,12 +971,11 @@ router.get('/avances', async (req, res) => {
 // Notificaciones enviadas a clientes (feed de salida).
 router.get('/notificaciones', async (req, res) => {
   try {
-    const [rows] = await req.db.query(
+    const [rows] = await pool.query(
       `SELECT n.id, n.titulo, n.mensaje, n.leida, n.created_at,
               c.id AS cliente_id, c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.telefono AS cliente_telefono
        FROM notificaciones n
-       JOIN clientes c ON c.id = n.cliente_id AND c.tenant_id = @tenant
-       WHERE n.tenant_id = @tenant
+       JOIN clientes c ON c.id = n.cliente_id
        ORDER BY n.created_at DESC LIMIT 40`
     );
     res.json({ data: rows });
@@ -881,11 +991,11 @@ router.post('/notificar', async (req, res) => {
     if (!cliente_id || !titulo || !mensaje) {
       return res.status(400).json({ error: 'cliente_id, titulo y mensaje son requeridos' });
     }
-    const [result] = await req.db.query(
-      "INSERT INTO notificaciones (tenant_id, cliente_id, cita_id, titulo, mensaje, tipo) VALUES (@tenant, ?, ?, ?, ?, 'mensaje')",
+    const [result] = await pool.query(
+      "INSERT INTO notificaciones (cliente_id, cita_id, titulo, mensaje, tipo) VALUES (?, ?, ?, ?, 'mensaje')",
       [cliente_id, cita_id || null, titulo, mensaje]
     );
-    const [[nueva]] = await req.db.query('SELECT * FROM notificaciones WHERE id = ? AND tenant_id = @tenant', [result.insertId]);
+    const [[nueva]] = await pool.query('SELECT * FROM notificaciones WHERE id = ?', [result.insertId]);
     res.status(201).json({ data: nueva, message: 'Notificación enviada' });
   } catch (err) {
     fail(res, err);
@@ -908,12 +1018,12 @@ const SELECT_MSG_INT = `
          COALESCE(sm.nombre, sr.nombre, sd.nombre) AS sucursal_nombre,
          ${LEIDO_POR_MI}, ${VISTO_POR_OTRO}
   FROM mensajes_internos m
-  JOIN usuarios ru ON ru.id = m.remitente_id AND ru.tenant_id = @tenant
-  LEFT JOIN usuarios du ON du.id = m.destino_id AND du.tenant_id = @tenant
-  LEFT JOIN ordenes_trabajo o ON o.id = m.orden_id AND o.tenant_id = @tenant
-  LEFT JOIN sucursales sm ON sm.id = m.sucursal_id AND sm.tenant_id = @tenant
-  LEFT JOIN sucursales sr ON sr.id = ru.sucursal_id AND sr.tenant_id = @tenant
-  LEFT JOIN sucursales sd ON sd.id = du.sucursal_id AND sd.tenant_id = @tenant`;
+  JOIN usuarios ru ON ru.id = m.remitente_id
+  LEFT JOIN usuarios du ON du.id = m.destino_id
+  LEFT JOIN ordenes_trabajo o ON o.id = m.orden_id
+  LEFT JOIN sucursales sm ON sm.id = m.sucursal_id
+  LEFT JOIN sucursales sr ON sr.id = ru.sucursal_id
+  LEFT JOIN sucursales sd ON sd.id = du.sucursal_id`;
 
 // Bandeja de la oficina, separada por rol del que consulta:
 //  · admin ve el bolsón 'admin' (lo que los mecánicos le mandan a admin + sus hilos)
@@ -923,16 +1033,16 @@ const SELECT_MSG_INT = `
 router.get('/mensajes-internos', async (req, res) => {
   try {
     const yo = req.usuario.id;
-    const [[me]] = await req.db.query('SELECT rol, sucursal_id FROM usuarios WHERE id = ? AND tenant_id = @tenant', [yo]);
+    const [[me]] = await pool.query('SELECT rol, sucursal_id FROM usuarios WHERE id = ?', [yo]);
     const rol = me.rol === 'admin' ? 'admin' : 'recepcion';
     const params = [yo, rol, rol];
-    let where = `WHERE m.tenant_id = @tenant AND ( (ru.rol = 'tecnico' AND m.destino_rol = ? AND m.tipo <> 'broadcast') OR ru.rol = ? )`;
+    let where = `WHERE ( (ru.rol = 'tecnico' AND m.destino_rol = ? AND m.tipo <> 'broadcast') OR ru.rol = ? )`;
     if (rol === 'recepcion' && me.sucursal_id) {
       where += ' AND (m.sucursal_id = ? OR m.sucursal_id IS NULL)';
       params.push(me.sucursal_id);
     }
-    const [rows] = await req.db.query(`${SELECT_MSG_INT} ${where} ORDER BY m.created_at DESC LIMIT 100`, params);
-    await marcarLeidos(req.db, yo, rows);
+    const [rows] = await pool.query(`${SELECT_MSG_INT} ${where} ORDER BY m.created_at DESC LIMIT 100`, params);
+    await marcarLeidos(yo, rows);
     res.json({ data: rows });
   } catch (err) {
     fail(res, err);
@@ -942,19 +1052,19 @@ router.get('/mensajes-internos', async (req, res) => {
 router.get('/mensajes-internos/no-leidos', async (req, res) => {
   try {
     const yo = req.usuario.id;
-    const [[me]] = await req.db.query('SELECT rol, sucursal_id FROM usuarios WHERE id = ? AND tenant_id = @tenant', [yo]);
+    const [[me]] = await pool.query('SELECT rol, sucursal_id FROM usuarios WHERE id = ?', [yo]);
     const rol = me.rol === 'admin' ? 'admin' : 'recepcion';
     // Solo cuentan los mensajes que un mecánico mandó a mi bolsón y que yo no leí.
     const params = [rol, yo, yo];
-    let where = `WHERE m.tenant_id = @tenant AND ru.rol = 'tecnico' AND m.destino_rol = ? AND m.tipo <> 'broadcast'
+    let where = `WHERE ru.rol = 'tecnico' AND m.destino_rol = ? AND m.tipo <> 'broadcast'
                  AND m.remitente_id <> ?
-                 AND NOT EXISTS(SELECT 1 FROM mensaje_lecturas ml WHERE ml.mensaje_id = m.id AND ml.usuario_id = ? AND ml.tenant_id = @tenant)`;
+                 AND NOT EXISTS(SELECT 1 FROM mensaje_lecturas ml WHERE ml.mensaje_id = m.id AND ml.usuario_id = ?)`;
     if (rol === 'recepcion' && me.sucursal_id) {
       where += ' AND (m.sucursal_id = ? OR m.sucursal_id IS NULL)';
       params.push(me.sucursal_id);
     }
-    const [[{ count }]] = await req.db.query(
-      `SELECT COUNT(*) AS count FROM mensajes_internos m JOIN usuarios ru ON ru.id = m.remitente_id AND ru.tenant_id = @tenant ${where}`,
+    const [[{ count }]] = await pool.query(
+      `SELECT COUNT(*) AS count FROM mensajes_internos m JOIN usuarios ru ON ru.id = m.remitente_id ${where}`,
       params
     );
     res.json({ data: { count } });
@@ -963,7 +1073,7 @@ router.get('/mensajes-internos/no-leidos', async (req, res) => {
   }
 });
 
-router.post('/mensajes-internos', async (req, res) => {
+router.post('/mensajes-internos', exigirPermiso('equipo.mensajes'), async (req, res) => {
   try {
     const { destino_id, mensaje, foto, orden_id } = req.body;
     if (!destino_id || ((!mensaje || !mensaje.trim()) && !foto)) {
@@ -971,31 +1081,30 @@ router.post('/mensajes-internos', async (req, res) => {
     }
     if (!fotoValida(foto)) return res.status(400).json({ error: 'Imagen inválida' });
     // La sede del mensaje = la del mecánico destinatario (para el filtro por sucursal).
-    const [r] = await req.db.query(
-      `INSERT INTO mensajes_internos (tenant_id, remitente_id, destino_id, mensaje, foto, orden_id, sucursal_id)
-       VALUES (@tenant, ?, ?, ?, ?, ?,
-               (SELECT sucursal_id FROM usuarios WHERE id = ? AND tenant_id = @tenant))`,
+    const [r] = await pool.query(
+      `INSERT INTO mensajes_internos (remitente_id, destino_id, mensaje, foto, orden_id, sucursal_id)
+       VALUES (?, ?, ?, ?, ?, (SELECT sucursal_id FROM usuarios WHERE id = ?))`,
       [req.usuario.id, destino_id, (mensaje || '').trim(), foto || null, orden_id || null, destino_id]
     );
-    const [[nuevo]] = await req.db.query(`${SELECT_MSG_INT} WHERE m.id = ?`, [req.usuario.id, r.insertId]);
+    const [[nuevo]] = await pool.query(`${SELECT_MSG_INT} WHERE m.id = ?`, [req.usuario.id, r.insertId]);
     res.status(201).json({ data: nuevo, message: 'Respuesta enviada' });
   } catch (err) {
     fail(res, err);
   }
 });
 
-router.post('/mensajes-internos/broadcast', async (req, res) => {
+router.post('/mensajes-internos/broadcast', exigirPermiso('equipo.mensajes'), async (req, res) => {
   try {
     const { mensaje, foto } = req.body;
     if ((!mensaje || !mensaje.trim()) && !foto) {
       return res.status(400).json({ error: 'El mensaje o una foto es requerido' });
     }
     if (!fotoValida(foto)) return res.status(400).json({ error: 'Imagen inválida' });
-    const [r] = await req.db.query(
-      "INSERT INTO mensajes_internos (tenant_id, remitente_id, destino_rol, tipo, mensaje, foto) VALUES (@tenant, ?, 'tecnico', 'broadcast', ?, ?)",
+    const [r] = await pool.query(
+      "INSERT INTO mensajes_internos (remitente_id, destino_rol, tipo, mensaje, foto) VALUES (?, 'tecnico', 'broadcast', ?, ?)",
       [req.usuario.id, (mensaje || '').trim(), foto || null]
     );
-    const [[nuevo]] = await req.db.query(`${SELECT_MSG_INT} WHERE m.id = ?`, [req.usuario.id, r.insertId]);
+    const [[nuevo]] = await pool.query(`${SELECT_MSG_INT} WHERE m.id = ?`, [req.usuario.id, r.insertId]);
     res.status(201).json({ data: nuevo, message: 'Mensaje enviado a todos los mecánicos' });
   } catch (err) {
     fail(res, err);

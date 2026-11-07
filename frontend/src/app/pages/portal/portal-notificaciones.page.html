@@ -1,5 +1,5 @@
 <ion-header>
-  <ion-toolbar>
+  <ion-toolbar class="admin-topbar">
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/portal/inicio" text=""></ion-back-button>
     </ion-buttons>
@@ -12,7 +12,7 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
+<ion-content class="admin-dark">
   <ion-refresher slot="fixed" (ionRefresh)="cargar($event)">
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
@@ -51,12 +51,12 @@
         </ion-item-sliding>
       </ion-list>
 
-      <p class="hint-swipe">Deslizá una notificación hacia la izquierda para eliminarla.</p>
+      <p class="hint-swipe">Desliza una notificación hacia la izquierda para eliminarla.</p>
     </ng-container>
 
     <div class="empty" *ngIf="!cargando && !notificaciones.length">
       <ion-icon name="notifications-off-outline"></ion-icon>
-      <p>No tenés notificaciones por ahora.</p>
+      <p>No tienes notificaciones por ahora.</p>
     </div>
 
     <div style="height:30px"></div>

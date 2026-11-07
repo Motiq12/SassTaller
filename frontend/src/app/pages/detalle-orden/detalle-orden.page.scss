@@ -1,521 +1,422 @@
+// Orden de trabajo. Va con la línea del panel (.admin-dark en global.scss): los
+// colores de cada tema (--sur, --bd, --tx…), los botones .btn, los campos .fg y las
+// etiquetas .bg. Acá va solo lo propio de esta pantalla.
+//
+// El ancho se decide por el espacio que tiene la pantalla (container queries), no
+// por el del navegador: dentro del panel, el menú lateral le quita 240 px.
+
 .ot {
-  max-width: 1120px;
+  container: ot / inline-size;
+  --pad: 24px;
+  max-width: 1240px;
   margin: 0 auto;
-  padding: 8px 16px 0;
-}
-
-// Hero y WhatsApp van centrados angostos; las tarjetas fluyen en columnas
-.ot-hero, .wa-wrap { max-width: 680px; margin-left: auto; margin-right: auto; }
-
-// Info duo also centered
-.info-duo { max-width: 680px; margin-left: auto; margin-right: auto; }
-
-@media (min-width: 860px) {
-  .ot-grid {
-    column-count: 2;
-    column-gap: 16px;
-  }
-  .ot-grid > .card,
-  .ot-grid > .info-duo { break-inside: avoid; }
-}
-
-// Tarjeta base de seccion
-.card {
-  background: var(--ion-card-background);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-sm);
-  padding: 18px;
-  margin-bottom: 14px;
-}
-.card-head {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 12px;
-  .section-label { margin: 0; }
-  .tiny { font-size: 10px; color: var(--n-400); }
-}
-
-// === Accent border-left for sections (Improvement #5) ===
-.accent-rose   { border-left: 4px solid var(--rose-600); }
-.accent-indigo { border-left: 4px solid var(--indigo-600, #4f46e5); }
-.accent-amber  { border-left: 4px solid var(--amber-700, #b45309); }
-.accent-emerald{ border-left: 4px solid var(--emerald-600, #059669); }
-
-// === Hero with gradient (Improvement #1) ===
-.ot-hero {
-  text-align: center;
-  padding: 20px 16px 16px;
-  background: linear-gradient(135deg, var(--rose-50), var(--emerald-50));
-  border: 1px solid var(--hairline);
-  border-radius: 24px;
-  margin-bottom: 16px;
-
-  .status-pill {
-    display: inline-block;
-    background: rgba(255,255,255,0.8);
-    border: 1px solid var(--rose-200);
-    color: var(--rose-700);
-    font-size: 11px; font-weight: 800;
-    text-transform: uppercase; letter-spacing: 0.12em;
-    padding: 7px 22px;
-    border-radius: var(--radius-pill);
-    box-shadow: var(--shadow-sm);
-  }
-  .ot-model {
-    font-family: var(--font-display);
-    font-size: 23px; font-weight: 800;
-    letter-spacing: -0.03em;
-    margin: 12px 0 8px;
-    color: var(--ion-text-color);
-  }
-  .placa-pill {
-    display: inline-block;
-    font-size: 12px; font-weight: 600;
-    background: rgba(255,255,255,0.6); color: var(--n-600);
-    padding: 3px 12px; border-radius: var(--radius-pill);
-  }
-  .ot-cliente {
-    font-size: 12px; color: var(--n-500);
-    margin: 8px 0 0; font-weight: 500;
-  }
-}
-
-// Dark mode: replace gradient with solid card bg
-@media (prefers-color-scheme: dark) {
-  .ot-hero {
-    background: var(--ion-card-background);
-    .status-pill { background: rgba(255,255,255,0.08); }
-    .placa-pill  { background: rgba(255,255,255,0.08); }
-  }
-}
-
-// === Progress Stepper (Improvement #1) ===
-.progress-stepper {
-  margin-top: 18px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 2px;
-}
-.stepper-track {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  min-width: max-content;
-  gap: 0;
-}
-.stepper-step {
+  padding: 20px var(--pad) 28px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  width: 64px;
-}
-.stepper-dot {
-  width: 28px; height: 28px;
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--n-100);
-  border: 2px solid var(--n-200, #e5e5e5);
-  color: var(--n-400);
+  gap: 16px;
   font-size: 14px;
-  transition: all .2s ease;
+  color: var(--tx);
+}
+@media (max-width: 760px) { .ot { --pad: 16px; padding-top: 14px; } }
 
-  .dot-inner {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--n-300, #d4d4d4);
-  }
-}
-.stepper-step.completed .stepper-dot {
-  background: var(--emerald-600, #059669);
-  border-color: var(--emerald-600, #059669);
-  color: #fff;
-  ion-icon { font-size: 15px; }
-}
-.stepper-step.active .stepper-dot {
-  background: var(--rose-600);
-  border-color: var(--rose-600);
-  box-shadow: 0 0 0 4px rgba(var(--ion-color-primary-rgb),0.18);
-  .dot-inner { background: #fff; }
-}
-.stepper-step.future .stepper-dot {
-  background: var(--n-100);
-}
-.stepper-label {
-  font-size: 9.5px;
-  font-weight: 700;
-  color: var(--n-400);
-  text-align: center;
-  line-height: 1.2;
-  max-width: 60px;
-  word-break: break-word;
-}
-.stepper-step.active .stepper-label { color: var(--rose-700); font-weight: 800; }
-.stepper-step.completed .stepper-label { color: var(--emerald-700); }
+// Los campos del panel traen margen abajo; acá el espacio lo dan los contenedores.
+.ot .fg { margin-bottom: 0; }
 
-.stepper-line {
-  flex-shrink: 0;
-  width: 20px;
-  height: 2px;
-  background: var(--n-200, #e5e5e5);
-  margin-top: 13px; // center with dot
-  &.filled { background: var(--emerald-600, #059669); }
-}
+// Barra de arriba: en el celular, solo los íconos.
+.tb-txt { margin-left: 6px; }
+@media (max-width: 900px) { .tb-txt { display: none; } }
 
-// === Progress bar (Improvement #4) ===
-.progress-bar-wrap {
-  margin-top: 14px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.progress-bar {
-  flex: 1;
-  height: 6px;
-  background: var(--n-100);
-  border-radius: 999px;
-  overflow: hidden;
-}
-.progress-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--rose-600), var(--emerald-600, #059669));
-  transition: width .4s ease;
-}
-.progress-pct {
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--n-500);
-  min-width: 36px;
-  text-align: right;
-}
-
-// === Mini cards (Improvement #2) ===
-.info-duo {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-@media (max-width: 520px) {
-  .info-duo { grid-template-columns: 1fr; }
-}
-.mini-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  background: var(--ion-card-background);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-sm);
-  padding: 14px;
-}
-.mini-icon {
-  flex-shrink: 0;
-  width: 38px; height: 38px;
-  border-radius: 12px;
-  display: flex; align-items: center; justify-content: center;
-  ion-icon { font-size: 20px; }
-}
-.mini-icon.vehiculo-icon {
-  background: var(--amber-50, #fffbeb);
-  color: var(--amber-700, #b45309);
-}
-.mini-icon.client-icon {
-  background: var(--indigo-50, #eef2ff);
-  color: var(--indigo-600, #4f46e5);
-}
-.mini-body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+// ── Tarjeta con cabecera ──
+.ot-card {
+  container: tarjeta / inline-size;
   min-width: 0;
+  background: var(--sur);
+  border: 1px solid var(--bd);
+  border-radius: 8px;
 }
-.mini-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--ion-text-color);
-  line-height: 1.3;
+.ot-card-cab {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 52px; padding: 9px 20px;
+  border-bottom: 1px solid var(--bd);
+  &--wrap { flex-wrap: wrap; }
+  .btn-sm { min-height: 34px; }
 }
-.mini-sub {
-  font-size: 12px;
-  color: var(--n-500);
-  font-weight: 500;
+.ot-h2 {
+  margin: 0;
+  font-family: var(--fd); font-size: 13px; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--tx2);
+}
+.ot-nota { font-size: 12px; color: var(--tx3); }
+.ot-card-cuerpo { padding: 18px 20px; display: flex; flex-direction: column; gap: 16px; }
+.ot-vacio-fila { margin: 0; padding: 18px 20px; text-align: center; font-size: 13px; color: var(--tx3); }
+.ot-card-cuerpo .ot-vacio-fila { padding: 2px 0; }
+.ot-botones { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+
+// ── Encabezado ──
+.ot-cab { box-shadow: var(--shadow-sm); }
+.ot-cab-top { display: flex; align-items: center; gap: 24px; padding: 22px 24px; }
+.ot-cab-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.ot-meta {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  .bg { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+}
+.ot-num { font-size: 13px; font-weight: 700; color: var(--tx2); }
+.ot-chip { border: 1px solid var(--bd); }
+.ot-titulo {
+  margin: 0;
+  font-family: var(--fd); font-size: 30px; font-weight: 700; line-height: 1.1;
+  color: var(--tx); overflow-wrap: anywhere;
+}
+.ot-placa { margin-left: 6px; font-size: 15px; font-weight: 500; color: var(--tx2); white-space: nowrap; }
+.ot-sub { margin: 0; font-size: 14px; color: var(--tx2); }
+.ot-cab-acciones { flex-shrink: 0; display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+.ot-principal { min-width: 220px; }
+
+// ── La línea de avance ──
+.ot-linea { border-top: 1px solid var(--bd); padding: 20px 24px 18px; overflow-x: auto; }
+.ot-pasos { display: flex; min-width: 560px; margin: 0; padding: 0; list-style: none; }
+.ot-paso { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.ot-paso-eje { display: flex; align-items: center; width: 100%; }
+.ot-tramo {
+  flex: 1 1 auto; height: 2px; background: var(--bd2);
+  &.on { background: var(--cr); }
+  &.vacio { background: transparent; }
+}
+.ot-punto {
+  flex: 0 0 auto; box-sizing: border-box;
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--sur); border: 2px solid var(--bd2); color: #fff;
+  ion-icon { font-size: 13px; }
+}
+.ot-paso-label { font-size: 12.5px; font-weight: 500; text-align: center; color: var(--tx3); }
+.ot-paso-sub { min-height: 14px; font-size: 11px; text-align: center; color: var(--tx3); }
+.ot-paso.hecho {
+  .ot-punto { background: var(--cr); border-color: var(--cr); }
+  .ot-paso-label { color: var(--tx); font-weight: 600; }
+}
+.ot-paso.actual {
+  .ot-punto {
+    border-color: var(--cr); box-shadow: 0 0 0 4px var(--adm-cr-bg);
+    &::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--cr); }
+  }
+  .ot-paso-label { color: var(--cr-tx); font-weight: 700; }
+}
+// Se lo saltó: círculo punteado sobre la línea, y la etiqueta en cursiva.
+.ot-paso.omitido {
+  .ot-punto { border-style: dashed; }
+  .ot-paso-label { font-style: italic; }
+}
+// Cancelada: lo recorrido queda en gris (no en rojo de "avanzó").
+.ot-linea.cancelada {
+  .ot-tramo.on { background: var(--tx3); }
+  .ot-paso.hecho .ot-punto { background: var(--tx3); border-color: var(--tx3); }
+}
+.ot-linea-resumen { display: none; }
+
+// ── Dos columnas: el trabajo a la izquierda, entrega y contexto a la derecha ──
+// Angosto, las tarjetas van en una sola columna (las columnas "desaparecen" con
+// display: contents) y la de Entrega sube primero: es lo que hay que hacer.
+.ot-cols { display: flex; flex-direction: column; gap: 16px; }
+.ot-main, .ot-side { display: contents; }
+.ot-entrega { order: -1; }
+@container ot (min-width: 900px) {
+  .ot-cols { display: grid; grid-template-columns: minmax(0, 1fr) 340px; align-items: start; gap: 20px; }
+  .ot-main, .ot-side { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .ot-entrega { order: 0; }
 }
 
-// Info
-.ot-info p {
-  margin: 0 0 10px; font-size: 14px; color: var(--ion-text-color); line-height: 1.5;
-  &:last-child { margin-bottom: 0; }
-  .k {
-    display: block; font-size: 10px; font-weight: 800;
-    text-transform: uppercase; letter-spacing: 0.08em;
-    color: var(--n-400); margin-bottom: 2px;
+// ── Trabajo ──
+.ot-dos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.ot-k { margin-bottom: 6px; font-size: 11.5px; font-weight: 600; color: var(--tx3); }
+.ot-v { margin: 0; font-size: 14.5px; line-height: 1.55; color: var(--tx); white-space: pre-line; overflow-wrap: anywhere; }
+.ot-vacio { color: var(--tx3); font-style: italic; }
+.ot-datos {
+  margin: 0; overflow: hidden;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px;
+  background: var(--bd); border: 1px solid var(--bd); border-radius: 2px;
+  > div { padding: 12px 14px; background: var(--sur2); }
+  dt { font-size: 11.5px; color: var(--tx3); }
+  dd { margin: 4px 0 0; font-weight: 600; color: var(--tx); }
+}
+.ot-extra { margin: 0; font-size: 13px; color: var(--tx2); strong { font-weight: 600; color: var(--tx); } }
+
+// ── Repuestos y costos ──
+// Formulario de agregar / editar / pedir: en una fila ancho, apilado angosto.
+.ot-form-rep, .ot-rep-edit {
+  display: grid; grid-template-columns: minmax(0, 1fr) 80px 150px 190px; gap: 12px;
+  padding: 16px 20px;
+  background: var(--sur2);
+  .ot-f-botones, .ot-sol-lista { grid-column: 1 / -1; }
+}
+.ot-form-rep { border-bottom: 1px solid var(--bd); }
+.ot-rep-edit { border-top: 1px solid var(--bd); }
+.ot-form-sol { grid-template-columns: minmax(0, 1fr) 80px auto; .ot-f-mas { align-self: end; } }
+.ot-sol-lista {
+  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px;
+  li {
+    display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 12px;
+    background: var(--sur); border: 1px solid var(--bd); border-radius: 2px; font-size: 13.5px;
+    span:first-child { flex: 1; min-width: 0; font-weight: 600; }
   }
 }
-.obs { margin: 12px 0 0; font-size: 14px; .k { display:block; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--n-400); margin-bottom:2px; } }
 
-// Banners (aprobacion / garantia)
-.banner {
-  display: flex; align-items: center; gap: 12px;
-  ion-icon { font-size: 28px; flex-shrink: 0; }
-  strong { font-size: 14px; font-weight: 700; display: block; }
-  p { margin: 3px 0 0; font-size: 13px; color: var(--n-500); }
-
-  &.ok   { background: var(--emerald-50); border-color: transparent; ion-icon, strong { color: var(--emerald-700); } }
-  &.no   { background: var(--rose-50);    border-color: transparent; ion-icon, strong { color: var(--rose-700); } }
-  &.wait { background: var(--amber-100);  border-color: transparent; ion-icon, strong { color: var(--amber-700); } }
-  &.inner { box-shadow: none; padding: 14px; border-radius: 16px; margin-bottom: 0; }
+.ot-rep-fila {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 56px 170px 100px 110px 200px;
+  align-items: center; gap: 8px;
+  padding: 10px 20px;
+  border-top: 1px solid var(--bd);
+  font-size: 13.5px;
+  &.solicitado { box-shadow: inset 3px 0 0 var(--cr); }
+}
+.ot-rep.sin-precios .ot-rep-fila { grid-template-columns: minmax(0, 1fr) 56px 170px; }
+.ot-rep.sin-acciones .ot-rep-fila { grid-template-columns: minmax(0, 1fr) 56px 170px 100px 110px; }
+.ot-rep-titulos { border-top: none; padding-top: 12px; padding-bottom: 8px; font-size: 11.5px; font-weight: 600; color: var(--tx3); }
+.c-nombre { font-weight: 500; overflow-wrap: anywhere; .bg { margin-left: 6px; vertical-align: 1px; } }
+.c-cant, .c-num { text-align: right; }
+.c-unit { color: var(--tx2); }
+.c-total { font-weight: 700; }
+.c-acc { display: flex; align-items: center; justify-content: flex-end; gap: 6px; .btn-sm { min-height: 32px; } }
+.ot-x {
+  width: 32px; height: 32px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 2px; background: none; color: var(--tx3); cursor: pointer;
+  ion-icon { font-size: 17px; }
+  &:hover { color: var(--rd); background: var(--sur2); }
 }
 
-// === State change pills (Improvement #3) ===
-.state-grid {
-  display: flex; flex-wrap: wrap; gap: 8px;
+.ot-totales {
+  display: flex; justify-content: flex-end;
+  padding: 16px 20px 18px; border-top: 1px solid var(--bd);
+  dl { width: 100%; max-width: 340px; margin: 0; display: grid; grid-template-columns: 1fr auto; row-gap: 8px; column-gap: 24px; font-size: 13.5px; }
+  dt { color: var(--tx2); }
+  dd { margin: 0; text-align: right; color: var(--tx); }
+  .t-total { padding-top: 10px; border-top: 1px solid var(--bd); font-weight: 700; color: var(--tx); }
+  dd.t-total { font-family: var(--fd); font-size: 26px; line-height: 1; font-variant-numeric: tabular-nums; }
 }
-.state-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: none;
-  border-radius: 999px;
-  padding: 9px 18px;
-  font-family: var(--ion-font-family);
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: transform .15s var(--ease-out), box-shadow .15s ease;
-  color: #fff;
-
-  ion-icon { font-size: 16px; }
-  &:active { transform: scale(0.96); }
-
-  // Per-state colors
-  &[data-state="recepcion"]            { background: var(--rose-600); }
-  &[data-state="diagnostico"]          { background: #d97706; } // amber-600
-  &[data-state="esperando_aprobacion"] { background: var(--indigo-600, #4f46e5); }
-  &[data-state="esperando_repuestos"]  { background: #6b7280; color: #fff; } // gray-500
-  &[data-state="en_reparacion"]        { background: #2563eb; } // blue-600
-  &[data-state="lista_entrega"]        { background: var(--emerald-600, #059669); }
-  &[data-state="entregada"]            { background: #047857; } // emerald-700
-  &[data-state="cancelada"]            { background: #dc2626; } // red-600
-}
-
-.sel-line {
-  background: var(--n-50);
-  border: 1px solid var(--hairline);
-  border-radius: 12px;
-  --padding-start: 14px; --padding-end: 14px;
-  min-height: 50px;
-}
-
-// Costos
-.costos {
-  .cost-row {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 7px 0; font-size: 14px;
-    span:first-child { color: var(--n-500); }
-    span:last-child { color: var(--ion-text-color); font-weight: 600; }
-    &.neg span { color: var(--rose-600); }
-  }
-  .cost-total {
-    display: flex; align-items: baseline; justify-content: space-between;
-    margin-top: 8px; padding-top: 12px;
-    border-top: 1px solid var(--hairline);
-    span:first-child { font-size: 16px; font-weight: 700; }
-    span:last-child {
-      font-family: var(--font-display);
-      font-size: 22px; font-weight: 800;
-      color: var(--rose-600); letter-spacing: -0.03em;
-    }
-  }
-}
-.btn-line {
-  width: 100%; margin-top: 14px;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  border: 1px solid var(--hairline); background: transparent;
-  padding: 13px; border-radius: 14px;
-  font-family: var(--ion-font-family); font-size: 13px; font-weight: 700;
-  color: var(--ion-text-color); cursor: pointer;
-  transition: transform .15s var(--ease-out);
-  &:active { transform: scale(0.98); }
-  ion-icon { font-size: 17px; color: var(--ion-color-primary); }
-}
-.link-add {
-  display: inline-flex; align-items: center; gap: 3px;
-  border: none; background: transparent;
-  color: var(--text-accent); font-weight: 800; font-size: 13px;  // AA
-  cursor: pointer; font-family: var(--ion-font-family);
-  ion-icon { font-size: 16px; }
-}
-
-// Linea de tiempo
-.timeline-card .tl-phases { display: flex; flex-direction: column; }
-.tl-phase {
-  position: relative; display: flex; align-items: flex-start; gap: 12px; padding-bottom: 16px;
-  .tl-dot {
-    flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%;
-    background: var(--n-100); color: var(--n-500);
-    display: flex; align-items: center; justify-content: center; z-index: 1;
-    ion-icon { font-size: 16px; }
-  }
-  .tl-body { flex: 1; min-width: 0;
-    strong { font-size: 13.5px; display: block; margin-bottom: 4px; }
-  }
-  .tl-dates { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 11.5px; color: var(--n-500);
-    span { display: inline-flex; align-items: center; gap: 3px; }
-    ion-icon { font-size: 13px; } }
-  .tl-dur { font-size: 11px; color: var(--n-400); margin-top: 4px; display: inline-block;
-    background: var(--n-100); padding: 2px 8px; border-radius: 999px; }
-  .tl-en-curso { color: var(--ion-color-primary); font-weight: 700; }
-  .tl-line { position: absolute; left: 15px; top: 32px; bottom: 0; width: 2px; background: var(--hairline); }
-  &.done .tl-dot { background: var(--emerald-50, rgba(16,185,129,.1)); color: var(--emerald-700); }
-  &.active .tl-dot { background: var(--ion-color-primary); color: #fff; animation: pulse 2s infinite; }
-  &:last-child { padding-bottom: 0; }
-}
-@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(var(--ion-color-primary-rgb),.3); } 50% { box-shadow: 0 0 0 6px rgba(var(--ion-color-primary-rgb),0); } }
-
-// Formularios inline
-.inline-form {
-  background: var(--n-50);
-  border: 1px solid var(--hairline);
-  border-radius: 16px;
-  padding: 6px 12px 12px;
-  margin-bottom: 12px;
-  ion-item { --background: transparent; --padding-start: 0; }
-}
-
-// Calificación del cliente
-.califa-card {
-  .califa-stars {
-    display: flex; align-items: center; gap: 3px; margin: 6px 0 2px;
-    ion-icon { font-size: 22px; color: var(--n-300); }
-    ion-icon.on { color: #f59e0b; }
-  }
-  .califa-num { margin-left: 8px; font-size: 14px; font-weight: 800; color: var(--ion-text-color); }
-  .califa-com { margin: 8px 0 0; font-size: 14px; line-height: 1.5; color: var(--ion-text-color); }
-  .califa-sincom { color: var(--n-500); font-style: italic; }
-}
-
-// Solicitud de repuestos (mecanico)
-.solicitud-row { display: flex; align-items: flex-end; gap: 4px;
-  .sol-input { flex: 1; min-width: 0; }
-  .sol-cant { width: 70px; flex-shrink: 0; }
-  ion-button { flex-shrink: 0; --padding-start: 4px; --padding-end: 4px; margin-bottom: 8px;
-    ion-icon { font-size: 28px; color: var(--ion-color-primary); } }
-}
-.sol-lista { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
-.sol-item { display: flex; align-items: center; gap: 8px;
-  background: var(--ion-card-background); border: 1px solid var(--hairline); border-radius: 10px; padding: 8px 12px;
-  .sol-nombre { flex: 1; font-size: 13.5px; font-weight: 600; }
-  .sol-qty { font-size: 12px; color: var(--n-500); }
-  .sol-del { background: none; border: none; cursor: pointer; padding: 2px; color: var(--n-400);
-    ion-icon { font-size: 20px; } &:hover { color: var(--ion-color-danger); } }
-}
-
-// Repuestos / listas
-.rep-list .rep-item {
-  --background: transparent;
-  --padding-start: 0;
-  --inner-padding-end: 0;
-  --border-color: var(--hairline);
-  border-bottom: 1px dashed var(--hairline);
-  h3 { font-size: 14px; font-weight: 700; }
-  p { font-size: 12px; color: var(--n-500); }
-}
-.rep-list ion-item-sliding:last-child .rep-item { border-bottom: none; }
-.rep-solicitado { border-left: 3px solid var(--ion-color-primary) !important; padding-left: 8px; }
-.rep-edit-btn {
-  display: inline-flex; align-items: center; gap: 4px;
-  background: rgba(var(--ion-color-primary-rgb), .1); color: var(--ion-color-primary);
-  border: 1px solid rgba(var(--ion-color-primary-rgb), .2); border-radius: 8px;
-  padding: 5px 10px; font-size: 12px; font-weight: 700; font-family: inherit;
-  cursor: pointer; white-space: nowrap;
-  ion-icon { font-size: 14px; }
-}
-.empty-row { text-align: center; color: var(--n-400); font-size: 13px; padding: 14px 0 4px; margin: 0; }
-
-// Timeline
-.tl-desc { margin: 2px 0 0; font-size: 14px; color: var(--ion-text-color); font-weight: 500; }
-.timeline { margin-top: 6px; }
-
-// Checklist
-.check-list { margin: 0 -4px; }
-.check-list ion-item { --background: transparent; --padding-start: 0; }
-
-// Total a cobrar
-.total-cobrar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 16px; margin: 6px 0 14px;
-  background: var(--emerald-50);
-  border-radius: 16px;
-
-  span { font-size: 12px; font-weight: 700; color: var(--emerald-700); text-transform: uppercase; letter-spacing: 0.06em; }
-  strong { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; color: var(--emerald-700); font-family: var(--font-display); }
-}
-
-.checklist-aviso {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 12px; color: var(--amber-700); margin-top: 10px;
+.ot-aprobado {
+  display: flex; align-items: center; justify-content: flex-end; gap: 6px;
+  margin: 0; padding: 0 20px 16px;
+  font-size: 12.5px; font-weight: 600; color: var(--em);
   ion-icon { font-size: 16px; flex-shrink: 0; }
 }
+.ot-rep + .ot-aprobado, .ot-vacio-fila + .ot-aprobado { padding-top: 12px; border-top: 1px solid var(--bd); }
 
-// Galeria de evidencia
-.foto-grupo { margin-top: 16px; }
-.foto-grupo-titulo {
-  font-size: 11px; font-weight: 800; color: var(--n-400);
-  text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 8px;
+// ── Avances y mensajes: caja de texto + botón ──
+.ot-enviar {
+  display: flex; align-items: flex-end; gap: 10px;
+  textarea, input {
+    flex: 1 1 auto; min-width: 0; min-height: 44px; box-sizing: border-box;
+    padding: 10px 12px; border: 1px solid var(--bd); border-radius: 2px;
+    background: var(--sur2); color: var(--tx); font: inherit; font-size: 14px; outline: none;
+    &:focus { border-color: var(--cr); }
+  }
+  textarea { resize: vertical; }
+  .btn { flex-shrink: 0; }
+  &--linea { align-items: center; .btn { padding: 0 14px; } }
 }
-.foto-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.foto-thumb {
-  position: relative; aspect-ratio: 1;
-  border-radius: 14px; overflow: hidden;
-  background: var(--n-100); border: 1px solid var(--hairline);
+.ot-avances {
+  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px;
+  li { display: flex; gap: 12px; }
+  li > div { min-width: 0; }
+  p { margin: 3px 0 0; font-size: 14px; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
+}
+.ot-av {
+  flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--sur2); border: 1px solid var(--bd);
+  font-size: 12px; font-weight: 700; color: var(--tx2);
+}
+.ot-av-meta { font-size: 12.5px; color: var(--tx3); strong { font-weight: 600; color: var(--tx); } }
 
-  img { width: 100%; height: 100%; object-fit: cover; cursor: pointer; }
-  .foto-del {
-    position: absolute; top: -4px; right: -4px;
-    --padding-start: 4px; --padding-end: 4px; margin: 0; height: 28px;
-    ion-icon { font-size: 20px; background: #fff; border-radius: 50%; }
+.ot-msgs { display: flex; flex-direction: column; gap: 10px; max-height: 360px; overflow-y: auto; }
+.ot-msg {
+  align-self: flex-start; max-width: 85%;
+  padding: 8px 12px; border-radius: 8px;
+  background: var(--sur2); border: 1px solid var(--bd);
+  font-size: 13.5px;
+  p { margin: 0; line-height: 1.45; color: var(--tx); white-space: pre-line; overflow-wrap: anywhere; }
+  &.mio { align-self: flex-end; background: var(--adm-cr-bg); border-color: transparent; }
+  &.sistema { align-self: stretch; max-width: none; background: none; border-style: dashed; }
+}
+.ot-msg-img { display: block; max-width: 180px; margin-bottom: 4px; border-radius: 2px; }
+.ot-msg-meta { display: block; margin-top: 4px; font-size: 11px; color: var(--tx3); }
+
+// ── Fotos ──
+.ot-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.ot-tab {
+  min-height: 32px; padding: 0 10px; border-radius: 2px;
+  border: 1px solid var(--bd); background: none; color: var(--tx2);
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  &.on { background: var(--tx); border-color: var(--tx); color: var(--sur); }
+}
+.ot-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+.ot-foto {
+  position: relative; aspect-ratio: 4 / 3; overflow: hidden;
+  border-radius: 2px; background: var(--sur2); border: 1px solid var(--bd);
+  img { display: block; width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; }
+}
+.ot-foto-x {
+  position: absolute; top: 4px; right: 4px;
+  width: 28px; height: 28px; border-radius: 50%; border: none;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, .62); color: #fff; cursor: pointer;
+  ion-icon { font-size: 16px; }
+}
+.ot-foto-subir {
+  aspect-ratio: 4 / 3; padding: 8px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  border: 1.5px dashed var(--bd2); border-radius: 2px; background: transparent;
+  color: var(--tx2); font-size: 12px; font-weight: 600; text-align: center; cursor: pointer;
+  ion-icon { font-size: 22px; }
+  ion-spinner { width: 22px; height: 22px; }
+  &:hover:not(:disabled) { border-color: var(--tx3); color: var(--tx); }
+}
+
+// ── Entrega ──
+.ot-entrega.lista { border-color: var(--cr); .ot-h2 { color: var(--cr-tx); } }
+.ot-entregada { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 600; color: var(--em); ion-icon { font-size: 20px; } }
+.ot-checks {
+  display: flex; flex-direction: column;
+  ion-checkbox {
+    min-height: 44px; border-bottom: 1px solid var(--bd);
+    font-size: 13.5px; color: var(--tx);
+    --size: 20px;
+    --checkbox-background-checked: var(--cr);
+    --border-color-checked: var(--cr);
+    &:last-child { border-bottom: none; }
+  }
+  &--compacto ion-checkbox { min-height: 36px; border-bottom: none; }
+}
+// Ya entregada: lo que se revisó, de solo lectura (las casillas apagadas no se leían).
+.ot-revisado {
+  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px;
+  li { display: flex; align-items: center; gap: 8px; color: var(--tx); }
+  ion-icon { font-size: 16px; color: var(--em); }
+  li.no { color: var(--tx3); ion-icon { color: var(--tx3); } }
+}
+
+// ── Cliente y moto, asignación ──
+.ot-nombre { font-size: 15px; font-weight: 700; color: var(--tx); &--moto { font-size: 14px; font-weight: 600; } }
+.ot-sub2 { margin-top: 2px; font-size: 13px; color: var(--tx2); overflow-wrap: anywhere; }
+.ot-fuerte { color: var(--tx); }
+.ot-par { display: flex; gap: 8px; .btn { flex: 1 1 0; padding: 0 10px; text-decoration: none; } }
+.ot-hr { height: 1px; margin: 0; border: none; background: var(--bd); }
+.ot-enlaces { display: flex; flex-wrap: wrap; gap: 16px; }
+.ot-link {
+  padding: 0; border: none; background: none; cursor: pointer; text-align: left;
+  font: inherit; font-size: 13px; font-weight: 600; color: var(--cr-tx);
+  &:hover { text-decoration: underline; }
+}
+.ot-dl {
+  margin: 0; display: grid; grid-template-columns: auto 1fr; row-gap: 8px; column-gap: 16px; font-size: 13px;
+  dt { color: var(--tx3); }
+  dd { margin: 0; color: var(--tx); overflow-wrap: anywhere; }
+}
+.ot-etapas {
+  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 12.5px;
+  li {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px;
+    padding-left: 12px; border-left: 2px solid var(--bd);
+    strong { font-weight: 600; color: var(--tx); }
+    span:nth-of-type(1) { grid-column: 1; color: var(--tx2); }
+    .mono { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: var(--tx2); }
+    &.en-curso { border-left-color: var(--cr); }
   }
 }
 
-// WhatsApp
-.wa-wrap { display: flex; justify-content: center; margin-top: 6px; }
-.wa-btn {
-  display: inline-flex; align-items: center; gap: 8px;
-  background: #22c55e; color: #fff;
-  border: none; padding: 13px 24px; border-radius: var(--radius-control);
-  font-family: var(--ion-font-family); font-size: 14px; font-weight: 700;
-  box-shadow: 0 8px 20px rgba(34,197,94,.28); cursor: pointer;
-  transition: transform .15s var(--ease-out);
-  &:active { transform: scale(0.97); }
-  ion-icon { font-size: 19px; }
+// ── Calificación y garantía ──
+.ot-estrellas {
+  display: flex; align-items: center; gap: 3px;
+  ion-icon { font-size: 22px; color: var(--bd2); &.on { color: #f59e0b; } }
+  span { margin-left: 8px; font-weight: 700; }
+}
+.ot-garantia {
+  display: flex; align-items: flex-start; gap: 8px; margin: 0;
+  font-size: 13.5px; color: var(--tx2);
+  ion-icon { flex-shrink: 0; font-size: 20px; }
+  strong { color: var(--tx); }
+  &.vigente { ion-icon, strong { color: var(--em); } }
+}
+.ot-reclamos {
+  list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--bd);
+  button {
+    width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 12px 0; border: none; border-bottom: 1px solid var(--bd); background: none;
+    font: inherit; color: var(--tx); text-align: left; cursor: pointer;
+    &:hover { background: var(--sur2); }
+  }
+  .ot-reclamo-txt {
+    min-width: 0; display: flex; flex-direction: column; gap: 2px;
+    strong { font-size: 13.5px; font-weight: 600; }
+    span { font-size: 12px; color: var(--tx3); }
+  }
 }
 
-/* Mensajes de la orden (contexto de orden) */
-.msg-card {
-  .msg-thread { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 12px; max-height: 340px; overflow-y: auto; }
-  .msg-row { display: flex; }
-  .msg-row.mio { justify-content: flex-end; }
-  .msg-bubble {
-    max-width: 80%; padding: 8px 12px; border-radius: 14px;
-    background: var(--n-100, #f3f4f6); border: 1px solid var(--hairline);
-    p { margin: 0; font-size: 14px; line-height: 1.4; color: var(--ion-text-color); word-break: break-word; }
+// ── Barra fija del celular ──
+.ot-barra { display: none; }
+
+// ═══ Angosto (celular, o el panel con poco espacio) ═══
+@container ot (max-width: 760px) {
+  .ot-cab-acciones { display: none; }
+  .ot-num { display: none; }
+  .ot-cab-top { padding: 16px; }
+  .ot-titulo { font-size: 24px; }
+  .ot-sub { font-size: 13px; }
+
+  // La línea: solo los puntos, y abajo un resumen del paso.
+  .ot-linea { padding: 14px 16px; overflow: visible; }
+  .ot-pasos { min-width: 0; }
+  .ot-paso { gap: 0; }
+  .ot-paso-label, .ot-paso-sub { display: none; }
+  .ot-punto { width: 16px; height: 16px; ion-icon { font-size: 10px; } }
+  .ot-paso.actual .ot-punto::after { width: 6px; height: 6px; }
+  .ot-linea-resumen {
+    display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; font-size: 12.5px;
+    strong { color: var(--cr-tx); }
+    span { color: var(--tx3); text-align: right; }
   }
-  .msg-row.mio .msg-bubble { background: var(--rose-50, #fff1f2); border-color: transparent; }
-  .msg-img { max-width: 180px; border-radius: 10px; margin-bottom: 4px; display: block; }
-  .msg-meta { display: block; margin-top: 4px; font-size: 10.5px; color: var(--n-400, #9ca3af); font-weight: 600; }
-  .msg-rol { color: var(--text-accent, var(--ion-color-primary)); }
-  .msg-send {
-    display: flex; gap: 8px; align-items: center;
-    input { flex: 1; min-width: 0; border: 1px solid var(--hairline); border-radius: 999px;
-      padding: 10px 16px; font-size: 14px; background: var(--ion-card-background); color: var(--ion-text-color); outline: none;
-      &:focus { border-color: var(--ion-color-primary); } }
-    button { flex-shrink: 0; width: 42px; height: 42px; border-radius: 50%; border: none;
-      background: var(--ion-color-primary); color: #fff; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      ion-icon { font-size: 19px; }
-      &:disabled { opacity: .45; cursor: default; } }
+  .ot-linea.cancelada .ot-linea-resumen strong { color: var(--tx2); }
+
+  .ot-barra {
+    display: flex; gap: 10px;
+    position: sticky; bottom: 0; z-index: 5;
+    margin: 0 calc(-1 * var(--pad)) -28px;
+    padding: 12px var(--pad) calc(12px + env(safe-area-inset-bottom, 0px));
+    background: var(--sur); border-top: 1px solid var(--bd);
+    box-shadow: 0 -4px 16px var(--adm-sombra);
   }
+  .ot-barra-otros { flex-shrink: 0; width: 48px; padding: 0; }
+  .ot-barra-pri { flex: 1 1 auto; min-width: 0; padding: 0 12px; }
+}
+
+@container tarjeta (max-width: 640px) {
+  .ot-card-cab, .ot-card-cuerpo { padding-left: 16px; padding-right: 16px; }
+  .ot-dos { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .ot-datos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ot-form-rep, .ot-rep-edit {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 14px 16px;
+    .ot-f-nombre, .ot-f-estado { grid-column: 1 / -1; }
+  }
+  .ot-form-sol { .ot-f-nombre { grid-column: 1 / -1; } }
+  .ot-totales { padding: 14px 16px 16px; dl { max-width: none; } }
+  .ot-aprobado { padding-left: 16px; padding-right: 16px; justify-content: flex-start; }
+}
+
+// La tabla de repuestos pide más espacio: debajo de esto, cada repuesto en un bloque.
+@container tarjeta (max-width: 760px) {
+  .ot-rep-titulos { display: none; }
+  .ot-rep-fila {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "nombre total" "estado cant" "acc acc";
+    row-gap: 6px; padding: 12px 16px;
+  }
+  .ot-rep.sin-precios .ot-rep-fila { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "nombre cant" "estado estado"; }
+  .c-nombre { grid-area: nombre; }
+  .c-total { grid-area: total; }
+  .c-estado { grid-area: estado; }
+  .c-cant { grid-area: cant; color: var(--tx2); }
+  .c-unit { display: none; }
+  .c-acc { grid-area: acc; justify-content: flex-start; }
 }

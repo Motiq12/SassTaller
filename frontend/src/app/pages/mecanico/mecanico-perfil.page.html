@@ -5,135 +5,166 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
-  <ion-refresher slot="fixed" (ionRefresh)="cargar($event)">
-    <ion-refresher-content pullingIcon="chevron-down" refreshingSpinner="crescent"></ion-refresher-content>
-  </ion-refresher>
+<!-- La misma lista de ajustes que el panel (shared/perfil): a la izquierda la lista y
+     a la derecha la sección desde 1200 px; en el celular, una cosa a la vez. -->
+<ion-content class="admin-dark">
+  <div class="pf" [class.con-seccion]="!!seccion">
+    <input #fotoInput type="file" accept="image/*" hidden (change)="onFoto($event)">
 
-  <div class="mec-perfil">
-    <div *ngIf="cargando" style="display:flex;flex-direction:column;gap:14px">
-      <div class="skeleton" style="height:108px"></div>
-      <div class="skeleton" style="height:96px"></div>
-      <div class="skeleton" style="height:240px"></div>
-    </div>
+    <div *ngIf="cargando" class="sk-dark" style="height:420px"></div>
 
     <ng-container *ngIf="!cargando && perfil">
-      <!-- Cabecera con foto -->
-      <div class="profile-header">
-        <div class="avatar-wrap">
-          <button type="button" class="avatar" (click)="pedirFoto(fotoInput)" [disabled]="subiendoFoto">
-            <img *ngIf="perfil?.foto; else iniTpl" [src]="perfil.foto" alt="Foto de perfil">
-            <ng-template #iniTpl>{{ iniciales }}</ng-template>
-          </button>
-          <button type="button" class="avatar-cam" [class.cargando]="subiendoFoto" (click)="pedirFoto(fotoInput)"
-                  [disabled]="subiendoFoto" aria-label="Cambiar foto de perfil">
-            <ion-icon [name]="subiendoFoto ? 'hourglass-outline' : 'camera'"></ion-icon>
-          </button>
-          <input #fotoInput type="file" accept="image/*" hidden (change)="onFoto($event)">
-        </div>
-        <div class="info">
-          <h2>{{ perfil.nombre }}</h2>
-          <span class="role-chip">Mecánico</span>
-          <p class="contact">{{ perfil.email || '—' }}<ng-container *ngIf="perfil.telefono"> · {{ perfil.telefono }}</ng-container></p>
-          <button type="button" class="quitar-foto" *ngIf="perfil?.foto" (click)="quitarFoto()" [disabled]="subiendoFoto">Quitar foto</button>
-          <div class="profile-rating" *ngIf="perfil.calificacion_promedio">
-            <span class="stars">{{ estrellas(perfil.calificacion_promedio) }}</span>
-            <span class="val">{{ perfil.calificacion_promedio }}/5</span>
-            <span class="muted">({{ perfil.calificacion_total }})</span>
-          </div>
-        </div>
-      </div>
+      <app-perfil-lista class="pf-lista cd" [grupos]="grupos" [vista]="vista" [valores]="valores" [estados]="estados"
+                        [nombre]="perfil.nombre || ''" [email]="perfil.email || ''" [fotoUrl]="perfil.foto" [iniciales]="iniciales"
+                        [chips]="[rolNombre, sedeLabel]" [subiendoFoto]="subiendoFoto"
+                        (abrir)="abrir($event)" (salir)="logout()" (foto)="pedirFoto(fotoInput)"></app-perfil-lista>
 
-      <!-- Stats -->
-      <div class="stat-grid">
-        <div class="stat"><div class="stat-num">{{ perfil.completadas }}</div><div class="stat-lbl">Completadas</div></div>
-        <div class="stat"><div class="stat-num">{{ perfil.citas_mes }}</div><div class="stat-lbl">Este mes</div></div>
-        <div class="stat"><div class="stat-num">{{ perfil.satisfechos_pct != null ? perfil.satisfechos_pct + '%' : '—' }}</div><div class="stat-lbl">Satisfechos</div></div>
-        <div class="stat"><div class="stat-num" style="font-size:22px">{{ formatMin(perfil.tiempo_promedio_min) }}</div><div class="stat-lbl">Tiempo prom.</div></div>
-      </div>
+      <main class="pf-detalle" *ngIf="vista as v">
+        <button type="button" class="pf-volver" (click)="volverALista()">
+          <ion-icon name="chevron-back"></ion-icon> Mi perfil
+        </button>
 
-      <!-- Mi cuenta -->
-      <section class="card">
-        <span class="section-label">Mi cuenta</span>
-        <div class="ig"><label>Teléfono</label><input type="tel" [(ngModel)]="cuenta.telefono" placeholder="8888-1234"></div>
-        <div class="ig"><label>Especialidades (separadas por coma)</label><input type="text" [(ngModel)]="cuenta.especialidades" placeholder="Frenos, Diagnóstico, Transmisión"></div>
-        <div class="ig"><label>Horario</label><input type="text" [(ngModel)]="cuenta.horario" placeholder="Lun a Vie 08:00–17:00"></div>
+        <ng-container [ngSwitch]="v">
+          <!-- Mi desempeño -->
+          <ng-container *ngSwitchCase="'desempeno'">
+            <section class="cd">
+              <div class="pf-sec-cab">
+                <span class="pf-sec-icono"><ion-icon name="stats-chart-outline"></ion-icon></span>
+                <div><h2>Mi desempeño</h2>
+                  <p *ngIf="perfil.calificacion_promedio; else sinNota">
+                    <span class="mp-estrellas">{{ estrellas(perfil.calificacion_promedio) }}</span> {{ perfil.calificacion_promedio }}/5 · {{ perfil.calificacion_total }} calificaci{{ perfil.calificacion_total === 1 ? 'ón' : 'ones' }}
+                  </p>
+                  <ng-template #sinNota><p>Todavía no hay calificaciones de clientes.</p></ng-template>
+                </div>
+              </div>
+              <div class="mp-cifras">
+                <div><strong>{{ perfil.completadas }}</strong><span>Completadas</span></div>
+                <div><strong>{{ perfil.citas_mes }}</strong><span>Este mes</span></div>
+                <div><strong>{{ perfil.satisfechos_pct != null ? perfil.satisfechos_pct + '%' : '—' }}</strong><span>Satisfechos</span></div>
+                <div><strong>{{ formatMin(perfil.tiempo_promedio_min) }}</strong><span>Tiempo promedio</span></div>
+              </div>
+              <ng-container *ngIf="perfil.especialidades_list?.length">
+                <span class="mp-etiqueta">Especialidades</span>
+                <div class="mp-especialidades"><span *ngFor="let s of perfil.especialidades_list">{{ s }}</span></div>
+              </ng-container>
+            </section>
 
-        <div class="ro-row">
-          <div class="ro"><ion-icon name="location-outline"></ion-icon><div><span class="ro-lbl">Sede asignada</span><strong>{{ sedeLabel }}</strong><span class="ro-dir" *ngIf="perfil.sucursal_direccion">{{ perfil.sucursal_direccion }}</span></div></div>
-          <div class="ro"><ion-icon name="calendar-outline"></ion-icon><div><span class="ro-lbl">Miembro desde</span><strong>{{ miembroDesde }}</strong></div></div>
-        </div>
+            <section class="cd" *ngIf="perfil.calificaciones?.length">
+              <span class="mp-etiqueta">Calificaciones recientes</span>
+              <div class="mp-calif" *ngFor="let r of perfil.calificaciones">
+                <div class="mp-calif-cab">
+                  <span class="mp-estrellas">{{ estrellas(r.calificacion) }}</span>
+                  <strong>{{ r.cliente_nombre }} {{ r.cliente_apellido }}</strong>
+                  <span class="mp-calif-fecha">{{ r.fecha_fin | date:'dd/MM' }}<ng-container *ngIf="r.servicios || r.tipo_servicio"> · {{ r.servicios || r.tipo_servicio }}</ng-container></span>
+                </div>
+                <p *ngIf="r.comentario_satisfaccion">"{{ r.comentario_satisfaccion }}"</p>
+              </div>
+            </section>
+          </ng-container>
 
-        <button class="cta" [disabled]="guardando" (click)="guardarCuenta()">Guardar cambios</button>
-      </section>
+          <!-- Datos de trabajo -->
+          <section class="cd" *ngSwitchCase="'datos'">
+            <div class="pf-sec-cab">
+              <span class="pf-sec-icono"><ion-icon name="person-outline"></ion-icon></span>
+              <div><h2>Datos de trabajo</h2><p>Tu nombre y tu correo los cambia administración.</p></div>
+            </div>
+            <div class="fg"><label>Teléfono o WhatsApp</label><input type="tel" [(ngModel)]="cuenta.telefono" name="telefono" placeholder="8888-1234" autocomplete="tel"></div>
+            <div class="fg"><label>Especialidades</label><input type="text" [(ngModel)]="cuenta.especialidades" name="especialidades" placeholder="Frenos, Diagnóstico, Transmisión">
+              <div class="hint">Separadas por coma.</div></div>
+            <div class="fg"><label>Horario</label><input type="text" [(ngModel)]="cuenta.horario" name="horario" placeholder="Lun a Vie 08:00–17:00"></div>
+            <div class="pf-datos-fijos">
+              <div><span>Sede asignada</span><strong>{{ sedeLabel }}</strong><small *ngIf="perfil.sucursal_direccion">{{ perfil.sucursal_direccion }}</small></div>
+              <div><span>En el equipo desde</span><strong>{{ miembroDesde }}</strong></div>
+            </div>
+            <div class="pf-pie">
+              <button class="btn btn-cr" [disabled]="guardando || !cuentaCambiada" (click)="guardarCuenta()">{{ guardando ? 'Guardando…' : 'Guardar cambios' }}</button>
+            </div>
+          </section>
 
-      <!-- Especialidades -->
-      <section class="card" *ngIf="perfil.especialidades_list?.length">
-        <span class="section-label">Especialidades</span>
-        <div class="spec-wrap">
-          <span class="spec" *ngFor="let s of perfil.especialidades_list">{{ s }}</span>
-        </div>
-      </section>
+          <!-- Foto de perfil -->
+          <section class="cd" *ngSwitchCase="'foto'">
+            <div class="pf-sec-cab">
+              <span class="pf-sec-icono"><ion-icon name="image-outline"></ion-icon></span>
+              <div><h2>Foto de perfil</h2><p>Se ve en el menú y en los mensajes del equipo. Al subirla la podés encuadrar.</p></div>
+            </div>
+            <div class="pf-foto">
+              <button type="button" class="pf-avatar grande" (click)="pedirFoto(fotoInput)" [disabled]="subiendoFoto" [attr.aria-label]="perfil.foto ? 'Cambiar la foto' : 'Subir una foto'">
+                <img *ngIf="perfil.foto; else ini2" [src]="perfil.foto" alt="">
+                <ng-template #ini2>{{ iniciales }}</ng-template>
+                <span class="pf-avatar-velo"><ion-icon [name]="subiendoFoto ? 'hourglass-outline' : 'camera-outline'"></ion-icon></span>
+              </button>
+              <div class="pf-foto-acciones">
+                <button type="button" class="btn btn-cr" (click)="pedirFoto(fotoInput)" [disabled]="subiendoFoto">
+                  <ion-icon name="camera-outline"></ion-icon> {{ perfil.foto ? 'Cambiar foto' : 'Subir foto' }}
+                </button>
+                <button type="button" class="btn btn-ou" *ngIf="perfil.foto" (click)="quitarFoto()" [disabled]="subiendoFoto">Quitar foto</button>
+              </div>
+            </div>
+          </section>
 
-      <!-- Accesibilidad -->
-      <section class="card">
-        <span class="section-label">Accesibilidad</span>
-        <div class="a11y-row">
-          <div class="a11y-info">
-            <strong>Tamaño de texto</strong>
-            <span>{{ nivelesTexto[a11y.nivel].nombre }}</span>
-          </div>
-          <div class="a11y-opts" role="group" aria-label="Tamaño de texto">
-            <button *ngFor="let n of nivelesTexto" class="a11y-opt" [class.on]="a11y.nivel === n.i"
-                    (click)="setTexto(n.i)" [attr.aria-pressed]="a11y.nivel === n.i" [attr.aria-label]="n.nombre"
-                    [style.font-size.px]="13 + n.i * 5">{{ n.etiqueta }}</button>
-          </div>
-        </div>
-      </section>
+          <!-- Contraseña -->
+          <section class="cd" *ngSwitchCase="'contrasena'">
+            <div class="pf-sec-cab">
+              <span class="pf-sec-icono"><ion-icon name="lock-closed-outline"></ion-icon></span>
+              <div><h2>Cambiar contraseña</h2><p>Mínimo {{ minimo }} caracteres{{ pideVariedad ? ', con letras y números' : '' }}. Una frase de varias palabras es lo más seguro.</p></div>
+            </div>
+            <div class="fg pass-field">
+              <label>Contraseña actual</label>
+              <div class="pass-wrap">
+                <input [type]="verActual ? 'text' : 'password'" [(ngModel)]="pass.actual" name="actual" placeholder="••••••••" autocomplete="current-password">
+                <button type="button" class="pass-eye" (click)="verActual = !verActual" [attr.aria-label]="verActual ? 'Ocultar' : 'Mostrar'">
+                  <ion-icon [name]="verActual ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+                </button>
+              </div>
+            </div>
+            <div class="fg pass-field">
+              <label>Nueva contraseña</label>
+              <div class="pass-wrap">
+                <input [type]="verNueva ? 'text' : 'password'" [(ngModel)]="pass.nueva" name="nueva" [placeholder]="'Mínimo ' + minimo + ' caracteres'" autocomplete="new-password">
+                <button type="button" class="pass-eye" (click)="verNueva = !verNueva" [attr.aria-label]="verNueva ? 'Ocultar' : 'Mostrar'">
+                  <ion-icon [name]="verNueva ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+                </button>
+              </div>
+              <div class="pf-fuerza" *ngIf="pass.nueva" [attr.data-nivel]="fuerza.nivel">
+                <div class="pf-fuerza-barras"><span></span><span></span><span></span></div>
+                <span class="pf-fuerza-txt">{{ fuerza.texto }}</span>
+              </div>
+            </div>
+            <div class="pf-pie">
+              <button class="btn btn-cr" [disabled]="guardandoPass || !pass.actual || !pass.nueva" (click)="cambiarPassword()">{{ guardandoPass ? 'Cambiando…' : 'Cambiar contraseña' }}</button>
+            </div>
+          </section>
 
-      <!-- Seguridad -->
-      <section class="card">
-        <span class="section-label">Seguridad</span>
-        <div class="ig pass-field">
-          <label>Contraseña actual</label>
-          <div class="pass-wrap">
-            <input [type]="verActual ? 'text' : 'password'" [(ngModel)]="pass.actual" placeholder="••••••••">
-            <button type="button" class="pass-eye" (click)="verActual = !verActual">
-              <ion-icon [name]="verActual ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
-            </button>
-          </div>
-        </div>
-        <div class="ig pass-field">
-          <label>Nueva contraseña</label>
-          <div class="pass-wrap">
-            <input [type]="verNueva ? 'text' : 'password'" [(ngModel)]="pass.nueva" placeholder="Mín. 8 caracteres">
-            <button type="button" class="pass-eye" (click)="verNueva = !verNueva">
-              <ion-icon [name]="verNueva ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
-            </button>
-          </div>
-        </div>
-        <button class="cta outline" [disabled]="guardandoPass" (click)="cambiarPassword()">Cambiar contraseña</button>
-      </section>
+          <app-dosfa *ngSwitchCase="'dosfa'"></app-dosfa>
+          <app-mis-sesiones *ngSwitchCase="'sesiones'"></app-mis-sesiones>
 
-      <!-- Verificación en dos pasos (componente compartido) -->
-      <app-dosfa></app-dosfa>
+          <!-- Apariencia -->
+          <section class="cd" *ngSwitchCase="'apariencia'">
+            <div class="pf-sec-cab">
+              <span class="pf-sec-icono"><ion-icon name="color-palette-outline"></ion-icon></span>
+              <div><h2>Apariencia</h2><p>Solo en este dispositivo.</p></div>
+            </div>
+            <div class="pf-opcion">
+              <div class="pf-opcion-txt"><strong>Tema</strong><span>{{ a11y.temaDetalle }}</span></div>
+              <div class="pf-seg" role="group" aria-label="Tema">
+                <button *ngFor="let t of a11y.temas" type="button" [class.on]="a11y.tema === t.id" (click)="a11y.setTema(t.id)" [attr.aria-pressed]="a11y.tema === t.id">
+                  <ion-icon [name]="iconoTema(t.id)"></ion-icon> {{ t.nombre }}
+                </button>
+              </div>
+            </div>
+            <div class="pf-opcion">
+              <div class="pf-opcion-txt"><strong>Tamaño de texto</strong><span>{{ nivelesTexto[a11y.nivel].nombre }}</span></div>
+              <div class="pf-seg" role="group" aria-label="Tamaño de texto">
+                <button *ngFor="let n of nivelesTexto" type="button" [class.on]="a11y.nivel === n.i" (click)="setTexto(n.i)" [attr.aria-pressed]="a11y.nivel === n.i"
+                        [attr.aria-label]="n.nombre"><span [style.font-size.px]="12 + n.i * 4">A</span></button>
+              </div>
+            </div>
+          </section>
 
-      <!-- Calificaciones recientes -->
-      <section class="card" *ngIf="perfil.calificaciones?.length">
-        <span class="section-label">Calificaciones recientes</span>
-        <div class="rating-card" *ngFor="let r of perfil.calificaciones">
-          <div class="rc-head">
-            <span class="stars">{{ estrellas(r.calificacion) }}</span>
-            <span class="client">{{ r.cliente_nombre }} {{ r.cliente_apellido }}</span>
-          </div>
-          <p class="rc-comment" *ngIf="r.comentario_satisfaccion">"{{ r.comentario_satisfaccion }}"</p>
-          <p class="rc-date">{{ r.fecha_fin | date:'dd/MM' }}<span *ngIf="r.tipo_servicio"> · {{ r.tipo_servicio }}</span></p>
-        </div>
-      </section>
-
-      <button class="cta danger" (click)="logout()">Cerrar sesión</button>
+          <app-mis-preferencias *ngSwitchCase="'inicio'" rol="tecnico"></app-mis-preferencias>
+          <app-mi-actividad *ngSwitchCase="'actividad'"></app-mi-actividad>
+        </ng-container>
+      </main>
     </ng-container>
-
-    <div style="height:80px"></div>
   </div>
 </ion-content>

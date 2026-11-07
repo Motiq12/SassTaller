@@ -1,8 +1,8 @@
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { MecanicoService } from '../../services/mecanico.service';
-import { hoyCR } from '../../shared/utils/fecha-cita.util';
+import { hoyCR } from '../../utils/fecha-cita';
 
 interface DiaCal {
   fecha: string;
@@ -22,8 +22,6 @@ interface DiaCal {
   styleUrls: ['./mecanico-agenda.page.scss'],
 })
 export class MecanicoAgendaPage implements OnInit, OnDestroy {
-  private mecanico = inject(MecanicoService);
-
   private destroy$ = new Subject<void>();
   readonly dows = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
   readonly meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -45,6 +43,8 @@ export class MecanicoAgendaPage implements OnInit, OnDestroy {
   citasMes: any[] = [];
   semanas: DiaCal[][] = [];
   diaSel: DiaCal | null = null;
+
+  constructor(private mecanico: MecanicoService) {}
 
   ngOnInit() { this.cargar(); }
   ionViewWillEnter() { this.cargar(); }

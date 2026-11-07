@@ -1,0 +1,71 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button text=""></ion-back-button>
+    </ion-buttons>
+    <ion-title>{{ esEdicion ? 'Editar' : 'Nueva' }} moto</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <div class="moto-form">
+    <div class="intro">
+      <h1>{{ esEdicion ? 'Editar moto' : 'Nueva moto' }}</h1>
+      <p>{{ esEdicion ? 'Actualizá los datos de la moto.' : 'Registrá la moto del cliente.' }}</p>
+    </div>
+
+    <!-- Identificación -->
+    <section class="card">
+      <span class="section-label">Identificación</span>
+      <div class="grid2">
+        <div class="ig">
+          <label>Marca *</label>
+          <input [(ngModel)]="form.marca" name="marca" placeholder="Honda, Yamaha…" autocapitalize="words">
+        </div>
+        <div class="ig">
+          <label>Modelo *</label>
+          <input [(ngModel)]="form.modelo" name="modelo" placeholder="CBR150, FZ25…">
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="ig">
+          <label>Año</label>
+          <input type="number" inputmode="numeric" [(ngModel)]="form.anio" name="anio" placeholder="2020">
+        </div>
+        <div class="ig">
+          <label>Placa</label>
+          <input class="upper" [(ngModel)]="form.placa" name="placa" placeholder="ABC-123">
+        </div>
+      </div>
+      <div class="ig" style="margin-bottom:4px">
+        <label>Color</label>
+        <input [(ngModel)]="form.color" name="color" placeholder="Rojo, Azul…" autocapitalize="words">
+      </div>
+    </section>
+
+    <!-- Datos técnicos -->
+    <section class="card">
+      <span class="section-label">Datos técnicos</span>
+      <div class="ig">
+        <label>Kilometraje actual</label>
+        <input type="number" inputmode="numeric" [(ngModel)]="form.kilometraje_actual" name="kilometraje_actual" placeholder="0">
+      </div>
+      <div class="grid2">
+        <div class="ig">
+          <label>Número de motor</label>
+          <input [(ngModel)]="form.numero_motor" name="numero_motor" placeholder="Opcional">
+        </div>
+        <div class="ig">
+          <label>Número de chasis</label>
+          <input [(ngModel)]="form.numero_chasis" name="numero_chasis" placeholder="Opcional">
+        </div>
+      </div>
+    </section>
+
+    <button class="cta" [disabled]="!valido || guardando" (click)="guardar()">
+      <ion-icon name="save-outline"></ion-icon> {{ guardando ? 'Guardando…' : 'Guardar' }}
+    </button>
+
+    <div style="height:60px"></div>
+  </div>
+</ion-content>

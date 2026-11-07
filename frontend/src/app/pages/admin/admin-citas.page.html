@@ -9,102 +9,163 @@
 <ion-content class="admin-dark">
   <ion-refresher slot="fixed" (ionRefresh)="cargar($event)"><ion-refresher-content></ion-refresher-content></ion-refresher>
 
-  <div class="admin">
-    <!-- Toggle vista -->
-    <div class="vista-toggle">
-      <button [class.on]="vista==='ordenes'" (click)="setVista('ordenes')"><ion-icon name="clipboard-outline"></ion-icon> Órdenes</button>
-      <button [class.on]="vista==='citas'" (click)="setVista('citas')"><ion-icon name="calendar-outline"></ion-icon> Citas</button>
-    </div>
-
-    <!-- Buscador -->
-    <div class="search-row">
-      <input class="grow" type="text" [(ngModel)]="q" (keyup.enter)="cargar()" placeholder="Buscar cliente, placa u orden...">
-      <button class="btn btn-cr" (click)="cargar()"><ion-icon name="search-outline"></ion-icon> Buscar</button>
+  <div class="admin gc">
+    <!-- Pestañas y búsqueda -->
+    <div class="gc-barra">
+      <div class="gc-tabs" role="tablist" aria-label="Qué ver">
+        <button role="tab" [class.on]="vista === 'ordenes'" [attr.aria-selected]="vista === 'ordenes'" (click)="setVista('ordenes')">
+          <ion-icon name="clipboard-outline"></ion-icon> Órdenes
+        </button>
+        <button role="tab" [class.on]="vista === 'citas'" [attr.aria-selected]="vista === 'citas'" (click)="setVista('citas')">
+          <ion-icon name="calendar-outline"></ion-icon> Citas
+        </button>
+      </div>
+      <label class="gc-buscar">
+        <ion-icon name="search-outline" aria-hidden="true"></ion-icon>
+        <input type="search" [(ngModel)]="q" (ngModelChange)="alEscribir()" (keyup.enter)="vista === 'citas' && cargar()"
+               [placeholder]="vista === 'citas' ? 'Buscar por cliente o placa…' : 'Buscar por orden, cliente, placa o moto…'" aria-label="Buscar">
+        <button type="button" *ngIf="q" (click)="limpiarBusqueda()" aria-label="Limpiar la búsqueda"><ion-icon name="close-circle"></ion-icon></button>
+      </label>
     </div>
 
     <!-- ═══ ÓRDENES ═══ -->
     <ng-container *ngIf="vista === 'ordenes'">
-      <div class="filter-bar">
-        <button class="filter-btn" *ngFor="let f of filtrosOrdenes" [class.on]="estadoOrden === f.v" (click)="setFiltroOrden(f.v)">{{ f.l }}</button>
+      <div class="gc-filtros" role="group" aria-label="Filtrar por etapa">
+        <button class="gc-chip" *ngFor="let f of filtrosOrdenes" [class.on]="estadoOrden === f.v" (click)="setFiltroOrden(f.v)"
+                [class.vacio]="cuantasOrdenes(f.v) === 0">
+          {{ f.l }}<span class="gc-chip-n" *ngIf="cuantasOrdenes(f.v) !== null">{{ cuantasOrdenes(f.v) }}</span>
+        </button>
       </div>
 
-      <!-- Skeleton -->
       <div *ngIf="cargando" class="orden-grid">
-        <div class="sk-dark" style="height:140px" *ngFor="let i of [1,2,3,4,5,6]"></div>
+        <div class="sk-dark" style="height:150px" *ngFor="let i of [1,2,3,4,5,6]"></div>
       </div>
 
-      <!-- Tarjetas -->
-      <div class="orden-count" *ngIf="!cargando">{{ ordenes.length }} orden{{ ordenes.length !== 1 ? 'es' : '' }}</div>
-      <div class="orden-grid" *ngIf="!cargando">
-        <div class="orden-card" *ngFor="let o of ordenes" (click)="abrirOrden(o)">
-          <div class="oc-top">
-            <span class="oc-num mono">{{ o.numero_orden }}</span>
-            <span class="bg" [ngClass]="ordenBadge[o.estado]">{{ ordenLabel(o.estado) }}</span>
-          </div>
-          <div class="oc-vehiculo">
-            <ion-icon name="bicycle-outline"></ion-icon>
-            <strong>{{ o.marca }} {{ o.modelo }}</strong>
-            <span class="mono" *ngIf="o.placa">· {{ o.placa }}</span>
-          </div>
-          <div class="oc-cliente">
-            <ion-icon name="person-outline"></ion-icon>
-            {{ o.cliente_nombre }} {{ o.cliente_apellido }}
-          </div>
-          <p class="oc-problema" *ngIf="o.problema_reportado">{{ o.problema_reportado.length > 80 ? o.problema_reportado.slice(0, 80) + '…' : o.problema_reportado }}</p>
-          <div class="oc-footer">
-            <span *ngIf="o.tecnico_nombre"><ion-icon name="construct-outline"></ion-icon> {{ o.tecnico_nombre }}</span>
-            <span *ngIf="!o.tecnico_nombre" class="sin-tec"><ion-icon name="alert-circle-outline"></ion-icon> Sin técnico</span>
-            <span class="oc-fecha"><ion-icon name="time-outline"></ion-icon> {{ o.fecha_ingreso | date:'dd/MM' }}</span>
+      <!-- Eliminadas: el registro con el motivo -->
+      <ng-container *ngIf="!cargando && estadoOrden === 'eliminadas'">
+        <div class="gc-cuenta">{{ eliminadasFiltradas.length }} eliminada{{ eliminadasFiltradas.length !== 1 ? 's' : '' }}</div>
+        <div class="orden-grid">
+          <div class="orden-card eliminada tono-rd" *ngFor="let o of eliminadasFiltradas">
+            <div class="oc-top">
+              <span class="oc-num mono">{{ o.numero_orden }}</span>
+              <span class="bg bg-rd">Eliminada</span>
+            </div>
+            <div class="oc-moto" *ngIf="o.moto"><ion-icon name="bicycle-outline"></ion-icon><strong>{{ o.moto }}</strong></div>
+            <div class="oc-cliente" *ngIf="o.cliente_nombre"><ion-icon name="person-outline"></ion-icon>{{ o.cliente_nombre }}</div>
+            <p class="oc-motivo"><strong>Motivo:</strong> {{ o.motivo }}</p>
+            <div class="oc-footer">
+              <span><ion-icon name="trash-outline"></ion-icon> {{ o.eliminada_por_nombre || '—' }}</span>
+              <span class="oc-fecha"><ion-icon name="time-outline"></ion-icon> {{ o.created_at | date:'dd/MM/yy HH:mm' }}</span>
+            </div>
           </div>
         </div>
-      </div>
+        <div class="empty" *ngIf="!eliminadasFiltradas.length"><ion-icon name="trash-outline"></ion-icon><p>No se ha eliminado ninguna orden.</p></div>
+      </ng-container>
 
-      <div class="empty" *ngIf="!cargando && !ordenes.length"><ion-icon name="clipboard-outline"></ion-icon><p>No hay órdenes con esos filtros.</p></div>
+      <ng-container *ngIf="!cargando && estadoOrden !== 'eliminadas'">
+        <div class="gc-cuenta">{{ ordenes.length }} {{ ordenes.length === 1 ? 'orden' : 'órdenes' }}</div>
+        <div class="orden-grid">
+          <button type="button" class="orden-card" *ngFor="let o of ordenes; trackBy: porId" (click)="abrirOrden(o)" [ngClass]="'tono-' + (ordenTono[o.estado] || 'n')">
+            <div class="oc-top">
+              <span class="oc-num mono">{{ o.numero_orden }}</span>
+              <span class="bg" [ngClass]="ordenBadge[o.estado]">{{ ordenLabel(o.estado) }}</span>
+            </div>
+            <div class="oc-moto">
+              <ion-icon name="bicycle-outline"></ion-icon>
+              <strong>{{ o.marca }} {{ o.modelo }}</strong>
+              <span class="mono oc-placa" *ngIf="o.placa">{{ o.placa }}</span>
+            </div>
+            <div class="oc-cliente"><ion-icon name="person-outline"></ion-icon>{{ o.cliente_nombre }} {{ o.cliente_apellido }}</div>
+            <p class="oc-problema" *ngIf="o.problema_reportado">{{ o.problema_reportado }}</p>
+            <div class="oc-footer">
+              <span *ngIf="o.tecnico_nombre"><ion-icon name="construct-outline"></ion-icon> {{ o.tecnico_nombre }}</span>
+              <span *ngIf="!o.tecnico_nombre" class="sin-tec"><ion-icon name="alert-circle-outline"></ion-icon> Sin mecánico</span>
+              <span class="oc-fecha"><ion-icon name="time-outline"></ion-icon> {{ o.fecha_ingreso | date:'dd/MM' }}</span>
+            </div>
+            <!-- Verde si ya está lista; si no, discreto (igual pide confirmación). -->
+            <span class="btn btn-sm oc-entregar" role="button" [ngClass]="o.estado === 'lista_entrega' ? 'btn-em' : 'btn-ou'" *ngIf="puedeEntregarOrden(o)" (click)="entregarOrden(o, $event)">
+              <ion-icon name="checkmark-done-outline"></ion-icon> Entregar
+            </span>
+          </button>
+        </div>
+        <div class="empty" *ngIf="!ordenes.length"><ion-icon name="clipboard-outline"></ion-icon><p>No hay órdenes con esos filtros.</p></div>
+      </ng-container>
     </ng-container>
 
     <!-- ═══ CITAS ═══ -->
     <ng-container *ngIf="vista === 'citas'">
-      <div class="filter-bar">
-        <button class="filter-btn" *ngFor="let f of filtrosCitas" [class.on]="estado === f.v" (click)="setFiltro(f.v)">{{ f.l }}</button>
+      <div class="gc-filtros" role="group" aria-label="Filtrar por estado">
+        <button class="gc-chip" *ngFor="let f of filtrosCitas" [class.on]="estado === f.v" (click)="setFiltro(f.v)" [class.vacio]="!cuantasCitas(f.v)">
+          {{ f.l }}<span class="gc-chip-n">{{ cuantasCitas(f.v) }}</span>
+        </button>
       </div>
 
-      <div class="search-row">
-        <select *ngIf="sucursales.length > 1" [(ngModel)]="sucursalId" (ngModelChange)="cargar()">
-          <option [ngValue]="''">Todas las sucursales</option>
+      <div class="gc-herramientas">
+        <select *ngIf="sucursales.length > 1" [(ngModel)]="sucursalId" (ngModelChange)="cargar()" aria-label="Sede">
+          <option [ngValue]="''">Todas las sedes</option>
           <option *ngFor="let s of sucursales" [ngValue]="s.id">{{ s.nombre }}</option>
         </select>
-        <input type="date" [(ngModel)]="fecha" (change)="cargar()">
-        <button class="btn btn-ou" (click)="exportar()" [disabled]="!citas.length"><ion-icon name="download-outline"></ion-icon> Exportar</button>
-      </div>
-
-      <!-- Skeleton -->
-      <div *ngIf="cargando" class="sk-dark" style="height:300px"></div>
-
-      <div class="cd" *ngIf="!cargando">
-        <div class="tbl-wrap">
-          <table class="tbl">
-            <thead>
-              <tr><th>#</th><th>Vehiculo / Placa</th><th>Cliente</th><th>Servicio</th><th>Fecha y hora</th><th>Mecánico</th><th>Estado</th><th>Acción</th></tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let c of citas">
-                <td class="mono clr-tx3">#{{ c.id }}</td>
-                <td><strong>{{ c.marca || 'Vehiculo' }} {{ c.modelo || '' }}</strong><br><span class="mono clr-tx3" style="font-size:11px">{{ c.placa || '—' }}</span></td>
-                <td>{{ c.cliente_nombre }} {{ c.cliente_apellido }}</td>
-                <td style="font-size:12px">{{ c.tipo_servicio || c.motivo }}</td>
-                <td class="mono" style="font-size:11px">{{ c.fecha | date:'dd/MM/yy' }} · {{ c.hora?.slice(0,5) }}</td>
-                <td>{{ c.tecnico_nombre || '—' }}</td>
-                <td><span class="bg" [ngClass]="estadoBadge[c.estado]">{{ estadoLabel[c.estado] }}</span></td>
-                <td>
-                  <button class="btn btn-ou btn-sm" *ngIf="c.orden_id" (click)="abrir(c)">Ver orden</button>
-                  <button class="btn btn-ou btn-sm" *ngIf="!c.orden_id" (click)="verDetalleCita(c)">Ver cita</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="gc-fecha">
+          <input type="date" [(ngModel)]="fecha" (change)="cargar()" aria-label="Solo un día">
+          <button type="button" *ngIf="fecha" (click)="fecha = ''; cargar()" aria-label="Quitar la fecha"><ion-icon name="close-circle"></ion-icon></button>
         </div>
-        <div class="empty" *ngIf="!citas.length"><ion-icon name="calendar-clear-outline"></ion-icon><p>No hay citas con esos filtros.</p></div>
+        <button class="btn btn-ou btn-sm gc-exportar" (click)="exportar()" [disabled]="!citas.length"><ion-icon name="download-outline"></ion-icon> Exportar</button>
       </div>
+
+      <div *ngIf="cargando" class="sk-dark" style="height:320px"></div>
+
+      <ng-container *ngIf="!cargando">
+        <section class="gc-dia" *ngFor="let d of dias; trackBy: porFecha">
+          <div class="gc-separador" *ngIf="d.primeraAnterior"><span>Anteriores</span></div>
+          <header class="gc-dia-cab" [class.hoy]="d.titulo === 'Hoy'">
+            <strong>{{ d.titulo }}</strong>
+            <span>{{ d.sub }}</span>
+            <span class="gc-dia-n">{{ d.citas.length }} cita{{ d.citas.length === 1 ? '' : 's' }}</span>
+          </header>
+
+          <div class="gc-lista cd">
+            <article class="gc-cita" *ngFor="let c of d.citas; trackBy: porId" [class.cerrada]="c.estado === 'entregado' || c.estado === 'cancelado'">
+              <div class="gc-hora">
+                <strong class="mono">{{ c.hora?.slice(0, 5) }}</strong>
+                <span [class.larga]="!c.duracion_min && (c.duracion_horas || 1) > 1">{{ duracionCorta(c.duracion_horas, c.duracion_min) }}</span>
+              </div>
+
+              <div class="gc-info">
+                <div class="gc-l1">
+                  <strong>{{ c.marca ? (c.marca + ' ' + (c.modelo || '')) : 'Moto sin registrar' }}</strong>
+                  <span class="mono gc-placa" *ngIf="c.placa">{{ c.placa }}</span>
+                </div>
+                <div class="gc-l2">
+                  <span class="gc-cliente">{{ c.cliente_nombre }} {{ c.cliente_apellido }}</span>
+                  <span class="gc-servicio">{{ c.servicios || c.tipo_servicio || c.motivo }}</span>
+                </div>
+                <div class="gc-l3">
+                  <span [class.sin-tec]="!c.tecnico_nombre"><ion-icon name="construct-outline"></ion-icon> {{ c.tecnico_nombre || 'Sin mecánico' }}</span>
+                  <span *ngIf="sucursales.length > 1 && c.sucursal_nombre"><ion-icon name="location-outline"></ion-icon> {{ c.sucursal_nombre }}</span>
+                  <span class="mono">#{{ c.id }}</span>
+                </div>
+              </div>
+
+              <div class="gc-estado">
+                <span class="bg" [ngClass]="estadoBadge[c.estado]">{{ estadoLabel[c.estado] }}</span>
+                <button type="button" class="orden-chip mono" *ngIf="c.orden_id" (click)="abrir(c)" title="Abrir la orden">{{ c.numero_orden || 'Ver orden' }}</button>
+                <span class="gc-sin-orden" *ngIf="!c.orden_id">Sin orden</span>
+              </div>
+
+              <div class="gc-acciones">
+                <button class="btn btn-cr btn-sm" *ngIf="puedeCrearOrden(c)" (click)="crearOrden(c)" [disabled]="creandoOrden === c.id">
+                  <ion-icon name="add-outline"></ion-icon> {{ creandoOrden === c.id ? 'Abriendo…' : 'Orden' }}
+                </button>
+                <button class="btn btn-em btn-sm" *ngIf="puedeEntregarCita(c)" (click)="entregarCita(c)">Entregar</button>
+                <button type="button" class="gc-icono" *ngIf="puedeEditar(c)" (click)="editarCita(c)" title="Editar cita" aria-label="Editar cita"><ion-icon name="create-outline"></ion-icon></button>
+                <button type="button" class="gc-icono" (click)="acciones(c, $event)" title="Más acciones" aria-label="Más acciones"><ion-icon name="ellipsis-horizontal"></ion-icon></button>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <div class="empty" *ngIf="!citas.length"><ion-icon name="calendar-clear-outline"></ion-icon><p>No hay citas con esos filtros.</p></div>
+      </ng-container>
     </ng-container>
   </div>
 </ion-content>

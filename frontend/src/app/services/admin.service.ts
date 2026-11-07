@@ -1,43 +1,48 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 
+// Lo que devuelve GET /api/admin/correo (services/mailer.js → estadoCorreo).
+export interface EstadoCorreo {
+  configurado: boolean;
+  remitente: string;
+  direccion: string;
+  dominio: string | null;
+  de_prueba: boolean;
+  con_mail_from: boolean;
+  verificacion: 'verificado' | 'pendiente' | 'fallido' | 'no_agregado' | 'sin_permiso' | 'error' | null;
+}
+
+// Lo que devuelve GET /api/admin/respaldos (services/respaldo.js → resumirRespaldos).
+export interface EstadoRespaldos {
+  estado: 'sin_configurar' | 'fallo' | 'atrasado' | 'al_dia' | 'sin_datos';
+  ultimo_ok: string | null;
+  configuracion: { activo: boolean; faltan: string[]; conservar: number; cifrado: boolean };
+  registro: { id: number; origen: 'automatico' | 'panel'; ok: number; clave: string | null; bytes: number | null;
+    tablas: number | null; filas: number | null; segundos: number | null; cifrado: number | null; error: string | null;
+    created_at: string; usuario_nombre: string | null }[];
+  guardados: { nombre: string; fecha: string; bytes: number; cifrado: boolean }[] | null;
+  error_almacen: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AdminService {
-  private http = inject(HttpClient);
-
   private url = `${environment.apiUrl}/admin`;
   private citasUrl = `${environment.apiUrl}/citas`;
+  constructor(private http: HttpClient) {}
 
   // Resumen ejecutivo (KPIs + top servicios + estado de citas + ingresos por servicio).
   getResumen(): Observable<{ data: any }> {
     return this.http.get<{ data: any }>(`${this.url}/resumen`);
   }
 
-  // Primeros pasos del taller. Los cuatro se derivan de los datos en el servidor, así
-  // que esto se vuelve a pedir cada vez que se entra al panel.
-  getArranque(): Observable<{ data: { pasos: any; completo: boolean; oculto: boolean; hay_ejemplo: boolean } }> {
-    return this.http.get<{ data: any }>(`${this.url}/arranque`);
-  }
-
-  ocultarArranque(): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.url}/arranque/ocultar`, {});
-  }
-
-  // Datos de mentira para poder mirar el sistema antes de cargar los propios.
-  cargarEjemplo(): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.url}/ejemplo`, {});
-  }
-
-  borrarEjemplo(): Observable<{ message: string }> {
-    return this.http.delete<{ message: string }>(`${this.url}/ejemplo`);
-  }
-
   // Gestión de citas: reusa /api/citas con filtros (estado, búsqueda, fecha, sucursal).
-  getCitas(filtros: { estado?: string; q?: string; fecha?: string; sucursal_id?: number | string } = {}): Observable<{ data: any[] }> {
+  // sin_orden: solo las citas vigentes que todavía no tienen orden de trabajo.
+  getCitas(filtros: { estado?: string; q?: string; fecha?: string; sucursal_id?: number | string; sin_orden?: boolean } = {}): Observable<{ data: any[] }> {
     const params: any = {};
     if (filtros.estado) params.estado = filtros.estado;
+    if (filtros.sin_orden) params.sin_orden = '1';
     if (filtros.q) params.q = filtros.q;
     if (filtros.fecha) params.fecha = filtros.fecha;
     if (filtros.sucursal_id) params.sucursal_id = filtros.sucursal_id;
@@ -101,15 +106,73 @@ export class AdminService {
     return this.http.get<{ data: any }>(`${this.url}/calendario`, { params: { anio, mes } as any });
   }
 
+  // Roles del personal con sus casillas (Equipo → Roles).
+  getRoles(): Observable<{ data: { roles: any[]; catalogo: any[]; bases: Record<string, string>; bases_propias?: Record<string, { ajustables: string[]; fijas: string[] }> } }> {
+    return this.http.get<{ data: any }>(`${this.url}/roles`);
+  }
+  crearRol(r: { nombre: string; base: string; descripcion?: string; permisos: string[] }): Observable<{ data: any; message: string }> {
+    return this.http.post<{ data: any; message: string }>(`${this.url}/roles`, r);
+  }
+  guardarRol(id: number, r: { nombre?: string; descripcion?: string; permisos: string[] }): Observable<{ data: any; message: string }> {
+    return this.http.put<{ data: any; message: string }>(`${this.url}/roles/${id}`, r);
+  }
+  restablecerRol(id: number): Observable<{ data: any; message: string }> {
+    return this.http.post<{ data: any; message: string }>(`${this.url}/roles/${id}/restablecer`, {});
+  }
+  eliminarRol(id: number): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.url}/roles/${id}`);
+  }
+
+  // Bloquear horario (horas o días en que no se agenda).
+  getBloqueos(): Observable<{ data: any[] }> {
+    return this.http.get<{ data: any[] }>(`${this.url}/bloqueos`);
+  }
+  crearBloqueo(b: any): Observable<{ data: any; message: string }> {
+    return this.http.post<{ data: any; message: string }>(`${this.url}/bloqueos`, b);
+  }
+  quitarBloqueo(id: number): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.url}/bloqueos/${id}`);
+  }
+
+  // Feriados que se repiten todos los años (los bloquea la agenda).
+  getFeriados(): Observable<{ data: { feriados: any[]; sugeridos: { mes: number; dia: number; nombre: string; proxima: string }[] } }> {
+    return this.http.get<{ data: any }>(`${this.url}/feriados`);
+  }
+  crearFeriados(lista: { mes: number; dia: number; nombre: string; sucursal_id?: number | null }[]): Observable<{ data: { agregados: number }; message: string }> {
+    return this.http.post<{ data: { agregados: number }; message: string }>(`${this.url}/feriados`, { lista });
+  }
+  quitarFeriado(id: number): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.url}/feriados/${id}`);
+  }
+
   // Configuración del taller.
   getConfig(): Observable<{ data: any }> {
     return this.http.get<{ data: any }>(`${this.url}/configuracion`);
   }
-  // `aviso` viene presente cuando el plan no incluye marca propia y se mandó logo o
-  // color: el backend igual guarda el resto y lo dice acá, en vez de aplicar el
-  // cambio en silencio.
-  updateConfig(payload: any): Observable<{ data: any; message: string; aviso?: string | null }> {
-    return this.http.put<{ data: any; message: string; aviso?: string | null }>(`${this.url}/configuracion`, payload);
+  updateConfig(payload: any): Observable<{ data: any; message: string }> {
+    return this.http.put<{ data: any; message: string }>(`${this.url}/configuracion`, payload);
+  }
+  // Correo de envío: remitente y dominio en Resend, y un correo de prueba a uno mismo.
+  getCorreo(): Observable<{ data: EstadoCorreo }> {
+    return this.http.get<{ data: EstadoCorreo }>(`${this.url}/correo`);
+  }
+  probarCorreo(): Observable<{ data: { enviado: boolean; email: string }; message: string }> {
+    return this.http.post<{ data: { enviado: boolean; email: string }; message: string }>(`${this.url}/correo/prueba`, {});
+  }
+  // Seguridad del personal: dos pasos, último ingreso y cerrar sesiones.
+  getSeguridad(): Observable<{ data: { personal: any[]; politica: { minimo: number; variedad: boolean } } }> {
+    return this.http.get<{ data: any }>(`${this.url}/seguridad`);
+  }
+  cerrarSesiones(cual: { usuario_id: number } | { todos: true }): Observable<{ data: { cerradas: number }; message: string }> {
+    return this.http.post<{ data: { cerradas: number }; message: string }>(`${this.url}/seguridad/cerrar`, cual);
+  }
+
+  // Respaldos de la base: estado y respaldar ahora.
+  getRespaldos(): Observable<{ data: EstadoRespaldos }> {
+    return this.http.get<{ data: EstadoRespaldos }>(`${this.url}/respaldos`);
+  }
+  respaldarAhora(): Observable<{ data: any; message: string }> {
+    return this.http.post<{ data: any; message: string }>(`${this.url}/respaldos`, {});
   }
   updateCuenta(payload: { nombre: string; email: string }): Observable<{ data: any; message: string }> {
     return this.http.put<{ data: any; message: string }>(`${this.url}/cuenta`, payload);

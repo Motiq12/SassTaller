@@ -1,90 +1,163 @@
-<ion-content class="login-content">
-  <div class="login-container">
-    <div class="login-header">
-      <div class="logo-wrapper">
-        <app-marca-logo [tamano]="84"></app-marca-logo>
+<ion-content class="acceso-content">
+  <div class="acceso">
+    <app-acceso-marca></app-acceso-marca>
+
+    <main class="acceso-panel">
+      <div class="acceso-caja">
+        <!-- Entrar y Crear cuenta son dos pestañas del mismo panel. Con el código ya
+             pedido no van: ahí solo falta confirmar el correo. -->
+        <nav class="pits-tabs" aria-label="Tu cuenta" *ngIf="paso === 1">
+          <a routerLink="/portal/login">Entrar</a>
+          <a class="on" routerLink="/portal/registro" aria-current="page">Crear cuenta</a>
+        </nav>
+
+        <!-- Tres pasos cortos: tus datos, tu acceso y el código del correo. -->
+        <header class="acceso-head">
+          <div class="pasos" *ngIf="!google" role="img" [attr.aria-label]="'Paso ' + numeroPaso + ' de 3: ' + nombrePaso">
+            <span class="on"></span><span [class.on]="numeroPaso >= 2"></span><span [class.on]="numeroPaso === 3"></span>
+            <em>{{ numeroPaso }}/3 · {{ nombrePaso }}</em>
+          </div>
+          <h1>{{ google ? 'Termina tu cuenta' : paso === 2 ? 'Confirma tu correo' : parte === 1 ? 'Crea tu cuenta' : 'Elige cómo entrar' }}</h1>
+          <p *ngIf="google">Entraste con Google como <strong>{{ google.email }}</strong>. Solo faltan tu teléfono y tu cédula.</p>
+          <p *ngIf="!google && paso === 1 && parte === 1">Con tu cuenta sigues el estado de tu moto y agendas tus citas.</p>
+          <p *ngIf="paso === 1 && parte === 2">Con este correo y esta contraseña vas a entrar al portal.</p>
+          <p *ngIf="paso === 2">Escribe el código que te llegó a <strong>{{ email }}</strong>.</p>
+        </header>
+
+        <!-- Paso 1, parte 1: tus datos -->
+        <ion-card *ngIf="paso === 1 && parte === 1" class="acceso-form">
+          <ion-card-content>
+            <div class="campos">
+              <ion-item lines="none" class="campo-par">
+                <ion-label position="stacked">Nombre</ion-label>
+                <!-- aria-label explícito: el <input> real vive dentro del shadow DOM de Ionic
+                     y no queda asociado al ion-label, así que un lector de pantalla anunciaba
+                     "cuadro de edición" sin decir qué se pide. -->
+                <ion-input [(ngModel)]="nombre" name="nombre" autocomplete="given-name" aria-label="Nombre"></ion-input>
+              </ion-item>
+              <ion-item lines="none" class="campo-par">
+                <ion-label position="stacked">Apellido</ion-label>
+                <ion-input [(ngModel)]="apellido" name="apellido" autocomplete="family-name" aria-label="Apellido"></ion-input>
+              </ion-item>
+              <ion-item lines="none" class="campo-par">
+                <ion-label position="stacked">Teléfono</ion-label>
+                <ion-input type="tel" [(ngModel)]="telefono" name="telefono" autocomplete="tel" placeholder="8888-1234"></ion-input>
+              </ion-item>
+              <ion-item lines="none" class="campo-par">
+                <ion-label position="stacked">Cédula</ion-label>
+                <ion-input [(ngModel)]="cedula" name="cedula" placeholder="1-2345-6789" (keyup.enter)="siguiente()"></ion-input>
+              </ion-item>
+            </div>
+
+            <ion-button expand="block" class="btn-principal" (click)="siguiente()" [disabled]="!datosOk || creandoConGoogle">
+              {{ google ? 'Crear cuenta' : 'Siguiente' }}
+              <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
+            </ion-button>
+            <p class="ayuda falta" *ngIf="!datosOk">Los cuatro datos son obligatorios.</p>
+
+            <!-- Registrarse con Google: después solo se piden teléfono y cédula. -->
+            <app-google-boton *ngIf="!google" [separador]="true" (credencial)="conGoogle($event)"></app-google-boton>
+            <div class="fila-centro" *ngIf="google">
+              <button type="button" class="enlace" (click)="dejarGoogle()">Usar correo y contraseña en vez de Google</button>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
+        <!-- Paso 1, parte 2: tu acceso -->
+        <ion-card *ngIf="paso === 1 && parte === 2" class="acceso-form">
+          <ion-card-content>
+            <ion-item lines="none">
+              <ion-label position="stacked">Correo</ion-label>
+              <ion-input type="email" [(ngModel)]="email" name="email" autocomplete="email" placeholder="tu@correo.com"></ion-input>
+            </ion-item>
+            <ion-item lines="none">
+              <ion-label position="stacked">Contraseña</ion-label>
+              <ion-input [type]="verPass ? 'text' : 'password'" [(ngModel)]="password" name="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres">
+                <!-- Botón común, no ion-button: a ion-button no se le puede cambiar el aria-label
+                     antes de que Ionic lo cargue (tira "reading 'onAriaChanged'" en la consola). -->
+                <button type="button" class="ver-pass" slot="end" (click)="verPass = !verPass" [attr.aria-label]="verPass ? 'Ocultar contraseña' : 'Mostrar contraseña'">
+                  <ion-icon [name]="verPass ? 'eye-off-outline' : 'eye-outline'" aria-hidden="true"></ion-icon>
+                </button>
+              </ion-input>
+            </ion-item>
+            <ion-item lines="none">
+              <ion-label position="stacked">Confirmar contraseña</ion-label>
+              <ion-input [type]="verConfirmar ? 'text' : 'password'" [(ngModel)]="confirmar" name="confirmar" autocomplete="new-password"
+                         (keyup.enter)="registrar()" aria-label="Confirmar contraseña">
+                <button type="button" class="ver-pass" slot="end" (click)="verConfirmar = !verConfirmar" [attr.aria-label]="verConfirmar ? 'Ocultar contraseña' : 'Mostrar contraseña'">
+                  <ion-icon [name]="verConfirmar ? 'eye-off-outline' : 'eye-outline'" aria-hidden="true"></ion-icon>
+                </button>
+              </ion-input>
+            </ion-item>
+
+            <!-- Lo que pide la contraseña, a la vista mientras se escribe. -->
+            <ul class="pass-reglas" aria-live="polite">
+              <li [class.ok]="passLarga">
+                <ion-icon [name]="passLarga ? 'checkmark-circle' : 'ellipse-outline'" aria-hidden="true"></ion-icon>
+                Al menos 8 caracteres
+              </li>
+              <li [class.ok]="confirmar && coinciden" [class.mal]="confirmar && !coinciden">
+                <ion-icon [name]="!confirmar ? 'ellipse-outline' : coinciden ? 'checkmark-circle' : 'close-circle'" aria-hidden="true"></ion-icon>
+                {{ confirmar && !coinciden ? 'Las contraseñas no coinciden' : 'Las dos contraseñas coinciden' }}
+              </li>
+            </ul>
+
+            <!-- Ley 8968: quien da sus datos tiene que saber para qué se usan. -->
+            <p class="aviso-legal">
+              Al crear tu cuenta aceptas los <a routerLink="/portal/legal/terminos">Términos y condiciones</a>
+              y la <a routerLink="/portal/legal/privacidad">Política de privacidad</a>.
+            </p>
+
+            <ion-button expand="block" class="btn-principal" (click)="registrar()" [disabled]="!valido">
+              Crear cuenta
+              <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
+            </ion-button>
+
+            <div class="fila-centro">
+              <button type="button" class="enlace" (click)="parte = 1">
+                <ion-icon name="arrow-back-outline" aria-hidden="true"></ion-icon> Volver a tus datos
+              </button>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
+        <!-- Paso 2: confirmar el correo -->
+        <ion-card *ngIf="paso === 2" class="acceso-form">
+          <ion-card-content>
+            <ion-item lines="none" class="campo-codigo">
+              <ion-label position="stacked">Código de 6 dígitos</ion-label>
+              <ion-input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" [(ngModel)]="codigo" name="codigo"
+                         placeholder="000000" (keyup.enter)="verificar()"></ion-input>
+            </ion-item>
+            <p class="ayuda">El código puede tardar un par de minutos. Si no llega, revisa la carpeta de spam.</p>
+
+            <ion-button expand="block" class="btn-principal" (click)="verificar()" [disabled]="!codigo || verificando">
+              {{ verificando ? 'Verificando…' : 'Confirmar' }}
+            </ion-button>
+
+            <div class="fila-centro">
+              <button type="button" class="enlace" [disabled]="cooldown > 0 || reenviando" (click)="reenviar()">
+                {{ cooldown > 0 ? 'Reenviar código en ' + cooldown + 's' : 'Reenviar código' }}
+              </button>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
+        <!-- Anti-bot (fuera de los cards para persistir entre pasos): honeypot + captcha. -->
+        <input type="text" [(ngModel)]="website" name="website" tabindex="-1" autocomplete="off"
+               aria-hidden="true" class="hp-field">
+        <div #tsBox *ngIf="mostrarCaptcha" class="turnstile-box"></div>
+
+        <div class="acceso-pie">
+          <app-volver-web estilo="enlace"></app-volver-web>
+        </div>
       </div>
-      <h1>Crear cuenta</h1>
-      <p *ngIf="paso === 1">Seguí el estado de tu vehiculo</p>
-      <p *ngIf="paso === 2">Escribí el código que te llegó a {{ email }}</p>
-    </div>
 
-    <!-- Paso 1: datos de la cuenta -->
-    <ion-card *ngIf="paso === 1">
-      <ion-card-content>
-        <ion-item lines="full">
-          <ion-label position="stacked">Nombre</ion-label>
-          <!-- aria-label explícito: el <input> real vive dentro del shadow DOM de Ionic
-               y no queda asociado al ion-label, así que un lector de pantalla anunciaba
-               "cuadro de edición" sin decir qué se pide. Los otros campos se salvaban de
-               casualidad por su placeholder; acá se dice de forma explícita. -->
-          <ion-input [(ngModel)]="nombre" autocomplete="given-name" aria-label="Nombre"></ion-input>
-        </ion-item>
-        <ion-item lines="full">
-          <ion-label position="stacked">Apellido</ion-label>
-          <ion-input [(ngModel)]="apellido" autocomplete="family-name" aria-label="Apellido"></ion-input>
-        </ion-item>
-        <ion-item lines="full">
-          <ion-label position="stacked">Teléfono</ion-label>
-          <ion-input type="tel" [(ngModel)]="telefono" placeholder="8888-1234"></ion-input>
-        </ion-item>
-        <ion-item lines="full">
-          <ion-label position="stacked">Correo</ion-label>
-          <ion-input type="email" [(ngModel)]="email" autocomplete="email" placeholder="tu@correo.com"></ion-input>
-        </ion-item>
-        <ion-item lines="full">
-          <ion-label position="stacked">Cédula *</ion-label>
-          <ion-input [(ngModel)]="cedula" placeholder="1-2345-6789"></ion-input>
-        </ion-item>
-        <ion-item lines="full">
-          <ion-label position="stacked">Contraseña</ion-label>
-          <ion-input [type]="verPass ? 'text' : 'password'" [(ngModel)]="password" placeholder="Mínimo 8 caracteres">
-            <ion-button fill="clear" slot="end" (click)="verPass = !verPass" aria-label="Mostrar contraseña">
-              <ion-icon slot="icon-only" [name]="verPass ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
-            </ion-button>
-          </ion-input>
-        </ion-item>
-        <ion-item lines="none">
-          <ion-label position="stacked">Confirmar contraseña</ion-label>
-          <ion-input [type]="verConfirmar ? 'text' : 'password'" [(ngModel)]="confirmar" (keyup.enter)="registrar()"
-                     aria-label="Confirmar contraseña">
-            <ion-button fill="clear" slot="end" (click)="verConfirmar = !verConfirmar" aria-label="Mostrar contraseña">
-              <ion-icon slot="icon-only" [name]="verConfirmar ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
-            </ion-button>
-          </ion-input>
-        </ion-item>
-
-        <ion-button expand="block" (click)="registrar()" [disabled]="!valido">
-          Crear cuenta
-          <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
-        </ion-button>
-      </ion-card-content>
-    </ion-card>
-
-    <!-- Paso 2: confirmar el correo -->
-    <ion-card *ngIf="paso === 2">
-      <ion-card-content>
-        <ion-item lines="full">
-          <ion-label position="stacked">Código de 6 dígitos</ion-label>
-          <ion-input type="text" inputmode="numeric" maxlength="6" [(ngModel)]="codigo" placeholder="000000" (keyup.enter)="verificar()"></ion-input>
-        </ion-item>
-        <p class="ayuda-correo">El código puede tardar un par de minutos. Si no llega, revisá la carpeta de spam.</p>
-
-        <ion-button expand="block" (click)="verificar()" [disabled]="!codigo || verificando">
-          {{ verificando ? 'Verificando...' : 'Confirmar' }}
-        </ion-button>
-
-        <a class="portal-link sub" [class.disabled]="cooldown > 0 || reenviando" (click)="reenviar()">
-          {{ cooldown > 0 ? 'Reenviar código en ' + cooldown + 's' : 'Reenviar código' }}
-        </a>
-      </ion-card-content>
-    </ion-card>
-
-    <!-- Anti-bot (fuera de los cards para persistir entre pasos): honeypot + captcha. -->
-    <input type="text" [(ngModel)]="website" name="website" tabindex="-1" autocomplete="off"
-           aria-hidden="true" class="hp-field">
-    <div #tsBox *ngIf="mostrarCaptcha" class="turnstile-box"></div>
-
-    <a *ngIf="paso === 1" class="portal-link" (click)="irLogin()">¿Ya tenés cuenta? Iniciá sesión</a>
+      <footer class="acceso-legal">
+        <a routerLink="/portal/legal/terminos">Términos</a>
+        <span aria-hidden="true">·</span>
+        <a routerLink="/portal/legal/privacidad">Privacidad</a>
+      </footer>
+    </main>
   </div>
 </ion-content>

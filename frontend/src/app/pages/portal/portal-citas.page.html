@@ -1,11 +1,11 @@
 <ion-header>
-  <ion-toolbar>
+  <ion-toolbar class="admin-topbar">
     <ion-title>Mis Citas</ion-title>
     <app-portal-actions slot="end"></app-portal-actions>
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
+<ion-content class="admin-dark">
   <ion-refresher slot="fixed" (ionRefresh)="cargar(); $event.target.complete()">
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
@@ -20,7 +20,7 @@
     <div class="filtros" *ngIf="!cargando && citas.length">
       <div class="buscador">
         <ion-icon name="search-outline"></ion-icon>
-        <input type="text" [(ngModel)]="busqueda" placeholder="Buscar por vehiculo, placa o servicio">
+        <input type="text" [(ngModel)]="busqueda" placeholder="Buscar por moto, placa o servicio">
         <button class="bx" *ngIf="busqueda" (click)="busqueda=''" aria-label="Limpiar"><ion-icon name="close-circle"></ion-icon></button>
       </div>
       <div class="chips" *ngIf="vista==='pendientes'">
@@ -35,7 +35,7 @@
     </div>
 
     <!-- PENDIENTES con barra de progreso -->
-    <div *ngIf="!cargando && vista === 'pendientes'">
+    <div class="lista" *ngIf="!cargando && vista === 'pendientes'">
       <div class="cita-card" *ngFor="let c of pendientesVista">
         <div class="cita-head">
           <h4>{{ c.marca }} {{ c.modelo }}</h4>
@@ -44,13 +44,13 @@
             <span class="pill rose">{{ estadoLabel[c.estado] }}</span>
           </div>
         </div>
-        <p class="cita-info">{{ c.tipo_servicio || c.motivo }} · {{ c.fecha | date:'dd/MM' }} · {{ c.hora }}</p>
+        <p class="cita-info">{{ c.servicios || c.tipo_servicio || c.motivo }} · {{ c.fecha | date:'dd/MM' }} · {{ c.hora }}</p>
         <p class="cita-suc" *ngIf="c.sucursal_nombre"><ion-icon name="location-outline"></ion-icon> {{ c.sucursal_nombre }}</p>
 
         <!-- Presupuesto por aprobar (la orden vinculada espera la decisión del cliente) -->
         <button class="presu-aviso" *ngIf="c.orden_estado === 'esperando_aprobacion' && c.aprobacion_cliente === 'pendiente'" (click)="irAInicio()">
           <ion-icon name="receipt-outline"></ion-icon>
-          <span>Tenés un presupuesto por aprobar</span>
+          <span>Tienes un presupuesto por aprobar</span>
           <ion-icon name="chevron-forward" class="chev"></ion-icon>
         </button>
 
@@ -79,13 +79,13 @@
       </div>
       <div class="empty-state" *ngIf="pendientes.length === 0 && !hayFiltro">
         <ion-icon name="calendar-outline"></ion-icon>
-        <p>No tenés citas pendientes.</p>
+        <p>No tienes citas pendientes.</p>
         <button class="empty-cta" (click)="irAgendar()"><ion-icon name="add"></ion-icon> Agendar una cita</button>
       </div>
     </div>
 
     <!-- COMPLETADAS / HISTORIAL con reporte -->
-    <div *ngIf="!cargando && vista === 'historial'">
+    <div class="lista" *ngIf="!cargando && vista === 'historial'">
       <div class="tp" *ngIf="totalPagado > 0">
         <span>Total pagado en citas completadas</span>
         <strong class="mono">{{ totalPagado | currency:'CRC':'symbol-narrow':'1.0-0' }}</strong>
@@ -96,7 +96,7 @@
           <h4>{{ c.marca }} {{ c.modelo }}</h4>
           <span class="pill" [ngClass]="c.estado === 'entregado' ? 'green' : 'gris'">{{ estadoLabel[c.estado] }}</span>
         </div>
-        <p class="cita-info">{{ c.tipo_servicio || c.motivo }} · {{ c.fecha | date:'dd/MM/yyyy' }}</p>
+        <p class="cita-info">{{ c.servicios || c.tipo_servicio || c.motivo }} · {{ c.fecha | date:'dd/MM/yyyy' }}</p>
         <p class="cita-suc" *ngIf="c.sucursal_nombre"><ion-icon name="location-outline"></ion-icon> {{ c.sucursal_nombre }}</p>
 
         <div class="prog" *ngIf="c.estado === 'entregado'">
@@ -122,7 +122,7 @@
       </div>
       <div class="empty-state" *ngIf="historial.length === 0 && !hayFiltro">
         <ion-icon name="time-outline"></ion-icon>
-        <p>Todavía no tenés citas completadas.</p>
+        <p>Todavía no tienes citas completadas.</p>
       </div>
     </div>
 

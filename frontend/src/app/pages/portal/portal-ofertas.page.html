@@ -1,11 +1,11 @@
 <ion-header>
-  <ion-toolbar>
+  <ion-toolbar class="admin-topbar">
     <ion-title>Ofertas</ion-title>
     <app-portal-actions slot="end"></app-portal-actions>
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
+<ion-content class="admin-dark" [scrollY]="!detalle">
   <ion-refresher slot="fixed" (ionRefresh)="cargar(); $event.target.complete()">
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
@@ -52,47 +52,50 @@
       <div class="skeleton" style="height:150px"></div>
     </div>
 
-    <div class="of" *ngFor="let p of promos; let i = index">
-      <img *ngIf="imagenes[p.id]" [src]="imagenes[p.id]" alt="" class="of-img" loading="lazy" />
+    <div class="of" *ngFor="let p of promos; let i = index" [class.of-solo]="!p.titulo && !p.descripcion">
+      <img *ngIf="imagenes[p.id]" [src]="imagenes[p.id]" [alt]="p.titulo || 'Promoción del taller'" class="of-img" loading="lazy" (click)="abrirDetalle(p)" />
       <div class="of-img-ph" *ngIf="!imagenes[p.id]" [ngClass]="'ph-' + (i % 4)" (click)="cargarImagen(p)">
         <ion-icon [name]="p.tiene_imagen ? 'image-outline' : phIcono(i)"></ion-icon>
       </div>
       <div class="of-b">
-        <div class="of-h">
+        <div class="of-h" *ngIf="p.titulo || p.descuento">
           <strong>{{ p.titulo }}</strong>
           <span class="bg" *ngIf="p.descuento">-{{ p.descuento }}%</span>
         </div>
-        <p class="of-desc">{{ p.descripcion }}</p>
+        <p class="of-desc" *ngIf="p.descripcion">{{ p.descripcion }}</p>
         <button class="of-detail-btn" (click)="abrirDetalle(p)">
           <ion-icon name="eye-outline"></ion-icon> Ver detalles
         </button>
       </div>
     </div>
 
-    <!-- Visor de detalle -->
-    <div class="of-viewer" *ngIf="detalle" (click)="cerrarDetalle()">
-      <div class="ofv-content" (click)="$event.stopPropagation()">
-        <button class="ofv-close" (click)="cerrarDetalle()"><ion-icon name="close"></ion-icon></button>
-        <img *ngIf="imagenes[detalle.id]" [src]="imagenes[detalle.id]" alt="" class="ofv-img" />
-        <div class="ofv-loading" *ngIf="detalle.tiene_imagen && !imagenes[detalle.id]">
-          <ion-spinner name="crescent"></ion-spinner>
-        </div>
-        <div class="ofv-info">
-          <div class="ofv-head">
-            <h3>{{ detalle.titulo }}</h3>
-            <span class="bg" *ngIf="detalle.descuento">-{{ detalle.descuento }}%</span>
-          </div>
-          <p *ngIf="detalle.precio_final" class="ofv-price mono">{{ detalle.precio_final | currency:'CRC':'symbol-narrow':'1.0-0' }}</p>
-          <p class="ofv-desc">{{ detalle.descripcion }}</p>
-        </div>
-      </div>
-    </div>
-
     <div class="empty-state" *ngIf="!cargando && promos.length === 0">
       <ion-icon name="pricetags-outline"></ion-icon>
-      <p>No hay ofertas por ahora. ¡Volvé pronto!</p>
+      <p>No hay ofertas por ahora. ¡Vuelve pronto!</p>
     </div>
 
     <div style="height:30px"></div>
+  </div>
+  <!-- Visor de detalle. Va fuera de la lista, en slot="fixed": dentro del área
+       que se desplaza, en iPhone quedaba pegado a la lista en vez de fijo en
+       pantalla, y se podía seguir bajando. Mientras está abierto, la página no
+       se desplaza (scrollY en ion-content) hasta tocar la X o el fondo. -->
+  <div class="of-viewer" slot="fixed" *ngIf="detalle" (click)="cerrarDetalle()" role="dialog" aria-modal="true">
+    <div class="ofv-content" (click)="$event.stopPropagation()">
+      <button class="ofv-close" (click)="cerrarDetalle()" aria-label="Cerrar"><ion-icon name="close"></ion-icon></button>
+      <img *ngIf="imagenes[detalle.id]" [src]="imagenes[detalle.id]" alt="" class="ofv-img" />
+      <div class="ofv-loading" *ngIf="detalle.tiene_imagen && !imagenes[detalle.id]">
+        <ion-spinner name="crescent"></ion-spinner>
+      </div>
+      <!-- Una promoción que es solo una imagen no tiene nada que poner aquí. -->
+      <div class="ofv-info" *ngIf="detalle.titulo || detalle.descuento || detalle.precio_final || detalle.descripcion">
+        <div class="ofv-head" *ngIf="detalle.titulo || detalle.descuento">
+          <h3>{{ detalle.titulo }}</h3>
+          <span class="bg" *ngIf="detalle.descuento">-{{ detalle.descuento }}%</span>
+        </div>
+        <p *ngIf="detalle.precio_final" class="ofv-price mono">{{ detalle.precio_final | currency:'CRC':'symbol-narrow':'1.0-0' }}</p>
+        <p class="ofv-desc" *ngIf="detalle.descripcion">{{ detalle.descripcion }}</p>
+      </div>
+    </div>
   </div>
 </ion-content>

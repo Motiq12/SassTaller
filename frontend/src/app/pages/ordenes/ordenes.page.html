@@ -1,6 +1,7 @@
 <ion-header>
-  <ion-toolbar color="primary">
-    <ion-buttons slot="start" *ngIf="esAdmin">
+  <ion-toolbar [color]="dentroDelPanel ? undefined : 'primary'" [class.admin-topbar]="dentroDelPanel">
+    <ion-buttons slot="start" *ngIf="dentroDelPanel"><ion-menu-button></ion-menu-button></ion-buttons>
+    <ion-buttons slot="start" *ngIf="esAdmin && !dentroDelPanel">
       <ion-back-button defaultHref="/admin" text="Panel"></ion-back-button>
     </ion-buttons>
     <ion-title>Órdenes de Trabajo</ion-title>
@@ -24,17 +25,27 @@
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
-  <div class="skeleton-wrap" *ngIf="cargando">
+  <!-- Buscador (fuera de la lista: no desaparece mientras busca) -->
+  <div class="ord-buscador">
+    <ion-icon name="search-outline"></ion-icon>
+    <input type="search" [ngModel]="busqueda" (ngModelChange)="buscar($event)" enterkeyhint="search"
+           placeholder="Buscar por número, cliente, teléfono, placa o moto" aria-label="Buscar órdenes">
+    <button type="button" *ngIf="busqueda" (click)="limpiarBusqueda()" aria-label="Limpiar búsqueda">
+      <ion-icon name="close-circle"></ion-icon>
+    </button>
+  </div>
+
+  <div class="skeleton-wrap" *ngIf="cargando && !ordenes.length">
     <div class="skeleton" style="height:128px;margin-bottom:14px"></div>
     <div class="skeleton" style="height:128px;margin-bottom:14px"></div>
     <div class="skeleton" style="height:128px;margin-bottom:14px"></div>
     <div class="skeleton" style="height:128px"></div>
   </div>
 
-  <div *ngIf="!cargando">
+  <div *ngIf="!cargando || ordenes.length">
     <!-- Contador -->
     <div class="ordenes-count" *ngIf="ordenes.length > 0">
-      {{ ordenes.length }} orden{{ ordenes.length !== 1 ? 'es' : '' }}
+      {{ ordenes.length }} {{ ordenes.length === 1 ? 'orden' : 'órdenes' }}
     </div>
 
     <ion-list style="padding:0 8px!important">
@@ -51,7 +62,7 @@
                   {{ orden.estado | estadoLabel }}
                 </ion-badge>
               </div>
-              <div class="orden-vehiculo">
+              <div class="orden-moto">
                 <ion-icon name="bicycle-outline"></ion-icon>
                 {{ orden.marca }} {{ orden.modelo }}
                 <span class="placa-inline" *ngIf="orden.placa">· {{ orden.placa }}</span>
@@ -82,8 +93,14 @@
 
       <div class="empty-state" *ngIf="ordenes.length === 0 && !cargando">
         <ion-icon name="clipboard-outline"></ion-icon>
-        <p>No hay órdenes{{ filtroEstado ? ' con ese estado' : '' }}</p>
-        <ion-button fill="outline" size="small" (click)="nuevaOrden()">Nueva orden</ion-button>
+        <ng-container *ngIf="busqueda.trim(); else sinBusqueda">
+          <p>Ninguna orden coincide con «{{ busqueda.trim() }}»{{ filtroEstado ? ' en este estado' : '' }}</p>
+          <ion-button *ngIf="filtroEstado" fill="outline" size="small" (click)="buscarEnTodas()">Buscar en todas</ion-button>
+        </ng-container>
+        <ng-template #sinBusqueda>
+          <p>No hay órdenes{{ filtroEstado ? ' con ese estado' : '' }}</p>
+          <ion-button fill="outline" size="small" (click)="nuevaOrden()">Nueva orden</ion-button>
+        </ng-template>
       </div>
     </ion-list>
 

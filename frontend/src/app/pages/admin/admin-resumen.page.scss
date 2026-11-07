@@ -1,315 +1,229 @@
 // ——————————————————————————————————————
-// Admin Resumen — component styles
+// Resumen ejecutivo. Colores del panel (.admin-dark): siguen el tema claro u oscuro.
+// En el celular todo va en una columna; desde 992 px, de a dos.
 // ——————————————————————————————————————
+.res { max-width: 1240px; margin: 0 auto; padding: 22px 18px 64px; }
 
-// Card border-radius override
-.cd {
-  border-radius: 24px;
+// ── Encabezado ──
+.res-cab {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px; margin-bottom: 20px;
+  h1 { margin: 2px 0 2px; font-family: var(--fd); font-size: 30px; font-weight: 700; line-height: 1.1; color: var(--tx); }
+  p { margin: 0; font-size: 13.5px; color: var(--tx3); }
+}
+.res-fecha {
+  font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--cr-tx);
+  &::first-letter { text-transform: uppercase; }
+}
+.res-cab-acciones { display: flex; flex-wrap: wrap; gap: 8px; ion-icon { font-size: 15px; } }
+
+// Menú de exportar (details/summary: se abre y cierra sin JS)
+.res-exportar {
+  position: relative;
+  summary { list-style: none; cursor: pointer; &::-webkit-details-marker { display: none; } }
+  .res-exportar-chev { font-size: 12px; transition: transform .15s; }
+  &[open] .res-exportar-chev { transform: rotate(180deg); }
+}
+.res-exportar-menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 10; min-width: 190px; padding: 6px;
+  background: var(--sur); border: 1px solid var(--bd2); border-radius: 8px; box-shadow: 0 12px 28px rgba(0, 0, 0, .18);
+  button {
+    display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 10px; border: 0; border-radius: 2px;
+    background: none; color: var(--tx); font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+    ion-icon { font-size: 16px; color: var(--tx3); }
+    &:hover:not(:disabled) { background: var(--sur2); }
+    &:disabled { opacity: .5; cursor: default; }
+  }
 }
 
-// Button overrides — larger touch targets
-.btn {
-  min-height: 44px;
-  padding: 12px 20px;
-  border-radius: 14px;
+// ── Cifras principales ──
+.res-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.res-kpi {
+  position: relative; display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 16px 16px 14px;
+  background: var(--sur); border: 1px solid var(--bd); border-radius: 8px; overflow: hidden;
+  &::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--acento); }
+}
+.res-kpi-icono {
+  position: absolute; top: 14px; right: 14px; display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 8px; color: var(--acento);
+  background: color-mix(in srgb, var(--acento) 14%, transparent);
+  ion-icon { font-size: 18px; }
+}
+.res-kpi-label { padding-right: 40px; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--tx3); }
+.res-kpi-val {
+  margin-top: 4px; font-family: var(--fd); font-size: 30px; font-weight: 700; line-height: 1.05; color: var(--tx);
+  font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+  &.mono { font-family: var(--fd); }
+}
+.res-kpi-sub { font-size: 12px; color: var(--tx3); &.alerta { color: var(--am); font-weight: 600; } }
+
+// ── Avisos ──
+.res-avisos {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-bottom: 16px; padding: 12px 16px;
+  background: var(--sur); border: 1px solid var(--bd); border-left: 3px solid var(--am); border-radius: 8px;
+  font-size: 13px; color: var(--tx2);
+  strong { margin-right: 4px; color: var(--tx); }
+  &.tranquilo { border-left-color: var(--em); }
+}
+.res-avisos-icono { font-size: 20px; color: var(--am); flex-shrink: 0; }
+.tranquilo .res-avisos-icono { color: var(--em); }
+.res-aviso {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px;
+  border: 1px solid var(--bd2); border-radius: 2px; background: var(--sur2);
+  font: inherit; font-size: 12.5px; font-weight: 600; color: var(--tx); cursor: pointer;
+  ion-icon { font-size: 13px; color: var(--tx3); }
+  &.grave { border-color: var(--rd); color: var(--rd); ion-icon { color: var(--rd); } }
+  &:hover { background: var(--sur3); }
 }
 
-// ——— Facturacion card ———
-.fact-today {
-  margin-bottom: 14px;
+// ── Filas y tarjetas ──
+.res-fila { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; margin-bottom: 14px; align-items: stretch; }
+.res-card { display: flex; flex-direction: column; min-width: 0; margin: 0; }
+.res-ancha { margin-bottom: 14px; }
+.res-card-cab {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px;
+  .cd-title { margin: 0; ion-icon { vertical-align: -2px; margin-right: 2px; } }
+}
+.res-cuenta { font-size: 12px; color: var(--tx3); }
+.res-vacio {
+  display: flex; align-items: center; gap: 8px; padding: 14px;
+  border: 1px dashed var(--bd2); border-radius: 2px; font-size: 13px; line-height: 1.45; color: var(--tx3);
+  ion-icon { font-size: 18px; flex-shrink: 0; }
 }
 
-.fact-val {
-  color: var(--em);
-  font-size: 28px;
+// Facturación
+.res-fact { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 22px; }
+.res-fact-tit { display: block; margin-bottom: 6px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--tx3); }
+.res-fact-fila {
+  display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--bd);
+  span { font-size: 13px; color: var(--tx2); }
+  strong { font-size: 14px; color: var(--tx); }
+}
+.res-fact-total {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 14px; padding: 12px 14px;
+  background: var(--sur2); border-radius: 2px;
+  span { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--tx3); }
+  strong { font-family: var(--fd); font-size: 24px; font-weight: 700; color: var(--em); }
+}
+.res-nota { margin: 8px 0 0; font-size: 11.5px; color: var(--tx3); }
+
+// Indicadores
+.res-ind {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; flex: 1;
+  > div {
+    display: flex; flex-direction: column; gap: 4px; padding: 14px; background: var(--sur2); border-radius: 2px;
+    ion-icon { font-size: 18px; color: var(--cr-tx); }
+    span { font-size: 12px; color: var(--tx3); }
+    strong { font-family: var(--fd); font-size: 22px; font-weight: 700; color: var(--tx); }
+  }
 }
 
-.fact-sub {
-  font-size: 12px;
-  color: var(--tx3);
-  margin-top: 2px;
+// Estado del taller: barra apilada + leyenda
+.res-barra {
+  display: flex; gap: 2px; height: 14px; margin-bottom: 14px; border-radius: 2px; overflow: hidden;
+  span { min-width: 4px; }
+}
+.res-estados { display: grid; grid-template-columns: minmax(0, 1fr); }
+.res-estado {
+  display: grid; grid-template-columns: 10px minmax(0, 1fr) auto 44px; align-items: center; gap: 10px;
+  padding: 8px 0; border-top: 1px solid var(--bd);
+  &:first-child { border-top: 0; }
+  strong { font-size: 14px; color: var(--tx); text-align: right; }
+}
+.res-estado-nom { font-size: 13px; color: var(--tx2); }
+.res-estado-pct { font-size: 12px; color: var(--tx3); text-align: right; font-variant-numeric: tabular-nums; }
+.res-punto {
+  display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  &.rojo { background: var(--rd); } &.amarillo { background: var(--am); } &.verde { background: var(--em); }
 }
 
-// ——— Stat box (small card inside cards) ———
-.stat-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+// Semáforo: control segmentado
+.res-seg {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; margin-bottom: 12px;
+  background: var(--sur2); border-radius: 2px;
+  button {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 6px;
+    border: 0; border-radius: 2px; background: none; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--tx3); cursor: pointer;
+    b { font-variant-numeric: tabular-nums; color: var(--tx2); }
+    &.on { background: var(--sur); color: var(--tx); box-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
+  }
+}
+.res-lista { display: flex; flex-direction: column; gap: 6px; }
+.res-sem {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 10px 12px;
+  background: var(--sur2); border: 1px solid var(--bd); border-left: 3px solid transparent; border-radius: 2px;
+  font: inherit; text-align: left; color: inherit; cursor: pointer;
+  &:hover { border-left-color: var(--cr); }
+}
+.res-sem-texto {
+  display: flex; flex-direction: column; gap: 1px; min-width: 0;
+  strong { font-size: 12.5px; color: var(--tx); }
+  span { font-size: 12px; color: var(--tx3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+.res-ver-mas {
+  display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; margin-top: 4px; padding: 6px 0;
+  border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--cr-tx); cursor: pointer;
 }
 
-.stat-box {
-  background: var(--sur2);
-  border: 1px solid var(--bd);
-  border-radius: 10px;
-  padding: 10px;
+// Opiniones
+.res-op-resumen { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--tx3); }
+.res-op-prom { display: inline-flex; align-items: center; gap: 3px; font-size: 16px; font-weight: 800; color: var(--am); ion-icon { font-size: 14px; } }
+.res-ops { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 10px; }
+.res-op {
+  display: flex; flex-direction: column; gap: 6px; padding: 14px; background: var(--sur2); border-radius: 2px;
+  border-left: 3px solid transparent;
+  &.baja { border-left-color: var(--rd); }
+  &.clic { cursor: pointer; &:hover { background: var(--sur3); } }
+}
+.res-op-estrellas { display: flex; gap: 2px; ion-icon { font-size: 14px; color: var(--tx3); &.on { color: var(--am); } } }
+.res-op-txt { margin: 0; font-size: 13px; line-height: 1.5; color: var(--tx); &.sin { color: var(--tx3); font-style: italic; } }
+.res-op-quien { margin-top: auto; font-size: 11.5px; color: var(--tx3); strong { color: var(--tx2); } }
+
+// Barras
+.res-barras { display: flex; flex-direction: column; gap: 12px; }
+.res-bar-cab {
+  display: flex; justify-content: space-between; gap: 10px; margin-bottom: 5px; font-size: 13px; color: var(--tx2);
+  b { display: inline-block; min-width: 18px; color: var(--tx3); font-variant-numeric: tabular-nums; }
+  strong { color: var(--tx); font-size: 13px; small { margin-left: 4px; font-size: 11px; color: var(--tx3); font-weight: 500; } }
+}
+.res-bar-pista {
+  height: 6px; background: var(--sur3); border-radius: 2px; overflow: hidden;
+  > div { height: 100%; background: var(--cr); border-radius: 2px; transition: width .4s ease; }
 }
 
-.stat-label {
-  font-size: 11px;
-  color: var(--tx3);
+// Mecánicos
+.res-tec {
+  display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 12px;
+  padding: 10px 12px; background: var(--sur2); border-radius: 2px;
 }
-
-.stat-val {
-  font-size: 14px;
+.res-tec-av {
+  display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%;
+  background: color-mix(in srgb, var(--in) 18%, transparent); color: var(--in); font-weight: 800;
 }
+.res-tec-texto { display: flex; flex-direction: column; gap: 1px; min-width: 0; strong { font-size: 13.5px; color: var(--tx); } span { font-size: 12px; color: var(--tx3); } }
+.res-tec-n { display: flex; flex-direction: column; align-items: flex-end; strong { font-family: var(--fd); font-size: 22px; line-height: 1; color: var(--tx); } span { font-size: 11px; color: var(--tx3); } }
 
-// ——— KPI detail card ———
-.kpi-detail-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+// Tabla de ingresos
+.res-tabla {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+  th { padding: 8px 10px; border-bottom: 1px solid var(--bd2); text-align: left; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--tx3); }
+  td { padding: 11px 10px; border-bottom: 1px solid var(--bd); color: var(--tx2); }
+  .num { text-align: right; white-space: nowrap; }
+  .nom { color: var(--tx); font-weight: 600; }
+  .fuerte { color: var(--em); font-weight: 700; }
+  tfoot td { border-bottom: 0; padding-top: 12px; font-weight: 800; color: var(--tx); }
+  tfoot .num { color: var(--em); }
 }
+.res-parte { display: flex; align-items: center; gap: 8px; min-width: 120px; .res-bar-pista { flex: 1; } span { font-size: 12px; color: var(--tx3); width: 36px; text-align: right; } }
 
-.kpi-detail-box {
-  background: var(--sur2);
-  border: 1px solid var(--bd);
-  border-radius: 12px;
-  padding: 14px;
-}
-
-.kpi-detail-label {
-  font-size: 11px;
-  color: var(--tx3);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  margin-bottom: 6px;
-}
-
-.kpi-detail-val {
-  font-size: 20px;
-  font-weight: 800;
-  color: var(--cr);
-}
-
-// ——— Estado del taller rows ———
-.estado-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 0;
-  border-bottom: 1px solid var(--bd2);
-}
-
-.estado-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.estado-label {
-  flex: 1;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-// ——— Semaforo rows ———
-.sem-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px;
-  background: var(--sur2);
-  border: 1px solid var(--bd);
-  border-radius: 10px;
-  margin-bottom: 8px;
-  cursor: pointer;
-}
-
-.sem-detail {
-  min-width: 0;
-}
-
-.sem-orden {
-  font-size: 11px;
-  color: var(--tx3);
-}
-
-.sem-vehiculo {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-// ——— Bar fills by status ———
-.bar-fill-indigo  { background: var(--indigo-600); }
-.bar-fill-amber   { background: var(--amber-500); }
-.bar-fill-emerald { background: var(--emerald-500); }
-.bar-fill-danger  { background: var(--ion-color-danger); }
-
-// ——— Table inline overrides ———
-.tbl-bold {
-  font-weight: 600;
-}
-
-.tbl-em {
-  color: var(--em);
-}
-
-.tbl-total {
-  border-top: 1.5px solid var(--bd);
-}
-
-.tbl-total-label {
-  font-weight: 800;
-}
-
-.tbl-total-val {
-  font-weight: 800;
-  color: var(--em);
-}
-
-// ——— Export button row ———
-.export-row {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-// ——— Opiniones (reseñas del cliente) ———
-.op-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 4px;
-}
-
-.op-resumen {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.op-prom {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  font-size: 16px;
-  font-weight: 800;
-  color: var(--am);
-  ion-icon { font-size: 14px; }
-}
-
-.op-total {
-  font-size: 12px;
-  color: var(--tx3);
-}
-
-.op-row {
-  display: flex;
-  gap: 12px;
-  justify-content: space-between;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--bd2);
-
-  &:last-of-type { border-bottom: 0; }
-}
-
-.op-clickable { cursor: pointer; }
-
-// Reseña baja (1-2★): franja carmesí para que salte a la vista.
-.op-baja {
-  background: rgba(var(--ion-color-primary-rgb), .08);
-  border-left: 3px solid var(--cr);
-  border-radius: 8px;
-  padding-left: 10px;
-  padding-right: 10px;
-  margin: 4px 0;
-}
-
-.op-main { min-width: 0; flex: 1; }
-
-.op-stars {
-  display: flex;
-  gap: 2px;
-  margin-bottom: 5px;
-  ion-icon { font-size: 14px; color: var(--tx3); }
-  ion-icon.on { color: var(--am); }
-}
-
-.op-cliente {
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.op-comentario {
-  margin: 3px 0 0;
-  font-size: 13px;
-  color: var(--tx2);
-  line-height: 1.4;
-}
-
-.op-sincom {
-  color: var(--tx3);
-  font-style: italic;
-}
-
-.op-meta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  text-align: right;
-  gap: 2px;
-  flex-shrink: 0;
-  max-width: 42%;
-}
-
-.op-vehiculo {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--tx2);
-}
-
-.op-orden {
-  font-size: 11px;
-  color: var(--tx3);
-}
-
-.op-fecha {
-  font-size: 11px;
-  color: var(--tx3);
-}
-
-// ——— Skeleton loader for admin resumen ———
-.admin-skeleton {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: 18px 16px 60px;
-}
-
-.sk-kpi-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  margin-bottom: 18px;
-}
-
-.sk-kpi {
-  height: 86px;
-  border-radius: 24px;
-}
-
-.sk-card {
-  height: 220px;
-  border-radius: 24px;
-  margin-bottom: 18px;
-}
-
-.sk-g2 {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
+// ── Escritorio ──
 @media (min-width: 768px) {
-  .sk-kpi-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-  .sk-g2 {
-    grid-template-columns: 1fr 1fr;
-  }
+  .res-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (min-width: 992px) {
+  .res-fila { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .res-fila--7-5 { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+}
+@media (max-width: 420px) {
+  .res-fact { grid-template-columns: minmax(0, 1fr); }
+  .res-kpi-val { font-size: 26px; }
 }

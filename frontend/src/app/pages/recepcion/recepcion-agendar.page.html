@@ -1,16 +1,18 @@
 <ion-header>
-  <ion-toolbar>
+  <ion-toolbar class="admin-topbar">
     <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
-    <ion-title>Recibir cliente</ion-title>
+    <ion-title>{{ titulo }}</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
-  <div class="agendar">
-    <div class="intro">
-      <h1>Recibir cliente</h1>
-      <p>{{ modo === 'ahora' ? 'El cliente está en el taller: abrí su orden ahora.' : 'Reservá fecha y hora para un cliente que llamó o vendrá luego.' }}</p>
-    </div>
+<ion-content class="admin-dark">
+  <div class="pg agendar">
+    <header class="pg-cab">
+      <div>
+        <h1>{{ titulo }}</h1>
+        <p>{{ modo === 'ahora' ? 'El cliente está en el taller: abrí su orden ahora.' : 'Reservá fecha y hora para un cliente que llamó o vendrá luego.' }}</p>
+      </div>
+    </header>
 
     <!-- Datos del cliente (compartido) -->
     <section class="card">
@@ -18,15 +20,15 @@
 
       <div class="ig cli-wrap" *ngIf="!cliente">
         <label>Buscar cliente *</label>
-        <input [(ngModel)]="qCliente" (ngModelChange)="buscarClientes()" placeholder="Nombre, teléfono o placa...">
+        <input [(ngModel)]="qCliente" name="qCliente" data-campo="cliente_id" (ngModelChange)="buscarClientes()" placeholder="Nombre, teléfono o placa…">
         <div class="cli-results" *ngIf="clientes.length">
           <button type="button" class="cli-item" *ngFor="let c of clientes" (click)="seleccionarCliente(c)">
             <strong>{{ c.nombre }} {{ c.apellido }}</strong>
             <span *ngIf="c.telefono">· {{ c.telefono }}</span>
           </button>
         </div>
-        <button type="button" class="link-nuevo" *ngIf="qCliente.trim().length > 2 && !clientes.length" (click)="crearCliente()">
-          <ion-icon name="person-add-outline"></ion-icon> Cliente no encontrado · Crear nuevo
+        <button type="button" class="link-nuevo" *ngIf="qCliente.trim().length > 2" (click)="crearCliente()">
+          <ion-icon name="person-add-outline"></ion-icon> {{ clientes.length ? '¿No es ninguno? Registrar cliente nuevo' : 'Cliente no encontrado · Registrarlo' }}
         </button>
       </div>
 
@@ -36,24 +38,24 @@
           <strong>{{ cliente.nombre }} {{ cliente.apellido }}</strong>
           <span>{{ cliente.telefono || cliente.email || '—' }}</span>
         </div>
-        <button class="x" (click)="limpiarCliente()" title="Cambiar cliente"><ion-icon name="close-outline"></ion-icon></button>
+        <button class="x" (click)="limpiarCliente()" title="Cambiar cliente" aria-label="Cambiar cliente"><ion-icon name="close-outline"></ion-icon></button>
       </div>
 
       <div class="ig" *ngIf="cliente">
-        <label>Vehiculo{{ modo === 'ahora' ? ' *' : '' }}</label>
-        <select [(ngModel)]="form.moto_id" *ngIf="vehiculos.length">
-          <option [ngValue]="null">{{ modo === 'ahora' ? 'Elegí la vehiculo' : 'Sin especificar' }}</option>
-          <option *ngFor="let m of vehiculos" [ngValue]="m.id">{{ m.marca }} {{ m.modelo }}{{ m.placa ? ' — ' + m.placa : '' }}</option>
+        <label>Moto{{ modo === 'ahora' ? ' *' : '' }}</label>
+        <select [(ngModel)]="form.moto_id" name="moto_id" *ngIf="motos.length">
+          <option [ngValue]="null">{{ modo === 'ahora' ? 'Elegí la moto' : 'Sin especificar' }}</option>
+          <option *ngFor="let m of motos" [ngValue]="m.id">{{ m.marca }} {{ m.modelo }}{{ m.placa ? ' — ' + m.placa : '' }}</option>
         </select>
         <button type="button" class="link-nuevo" (click)="registrarMoto()">
-          <ion-icon name="add-outline"></ion-icon> {{ vehiculos.length ? 'Registrar otra vehiculo' : 'Este cliente no tiene vehiculos · Registrar' }}
+          <ion-icon name="add-outline"></ion-icon> {{ motos.length ? 'Registrar otra moto' : 'Este cliente no tiene motos · Registrar' }}
         </button>
       </div>
 
       <!-- Sucursal (compartida por ambos modos; solo si hay más de un local) -->
       <div class="ig" *ngIf="cliente && sucursales.length > 1">
         <label>Sucursal *</label>
-        <select [(ngModel)]="form.sucursal_id" (ngModelChange)="onSucursal()">
+        <select [(ngModel)]="form.sucursal_id" name="sucursal_id" (ngModelChange)="onSucursal()">
           <option [ngValue]="null">Elegí la sucursal</option>
           <option *ngFor="let s of sucursales" [ngValue]="s.id">{{ s.nombre }}</option>
         </select>
@@ -76,23 +78,31 @@
 
       <div class="ig">
         <label>Problema reportado *</label>
-        <textarea [(ngModel)]="form.problema_reportado" placeholder="Lo que dice el cliente sobre su vehiculo..."></textarea>
+        <textarea [(ngModel)]="form.problema_reportado" name="problema_reportado" placeholder="Lo que dice el cliente sobre su moto…"></textarea>
       </div>
 
       <div class="grid2">
         <div class="ig">
           <label>Kilometraje (opcional)</label>
-          <input type="number" [(ngModel)]="form.kilometraje_ingreso" placeholder="0">
+          <input type="number" [(ngModel)]="form.kilometraje_ingreso" name="kilometraje_ingreso" placeholder="0">
         </div>
         <div class="ig">
           <label>Prioridad</label>
-          <select [(ngModel)]="form.prioridad">
+          <select [(ngModel)]="form.prioridad" name="prioridad">
             <option value="normal">Normal</option>
             <option value="urgente">Urgente</option>
             <option value="emergencia">Emergencia</option>
             <option value="garantia">Garantía</option>
           </select>
         </div>
+      </div>
+
+      <div class="ig" style="margin-bottom:4px">
+        <label for="ag-tiempo-ahora">Tiempo estimado</label>
+        <select id="ag-tiempo-ahora" [(ngModel)]="minutos" name="duracion_min">
+          <option *ngFor="let o of opcionesTiempo" [ngValue]="o.v">{{ o.l }}</option>
+        </select>
+        <div class="hint-campo">Un servicio rápido usa solo esos minutos de la hora: el resto queda para otro cliente.</div>
       </div>
     </section>
 
@@ -101,16 +111,13 @@
       <span class="section-label">Detalles de la cita</span>
 
       <div class="ig">
-        <label>Tipo de servicio *</label>
-        <select [(ngModel)]="form.tipo_servicio">
-          <option value="">Seleccionar servicio</option>
-          <option *ngFor="let s of servicios" [value]="s">{{ s }}</option>
-        </select>
+        <label>Servicios *</label>
+        <app-elegir-servicios [servicios]="servicios" [(seleccion)]="form.servicios" etiqueta="Servicios de la cita"></app-elegir-servicios>
       </div>
 
       <div class="ig">
         <label>Mecánico asignado</label>
-        <select [(ngModel)]="form.tecnico_id">
+        <select [(ngModel)]="form.tecnico_id" name="tecnico_id">
           <option [ngValue]="null">Sin asignar</option>
           <option *ngFor="let t of tecnicos" [ngValue]="t.id">{{ t.nombre }}</option>
         </select>
@@ -119,22 +126,30 @@
       <div class="grid2">
         <div class="ig">
           <label>Fecha *</label>
-          <input type="date" [(ngModel)]="form.fecha" (ngModelChange)="cargarDisponibilidad()">
+          <input type="date" [min]="hoy" [(ngModel)]="form.fecha" name="fecha" (ngModelChange)="cargarDisponibilidad()">
         </div>
         <div class="ig">
           <label>Hora *</label>
-          <select [(ngModel)]="form.hora">
-            <option value="">{{ sucursales.length > 1 && !form.sucursal_id ? 'Elegí la sucursal' : (disp && disp.horas.length ? 'Elegí una hora' : 'Día cerrado') }}</option>
-            <option *ngFor="let h of disp?.horas || []" [value]="h" [disabled]="llena(h)">
-              {{ h }} — {{ llena(h) ? 'LLENA' : restantes(h) + ' disp.' }}
+          <select [(ngModel)]="form.hora" name="hora">
+            <option value="">{{ textoSinHora }}</option>
+            <option *ngFor="let h of disp?.horas || []" [value]="h" [disabled]="horaDeshabilitada(h)">
+              {{ h }} — {{ pasada(h) ? 'ya pasó' : bloqueada(h) ? 'BLOQUEADA · ' + disp?.bloqueadas?.[h] : llena(h) ? 'LLENA' : restantes(h) + ' disp.' }}
             </option>
           </select>
         </div>
       </div>
 
+      <div class="ig" *ngIf="esAdmin">
+        <label>Duración</label>
+        <select [(ngModel)]="duracion" name="duracion_horas">
+          <option *ngFor="let d of duraciones" [ngValue]="d.v">{{ d.l }}</option>
+        </select>
+        <div class="hint-campo">Ocupa un lugar en cada hora que dure. «Todo el día» llega hasta el cierre.</div>
+      </div>
+
       <div class="ig" style="margin-bottom:4px">
         <label>Problema o notas (opcional)</label>
-        <textarea [(ngModel)]="form.motivo" placeholder="Anotá lo que dijo el cliente sobre su vehiculo..."></textarea>
+        <textarea [(ngModel)]="form.motivo" name="motivo" placeholder="Anotá lo que dijo el cliente sobre su moto…"></textarea>
       </div>
     </section>
 
@@ -145,4 +160,75 @@
 
     <div style="height:80px"></div>
   </div>
+
+  <!-- Registrar cliente (sin salir de la pantalla). Los modales se dibujan fuera del
+       contenido: la clase admin-dark les da los colores del panel (sin ella los campos
+       quedaban sin borde ni fondo). -->
+  <ion-modal class="adm-modal" [isOpen]="modalCliente" (didDismiss)="modalCliente = false" (didPresent)="enfocarVacio($event)">
+    <ng-template>
+      <form class="admin-dark adm-modal-box alta" (ngSubmit)="guardarCliente()" autocomplete="off">
+        <div class="amb-head">
+          <div class="alta-tit">
+            <span class="alta-ico"><ion-icon name="person-add-outline"></ion-icon></span>
+            <div><strong>Registrar cliente</strong><span>Queda guardado y elegido para esta cita.</span></div>
+          </div>
+          <button type="button" class="amb-x" (click)="modalCliente = false" aria-label="Cerrar"><ion-icon name="close-outline"></ion-icon></button>
+        </div>
+        <div class="amb-body">
+          <div class="fg-row">
+            <div class="fg"><label for="ac-nombre">Nombre <b>*</b></label><input id="ac-nombre" [(ngModel)]="nuevoCliente.nombre" name="nombre" autocomplete="off" autocapitalize="words"></div>
+            <div class="fg"><label for="ac-apellido">Apellido <b>*</b></label><input id="ac-apellido" [(ngModel)]="nuevoCliente.apellido" name="apellido" autocomplete="off" autocapitalize="words"></div>
+          </div>
+          <div class="fg-row">
+            <div class="fg"><label for="ac-tel">Teléfono <b>*</b></label><input id="ac-tel" type="tel" inputmode="tel" [(ngModel)]="nuevoCliente.telefono" name="telefono" placeholder="8888-1234"></div>
+            <div class="fg"><label for="ac-ced">Cédula <b>*</b></label><input id="ac-ced" inputmode="numeric" [(ngModel)]="nuevoCliente.cedula" name="cedula" placeholder="1-2345-6789"></div>
+          </div>
+          <div class="fg"><label for="ac-mail">Correo</label><input id="ac-mail" type="email" inputmode="email" [(ngModel)]="nuevoCliente.email" name="email" placeholder="cliente@correo.com">
+            <div class="hint">Opcional. Con el correo puede entrar al portal y ver su moto.</div></div>
+        </div>
+        <div class="amb-foot">
+          <span class="amb-tip"><b>*</b> Obligatorio</span>
+          <div class="amb-btns">
+            <button type="button" class="btn btn-ou" (click)="modalCliente = false">Cancelar</button>
+            <button type="submit" class="btn btn-cr" [disabled]="guardandoAlta || !clienteCompleto">{{ guardandoAlta ? 'Guardando…' : 'Registrar y seguir' }}</button>
+          </div>
+        </div>
+      </form>
+    </ng-template>
+  </ion-modal>
+
+  <!-- Registrar moto del cliente elegido -->
+  <ion-modal class="adm-modal" [isOpen]="modalMoto" (didDismiss)="modalMoto = false" (didPresent)="enfocarVacio($event)">
+    <ng-template>
+      <form class="admin-dark adm-modal-box alta" (ngSubmit)="guardarMoto()" autocomplete="off">
+        <div class="amb-head">
+          <div class="alta-tit">
+            <span class="alta-ico"><ion-icon name="bicycle-outline"></ion-icon></span>
+            <div><strong>Registrar moto</strong><span>De {{ cliente?.nombre }} {{ cliente?.apellido }}</span></div>
+          </div>
+          <button type="button" class="amb-x" (click)="modalMoto = false" aria-label="Cerrar"><ion-icon name="close-outline"></ion-icon></button>
+        </div>
+        <div class="amb-body">
+          <div class="fg-row">
+            <div class="fg"><label for="am-marca">Marca <b>*</b></label><input id="am-marca" [(ngModel)]="nuevaMoto.marca" name="marca" list="am-marcas" placeholder="Freedom, Hero, KYMCO…" autocapitalize="words"></div>
+            <div class="fg"><label for="am-modelo">Modelo <b>*</b></label><input id="am-modelo" [(ngModel)]="nuevaMoto.modelo" name="modelo" placeholder="Ej.: Hunk 150"></div>
+          </div>
+          <div class="fg-row">
+            <div class="fg"><label for="am-placa">Placa</label><input id="am-placa" class="alta-placa" [(ngModel)]="nuevaMoto.placa" name="placa" placeholder="ABC123" autocapitalize="characters" maxlength="12"></div>
+            <div class="fg"><label for="am-anio">Año</label><input id="am-anio" type="number" inputmode="numeric" [(ngModel)]="nuevaMoto.anio" name="anio" [placeholder]="anioActual" min="1980" [max]="anioActual + 1"></div>
+          </div>
+          <div class="fg"><label for="am-color">Color</label><input id="am-color" [(ngModel)]="nuevaMoto.color" name="color" list="am-colores" placeholder="Negro, rojo…"></div>
+          <datalist id="am-marcas"><option *ngFor="let m of marcasSugeridas" [value]="m"></option></datalist>
+          <datalist id="am-colores"><option *ngFor="let c of coloresSugeridos" [value]="c"></option></datalist>
+        </div>
+        <div class="amb-foot">
+          <span class="amb-tip">La placa y el año se pueden completar después.</span>
+          <div class="amb-btns">
+            <button type="button" class="btn btn-ou" (click)="modalMoto = false">Ahora no</button>
+            <button type="submit" class="btn btn-cr" [disabled]="guardandoAlta || !motoCompleta">{{ guardandoAlta ? 'Guardando…' : 'Registrar moto' }}</button>
+          </div>
+        </div>
+      </form>
+    </ng-template>
+  </ion-modal>
 </ion-content>

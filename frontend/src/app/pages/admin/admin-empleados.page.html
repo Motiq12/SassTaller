@@ -21,7 +21,7 @@
       <div class="emp-tools">
         <div class="adm-buscador">
           <ion-icon name="search-outline" class="bs-lupa"></ion-icon>
-          <input type="text" [(ngModel)]="busqueda" placeholder="Buscar por nombre, correo, teléfono o rol…">
+          <input type="text" [(ngModel)]="busqueda" name="busqueda" placeholder="Buscar por nombre, correo, teléfono o rol…">
           <button type="button" class="bs-x" *ngIf="busqueda" (click)="busqueda = ''" aria-label="Limpiar búsqueda">
             <ion-icon name="close-circle"></ion-icon>
           </button>
@@ -42,11 +42,11 @@
           <div class="emp-av" [ngClass]="u.activo ? avatarColor(u.rol) : 'off'">{{ iniciales(u.nombre) }}</div>
           <div class="emp-info">
             <strong>{{ u.nombre }}</strong>
-            <span>{{ rolLabel[u.rol] || u.rol }}<span *ngIf="u.telefono"> · {{ u.telefono }}</span></span>
+            <span>{{ nombreRol(u) }}<span *ngIf="u.telefono"> · {{ u.telefono }}</span><span *ngIf="sitioWebActivo && u.rol !== 'admin' && u.rol !== 'contenido' && tieneWeb(u)"> · también el sitio web</span></span>
             <!-- Sucursal del empleado (el admin no se ata a un local) -->
-            <select *ngIf="u.rol !== 'admin' && sucursales.length" class="emp-suc"
+            <select *ngIf="u.rol !== 'admin' && u.rol !== 'contenido' && sucursales.length" class="emp-suc"
                     [ngModel]="u.sucursal_id ?? null" (ngModelChange)="cambiarSucursal(u, $event)">
-              <option [ngValue]="null">Ambas sucursales</option>
+              <option [ngValue]="null">Las dos sucursales</option>
               <option *ngFor="let s of sucursales" [ngValue]="s.id">{{ s.nombre }}</option>
             </select>
           </div>
@@ -72,6 +72,19 @@
   </div>
 </ion-content>
 
+<!-- Permisos del sitio web. El administrador puede todo, así que a él no se le
+     ofrecen; a cualquier otro rol se le pueden dar (por ejemplo, una recepcionista
+     que además lleva la web). El objeto `permisos` se modifica en el lugar. -->
+<ng-template #casillasWeb let-rol="rol" let-permisos="permisos">
+  <div class="fg emp-web" *ngIf="rol !== 'admin' && permisosWeb.length && (sitioWebActivo || rol === 'contenido')">
+    <label>{{ rol === 'contenido' ? 'Qué puede hacer en el sitio web *' : 'Además, en el sitio web puede… (opcional)' }}</label>
+    <label class="emp-web-op" *ngFor="let p of permisosWeb">
+      <input type="checkbox" [(ngModel)]="permisos[p.id]">
+      <span><strong>{{ p.nombre }}</strong><small>{{ p.descripcion }}</small></span>
+    </label>
+  </div>
+</ng-template>
+
 <!-- Alta y edición. Ionic monta el modal fuera de .admin-dark: de ahí la clase repetida. -->
 <ion-modal class="adm-modal" [isOpen]="modalAbierto" (didDismiss)="cerrarModal()">
   <ng-template>
@@ -86,12 +99,12 @@
       <div class="amb-body">
         <!-- Alta: con contraseña. -->
         <ng-container *ngIf="!editandoId">
-          <div class="fg"><label>Nombre completo *</label><input [(ngModel)]="nuevo.nombre" placeholder="Ej: Carlos García"></div>
-          <div class="fg"><label>Correo electrónico *</label><input type="email" [(ngModel)]="nuevo.email" placeholder="carlos@taller.com"></div>
+          <div class="fg"><label>Nombre completo *</label><input [(ngModel)]="nuevo.nombre" name="nombre" placeholder="Ej: Carlos García"></div>
+          <div class="fg"><label>Correo electrónico *</label><input type="email" [(ngModel)]="nuevo.email" name="email" placeholder="carlos@taller.com"></div>
           <div class="fg">
             <label>Contraseña *</label>
             <div class="pass-wrap">
-              <input [type]="verPass ? 'text' : 'password'" [(ngModel)]="nuevo.password" placeholder="Mín. 6 caracteres">
+              <input [type]="verPass ? 'text' : 'password'" [(ngModel)]="nuevo.password" name="password" placeholder="Mín. 8 caracteres">
               <button type="button" class="pass-eye" (click)="verPass = !verPass"
                       [attr.aria-label]="verPass ? 'Ocultar contraseña' : 'Ver contraseña'">
                 <ion-icon [name]="verPass ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
@@ -100,43 +113,57 @@
           </div>
           <div class="fg">
             <label>Confirmar contraseña *</label>
-            <input [type]="verPass ? 'text' : 'password'" [(ngModel)]="nuevo.password2" placeholder="Repetí la contraseña">
+            <input [type]="verPass ? 'text' : 'password'" [(ngModel)]="nuevo.password2" name="password2" placeholder="Repetí la contraseña">
             <div class="hint hint-error" *ngIf="nuevo.password2 && !passCoincide">Las contraseñas no coinciden</div>
           </div>
-          <div class="fg"><label>Teléfono (opcional)</label><input type="tel" [(ngModel)]="nuevo.telefono" placeholder="8888-8888"></div>
+          <div class="fg"><label>Teléfono (opcional)</label><input type="tel" [(ngModel)]="nuevo.telefono" name="telefono" placeholder="8888-8888"></div>
           <div class="fg"><label>Rol *</label>
-            <select [(ngModel)]="nuevo.rol">
+            <select [ngModel]="nuevo.eleccion" (ngModelChange)="elegir(nuevo, $event)" name="rol">
               <option value="tecnico">Mecánico</option>
               <option value="recepcion">Recepcionista</option>
+              <option value="contenido" *ngIf="sitioWebActivo">Contenido del sitio web</option>
+              <optgroup label="Roles propios" *ngIf="rolesPropios.length">
+                <option *ngFor="let r of rolesPropios" [value]="'r:' + r.id">{{ r.nombre }} ({{ BASE_LABEL[r.base] }})</option>
+              </optgroup>
             </select>
+            <div class="hint" *ngIf="nuevo.rol === 'contenido'">Solo entra a la sección «Sitio web» del panel. No ve clientes, citas, órdenes ni facturas.</div>
+            <div class="hint"><a routerLink="/admin/roles">Ver qué puede hacer cada rol</a></div>
           </div>
-          <div class="fg" *ngIf="sucursales.length"><label>Sucursal</label>
-            <select [(ngModel)]="nuevo.sucursal_id">
-              <option [ngValue]="null">Ambas / sin asignar</option>
+          <ng-container *ngTemplateOutlet="casillasWeb; context: { rol: nuevo.rol, permisos: nuevo.permisos_web }"></ng-container>
+          <div class="fg" *ngIf="sucursales.length && nuevo.rol !== 'contenido'"><label>Sucursal</label>
+            <select [(ngModel)]="nuevo.sucursal_id" name="sucursal_id">
+              <option [ngValue]="null">Las dos sucursales</option>
               <option *ngFor="let s of sucursales" [ngValue]="s.id">{{ s.nombre }}</option>
             </select>
+            <div class="hint">Con una sucursal, ve solo las citas, órdenes y alertas de esa sucursal. Los clientes se comparten.</div>
           </div>
         </ng-container>
 
         <!-- Edición: sin contraseña. Cambiarla es otra cosa y se hace desde el
              perfil del propio empleado, no desde acá. -->
         <ng-container *ngIf="editandoId">
-          <div class="fg"><label>Nombre completo *</label><input [(ngModel)]="editando.nombre" placeholder="Ej: Carlos García"></div>
-          <div class="fg"><label>Correo electrónico *</label><input type="email" [(ngModel)]="editando.email" placeholder="carlos@taller.com"></div>
-          <div class="fg"><label>Teléfono</label><input type="tel" [(ngModel)]="editando.telefono" placeholder="8888-8888"></div>
+          <div class="fg"><label>Nombre completo *</label><input [(ngModel)]="editando.nombre" name="nombre" placeholder="Ej: Carlos García"></div>
+          <div class="fg"><label>Correo electrónico *</label><input type="email" [(ngModel)]="editando.email" name="email" placeholder="carlos@taller.com"></div>
+          <div class="fg"><label>Teléfono</label><input type="tel" [(ngModel)]="editando.telefono" name="telefono" placeholder="8888-8888"></div>
           <div class="fg"><label>Rol *</label>
-            <select [(ngModel)]="editando.rol">
+            <select [ngModel]="editando.eleccion" (ngModelChange)="elegir(editando, $event)" name="rol">
               <option value="tecnico">Mecánico</option>
               <option value="recepcion">Recepcionista</option>
+              <option value="contenido" *ngIf="sitioWebActivo || editando.rol === 'contenido'">Contenido del sitio web</option>
               <option value="admin">Administración</option>
+              <optgroup label="Roles propios" *ngIf="rolesPropios.length">
+                <option *ngFor="let r of rolesPropios" [value]="'r:' + r.id">{{ r.nombre }} ({{ BASE_LABEL[r.base] }})</option>
+              </optgroup>
             </select>
             <div class="hint">No podés quitarte a vos mismo el rol de administrador.</div>
           </div>
-          <div class="fg" *ngIf="sucursales.length"><label>Sucursal</label>
-            <select [(ngModel)]="editando.sucursal_id">
-              <option [ngValue]="null">Ambas / sin asignar</option>
+          <ng-container *ngTemplateOutlet="casillasWeb; context: { rol: editando.rol, permisos: editando.permisos_web }"></ng-container>
+          <div class="fg" *ngIf="sucursales.length && editando.rol !== 'contenido' && editando.rol !== 'admin'"><label>Sucursal</label>
+            <select [(ngModel)]="editando.sucursal_id" name="sucursal_id">
+              <option [ngValue]="null">Las dos sucursales</option>
               <option *ngFor="let s of sucursales" [ngValue]="s.id">{{ s.nombre }}</option>
             </select>
+            <div class="hint">Con una sucursal, ve solo las citas, órdenes y alertas de esa sucursal. Los clientes se comparten.</div>
           </div>
         </ng-container>
       </div>

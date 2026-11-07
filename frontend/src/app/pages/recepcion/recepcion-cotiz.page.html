@@ -1,146 +1,195 @@
 <ion-header>
-  <ion-toolbar>
+  <ion-toolbar class="admin-topbar">
     <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
     <ion-title>Cotizaciones</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
+<ion-content class="admin-dark">
   <ion-refresher slot="fixed" (ionRefresh)="cargar($event)">
     <ion-refresher-content pullingIcon="chevron-down" refreshingSpinner="crescent"></ion-refresher-content>
   </ion-refresher>
 
-  <div class="rec">
-    <div class="segment">
-      <button class="seg-btn" [class.on]="vista==='pendiente'" (click)="vista='pendiente'; cargar()">Pendientes</button>
-      <button class="seg-btn" [class.on]="vista==='enviada'" (click)="vista='enviada'; cargar()">Enviadas</button>
+  <div class="pg">
+    <header class="pg-cab">
+      <div>
+        <h1>Cotizaciones</h1>
+        <p>Precios de repuestos y mano de obra para que el cliente apruebe.</p>
+      </div>
+      <div class="pg-acciones">
+        <button type="button" class="btn" [ngClass]="mostrarForm ? 'btn-ou' : 'btn-cr'" (click)="mostrarForm ? cerrarForm() : abrirForm()">
+          <ion-icon [name]="mostrarForm ? 'close-outline' : 'add-outline'"></ion-icon>
+          {{ mostrarForm ? 'Cancelar' : 'Nueva cotización' }}
+        </button>
+      </div>
+    </header>
+
+    <div class="pg-tabs">
+      <button [class.on]="vista==='pendiente'" (click)="cambiarVista('pendiente')"><ion-icon name="hourglass-outline"></ion-icon> Pendientes</button>
+      <button [class.on]="vista==='enviada'" (click)="cambiarVista('enviada')"><ion-icon name="paper-plane-outline"></ion-icon> Enviadas</button>
     </div>
 
-    <!-- Botón nueva cotización -->
-    <button class="cta-outline" (click)="mostrarForm ? cerrarForm() : abrirForm()">
-      <ion-icon [name]="mostrarForm ? 'close-outline' : 'add-outline'"></ion-icon>
-      {{ mostrarForm ? 'Cancelar' : 'Nueva cotización' }}
-    </button>
-
     <!-- Formulario nueva cotización -->
-    <section class="card form-card" *ngIf="mostrarForm">
-      <span class="section-label">Nueva cotización</span>
+    <section class="cd pg-card rc-form" *ngIf="mostrarForm">
+      <div class="pg-card-cab"><span class="cd-title"><ion-icon name="receipt-outline"></ion-icon> Nueva cotización</span></div>
 
-      <div class="field">
-        <label>Cliente</label>
-        <ion-select [(ngModel)]="form.cliente_id" (ionChange)="onClienteChange()" placeholder="Elegí un cliente" interface="action-sheet">
-          <ion-select-option *ngFor="let c of clientes" [value]="c.id">{{ c.nombre }} {{ c.apellido }}</ion-select-option>
-        </ion-select>
+      <!-- Los tres campos abren el mismo selector con buscador. No son ion-select:
+           el action-sheet lista todo de corrido, sin forma de buscar ni de ver el
+           dato de apoyo (el teléfono del cliente, la moto de la orden). -->
+      <div class="rc-campos">
+        <div class="fg">
+          <label>Cliente</label>
+          <button type="button" class="rc-picker" (click)="abrirPicker('cliente')">
+            <span [class.ph]="!clienteElegido">{{ clienteElegido ? (clienteElegido.nombre + ' ' + clienteElegido.apellido) : 'Elegí un cliente' }}</span>
+            <ion-icon name="chevron-down"></ion-icon>
+          </button>
+        </div>
+        <div class="fg">
+          <label>Orden</label>
+          <button type="button" class="rc-picker" [disabled]="!form.cliente_id" (click)="abrirPicker('orden')">
+            <span [class.ph]="!ordenElegida">{{ ordenElegida ? (ordenElegida.numero_orden + ' — ' + ordenElegida.marca + ' ' + ordenElegida.modelo) : 'Orden activa del cliente' }}</span>
+            <ion-icon name="chevron-down"></ion-icon>
+          </button>
+          <p class="hint rc-aviso" *ngIf="form.cliente_id && !ordenesCliente.length">Este cliente no tiene órdenes activas.</p>
+        </div>
+        <div class="fg">
+          <label>Mecánico</label>
+          <button type="button" class="rc-picker" (click)="abrirPicker('tecnico')">
+            <span [class.ph]="!tecnicoElegido">{{ tecnicoElegido ? tecnicoElegido.nombre : 'Asignar mecánico (opcional)' }}</span>
+            <ion-icon name="chevron-down"></ion-icon>
+          </button>
+        </div>
       </div>
 
-      <div class="field">
-        <label>Orden</label>
-        <ion-select [(ngModel)]="form.orden_id" (ionChange)="onOrdenChange()" placeholder="Orden activa del cliente" interface="action-sheet" [disabled]="!form.cliente_id">
-          <ion-select-option *ngFor="let o of ordenesCliente" [value]="o.id">{{ o.numero_orden }} — {{ o.marca }} {{ o.modelo }}</ion-select-option>
-        </ion-select>
-        <p class="hint" *ngIf="form.cliente_id && !ordenesCliente.length">Este cliente no tiene órdenes activas.</p>
+      <div class="fg rc-piezas">
+        <label>Piezas</label>
+        <div class="rc-pieza" *ngFor="let p of form.piezas; let i = index">
+          <input type="text" [(ngModel)]="p.nombre" placeholder="Nombre de la pieza" aria-label="Nombre de la pieza" />
+          <input type="number" [(ngModel)]="p.monto" placeholder="₡" class="rc-monto" aria-label="Precio de la pieza" />
+          <button type="button" class="rc-x" (click)="quitarPieza(i)" aria-label="Quitar pieza"><ion-icon name="trash-outline"></ion-icon></button>
+        </div>
+        <button type="button" class="btn btn-ou btn-sm rc-mas" (click)="agregarPieza()"><ion-icon name="add"></ion-icon> Agregar pieza</button>
       </div>
 
-      <div class="field">
-        <label>Mecánico</label>
-        <ion-select [(ngModel)]="form.tecnico_id" placeholder="Asignar mecánico (opcional)" interface="action-sheet">
-          <ion-select-option *ngFor="let t of tecnicos" [value]="t.id">{{ t.nombre }}</ion-select-option>
-        </ion-select>
-      </div>
-
-      <label class="piezas-lbl">Piezas</label>
-      <div class="pieza-row" *ngFor="let p of form.piezas; let i = index">
-        <input type="text" [(ngModel)]="p.nombre" placeholder="Nombre de la pieza" />
-        <input type="number" [(ngModel)]="p.monto" placeholder="₡" class="monto" />
-        <button class="pieza-del" (click)="quitarPieza(i)"><ion-icon name="trash-outline"></ion-icon></button>
-      </div>
-      <button class="link-add" (click)="agregarPieza()"><ion-icon name="add"></ion-icon> Agregar pieza</button>
-
-      <div class="field">
+      <div class="fg">
         <label>Mano de obra (₡)</label>
-        <input type="number" [(ngModel)]="form.mano_obra" placeholder="0" class="mo-input" />
+        <input type="number" [(ngModel)]="form.mano_obra" placeholder="0" />
       </div>
 
-      <div class="form-total">
+      <div class="rc-total">
         <span>Total estimado</span>
-        <strong class="mono">₡{{ totalForm | number:'1.0-0' }}</strong>
+        <strong>₡{{ totalForm | number:'1.0-0' }}</strong>
       </div>
 
-      <ion-button expand="block" class="btn-guardar" (click)="guardarCotizacion()" [disabled]="!formValido || guardando">
+      <button type="button" class="btn btn-cr btn-block" (click)="guardarCotizacion()" [disabled]="!formValido || guardando">
         {{ guardando ? 'Guardando…' : 'Guardar cotización' }}
-      </ion-button>
+      </button>
     </section>
 
-    <!-- Skeleton -->
-    <div *ngIf="cargando" style="display:flex;flex-direction:column;gap:12px;margin-top:6px">
-      <div class="skeleton" style="height:170px"></div>
-      <div class="skeleton" style="height:170px"></div>
+    <!-- Buscador y filtro de la lista. El filtro por aprobación solo se ofrece en
+         Enviadas: en Pendientes todas están, por definición, sin responder. -->
+    <ng-container *ngIf="!mostrarForm && !cargando && cotizaciones.length">
+      <div class="pg-buscar">
+        <ion-icon name="search-outline"></ion-icon>
+        <input type="search" [value]="busqueda" (input)="buscar($event)" placeholder="Cliente, orden, moto o mecánico" aria-label="Buscar cotización" />
+      </div>
+      <div class="pg-filtros" *ngIf="vista === 'enviada'">
+        <button type="button" class="chip-filtro" [class.on]="filtroAprob==='todas'" (click)="setFiltro('todas')">Todas</button>
+        <button type="button" class="chip-filtro" [class.on]="filtroAprob==='aprobado'" (click)="setFiltro('aprobado')">Aprobadas</button>
+        <button type="button" class="chip-filtro" [class.on]="filtroAprob==='rechazado'" (click)="setFiltro('rechazado')">Rechazadas</button>
+      </div>
+    </ng-container>
+
+    <!-- Cargando -->
+    <div class="rc-grid" *ngIf="cargando">
+      <div class="sk-dark" style="height:220px"></div>
+      <div class="sk-dark" style="height:220px"></div>
     </div>
 
     <!-- Lista de cotizaciones -->
-    <div class="cotiz-list" *ngIf="!cargando">
-      <div class="card cotiz-card" *ngFor="let o of cotizaciones">
-        <div class="cz-top">
-          <div>
+    <div class="rc-grid" *ngIf="!cargando">
+      <article class="cd rc-card" *ngFor="let o of cotizacionesFiltradas; trackBy: trackId">
+        <div class="rc-top">
+          <div class="pg-item-txt">
             <strong>{{ o.cliente_nombre }} {{ o.cliente_apellido }}</strong>
-            <p class="cz-sub">{{ o.marca }} {{ o.modelo }} · {{ o.numero_orden }}<ng-container *ngIf="o.tecnico_nombre"> · {{ o.tecnico_nombre }}</ng-container></p>
+            <span>{{ o.marca }} {{ o.modelo }} · <span class="mono">{{ o.numero_orden }}</span><ng-container *ngIf="o.tecnico_nombre"> · {{ o.tecnico_nombre }}</ng-container></span>
           </div>
           <span class="pill" [ngClass]="aprobPill[o.aprobacion_cliente]">{{ aprobLabel[o.aprobacion_cliente] }}</span>
         </div>
 
         <!-- Piezas -->
-        <div class="pieza-list">
-          <div class="pieza-item" *ngFor="let p of repuestos[o.id]">
-            <span class="pi-nombre">{{ p.nombre }}<span class="pi-cant" *ngIf="p.cantidad > 1"> ×{{ p.cantidad }}</span></span>
-            <span class="pi-precio mono">₡{{ (p.cantidad * p.costo_unitario) | number:'1.0-0' }}</span>
-            <button class="pi-edit" (click)="editarPieza(o, p)"><ion-icon name="create-outline"></ion-icon></button>
+        <div class="rc-filas">
+          <div class="rc-fila" *ngFor="let p of repuestos[o.id]">
+            <span class="rc-nom">{{ p.nombre }}<span class="rc-cant" *ngIf="p.cantidad > 1"> ×{{ p.cantidad }}</span></span>
+            <span class="mono">₡{{ (p.cantidad * p.costo_unitario) | number:'1.0-0' }}</span>
+            <button type="button" class="rc-x" (click)="editarPieza(o, p)" [attr.aria-label]="'Editar ' + p.nombre"><ion-icon name="create-outline"></ion-icon></button>
           </div>
-          <div class="pieza-empty" *ngIf="!repuestos[o.id]?.length">Sin piezas cargadas</div>
-        </div>
+          <div class="pg-vacio" *ngIf="!repuestos[o.id]?.length"><ion-icon name="cube-outline"></ion-icon> Sin piezas cargadas.</div>
 
-        <!-- Mano de obra -->
-        <div class="mo-row" *ngIf="editandoCostos !== o.id">
-          <span>Mano de obra</span>
-          <span class="mono">₡{{ o.costo_mano_obra | number:'1.0-0' }}</span>
-        </div>
-        <div class="mo-row" *ngIf="o.descuento > 0 && editandoCostos !== o.id">
-          <span>Descuento</span>
-          <span class="mono">− ₡{{ o.descuento | number:'1.0-0' }}</span>
+          <!-- Mano de obra -->
+          <div class="rc-fila rc-sec" *ngIf="editandoCostos !== o.id">
+            <span class="rc-nom">Mano de obra</span><span class="mono">₡{{ o.costo_mano_obra | number:'1.0-0' }}</span>
+          </div>
+          <div class="rc-fila rc-sec" *ngIf="o.descuento > 0 && editandoCostos !== o.id">
+            <span class="rc-nom">Descuento</span><span class="mono">−₡{{ o.descuento | number:'1.0-0' }}</span>
+          </div>
         </div>
 
         <!-- Edición inline de costos -->
-        <div class="costos-edit" *ngIf="editandoCostos === o.id">
-          <div class="ce-field"><label>Mano de obra</label><input type="number" [(ngModel)]="costosEdit.costo_mano_obra" /></div>
-          <div class="ce-field"><label>Descuento</label><input type="number" [(ngModel)]="costosEdit.descuento" /></div>
-          <ion-button size="small" (click)="guardarCostos(o)">Guardar costos</ion-button>
+        <div class="rc-costos" *ngIf="editandoCostos === o.id">
+          <div class="fg"><label>Mano de obra</label><input type="number" [(ngModel)]="costosEdit.costo_mano_obra" /></div>
+          <div class="fg"><label>Descuento</label><input type="number" [(ngModel)]="costosEdit.descuento" /></div>
+          <button type="button" class="btn btn-cr btn-sm" (click)="guardarCostos(o)">Guardar costos</button>
         </div>
 
-        <!-- Total -->
-        <div class="cz-total">
+        <div class="rc-total">
           <span>Total</span>
-          <strong class="mono">₡{{ totalCotiz(o) | number:'1.0-0' }}</strong>
+          <strong>₡{{ totalCotiz(o) | number:'1.0-0' }}</strong>
         </div>
 
-        <!-- Acciones -->
-        <div class="cz-acciones">
-          <button class="act act-amber" (click)="toggleEditCostos(o)">
-            <ion-icon name="create-outline"></ion-icon> Editar
-          </button>
-          <button class="act act-rose" (click)="enviar(o)">
-            <ion-icon name="paper-plane-outline"></ion-icon> Enviar
-          </button>
-          <button class="act act-green" (click)="aprobar(o)" [disabled]="o.aprobacion_cliente === 'aprobado'">
-            <ion-icon name="checkmark-outline"></ion-icon> Aprobada
-          </button>
+        <div class="rc-acc">
+          <button type="button" class="btn btn-ou btn-sm" (click)="toggleEditCostos(o)"><ion-icon name="create-outline"></ion-icon> Editar</button>
+          <button type="button" class="btn btn-cr btn-sm" (click)="enviar(o)"><ion-icon name="paper-plane-outline"></ion-icon> Enviar</button>
+          <button type="button" class="btn btn-em btn-sm" (click)="aprobar(o)" [disabled]="o.aprobacion_cliente === 'aprobado'"><ion-icon name="checkmark-outline"></ion-icon> Aprobada</button>
         </div>
-      </div>
+      </article>
 
-      <div class="empty-state" *ngIf="!cotizaciones.length">
-        <ion-icon name="receipt-outline"></ion-icon>
-        <p>No hay cotizaciones {{ vista === 'pendiente' ? 'pendientes' : 'enviadas' }}.</p>
+      <!-- Se distingue "no hay nada" de "no hay nada que coincida": con un filtro
+           puesto, el mismo mensaje haría pensar que se perdieron las cotizaciones. -->
+      <div class="pg-vacio rc-vacio" *ngIf="!cotizacionesFiltradas.length">
+        <ion-icon [name]="cotizaciones.length ? 'search-outline' : 'receipt-outline'"></ion-icon>
+        <span *ngIf="!cotizaciones.length">No hay cotizaciones {{ vista === 'pendiente' ? 'pendientes' : 'enviadas' }}.</span>
+        <span *ngIf="cotizaciones.length">Ninguna coincide con la búsqueda o el filtro.</span>
+        <button type="button" class="btn btn-ou btn-sm" *ngIf="cotizaciones.length" (click)="limpiarFiltros()">Limpiar</button>
       </div>
     </div>
-
-    <div style="height:80px"></div>
   </div>
 </ion-content>
+
+<!-- Selector con buscador y Cancelar, compartido por los tres campos del formulario.
+     Uno solo y no tres iguales: cambia qué lista muestra, no cómo se ve ni cómo se
+     usa. Las opciones ya están en memoria, así que el filtro es local y responde
+     mientras se escribe, sin ir al servidor. -->
+<ion-modal class="adm-modal" [isOpen]="!!picker" (didDismiss)="cerrarPicker()">
+  <ng-template>
+    <div class="admin-dark adm-modal-box rc-pk">
+      <div class="amb-head">
+        <span class="cd-title">{{ pickerTitulo }}</span>
+        <button type="button" class="amb-x" (click)="cerrarPicker()" aria-label="Cancelar"><ion-icon name="close"></ion-icon></button>
+      </div>
+      <div class="amb-body">
+        <div class="pg-buscar">
+          <ion-icon name="search-outline"></ion-icon>
+          <input type="search" [value]="busquedaPicker" (input)="filtrarPicker($event)" [placeholder]="pickerPlaceholder" aria-label="Buscar" />
+        </div>
+        <div class="rc-pk-lista">
+          <button type="button" class="rc-pk-fila" *ngFor="let o of opcionesFiltradas; trackBy: trackId" [class.on]="esElegida(o)" (click)="elegirOpcion(o)">
+            <strong>{{ tituloOpcion(o) }}</strong>
+            <span *ngIf="subtituloOpcion(o)">{{ subtituloOpcion(o) }}</span>
+          </button>
+          <div class="pg-vacio" *ngIf="!opcionesFiltradas.length"><ion-icon name="search-outline"></ion-icon> {{ pickerVacio }}</div>
+        </div>
+      </div>
+    </div>
+  </ng-template>
+</ion-modal>

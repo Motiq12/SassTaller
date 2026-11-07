@@ -1,11 +1,12 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { RecepcionService } from '../../services/recepcion.service';
-import { abrirWhatsApp, mensajeCita } from '../../shared/utils/whatsapp.util';
-import { hoyCR } from '../../shared/utils/fecha-cita.util';
+import { abrirWhatsApp } from '../../shared/whatsapp.util';
+import { MensajesService } from '../../services/mensajes.service';
+import { hoyCR } from '../../utils/fecha-cita';
 
 // Celda del calendario mensual. `fecha` vacía = celda de relleno (fuera del mes).
 interface DiaCal {
@@ -26,10 +27,6 @@ interface DiaCal {
   styleUrls: ['./recepcion-agenda.page.scss'],
 })
 export class RecepcionAgendaPage implements OnInit, OnDestroy {
-  private rec = inject(RecepcionService);
-  private router = inject(Router);
-  private toast = inject(ToastController);
-
   private destroy$ = new Subject<void>();
   readonly dows = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
   readonly diasLargos = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -54,7 +51,9 @@ export class RecepcionAgendaPage implements OnInit, OnDestroy {
   semanas: DiaCal[][] = [];
   diaSel: DiaCal | null = null;
 
-  ngOnInit() { this.cargar(); }
+  constructor(private rec: RecepcionService, private router: Router, private toast: ToastController, private mensajes: MensajesService) {}
+
+  ngOnInit() { this.mensajes.precargar(); this.cargar(); }
   ionViewWillEnter() { this.cargar(); }
 
   get tituloMes(): string { return `${this.meses[this.mes - 1]} ${this.anio}`; }
@@ -174,7 +173,7 @@ export class RecepcionAgendaPage implements OnInit, OnDestroy {
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
 
   async whatsapp(c: any) {
-    if (!abrirWhatsApp(c.cliente_telefono, mensajeCita(c))) {
+    if (!abrirWhatsApp(c.cliente_telefono, this.mensajes.deCita(c))) {
       const t = await this.toast.create({ message: 'Este cliente no tiene teléfono cargado', duration: 2200, color: 'warning' });
       await t.present();
     }

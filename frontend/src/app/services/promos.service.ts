@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
@@ -18,9 +18,8 @@ export interface Promo {
 
 @Injectable({ providedIn: 'root' })
 export class PromosService {
-  private http = inject(HttpClient);
-
   private url = `${environment.apiUrl}/promos`;
+  constructor(private http: HttpClient) {}
 
   // La imagen se pide por separado: la ruta exige sesion y un <img src> no puede
   // mandar la cabecera de autorizacion, asi que viaja como data URL en JSON.

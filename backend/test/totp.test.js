@@ -74,18 +74,7 @@ test('la URI otpauth lleva la clave y el emisor', () => {
   const uri = totp.uriOtpauth(s, 'admin@taller.com');
   assert.ok(uri.startsWith('otpauth://totp/'));
   assert.ok(uri.includes(`secret=${s}`));
-  // Sin emisor explícito el rótulo es genérico, no el de un taller concreto.
-  assert.ok(uri.includes('issuer=Taller'));
-});
-
-// El emisor es lo que el empleado ve en su app de autenticación. Con multi-tenant
-// tiene que ser el nombre de SU taller: con uno fijo, todos los talleres del SaaS
-// aparecerían igual y quien trabaje en dos no distinguiría cuál código es cuál.
-test('el emisor de la URI otpauth es el nombre del taller', () => {
-  const s = totp.generarSecreto();
-  const uri = totp.uriOtpauth(s, 'ana@autos.com', 'Autos del Valle');
-  assert.ok(uri.includes('issuer=Autos+del+Valle'), uri);
-  assert.ok(uri.includes(encodeURIComponent('Autos del Valle:ana@autos.com')), uri);
+  assert.ok(uri.includes('issuer=MS+Motos'));
 });
 
 test('los códigos de respaldo son únicos y se normalizan al comparar', () => {

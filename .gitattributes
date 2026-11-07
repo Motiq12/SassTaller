@@ -1,1 +1,16 @@
+# Todo el texto en LF, en cualquier máquina.
+# El repo ya guarda todo en LF, pero sin esta regla lo que queda en disco
+# depende del core.autocrlf de cada quien. En Windows con autocrlf=true, un
+# archivo que una herramienta guardó en LF aparece como modificado aunque el
+# diff salga vacío, y no deja cambiar de rama.
+* text=auto eol=lf
+
+# Los scripts de Windows necesitan CRLF.
+*.bat text eol=crlf
+
+# Binarios: sus bytes no se tocan nunca.
+*.png binary
+*.jpg binary
+*.jar binary
+
 graphify-out/graph.json merge=graphify

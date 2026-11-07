@@ -6,8 +6,8 @@
   margin: 20px auto;
   padding: 36px 40px;
   background: #fff;
-  color: #1a1a1a;
-  border-radius: 16px;
+  color: #1b1f26;
+  border-radius: 2px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
 }
 @media (max-width: 600px) {
@@ -28,13 +28,14 @@
   h1 { margin: 0; font-family: var(--font-display, sans-serif); font-size: 26px; font-weight: 800; color: var(--ion-color-primary); }
   p { margin: 2px 0 0; font-size: 13px; color: #666; }
   .fac-suc { margin-top: 6px; font-size: 12px; line-height: 1.4;
-    strong { color: #333; } }
+    strong { color: #323845; } }
+  .fac-legal { margin-top: 6px; font-size: 12px; strong { color: #323845; } }
 }
 
 .fac-num {
   text-align: right; flex-shrink: 0;
-  .etiqueta { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: #999; }
-  strong { font-family: var(--font-display, sans-serif); font-size: 20px; font-weight: 800; letter-spacing: -.01em; color: #111; }
+  .etiqueta { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: #666; }
+  strong { font-family: var(--font-display, sans-serif); font-size: 20px; font-weight: 800; letter-spacing: 0; color: #14171c; }
   p { margin: 2px 0 0; font-size: 13px; color: #666; }
 }
 
@@ -42,7 +43,7 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: .5px;
-  color: #999;
+  color: #666;
   font-weight: 700;
 }
 
@@ -52,7 +53,7 @@
   margin-bottom: 22px;
 
   div { flex: 1; min-width: 0; }
-  p { margin: 3px 0 0; font-size: 14px; color: #1a1a1a;
+  p { margin: 3px 0 0; font-size: 14px; color: #1b1f26;
     strong { font-weight: 700; } }
 }
 
@@ -76,10 +77,10 @@
     text-transform: uppercase;
     letter-spacing: .4px;
     color: #555;
-    &:first-child { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
-    &:last-child { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
+    &:first-child { border-top-left-radius: 2px; border-bottom-left-radius: 2px; }
+    &:last-child { border-top-right-radius: 2px; border-bottom-right-radius: 2px; }
   }
-  td { padding: 10px 8px; border-bottom: 1px solid #eee; color: #1a1a1a; }
+  td { padding: 10px 8px; border-bottom: 1px solid #eee; color: #1b1f26; }
   .num { text-align: right; font-variant-numeric: tabular-nums; }
 }
 
@@ -97,16 +98,16 @@
     padding: 6px 8px;
     font-size: 14px;
     color: #444;
-    span:last-child { font-variant-numeric: tabular-nums; color: #1a1a1a; }
+    span:last-child { font-variant-numeric: tabular-nums; color: #1b1f26; }
   }
   .total {
-    border-top: 2px solid #1a1a1a;
+    border-top: 2px solid #1b1f26;
     margin-top: 6px;
     padding-top: 10px;
     font-family: var(--font-display, sans-serif);
     font-weight: 800;
     font-size: 19px;
-    color: #111;
+    color: #14171c;
     span:last-child { color: var(--ion-color-primary); }
   }
 }
@@ -116,10 +117,12 @@
   border-top: 1px solid #eee;
   padding-top: 18px;
   font-size: 14px;
-  color: #333;
+  color: #323845;
 
   p { margin: 4px 0; }
-  .gracias { margin-top: 18px; text-align: center; color: var(--rose-700); font-weight: 700; }  // AA (factura impresa, fondo blanco)
+  .fac-nota { margin-top: 14px; font-size: 12px; line-height: 1.5; color: #666; white-space: pre-line; }
+  // Fijo, no var(--rose-700): en tema oscuro esa variable se aclara y sobre la hoja blanca no se leía.
+  .gracias { margin-top: 18px; text-align: center; color: #c2201a; font-weight: 700; }  // AA (factura impresa, fondo blanco)
 }
 
 // Impresión: sin barra y solo la hoja (plana, sin sombra ni márgenes de pantalla).
@@ -128,3 +131,15 @@
   ion-content { --background: #fff; }
   .factura { padding: 0; margin: 0; max-width: none; border-radius: 0; box-shadow: none; }
 }
+
+// Firma de quien emite: a la derecha, sobre una línea, como en papel.
+.fac-firma {
+  display: flex; flex-direction: column; align-items: center; width: 240px; margin: 26px 0 0 auto;
+  img { width: 100%; height: auto; max-height: 80px; object-fit: contain; }
+  .fac-firma-nombre { width: 100%; padding-top: 6px; border-top: 1px solid #1b1f26; text-align: center; font-size: 13px; font-weight: 700; color: #1b1f26; }
+  .etiqueta { margin-top: 2px; }
+}
+
+.fac-cargando { display: flex; justify-content: center; padding-top: 48px; color: var(--tx3); }
+// El botón del topbar queda a la derecha con aire, como "Nueva cita" en el panel.
+.fac-acc { display: flex; align-items: center; padding-right: 10px; }

@@ -1,102 +1,109 @@
 <ion-header>
-  <ion-toolbar>
+  <ion-toolbar class="admin-topbar">
     <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
     <ion-title>Agenda</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
+<ion-content class="admin-dark">
   <ion-refresher slot="fixed" (ionRefresh)="cargar($event)">
     <ion-refresher-content pullingIcon="chevron-down" refreshingSpinner="crescent"></ion-refresher-content>
   </ion-refresher>
 
-  <div class="mec-agenda">
-    <!-- Cabecera del mes -->
-    <div class="cal-head">
-      <h2>{{ tituloMes }}</h2>
-      <div class="cal-nav">
-        <button (click)="cambiarMes(-1)" aria-label="Mes anterior"><ion-icon name="chevron-back"></ion-icon></button>
-        <button class="hoy" (click)="cambiarMes(0)">Hoy</button>
-        <button (click)="cambiarMes(1)" aria-label="Mes siguiente"><ion-icon name="chevron-forward"></ion-icon></button>
+  <div class="pg">
+    <header class="pg-cab">
+      <div>
+        <span class="pg-ante">Mi agenda</span>
+        <h1>{{ tituloMes }}</h1>
       </div>
-    </div>
+      <div class="pg-acciones">
+        <div class="pg-cal-nav" role="group" aria-label="Cambiar de mes">
+          <button type="button" class="btn btn-ou btn-sm" (click)="cambiarMes(-1)" aria-label="Mes anterior"><ion-icon name="chevron-back"></ion-icon></button>
+          <button type="button" class="btn btn-ou btn-sm" (click)="cambiarMes(0)">Hoy</button>
+          <button type="button" class="btn btn-ou btn-sm" (click)="cambiarMes(1)" aria-label="Mes siguiente"><ion-icon name="chevron-forward"></ion-icon></button>
+        </div>
+      </div>
+    </header>
 
     <!-- Resumen del mes -->
-    <div class="mes-resumen" *ngIf="!cargando && citasMes.length">
-      <div class="mr-item agendado"><span class="mr-num">{{ resumenMes.agendadas }}</span><span class="mr-lbl">Agendadas</span></div>
-      <div class="mr-item proceso"><span class="mr-num">{{ resumenMes.enProceso }}</span><span class="mr-lbl">En proceso</span></div>
-      <div class="mr-item completo"><span class="mr-num">{{ resumenMes.completadas }}</span><span class="mr-lbl">Completadas</span></div>
-    </div>
+    <section class="pg-kpis" *ngIf="!cargando && citasMes.length">
+      <div class="pg-kpi in">
+        <span class="pg-kpi-icono"><ion-icon name="calendar-outline"></ion-icon></span>
+        <span class="pg-kpi-label">Agendadas</span>
+        <strong class="pg-kpi-val">{{ resumenMes.agendadas }}</strong>
+      </div>
+      <div class="pg-kpi am">
+        <span class="pg-kpi-icono"><ion-icon name="construct-outline"></ion-icon></span>
+        <span class="pg-kpi-label">En proceso</span>
+        <strong class="pg-kpi-val">{{ resumenMes.enProceso }}</strong>
+      </div>
+      <div class="pg-kpi em">
+        <span class="pg-kpi-icono"><ion-icon name="checkmark-done-outline"></ion-icon></span>
+        <span class="pg-kpi-label">Completadas</span>
+        <strong class="pg-kpi-val">{{ resumenMes.completadas }}</strong>
+      </div>
+    </section>
 
-    <div class="cal-layout">
+    <div class="pg-fila pg-fila--7-5">
       <!-- Calendario -->
-      <div class="cal-card card">
-        <div class="cal-grid cal-dows">
-          <div class="cal-dow" *ngFor="let d of dows">{{ d }}</div>
+      <section class="cd pg-card">
+        <div class="pg-cal-grid pg-cal-dows">
+          <div class="pg-cal-dow" *ngFor="let d of dows">{{ d }}</div>
         </div>
-        <div class="cal-grid" *ngFor="let semana of semanas">
+        <div class="pg-cal-grid" *ngFor="let semana of semanas">
           <button *ngFor="let c of semana"
-                  class="cal-day"
-                  [class.empty]="!c.dia"
-                  [class.today]="c.hoy"
+                  class="pg-cal-dia"
+                  [class.vacio]="!c.dia"
+                  [class.hoy]="c.hoy"
                   [class.sel]="diaSel && c.fecha === diaSel.fecha && c.dia"
                   [ngClass]="c.flujo ? 'flujo-' + c.flujo : ''"
                   [disabled]="!c.dia"
+                  [attr.aria-label]="c.dia ? c.dia + (c.total ? ', ' + c.total + ' citas' : '') : null"
                   (click)="selDia(c)">
             <ng-container *ngIf="c.dia">
-              <span class="d-num">{{ c.dia }}</span>
-              <span class="d-cnt" *ngIf="c.total">{{ c.total }}</span>
+              <span class="pg-cal-num">{{ c.dia }}</span>
+              <span class="pg-cal-n" *ngIf="c.total">{{ c.total }}</span>
             </ng-container>
           </button>
         </div>
-
-        <div class="cal-legend">
-          <span><i class="lg agendado"></i> Agendadas</span>
-          <span><i class="lg proceso"></i> En proceso</span>
-          <span><i class="lg completo"></i> Completadas</span>
+        <div class="pg-cal-ley">
+          <span><i class="in"></i> Agendadas</span>
+          <span><i class="am"></i> En proceso</span>
+          <span><i class="em"></i> Completadas</span>
         </div>
-      </div>
+        <div *ngIf="cargando && !semanas.length" class="sk-dark" style="height:300px"></div>
+      </section>
 
       <!-- Panel del día -->
-      <div class="day-card card" *ngIf="diaSel && diaSel.dia">
-        <div class="day-head">
+      <section class="cd pg-card" *ngIf="diaSel && diaSel.dia">
+        <div class="pg-card-cab">
           <div>
-            <h3>{{ detalleTitulo() }}</h3>
-            <p class="day-sub">
+            <span class="cd-title">{{ detalleTitulo() }}</span>
+            <span class="pg-cuenta ma-cuenta">
               {{ citasDia.length }} {{ citasDia.length === 1 ? 'cita' : 'citas' }}
-              <span *ngIf="esPasado" class="historial-tag"><ion-icon name="time-outline"></ion-icon> Historial</span>
-            </p>
+              <ng-container *ngIf="esPasado"> · Historial</ng-container>
+            </span>
           </div>
         </div>
 
-        <div class="cita-list">
-          <div class="cita-row" *ngFor="let c of citasDia">
-            <div class="ci-hora mono">{{ c.hora || '—' }}</div>
-            <div class="ci-info">
-              <strong>{{ c.marca || 'Vehiculo' }} {{ c.modelo || '' }}<span class="placa" *ngIf="c.placa"> · {{ c.placa }}</span></strong>
-              <span class="ci-vehiculo" *ngIf="c.tipo_servicio">{{ c.tipo_servicio }}</span>
-              <span class="ci-vehiculo" *ngIf="c.cliente_nombre">
-                <ion-icon name="person-outline"></ion-icon> {{ c.cliente_nombre }} {{ c.cliente_apellido }}
-              </span>
-              <span class="ci-vehiculo mono" *ngIf="c.monto > 0">
-                <ion-icon name="cash-outline"></ion-icon> {{ c.monto | currency:'CRC':'symbol-narrow':'1.0-0' }}
-              </span>
-              <div class="ci-badges">
+        <div class="pg-lista">
+          <div class="pg-item ma-cita" *ngFor="let c of citasDia">
+            <span class="ma-hora mono">{{ c.hora || '—' }}</span>
+            <div class="pg-item-txt">
+              <strong>{{ c.marca || 'Moto' }} {{ c.modelo || '' }}<ng-container *ngIf="c.placa"> · {{ c.placa }}</ng-container></strong>
+              <span *ngIf="c.servicios || c.tipo_servicio">{{ c.servicios || c.tipo_servicio }}</span>
+              <span *ngIf="c.cliente_nombre"><ion-icon name="person-outline"></ion-icon> {{ c.cliente_nombre }} {{ c.cliente_apellido }}</span>
+              <span class="ma-badges">
                 <span class="pill" [ngClass]="estadoPill[c.estado]">{{ estadoLabel[c.estado] || c.estado }}</span>
                 <span class="pill green" *ngIf="c.calificacion">{{ c.calificacion }}★</span>
-              </div>
+              </span>
             </div>
           </div>
-
-          <div class="cita-empty" *ngIf="!citasDia.length">
-            <ion-icon name="calendar-clear-outline"></ion-icon>
-            <p>{{ esPasado ? 'No tuviste citas este día.' : 'Sin citas este día.' }}</p>
+          <div class="pg-vacio" *ngIf="!citasDia.length">
+            <ion-icon name="calendar-clear-outline"></ion-icon> {{ esPasado ? 'No tuviste citas este día.' : 'Sin citas este día.' }}
           </div>
         </div>
-      </div>
+      </section>
     </div>
-
-    <div *ngIf="cargando && !semanas.length" class="skeleton" style="height:360px;margin-top:6px"></div>
-    <div style="height:80px"></div>
   </div>
 </ion-content>

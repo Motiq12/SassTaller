@@ -1,120 +1,65 @@
-.rec { max-width: 760px; margin: 0 auto; padding: 14px 16px 0; }
+// Cotizaciones de recepción. Encabezado, pestañas, buscador, campos y botones: el
+// estándar del panel (global.scss). Acá, las filas de piezas y el selector.
 
-.cta-outline {
-  width: 100%; padding: 12px; margin-bottom: 14px;
-  border: 1.5px solid var(--hairline); border-radius: 16px;
-  background: none; color: var(--ion-text-color); cursor: pointer;
-  font-size: 13px; font-weight: 700;
-  display: flex; align-items: center; justify-content: center; gap: 6px;
-  ion-icon { font-size: 18px; }
+// ── Formulario ──
+.rc-form { border-color: var(--cr); }
+.rc-campos { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 14px; }
+@media (min-width: 900px) { .rc-campos { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.rc-picker {
+  width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 10px 14px; border: 1px solid var(--bd); border-radius: 2px; background: var(--sur2); color: var(--tx);
+  font: inherit; font-size: 14px; font-weight: 600; text-align: left; cursor: pointer;
+  .ph { color: var(--tx3); font-weight: 400; }
+  ion-icon { flex: none; font-size: 16px; color: var(--tx3); }
+  &:disabled { opacity: .55; cursor: not-allowed; }
 }
-
-.card {
-  background: var(--ion-card-background);
-  border: 1px solid var(--hairline);
-  border-radius: 24px;
-  box-shadow: var(--shadow-sm);
-  padding: 18px;
-}
-
-.section-label { display: block; margin: 0 0 14px; }
-
-/* Formulario nueva cotización */
-.form-card {
-  border: 1.5px solid var(--ion-color-primary);
-  margin-bottom: 16px;
-
-  .field { margin-bottom: 14px;
-    label { display: block; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--n-500); margin-bottom: 4px; }
-    ion-select { --padding-start: 12px; border: 1px solid var(--hairline); border-radius: 12px; width: 100%; }
-    .hint { font-size: 12px; color: var(--amber-700); margin: 6px 2px 0; }
-  }
-  .mo-input { width: 100%; }
-}
-
-.piezas-lbl { display: block; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--n-500); margin: 4px 0 8px; }
-
-.pieza-row {
-  display: flex; gap: 8px; margin-bottom: 8px; align-items: center;
-  input { border: 1px solid var(--hairline); border-radius: 10px; padding: 9px 11px; font-size: 14px; background: var(--ion-card-background); color: var(--ion-text-color); }
+.rc-aviso { color: var(--am) !important; }
+.rc-pieza { display: flex; gap: 8px; align-items: center; margin-bottom: 8px;
   input:first-child { flex: 1; min-width: 0; }
-  input.monto { width: 96px; }
-  .pieza-del { background: none; border: none; color: var(--n-400); cursor: pointer; padding: 4px; ion-icon { font-size: 18px; } }
+  .rc-monto { width: 120px; flex: none; } }
+.rc-mas { margin-top: 2px; }
+.rc-x {
+  width: 34px; height: 34px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 2px; background: none; color: var(--tx3); cursor: pointer;
+  ion-icon { font-size: 17px; }
+  &:hover { background: var(--sur2); color: var(--tx); }
 }
 
-input.mo-input, .ce-field input {
-  border: 1px solid var(--hairline); border-radius: 10px; padding: 9px 11px; font-size: 14px;
-  background: var(--ion-card-background); color: var(--ion-text-color);
+// ── Lista ──
+.rc-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+@media (min-width: 992px) { .rc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.rc-card { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.rc-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.rc-filas { display: flex; flex-direction: column; }
+.rc-fila {
+  display: flex; align-items: center; gap: 8px; min-height: 36px; border-top: 1px solid var(--bd);
+  font-size: 13.5px; color: var(--tx);
+  &:first-child { border-top: 0; }
+  .mono { font-weight: 600; }
+  &.rc-sec { color: var(--tx2); .mono { font-weight: 500; } }
 }
-
-.link-add {
-  background: none; border: none; cursor: pointer; padding: 4px 0 10px;
-  display: inline-flex; align-items: center; gap: 5px;
-  font-size: 13px; font-weight: 700; color: var(--text-accent);  // AA: texto carmín pequeño
-  ion-icon { font-size: 16px; }
+.rc-nom { flex: 1; min-width: 0; }
+.rc-cant { color: var(--tx3); }
+.rc-costos { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; .fg { flex: 1; min-width: 120px; } .btn { min-height: 44px; } }
+.rc-total {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 12px 14px; margin: 2px 0 14px; background: var(--sur2); border-radius: 2px;
+  span { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--tx3); }
+  strong { font-family: var(--fd); font-size: 24px; font-weight: 700; color: var(--tx); font-variant-numeric: tabular-nums; }
 }
+.rc-card .rc-total { margin: 0; }
+.rc-acc { display: flex; flex-wrap: wrap; gap: 8px; .btn { flex: 1; min-width: 100px; min-height: 38px; } }
+.rc-vacio { grid-column: 1 / -1; flex-wrap: wrap; }
 
-.form-total {
-  display: flex; align-items: center; justify-content: space-between;
-  margin: 8px 0 12px; padding-top: 12px; border-top: 1px solid var(--hairline);
-  span { font-size: 13px; color: var(--n-500); }
-  strong { font-family: var(--font-display); font-size: 22px; font-weight: 800; color: var(--ion-color-primary); }
-}
-
-.btn-guardar { --border-radius: 14px; margin: 0; }
-
-/* Lista de cotizaciones */
-.cotiz-list { display: flex; flex-direction: column; gap: 14px; }
-
-.cotiz-card {
-  .cz-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
-    strong { font-size: 15px; font-weight: 700; }
-    .cz-sub { margin: 3px 0 0; font-size: 12.5px; color: var(--n-500); }
-  }
-}
-
-.pieza-list { margin: 14px 0 6px; }
-.pieza-item {
-  display: flex; align-items: center; gap: 8px; padding: 6px 0;
-  & + .pieza-item { border-top: 1px dashed var(--hairline); }
-  .pi-nombre { flex: 1; font-size: 13.5px; color: var(--n-700); }
-  .pi-cant { color: var(--n-400); }
-  .pi-precio { font-size: 13.5px; font-weight: 600; }
-  .pi-edit { background: none; border: none; color: var(--ion-color-primary); cursor: pointer; padding: 2px; ion-icon { font-size: 17px; } }
-}
-.pieza-empty { font-size: 12.5px; color: var(--n-400); padding: 4px 0; }
-
-.mo-row { display: flex; justify-content: space-between; font-size: 13.5px; color: var(--n-600); padding: 4px 0; }
-
-.costos-edit {
-  display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin: 8px 0;
-  .ce-field { flex: 1; min-width: 110px;
-    label { display: block; font-size: 11px; color: var(--n-500); margin-bottom: 3px; }
-    input { width: 100%; }
-  }
-  ion-button { --border-radius: 10px; margin: 0; }
-}
-
-.cz-total {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--hairline);
-  span { font-size: 13px; color: var(--n-500); }
-  strong { font-family: var(--font-display); font-size: 20px; font-weight: 800; color: var(--ion-color-primary); }
-}
-
-.cz-acciones { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
-.act {
-  flex: 1; min-width: 92px; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-  border: none; border-radius: 12px; padding: 9px 8px; font-size: 13px; font-weight: 700; cursor: pointer;
-  ion-icon { font-size: 16px; }
-  &:disabled { opacity: .45; }
-}
-.act-amber { background: #faeeda; color: #854f0b; }
-.act-rose  { background: var(--ion-color-primary); color: #fff; }
-.act-green { background: #eaf3de; color: #3b6d11; }
-
-.empty-state {
-  text-align: center; padding: 50px 24px; color: var(--n-400);
-  ion-icon { font-size: 52px; opacity: .4; display: block; margin: 0 auto 12px; }
-  p { font-size: 14px; }
+// ── Selector (modal) ──
+.rc-pk { min-height: 0; }
+.rc-pk-lista { display: flex; flex-direction: column; gap: 2px; min-height: 190px; padding-bottom: 14px; }
+.rc-pk-fila {
+  display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 10px 12px;
+  border: 1px solid transparent; border-radius: 2px; background: none; cursor: pointer;
+  font: inherit; text-align: left; color: var(--tx);
+  strong { font-size: 14px; }
+  span { font-size: 12px; color: var(--tx3); }
+  &:hover { background: var(--sur2); }
+  &.on { border-color: var(--cr); background: var(--adm-cr-bg); }
 }

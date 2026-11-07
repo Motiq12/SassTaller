@@ -1,28 +1,25 @@
-// Motiq — Sistema de diseño
-// Lenguaje del export de Stitch: acento carmesí (rose), neutros fríos, esquinas
-// muy redondeadas (24px), tipografía Outfit + Plus Jakarta Sans + JetBrains Mono.
+// MS Motos — el mismo estilo del sitio web (msmotors-web), para que el sitio,
+// el portal de clientes y las pantallas del taller se vean como una sola cosa:
+// rojo de marca, superficies frías casi negras, esquinas rectas y tipografía
+// Rajdhani (títulos y etiquetas) + Inter (texto). JetBrains Mono se queda para
+// los datos (montos, placas, fechas), que el sitio no tiene. Ver DESIGN.md.
 
 :root {
-  // —— Acento de marca: azul marino del isotipo de Motiq ——
-  // Es el color POR DEFECTO del producto. Cada taller lo pisa con el suyo desde su
-  // configuración (MarcaService reescribe estas mismas variables en caliente), así
-  // que esto es lo que ve un taller que todavía no eligió color.
-  // Antes era el carmesí del taller original: eso hacía que un taller nuevo abriera
-  // el sistema con el color de otra empresa.
-  --ion-color-primary: #1e3a5f;
-  --ion-color-primary-rgb: 30, 58, 95;
+  // —— Acento de marca: el rojo del sitio (accent / accent2 / accentText) ——
+  --ion-color-primary: #e2231a;
+  --ion-color-primary-rgb: 226, 35, 26;
   --ion-color-primary-contrast: #ffffff;
   --ion-color-primary-contrast-rgb: 255, 255, 255;
-  --ion-color-primary-shade: #1a3252;
-  --ion-color-primary-tint: #354e6f;
+  --ion-color-primary-shade: #c2201a;
+  --ion-color-primary-tint: #f24a3d;
 
   // —— Secondary: grafito neutro (estructura, no compite con el acento) ——
-  --ion-color-secondary: #262626;
-  --ion-color-secondary-rgb: 38, 38, 38;
+  --ion-color-secondary: #262b34;
+  --ion-color-secondary-rgb: 38, 43, 52;
   --ion-color-secondary-contrast: #ffffff;
   --ion-color-secondary-contrast-rgb: 255, 255, 255;
-  --ion-color-secondary-shade: #212121;
-  --ion-color-secondary-tint: #3c3c3c;
+  --ion-color-secondary-shade: #21262e;
+  --ion-color-secondary-tint: #3c424d;
 
   // —— Tertiary: índigo (rol técnico / acentos secundarios) ——
   --ion-color-tertiary: #4f46e5;
@@ -33,12 +30,13 @@
   --ion-color-tertiary-tint: #6a62e9;
 
   // —— Estados semánticos ——
-  --ion-color-success: #059669;
-  --ion-color-success-rgb: 5, 150, 105;
+  // Era #059669: con texto blanco encima (la etiqueta "Lista para entrega") daba 3,8:1.
+  --ion-color-success: #047857;
+  --ion-color-success-rgb: 4, 120, 87;
   --ion-color-success-contrast: #ffffff;
   --ion-color-success-contrast-rgb: 255, 255, 255;
-  --ion-color-success-shade: #04845c;
-  --ion-color-success-tint: #1ea178;
+  --ion-color-success-shade: #046a4d;
+  --ion-color-success-tint: #1d8668;
 
   --ion-color-warning: #d97706;
   --ion-color-warning-rgb: 217, 119, 6;
@@ -55,69 +53,77 @@
   --ion-color-danger-tint: #e03c3c;
 
   // —— Neutros fríos (familia neutral de Tailwind) ——
-  --ion-color-light: #f5f5f5;
-  --ion-color-light-rgb: 245, 245, 245;
-  --ion-color-light-contrast: #0a0a0a;
-  --ion-color-light-shade: #d8d8d8;
-  --ion-color-light-tint: #f7f7f7;
+  --ion-color-light: #f1f5f9;
+  --ion-color-light-rgb: 241, 245, 249;
+  --ion-color-light-contrast: #0b0d10;
+  --ion-color-light-shade: #d5dbe3;
+  --ion-color-light-tint: #f4f7fa;
 
-  --ion-color-medium: #737373;
-  --ion-color-medium-rgb: 115, 115, 115;
+  --ion-color-medium: #64748b;
+  --ion-color-medium-rgb: 100, 116, 139;
   --ion-color-medium-contrast: #ffffff;
-  --ion-color-medium-shade: #656565;
-  --ion-color-medium-tint: #818181;
+  --ion-color-medium-shade: #586579;
+  --ion-color-medium-tint: #7484a0;
 
-  --ion-color-dark: #0a0a0a;
-  --ion-color-dark-rgb: 10, 10, 10;
+  --ion-color-dark: #0b0d10;
+  --ion-color-dark-rgb: 11, 13, 16;
   --ion-color-dark-contrast: #ffffff;
-  --ion-color-dark-shade: #090909;
-  --ion-color-dark-tint: #232323;
+  --ion-color-dark-shade: #090b0e;
+  --ion-color-dark-tint: #232832;
 
   // —— Superficies (modo claro) ——
-  --ion-background-color: #fafafa;
-  --ion-background-color-rgb: 250, 250, 250;
-  --ion-text-color: #0a0a0a;
-  --ion-text-color-rgb: 10, 10, 10;
+  --ion-background-color: #f8fafc;
+  --ion-background-color-rgb: 248, 250, 252;
+  --ion-text-color: #0b0d10;
+  --ion-text-color-rgb: 11, 13, 16;
 
   --ion-card-background: #ffffff;
   --ion-item-background: #ffffff;
   --ion-toolbar-background: #ffffff;
-  --ion-toolbar-color: #0a0a0a;
+  --ion-toolbar-color: #0b0d10;
   // Fondo de los overlays (alert, popover, loading). Sin esto Ionic usa su propio
   // gris casi blanco: en modo oscuro el texto (--ion-text-color) quedaba blanco
   // sobre fondo blanco y los diálogos eran ilegibles, sobre todo en iOS.
   --ion-overlay-background-color: #ffffff;
   --ion-tab-bar-background: #ffffff;
-  --ion-tab-bar-color: #a3a3a3;
-  // Sigue al color de marca: si el taller elige el suyo, la pestaña activa acompaña.
-  --ion-tab-bar-color-selected: var(--ion-color-primary);
+  --ion-tab-bar-color: #94a3b8;
+  --ion-tab-bar-color-selected: #e2231a;
 
   // —— Escala neutral cruda (para SCSS de páginas) ——
-  --n-50: #fafafa;
-  --n-100: #f5f5f5;
-  --n-150: #ededed;
-  --n-200: #e5e5e5;
-  --n-300: #d4d4d4;
-  --n-400: #a3a3a3;
-  --n-500: #737373;
-  --n-600: #525252;
-  --n-700: #404040;
-  --n-800: #262626;
-  --n-900: #171717;
-  --n-950: #0a0a0a;
+  --n-50: #f8fafc;
+  --n-100: #f1f5f9;
+  --n-150: #e9eef4;
+  --n-200: #e2e8f0;
+  --n-300: #cbd5e1;
+  // --n-400 es el gris de los textos de apoyo (etiquetas, fechas, "Sin datos"…) y de
+  // algunos íconos. Era #94a3b8, que sobre blanco da 2,6:1 y casi no se leía; #677589
+  // es el más claro que pasa 4,5:1 sobre blanco (en oscuro ya se había corregido igual).
+  --n-400: #677589;
+  --n-500: #64748b;
+  --n-600: #475569;
+  --n-700: #334155;
+  --n-800: #262b34;
+  --n-900: #14171c;
+  --n-950: #0b0d10;
 
   // —— Tintes de acento reutilizables ——
-  --rose-50: #fff1f2;
-  --rose-100: #ffe4e6;
-  --rose-200: #fecdd3;
-  --rose-600: #e11d48;
-  --rose-700: #be123c;
+  --rose-50: #fef2f1;
+  --rose-100: #fde4e1;
+  --rose-200: #fbcdc8;
+  --rose-600: #e2231a;
+  --rose-700: #c2201a;
   // Carmín para TEXTO pequeño sobre fondo de la app: oscuro en claro (AA ≈5.2:1),
   // se aclara en modo oscuro (ver bloque dark) para no quedar ilegible sobre negro.
-  --text-accent: var(--ion-color-primary-shade);
+  --text-accent: #c2201a;
   --emerald-50: #ecfdf5;
   --emerald-600: #059669;
   --emerald-700: #047857;
+  // Verde de WhatsApp para TEXTO sobre fondo claro (el de la marca, #25d366, da 1,9:1).
+  // Los botones verdes con texto blanco usan #15803d (5:1) en los dos temas.
+  --whatsapp-texto: #15803d;
+  // Calendario: el color de cada mecánico, para el texto sobre su tinte. En claro, el
+  // tono oscuro de cada color; en oscuro, el claro (los medios daban 3,2 a 3,8:1).
+  --cal-1: #c2201a; --cal-2: #4338ca; --cal-3: #047857; --cal-4: #b45309; --cal-5: #0369a1; --cal-6: #7e22ce; --cal-n: #525252;
   --amber-50: #fffbeb;
   --amber-100: #fef3c7;
   --amber-700: #b45309;
@@ -125,72 +131,166 @@
   --indigo-600: #4f46e5;
 
   // —— Tipografía ——
-  --font-display: 'Outfit', 'Plus Jakarta Sans', sans-serif;
-  --ion-font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Rajdhani', 'Inter', sans-serif;
+  --ion-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
 
-  // —— Sistema (radios muy redondeados, easing, sombras) ——
-  --radius-card: 24px;
-  --radius-control: 16px;
-  --radius-input: 12px;
-  --radius-pill: 999px;
-  --ion-border-radius: 16px;
+  // —— Sistema (esquinas rectas como el sitio, easing, sombras) ——
+  // El sitio usa 2px en botones, campos y etiquetas, y 8px en tarjetas.
+  // --radius-pill conserva el nombre, pero ya no es una pastilla.
+  --radius-card: 8px;
+  --radius-control: 2px;
+  --radius-input: 2px;
+  --radius-pill: 2px;
+  --ion-border-radius: 2px;
   --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
 
-  --shadow-xs: 0 1px 2px rgba(10, 10, 10, 0.04);
-  --shadow-sm: 0 1px 2px rgba(10, 10, 10, 0.04), 0 1px 3px rgba(10, 10, 10, 0.06);
-  --shadow-md: 0 1px 3px rgba(10, 10, 10, 0.05), 0 6px 20px rgba(10, 10, 10, 0.07);
-  --shadow-accent: 0 10px 24px rgba(var(--ion-color-primary-rgb), 0.28);
-  --hairline: rgba(10, 10, 10, 0.07);
+  --shadow-xs: 0 1px 2px rgba(11, 13, 16, 0.04);
+  --shadow-sm: 0 1px 2px rgba(11, 13, 16, 0.04), 0 1px 3px rgba(11, 13, 16, 0.06);
+  --shadow-md: 0 1px 3px rgba(11, 13, 16, 0.05), 0 6px 20px rgba(11, 13, 16, 0.07);
+  --shadow-accent: 0 10px 24px rgba(226, 35, 26, 0.28);
+  --hairline: rgba(11, 13, 16, 0.07);
+  // Velo sobre un fondo de tinte (la etiqueta de estado en la cabecera de una orden).
+  --velo: rgba(255, 255, 255, 0.8);
+
+  // —— Panel del taller (.admin-dark: administración, y el menú de recepción y
+  // mecánico). Antes era oscuro siempre; ahora sigue el tema elegido en Mi perfil
+  // como el resto del sistema. Los textos pasan 4,5:1 sobre sus fondos.
+  --adm-bg: #f4f5f7;
+  --adm-sur: #ffffff; --adm-sur2: #f6f7f9; --adm-sur3: #eceef2;
+  --adm-bd: #e2e5ea; --adm-bd2: #d3d8df;
+  --adm-tx: #14171c; --adm-tx2: #475569; --adm-tx3: #5e6a7d;
+  // Acentos para texto: los colores base de Ionic quedan justos sobre blanco.
+  --adm-em: #047857; --adm-am: #b45309; --adm-in: var(--ion-color-tertiary); --adm-rd: #c81e1e;
+  // Etiquetas y botones de estado: fondo + texto (+ borde de los botones).
+  --adm-cr-bg: #fde8e7; --adm-cr-fg: #b91c1c;
+  --adm-am-bg: #fef3c7; --adm-am-fg: #92400e; --adm-am-bd: #fcd34d;
+  --adm-em-bg: #dcfce7; --adm-em-fg: #166534; --adm-em-bd: #86efac;
+  --adm-in-bg: #e0e7ff; --adm-in-fg: #3730a3;
+  --adm-rd-bg: #fee2e2; --adm-rd-fg: #991b1b; --adm-rd-bd: #fca5a5;
+  // Calendario: hoy y los días de poco o mucho flujo.
+  --adm-hoy: #fdecec; --adm-flujo-bajo: #f0fdf4; --adm-flujo-alto: #fef2f2;
+  // Alertas y hojas de acciones (se montan fuera del panel).
+  --adm-ov: #ffffff; --adm-ov-tx: #1e293b; --adm-ov-msg: #475569; --adm-ov-tenue: #64748b;
+  --adm-ov-linea: rgba(11, 13, 16, 0.1); --adm-ov-hover: rgba(11, 13, 16, 0.05);
+  --adm-ov-radio: #94a3b8; --adm-sombra: rgba(11, 13, 16, 0.18);
 }
 
-// —— Modo oscuro: negro neutro (como el login y la tarjeta de fidelidad) ——
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ion-background-color: #0a0a0a;
-    --ion-background-color-rgb: 10, 10, 10;
-    --ion-text-color: #fafafa;
-    --ion-text-color-rgb: 250, 250, 250;
+// —— Modo oscuro: los mismos fondos del sitio (ink #0b0d10, panel #14171c, panel2 #1b1f26) ——
+@mixin tema-oscuro {
+    --ion-background-color: #0b0d10;
+    --ion-background-color-rgb: 11, 13, 16;
+    --ion-text-color: #f8fafc;
+    --ion-text-color-rgb: 248, 250, 252;
 
-    --ion-card-background: #171717;
-    --ion-item-background: #171717;
-    --ion-toolbar-background: #0f0f0f;
-    --ion-toolbar-color: #fafafa;
+    --ion-card-background: #14171c;
+    --ion-item-background: #14171c;
+    --ion-toolbar-background: #0e1115;
+    --ion-toolbar-color: #f8fafc;
     // Overlays oscuros: acompañan al texto claro (ver nota en el :root de arriba).
-    --ion-overlay-background-color: #171717;
-    --ion-tab-bar-background: #0f0f0f;
-    --ion-tab-bar-color: #737373;
-    --ion-tab-bar-color-selected: var(--ion-color-primary-tint);
+    --ion-overlay-background-color: #14171c;
+    --ion-tab-bar-background: #0e1115;
+    --ion-tab-bar-color: #64748b;
+    --ion-tab-bar-color-selected: #f24a3d;
 
-    --ion-color-light: #262626;
-    --ion-color-light-rgb: 38, 38, 38;
-    --ion-color-light-contrast: #fafafa;
-    --ion-color-light-shade: #212121;
-    --ion-color-light-tint: #3c3c3c;
+    --ion-color-light: #262b34;
+    --ion-color-light-rgb: 38, 43, 52;
+    --ion-color-light-contrast: #f8fafc;
+    --ion-color-light-shade: #21262e;
+    --ion-color-light-tint: #3c424d;
 
-    --ion-color-medium: #a3a3a3;
-    --ion-color-medium-rgb: 163, 163, 163;
+    --ion-color-medium: #94a3b8;
+    --ion-color-medium-rgb: 148, 163, 184;
 
-    --n-50: #171717;
-    --n-100: #1c1c1c;
-    --n-150: #232323;
-    --n-200: #2a2a2a;
-    --n-300: #3a3a3a;
-    --n-400: #8a8a8a;
-    --n-500: #a3a3a3;
+    --n-50: #14171c;
+    --n-100: #1b1f26;
+    --n-150: #232832;
+    --n-200: #2a303a;
+    --n-300: #3a4150;
+    --n-400: #8591a3;
+    --n-500: #94a3b8;
     // En oscuro la escala "tinta" se aclara hacia el blanco (sin estos valores,
     // --n-600..900 caían a los del tema claro y el texto quedaba ilegible).
-    --n-600: #b8b8b8;
-    --n-700: #d4d4d4;
-    --n-800: #e5e5e5;
-    --n-900: #f5f5f5;
+    --n-600: #b4bfcc;
+    --n-700: #cbd5e1;
+    --n-800: #e2e8f0;
+    --n-900: #f1f5f9;
 
     // Carmín para texto: se aclara sobre fondo oscuro (rose-400 ≈6.9:1 sobre la tarjeta).
-    --text-accent: #fb7185;
+    --text-accent: #f24a3d;
+
+    // Tintes y sus textos. En claro son fondo pastel + texto oscuro; aquí se
+    // invierten (fondo profundo + texto claro). Sin esto, una etiqueta o un
+    // adorno con --rose-50 era un cuadro casi blanco sobre la tarjeta oscura, y
+    // un texto --emerald-700 sobre la tarjeta quedaba en 3:1.
+    // Por eso los -600/-700 NO se usan como fondo de nada: para un fondo sólido
+    // están --ion-color-primary, -success, -warning y -tertiary.
+    --rose-50: #2a1614;
+    --rose-100: #3b1b18;
+    --rose-200: #5a2621;
+    --rose-600: #f24a3d;
+    --rose-700: #f8776c;
+    --emerald-50: #10271f;
+    --emerald-600: #34d399;
+    --emerald-700: #34d399;
+    --whatsapp-texto: #25d366;
+    --cal-1: #f87171; --cal-2: #a5b4fc; --cal-3: #34d399; --cal-4: #fbbf24; --cal-5: #7dd3fc; --cal-6: #d8b4fe; --cal-n: #a3a3a3;
+    // Ionic pinta los subtítulos de las listas (el <p> dentro de ion-label) con estos
+    // grises; sin definirlos en oscuro caía a su gris de tema claro (#666), que sobre
+    // el fondo oscuro daba 3,1:1.
+    --ion-text-color-step-300: #b4bfcc;
+    --ion-text-color-step-350: #a6b1bf;
+    --ion-text-color-step-400: #94a3b8;
+    --ion-text-color-step-450: #8c99ab;
+    --ion-text-color-step-500: #8591a3;
+    --ion-text-color-step-550: #8591a3;
+    --ion-text-color-step-600: #8591a3;
+    --amber-50: #2a2010;
+    --amber-100: #3a2b12;
+    --amber-700: #fbbf24;
+    --indigo-50: #1d2042;
+    --indigo-600: #a5b4fc;
 
     --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.5);
     --hairline: rgba(255, 255, 255, 0.08);
-  }
+    --velo: rgba(255, 255, 255, 0.08);
+
+    // Panel del taller: los mismos colores que tenía cuando era oscuro siempre.
+    // Acentos en *-tint: los base caen bajo AA sobre #14171c (tertiary ≈3,2:1).
+    // --adm-tx3 no es #475569: sobre estos fondos daba 2,2 a 2,5 de contraste.
+    --adm-bg: #0b0d10;
+    --adm-sur: #14171c; --adm-sur2: #1b1f26; --adm-sur3: #232832;
+    --adm-bd: #2a303a; --adm-bd2: #323845;
+    --adm-tx: #f1f5f9; --adm-tx2: #94a3b8; --adm-tx3: #8591a3;
+    --adm-em: #34d399; --adm-am: var(--ion-color-warning-tint);
+    // El índigo y el rojo "tint" daban 3,9:1 como texto sobre el panel; estos, 5,5:1 y más.
+    --adm-in: #818cf8; --adm-rd: #f87171;
+    --adm-cr-bg: #2c0a12; --adm-cr-fg: #f24a3d;
+    --adm-am-bg: #2c1a00; --adm-am-fg: #fbb834; --adm-am-bd: #78350f;
+    --adm-em-bg: #0a1f0a; --adm-em-fg: #4ade80; --adm-em-bd: #14532d;
+    --adm-in-bg: #0a0f2e; --adm-in-fg: #818cf8;
+    --adm-rd-bg: #2b0d0d; --adm-rd-fg: #f87171; --adm-rd-bd: #7f1d1d;
+    --adm-hoy: #1a0608; --adm-flujo-bajo: #0a1a0a; --adm-flujo-alto: #1a0a0a;
+    --adm-ov: #1b1f26; --adm-ov-tx: #e2e8f0; --adm-ov-msg: #cccccc; --adm-ov-tenue: #999999;
+    --adm-ov-linea: rgba(255, 255, 255, 0.1); --adm-ov-hover: rgba(255, 255, 255, 0.06);
+    --adm-ov-radio: #555555; --adm-sombra: rgba(0, 0, 0, 0.5);
+    // Para que los controles del navegador (selects, barras, calendario) sigan al tema.
+    color-scheme: dark;
 }
+
+// Quién ve el tema oscuro:
+//   - Automático (sin clase en <html>): quien tiene el dispositivo en oscuro.
+//   - "Oscuro" elegido en Mi perfil -> Accesibilidad: siempre.
+//   - "Claro" elegido ahí: nunca, aunque el dispositivo esté en oscuro.
+// La clase la pone AccesibilidadService, y antes que él un script en index.html,
+// para que la pantalla no parpadee al abrir.
+// Por eso NINGUNA pantalla usa `@media (prefers-color-scheme)` por su cuenta: no
+// se enteraría de lo que la persona eligió. Lo que cambie entre temas va aquí,
+// como variable.
+@media (prefers-color-scheme: dark) {
+  :root:not(.tema-claro) { @include tema-oscuro; }
+}
+:root.tema-oscuro { @include tema-oscuro; }
+:root.tema-claro { color-scheme: light; }

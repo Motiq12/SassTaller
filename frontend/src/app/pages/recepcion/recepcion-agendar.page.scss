@@ -1,59 +1,78 @@
-.agendar { max-width: 920px; margin: 0 auto; padding: 14px 16px 0; }
-
-.intro {
-  margin: 2px 2px 16px;
-  h1 { font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
-  p { font-size: 13px; color: var(--n-500); margin: 4px 0 0; }
-}
+// Colores y encabezado del estándar del panel (global.scss: .admin-dark, .pg-cab).
+// El formulario queda en una columna de 920 px, alineado con el encabezado.
+.agendar > section, .agendar > .ag-acciones { max-width: 920px; }
 
 .card {
-  background: var(--ion-card-background); border: 1px solid var(--hairline);
-  border-radius: 24px; box-shadow: var(--shadow-sm); padding: 18px; margin-bottom: 14px;
+  background: var(--sur); border: 1px solid var(--bd);
+  border-radius: 8px; padding: 18px; margin-bottom: 14px;
 }
 .section-label {
   display: block; font-size: 11px; font-weight: 800; text-transform: uppercase;
-  letter-spacing: 0.12em; color: var(--n-400); margin-bottom: 14px;
+  letter-spacing: 0.12em; color: var(--tx3); margin-bottom: 14px;
 }
 
 /* Campos */
 .ig {
   margin-bottom: 12px;
-  label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--n-400); margin-bottom: 5px; }
+  label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--tx3); margin-bottom: 5px; }
   input, select, textarea {
-    width: 100%; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: 12px;
-    font-family: inherit; font-size: 13px; background: var(--ion-card-background); color: var(--ion-text-color);
+    width: 100%; padding: 10px 12px; border: 1px solid var(--bd); border-radius: 2px;
+    font-family: inherit; font-size: 13px; background: var(--sur); color: var(--tx);
     outline: none; transition: border-color 0.2s;
     &:focus { border-color: var(--ion-color-primary); }
   }
   // El desplegable nativo del <select> hereda color-scheme: sin esto Chrome lo dibuja
   // en claro sobre el fondo oscuro forzado y los nombres quedan casi ilegibles.
   select { color-scheme: light dark; }
-  select option { background: var(--ion-card-background); color: var(--ion-text-color); }
+  select option { background: var(--sur); color: var(--tx); }
   textarea { resize: none; height: 60px; }
   input[type="date"] { color-scheme: light dark; }
 }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.hint-campo { font-size: 11.5px; color: var(--tx3); margin-top: 4px; }
+
+/* Cuadros para registrar cliente o moto: la caja estándar del panel
+   (global.scss → .adm-modal-box); acá solo el encabezado con ícono. */
+.alta {
+  .amb-head { align-items: flex-start; }
+  .alta-tit {
+    display: flex; align-items: center; gap: 12px; min-width: 0;
+    strong { display: block; font-family: var(--fd); font-size: 20px; font-weight: 700; line-height: 1.15; color: var(--tx); }
+    div > span { display: block; margin-top: 2px; font-size: 12.5px; color: var(--tx3); }
+  }
+  .alta-ico {
+    display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex-shrink: 0;
+    border-radius: 8px; background: color-mix(in srgb, var(--cr) 12%, transparent); color: var(--cr-tx);
+    ion-icon { font-size: 20px; }
+  }
+  .fg label b, .amb-tip b { color: var(--cr-tx); font-weight: 800; }
+  .alta-placa { text-transform: uppercase; font-family: var(--fm); letter-spacing: .04em; }
+  .amb-foot .btn { min-width: 120px; }
+}
+@media (max-width: 420px) {
+  .alta .amb-btns { width: 100%; .btn { flex: 1; min-width: 0; } }
+}
 
 /* Selector de modo: ingresar ahora vs agendar */
 .modo-seg {
   display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px;
   .ms-btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-    padding: 12px; border-radius: 14px; cursor: pointer;
-    border: 1px solid var(--hairline); background: var(--ion-card-background); color: var(--n-500);
+    padding: 12px; border-radius: 2px; cursor: pointer;
+    border: 1px solid var(--bd); background: var(--sur); color: var(--tx3);
     font-family: inherit; font-size: 13px; font-weight: 700;
     transition: border-color .15s, color .15s, background .15s;
     ion-icon { font-size: 17px; }
-    &.on { border-color: var(--ion-color-primary); color: var(--ion-color-primary); background: var(--rose-50); }
+    &.on { border-color: var(--ion-color-primary); color: var(--cr-tx); background: var(--rose-50); }
     &:active { transform: scale(.98); }
   }
 }
 
-/* Enlace para crear cliente / registrar vehiculo */
+/* Enlace para crear cliente / registrar moto */
 .link-nuevo {
   display: inline-flex; align-items: center; gap: 6px; margin-top: 8px;
   background: none; border: none; cursor: pointer; padding: 4px 0;
-  font-family: inherit; font-size: 12.5px; font-weight: 700; color: var(--text-accent);
+  font-family: inherit; font-size: 12.5px; font-weight: 700; color: var(--cr-tx);
   ion-icon { font-size: 15px; }
   &:active { transform: scale(.98); }
 }
@@ -61,35 +80,35 @@
 /* Autocompletar cliente */
 .cli-wrap { position: relative; }
 .cli-results {
-  margin-top: 6px; background: var(--ion-card-background); border: 1px solid var(--hairline);
-  border-radius: 12px; overflow: hidden auto; max-height: 220px;
+  margin-top: 6px; background: var(--sur); border: 1px solid var(--bd);
+  border-radius: 2px; overflow: hidden auto; max-height: 220px;
 }
 .cli-item {
   display: block; width: 100%; text-align: left; padding: 10px 12px;
-  background: none; border: none; border-bottom: 1px solid var(--hairline);
-  color: var(--ion-text-color); font-size: 13px; cursor: pointer;
+  background: none; border: none; border-bottom: 1px solid var(--bd);
+  color: var(--tx); font-size: 13px; cursor: pointer;
   &:last-child { border-bottom: none; }
-  &:hover { background: var(--n-100); }
+  &:hover { background: var(--sur2); }
   strong { font-weight: 600; }
-  span { color: var(--n-400); font-size: 12px; margin-left: 4px; }
+  span { color: var(--tx3); font-size: 12px; margin-left: 4px; }
 }
 
 /* Cliente elegido */
 .cli-pick {
   display: flex; align-items: center; gap: 10px;
-  background: var(--n-100); border-radius: 14px; padding: 12px; margin-bottom: 12px;
+  background: var(--sur2); border-radius: 2px; padding: 12px; margin-bottom: 12px;
   .av { width: 38px; height: 38px; border-radius: 50%; background: var(--ion-color-primary); color: #fff;
     display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0; }
-  .meta { flex: 1; min-width: 0; strong { display: block; font-size: 13px; } span { font-size: 11px; color: var(--n-500); } }
-  .x { background: none; border: none; color: var(--n-400); cursor: pointer; padding: 4px; ion-icon { font-size: 18px; } }
+  .meta { flex: 1; min-width: 0; strong { display: block; font-size: 13px; } span { font-size: 11px; color: var(--tx3); } }
+  .x { background: none; border: none; color: var(--tx3); cursor: pointer; padding: 4px; ion-icon { font-size: 18px; } }
 }
 
 /* CTA */
 .cta {
-  width: 100%; padding: 14px; border: none; border-radius: 16px;
+  width: 100%; padding: 14px; border: none; border-radius: 2px;
   background: var(--ion-color-primary); color: #fff;
   font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
-  box-shadow: 0 8px 20px rgba(var(--ion-color-primary-rgb), 0.22);
+  box-shadow: 0 8px 20px rgba(226, 35, 26, 0.22);
   display: flex; align-items: center; justify-content: center; gap: 8px;
   transition: transform 0.15s var(--ease, ease);
   &:active { transform: scale(0.98); }

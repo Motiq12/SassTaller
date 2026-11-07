@@ -7,7 +7,7 @@
   padding: 18px 16px 60px;
 }
 
-.cd { border-radius: 24px; }
+.cd { border-radius: 8px; }
 
 // ——— Resumen (3 cajas) ———
 .op-summary {
@@ -20,13 +20,13 @@
 .sum-box {
   background: var(--sur2);
   border: 1px solid var(--bd);
-  border-radius: 16px;
+  border-radius: 2px;
   padding: 14px 12px;
   text-align: center;
 
   &.alert {
     border-color: var(--cr);
-    background: rgba(var(--ion-color-primary-rgb), .08);
+    background: rgba(226, 35, 26, .08);
   }
 }
 
@@ -79,7 +79,7 @@
   align-items: center;
   gap: 2px;
   padding: 7px 12px;
-  border-radius: 999px;
+  border-radius: 2px;
   border: 1px solid var(--bd);
   background: var(--sur2);
   color: var(--tx2);
@@ -87,7 +87,7 @@
   font-weight: 700;
   font-family: inherit;
   cursor: pointer;
-  transition: all .15s ease;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .15s ease, opacity .15s ease;
   ion-icon { font-size: 13px; color: var(--am); }
 
   &.on {
@@ -104,7 +104,7 @@
   min-width: 180px;
   min-height: 40px;
   border: 1px solid var(--bd);
-  border-radius: 12px;
+  border-radius: 2px;
   background: var(--sur2);
   color: var(--tx);
   font-size: 14px;
@@ -118,7 +118,7 @@
   margin-left: auto;
   padding: 8px 12px;
   border: 1px solid var(--bd);
-  border-radius: 12px;
+  border-radius: 2px;
   background: transparent;
   color: var(--tx2);
   font-size: 13px;
@@ -142,9 +142,9 @@
 .op-clickable { cursor: pointer; }
 
 .op-baja {
-  background: rgba(var(--ion-color-primary-rgb), .08);
+  background: rgba(226, 35, 26, .08);
   border-left: 3px solid var(--cr);
-  border-radius: 8px;
+  border-radius: 2px;
   padding-left: 10px;
   padding-right: 10px;
   margin: 4px 0;
@@ -181,14 +181,14 @@
   max-width: 42%;
 }
 
-.op-vehiculo { font-size: 12px; font-weight: 600; color: var(--tx2); }
+.op-moto { font-size: 12px; font-weight: 600; color: var(--tx2); }
 .op-orden { font-size: 11px; color: var(--tx3); }
 .op-fecha { font-size: 11px; color: var(--tx3); }
 
 // ——— Skeleton ———
 .sk-op {
   height: 64px;
-  border-radius: 12px;
+  border-radius: 2px;
   margin-bottom: 10px;
   &:last-child { margin-bottom: 0; }
 }

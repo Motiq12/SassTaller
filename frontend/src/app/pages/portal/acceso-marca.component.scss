@@ -1,0 +1,128 @@
+// La marca (ver acceso-marca.component.ts). Va sobre la foto del taller, que pone
+// el contenedor de cada pantalla: aquí solo el texto, siempre blanco.
+:host { display: block; }
+
+.marca {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: calc(26px + var(--ion-safe-area-top, 0px)) 22px 30px;
+  color: #f1f5f9;
+  // En celular y tablet la foto cubre solo esta franja, encuadrada en el banco de
+  // herramientas (estirada a toda la página se veía solo la pared).
+  background:
+    linear-gradient(180deg, rgba(11, 13, 16, .35) 0%, rgba(11, 13, 16, .55) 55%, rgba(11, 13, 16, .85) 100%),
+    url('/assets/portal/taller-bg.jpg') 60% 62% / cover no-repeat,
+    #0b0d10;
+}
+
+.marca-logo {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, .55));
+  animation: marcaEntra .5s var(--ease-out, cubic-bezier(0.32, 0.72, 0, 1)) both;
+}
+
+.marca-cuerpo {
+  animation: marcaEntra .6s .06s var(--ease-out, cubic-bezier(0.32, 0.72, 0, 1)) both;
+}
+
+// La etiqueta de arriba, con el punto rojo, como la del menú del panel.
+.marca-rotulo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 2px;
+  background: rgba(11, 13, 16, .5);
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: #cbd5e1;
+
+  &::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--ion-color-primary); }
+}
+
+.marca-titulo {
+  margin: 12px 0 0;
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 700;
+  line-height: .98;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, .5);
+
+  // El rojo claro: el de marca no llega a 4,5:1 como texto sobre la foto oscura.
+  span { display: block; color: var(--ion-color-primary-tint); }
+}
+
+// En tablet y celular no va la lista: el formulario tiene que verse sin bajar.
+.marca-lista { display: none; }
+
+// ── Escritorio: el título grande abajo a la izquierda, los puntos debajo ──
+@media (min-width: 1024px) {
+  :host { height: 100%; }
+
+  .marca {
+    // La foto la pone la pantalla de fondo, de lado a lado.
+    background: none;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 620px;
+    box-sizing: border-box;
+    justify-content: space-between;
+    padding: 44px clamp(40px, 5vw, 84px) 52px;
+  }
+
+  .marca-logo { width: 104px; height: 104px; }
+
+  .marca-titulo { margin-top: 20px; font-size: clamp(56px, 5.4vw, 92px); line-height: .92; }
+
+  // 01 · 02 · 03: en fila, separados por una raya, como los pasos de una orden.
+  .marca-lista {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 28px;
+    max-width: 820px;
+    margin: 38px 0 0;
+    padding: 22px 0 0;
+    list-style: none;
+    border-top: 1px solid rgba(255, 255, 255, .18);
+
+    li { display: flex; flex-direction: column; gap: 8px; }
+
+    strong { display: block; margin-bottom: 4px; font-size: 14.5px; font-weight: 700; color: #fff; }
+
+    li > span:last-child { font-size: 13px; line-height: 1.5; color: #cbd5e1; }
+  }
+
+  .marca-n {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    color: var(--ion-color-primary-tint);
+  }
+}
+
+// En pantallas bajas de escritorio los puntos no entran junto al título.
+@media (min-width: 1024px) and (max-height: 700px) {
+  .marca-lista { display: none; }
+}
+
+@keyframes marcaEntra {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marca-logo, .marca-cuerpo { animation: none; }
+}

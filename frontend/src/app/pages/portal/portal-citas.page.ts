@@ -1,11 +1,11 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 import { ToastController, AlertController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PortalService } from '../../services/portal.service';
-import { FLUJO_CITA, ESTADO_CITA_LABEL } from '../../shared/utils/servicios.util';
-import { badgeProximidad, BadgeProximidad, diasHastaCita } from '../../shared/utils/fecha-cita.util';
+import { FLUJO_CITA, ESTADO_CITA_LABEL } from '../../utils/servicios';
+import { badgeProximidad, BadgeProximidad, diasHastaCita } from '../../utils/fecha-cita';
 
 @Component({
   standalone: false,
@@ -14,11 +14,6 @@ import { badgeProximidad, BadgeProximidad, diasHastaCita } from '../../shared/ut
   styleUrls: ['./portal-citas.page.scss'],
 })
 export class PortalCitasPage implements OnInit, OnDestroy {
-  private portal = inject(PortalService);
-  private toast = inject(ToastController);
-  private alert = inject(AlertController);
-  private router = inject(Router);
-
   private destroy$ = new Subject<void>();
   citas: any[] = [];
   cargando = true;
@@ -26,7 +21,7 @@ export class PortalCitasPage implements OnInit, OnDestroy {
   reporteAbierto = new Set<number>();
   confirmando = new Set<number>();
 
-  // Buscador (por vehiculo/placa/servicio) y filtro por estado (solo en pendientes).
+  // Buscador (por moto/placa/servicio) y filtro por estado (solo en pendientes).
   busqueda = '';
   filtroEstado = '';
 
@@ -34,6 +29,8 @@ export class PortalCitasPage implements OnInit, OnDestroy {
   readonly estadoLabel = ESTADO_CITA_LABEL;
   // Estados posibles de una cita pendiente (para los chips de filtro).
   readonly estadosPendiente = ['agendado', 'en_revision', 'en_mantenimiento', 'listo'];
+
+  constructor(private portal: PortalService, private toast: ToastController, private alert: AlertController, private router: Router) {}
 
   ngOnInit() { this.cargar(); }
   ionViewWillEnter() { this.cargar(); }
@@ -63,7 +60,7 @@ export class PortalCitasPage implements OnInit, OnDestroy {
   limpiarFiltros() { this.busqueda = ''; this.filtroEstado = ''; }
   toggleEstado(e: string) { this.filtroEstado = this.filtroEstado === e ? '' : e; }
 
-  // Texto de la cita contra el que se busca (vehiculo, placa, servicio).
+  // Texto de la cita contra el que se busca (moto, placa, servicio).
   private coincide(c: any): boolean {
     const q = this.busqueda.trim().toLowerCase();
     if (!q) return true;

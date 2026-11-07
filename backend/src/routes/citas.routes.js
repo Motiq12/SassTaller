@@ -1,13 +1,31 @@
 const router = require('express').Router();
-// Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
-const { fail } = require('../utils/responder');
+const { pool } = require('../db/pool');
+const { fail, invalido, faltante } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { soloRoles } = require('../middleware/roles');
+const { cargarAlcance, soloSucursal, sucursalParaGuardar, exigirSucursal, SUCURSAL_DE_CITA } = require('../utils/alcance');
 const { notificarCambioEstado, notificarMecanico, notificarCitaAgendada } = require('../utils/notificaciones');
 const { TRANSICIONES_CITA, transicionPermitida } = require('../utils/transiciones');
 const { sucursalValida, tecnicoEnSucursal } = require('../utils/sucursales');
 const { textoDentroDeLimite } = require('../utils/validar');
+const { getConfig } = require('../utils/configuracion');
+const { serviciosDelPedido, pedidoTraeServicios, problemaConServicios, textoServicios, guardarServiciosCita } = require('../utils/servicios-cita');
+const { agendaDia, duracionValida, horasDeCita, conflictosDeCita, textoConflictos, problemaDeHorario } = require('../utils/agenda');
+const { exigirPermiso } = require('../middleware/permisos');
+const { anotar } = require('../utils/actividad');
+
+// Si se puede poner la cita ahí (utils/agenda.js → problemaDeHorario): nadie agenda en
+// el pasado; recepción, además, solo dentro del horario, sin bloqueo y con lugar.
+// Administración se salta eso último: ella puso el bloqueo y sabe si el taller da abasto.
+async function rechazoDeHorario(req, res, { fecha, hora, sucursalId, excluirId = null, minutos = null }) {
+  const p = await problemaDeHorario({
+    fecha, hora, sucursalId, excluirId, minutos, config: await getConfig(), puedeForzar: req.usuario.rol === 'admin',
+  });
+  if (!p) return false;
+  invalido(res, p.campo, p.error, p.status || 400);
+  return true;
+}
 
 const ESTADOS = ['agendado', 'en_revision', 'en_mantenimiento', 'listo', 'entregado', 'cancelado'];
 const MAX_MOTIVO = 1000;
@@ -22,7 +40,13 @@ const GESTIONA_AGENDA = ['recepcion', 'admin'];
 
 // Piso de rol: recepción o superior. Sin esto, cualquier token válido (incluido el
 // de un cliente del portal) podía leer la agenda y cambiar el estado de cualquier cita.
-router.use(auth, requireRol('recepcion'));
+// El mecánico tampoco: ve y mueve sus citas por /api/mecanico (antes, por la jerarquía,
+// leía la agenda de todo el taller).
+router.use(auth, soloRoles('recepcion', 'admin'));
+// Quien tiene una sucursal ve solo las citas de ella (utils/alcance.js). Todas las
+// rutas con :id de este archivo son de una cita: una de la otra sucursal da 404.
+router.use(cargarAlcance);
+router.param('id', exigirSucursal(SUCURSAL_DE_CITA));
 
 router.get('/', async (req, res) => {
   try {
@@ -31,71 +55,126 @@ router.get('/', async (req, res) => {
                       m.marca, m.modelo, m.placa,
                       u.nombre AS usuario_nombre,
                       t.nombre AS tecnico_nombre,
-                      s.nombre AS sucursal_nombre
+                      s.nombre AS sucursal_nombre,
+                      o.numero_orden
                FROM citas ci
-               JOIN clientes c ON ci.cliente_id = c.id AND c.tenant_id = @tenant
-               LEFT JOIN vehiculos m ON ci.vehiculo_id = m.id AND m.tenant_id = @tenant
-               LEFT JOIN usuarios u ON ci.usuario_id = u.id AND u.tenant_id = @tenant
-               LEFT JOIN usuarios t ON ci.tecnico_id = t.id AND t.tenant_id = @tenant
-               LEFT JOIN sucursales s ON s.id = ci.sucursal_id AND s.tenant_id = @tenant
-               WHERE ci.tenant_id = @tenant`;
+               JOIN clientes c ON ci.cliente_id = c.id
+               LEFT JOIN motos m ON ci.moto_id = m.id
+               LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id
+               LEFT JOIN usuarios u ON ci.usuario_id = u.id
+               LEFT JOIN usuarios t ON ci.tecnico_id = t.id
+               LEFT JOIN sucursales s ON s.id = ci.sucursal_id
+               WHERE 1=1`;
     const params = [];
     if (fecha) { sql += ' AND ci.fecha = ?'; params.push(fecha); }
     if (estado) { sql += ' AND ci.estado = ?'; params.push(estado); }
     if (tecnico_id) { sql += ' AND ci.tecnico_id = ?'; params.push(tecnico_id); }
     if (sucursal_id) { sql += ' AND ci.sucursal_id = ?'; params.push(sucursal_id); }
+    // ?sin_orden=1: las citas vigentes que todavía no tienen orden de trabajo.
+    if (req.query.sin_orden === '1') sql += " AND ci.orden_id IS NULL AND ci.estado NOT IN ('cancelado','entregado')";
     if (q) {
       sql += ' AND (c.nombre LIKE ? OR c.apellido LIKE ? OR CONCAT(c.nombre, " ", c.apellido) LIKE ? OR m.placa LIKE ?)';
       const like = `%${q}%`;
       params.push(like, like, like, like);
     }
-    sql += ` ORDER BY ci.fecha ASC, ci.hora ASC LIMIT ${MAX_LISTADO}`;
-    const [rows] = await req.db.query(sql, params);
+    sql += soloSucursal(req, 'ci.sucursal_id');
+    // Las MAX_LISTADO más recientes, mostradas de la más vieja a la más nueva. Antes se
+    // cortaban las más viejas: pasadas las 500 citas, las nuevas ya no aparecían.
+    sql = `SELECT * FROM (${sql} ORDER BY ci.fecha DESC, ci.hora DESC, ci.id DESC LIMIT ${MAX_LISTADO}) recientes
+           ORDER BY fecha ASC, hora ASC, id ASC`;
+    const [rows] = await pool.query(sql, params);
     res.json({ data: rows });
   } catch (err) {
     fail(res, err);
   }
 });
 
-router.post('/', soloRoles(...GESTIONA_AGENDA), async (req, res) => {
+router.post('/', soloRoles(...GESTIONA_AGENDA), exigirPermiso('citas.agendar'), async (req, res) => {
   try {
-    const { cliente_id, vehiculo_id, fecha, hora, tipo_servicio, tecnico_id } = req.body;
+    const { cliente_id, moto_id, fecha, hora, tecnico_id } = req.body;
     const motivo = String(req.body.motivo || '').trim();
-    if (!cliente_id || !fecha || !hora || !motivo) {
-      return res.status(400).json({ error: 'cliente_id, fecha, hora y motivo son requeridos' });
-    }
+    if (faltante(res, { ...req.body, motivo }, [['cliente_id', 'el cliente'], ['fecha', 'la fecha'], ['hora', 'la hora'], ['motivo', 'el motivo']])) return;
     if (!textoDentroDeLimite(motivo, MAX_MOTIVO)) {
-      return res.status(400).json({ error: `motivo no puede exceder ${MAX_MOTIVO} caracteres` });
+      return invalido(res, 'motivo', `El motivo no puede pasar de ${MAX_MOTIVO} caracteres`);
     }
-    const sucursal_id = (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
-    if (!(await tecnicoEnSucursal(req.db, tecnico_id, sucursal_id))) {
-      return res.status(400).json({ error: 'El mecánico no atiende en esa sucursal' });
+    // Uno o varios servicios (o ninguno: el personal puede agendar solo con el motivo).
+    const servicios = serviciosDelPedido(req.body);
+    const problemaServicios = await problemaConServicios(servicios);
+    if (problemaServicios) return invalido(res, 'servicios', problemaServicios);
+    const sucursal_id = sucursalParaGuardar(req, (await sucursalValida(req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null);
+    if (!(await tecnicoEnSucursal(tecnico_id, sucursal_id))) {
+      return invalido(res, 'tecnico_id', 'El mecánico no atiende en esa sucursal');
     }
-    const [result] = await req.db.query(
-      'INSERT INTO citas (tenant_id,cliente_id, vehiculo_id, usuario_id, tecnico_id, sucursal_id, fecha, hora, motivo, tipo_servicio) VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [cliente_id, vehiculo_id || null, req.usuario.id, tecnico_id || null, sucursal_id, fecha, hora, motivo, tipo_servicio || null]
+    const esAdmin = req.usuario.rol === 'admin';
+    if (await rechazoDeHorario(req, res, { fecha, hora, sucursalId: sucursal_id })) return;
+    // La duración solo la decide administración; las demás nacen de 1 hora.
+    const duracion = esAdmin && duracionValida(req.body.duracion_horas) ? Number(req.body.duracion_horas) : 1;
+    const [result] = await pool.query(
+      'INSERT INTO citas (cliente_id, moto_id, usuario_id, tecnico_id, sucursal_id, fecha, hora, motivo, tipo_servicio, duracion_horas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [cliente_id, moto_id || null, req.usuario.id, tecnico_id || null, sucursal_id, fecha, hora, motivo, servicios[0] || null, duracion]
     );
-    const [[nueva]] = await req.db.query('SELECT * FROM citas WHERE tenant_id = @tenant AND id = ?', [result.insertId]);
+    await guardarServiciosCita(result.insertId, servicios);
+    const [[nueva]] = await pool.query('SELECT * FROM citas WHERE id = ?', [result.insertId]);
     if (tecnico_id) {
-      await notificarMecanico(req.db, tecnico_id, `Nueva cita asignada: ${tipo_servicio || motivo} el ${fecha} a las ${hora}`, req.usuario.id);
+      await notificarMecanico(tecnico_id, `Nueva cita asignada: ${textoServicios(servicios) || motivo} el ${fecha} a las ${hora}`, req.usuario.id);
     }
     // El cliente también se entera: el taller le agendó una cita desde el mostrador.
-    await notificarCitaAgendada(req.db, result.insertId);
+    await notificarCitaAgendada(result.insertId);
     res.status(201).json({ data: nueva, message: 'Cita creada' });
   } catch (err) {
     fail(res, err);
   }
 });
 
+// DELETE /api/citas/:id — borra una cita (solo administración), para las que se
+// agendaron por error o de prueba. Una cita con orden no se borra (la orden es la que
+// guarda el trabajo: se elimina primero la orden), ni una entregada (queda en el
+// historial). Para una que el cliente ya no quiere, lo normal es cancelarla.
+router.delete('/:id', requireRol('admin'), async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[cita]] = await conn.query(
+      `SELECT ci.id, ci.estado, ci.orden_id, o.numero_orden, DATE_FORMAT(ci.fecha, '%d/%m/%Y') AS fecha,
+              TIME_FORMAT(ci.hora, '%H:%i') AS hora, CONCAT_WS(' ', c.nombre, c.apellido) AS cliente
+       FROM citas ci
+       LEFT JOIN clientes c ON c.id = ci.cliente_id
+       LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id
+       WHERE ci.id = ? FOR UPDATE`,
+      [req.params.id]
+    );
+    if (!cita) { await conn.rollback(); return res.status(404).json({ error: 'Cita no encontrada' }); }
+    if (cita.orden_id) {
+      await conn.rollback();
+      const orden = cita.numero_orden ? `la orden ${cita.numero_orden}` : 'una orden';
+      return res.status(409).json({ error: `Esta cita tiene ${orden}. Para borrarla, primero eliminá la orden.` });
+    }
+    if (cita.estado === 'entregado') {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Esta cita ya se entregó: se queda en el historial. No se puede borrar.' });
+    }
+    await conn.query('DELETE FROM notificaciones WHERE cita_id = ?', [cita.id]);
+    await conn.query('DELETE FROM citas WHERE id = ?', [cita.id]);
+    await conn.commit();
+    anotar(req.usuario.id, 'cita_eliminada', `${cita.cliente || 'Cliente'} · ${cita.fecha} ${cita.hora}`);
+    res.json({ message: 'Cita eliminada' });
+  } catch (err) {
+    await conn.rollback();
+    fail(res, err);
+  } finally {
+    conn.release();
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
-    const [[cita]] = await req.db.query(
+    const [[cita]] = await pool.query(
       `SELECT ci.*, c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.telefono AS cliente_telefono,
               m.marca, m.modelo, m.placa
        FROM citas ci
-       JOIN clientes c ON ci.cliente_id = c.id AND c.tenant_id = @tenant
-       LEFT JOIN vehiculos m ON ci.vehiculo_id = m.id AND m.tenant_id = @tenant
-       WHERE ci.tenant_id = @tenant AND ci.id = ?`,
+       JOIN clientes c ON ci.cliente_id = c.id
+       LEFT JOIN motos m ON ci.moto_id = m.id
+       WHERE ci.id = ?`,
       [req.params.id]
     );
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
@@ -105,42 +184,89 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.put('/:id', soloRoles(...GESTIONA_AGENDA), async (req, res) => {
+router.put('/:id', soloRoles(...GESTIONA_AGENDA), exigirPermiso('citas.agendar'), async (req, res) => {
   try {
-    const { cliente_id, vehiculo_id, fecha, hora, tipo_servicio, tecnico_id } = req.body;
+    const { cliente_id, moto_id, fecha, hora, tecnico_id } = req.body;
     const motivo = String(req.body.motivo || '').trim();
     if (!textoDentroDeLimite(motivo, MAX_MOTIVO)) {
-      return res.status(400).json({ error: `motivo no puede exceder ${MAX_MOTIVO} caracteres` });
+      return invalido(res, 'motivo', `El motivo no puede pasar de ${MAX_MOTIVO} caracteres`);
     }
+    // Servicios: si la pantalla los manda, reemplazan a los que tenía; si no, se conservan.
+    const cambiaServicios = pedidoTraeServicios(req.body);
+    const servicios = serviciosDelPedido(req.body);
+    const problemaServicios = cambiaServicios ? await problemaConServicios(servicios) : null;
+    if (problemaServicios) return invalido(res, 'servicios', problemaServicios);
     // Solo cambia la sucursal si llega una válida (no la borra al editar otros campos).
-    const sucursalNueva = (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
+    const sucursalNueva = sucursalParaGuardar(req, (await sucursalValida(req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null);
     // Fecha/hora previas: si el taller mueve la cita hay que avisarle al cliente
     // (antes se le cambiaba el día y no se enteraba por ningún lado).
-    const [[previa]] = await req.db.query(
-      "SELECT DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora FROM citas WHERE tenant_id = @tenant AND id = ?",
+    const [[previa]] = await pool.query(
+      "SELECT DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora, sucursal_id, duracion_horas, duracion_min FROM citas WHERE id = ?",
       [req.params.id]
     );
-    await req.db.query(
-      `UPDATE citas SET cliente_id=?, vehiculo_id=?, tecnico_id=?, fecha=?, hora=?, motivo=?, tipo_servicio=?,
-         sucursal_id = COALESCE(?, sucursal_id) WHERE id=? AND tenant_id = @tenant`,
-      [cliente_id, vehiculo_id || null, tecnico_id || null, fecha, hora, motivo, tipo_servicio || null, sucursalNueva, req.params.id]
-    );
-    const [[actualizada]] = await req.db.query('SELECT * FROM citas WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     // Solo si de verdad cambió el momento de la cita (editar el motivo no molesta al cliente).
     const movida = previa && (previa.fecha !== String(fecha).slice(0, 10) || previa.hora !== String(hora).slice(0, 5));
-    if (movida) await notificarCitaAgendada(req.db, req.params.id, { reprogramada: true });
+    const esAdmin = req.usuario.rol === 'admin';
+    // Servicio rápido de Ingresar ahora (20, 30 o 40 min): editar la cita no se lo quita.
+    const minutos = previa?.duracion_min || null;
+    // Solo si se mueve: editar el motivo de una cita vieja no tiene por qué fallar.
+    if (movida && await rechazoDeHorario(req, res, { fecha, hora, sucursalId: sucursalNueva || previa.sucursal_id, excluirId: Number(req.params.id), minutos })) return;
+    // La duración solo la cambia administración; si no viene, se conserva.
+    const duracion = minutos ? 1 : (esAdmin && duracionValida(req.body.duracion_horas) ? Number(req.body.duracion_horas) : (previa?.duracion_horas || 1));
+    await pool.query(
+      `UPDATE citas SET cliente_id=?, moto_id=?, tecnico_id=?, fecha=?, hora=?, motivo=?,
+         sucursal_id = COALESCE(?, sucursal_id), duracion_horas = ? WHERE id=?`,
+      [cliente_id, moto_id || null, tecnico_id || null, fecha, hora, motivo, sucursalNueva, duracion, req.params.id]
+    );
+    if (cambiaServicios) await guardarServiciosCita(req.params.id, servicios);
+    const [[actualizada]] = await pool.query('SELECT * FROM citas WHERE id = ?', [req.params.id]);
+    if (movida) await notificarCitaAgendada(req.params.id, { reprogramada: true });
     res.json({ data: actualizada, message: 'Cita actualizada' });
   } catch (err) {
     fail(res, err);
   }
 });
 
-router.patch('/:id/estado', async (req, res) => {
+// PATCH /api/citas/:id/duracion — cuánto dura la cita (solo administración).
+// Body: { duracion_horas, forzar? }. Si en alguna de las horas nuevas ya no hay
+// lugar o está bloqueada, responde 409 con la lista para que la persona decida; con
+// forzar se guarda igual (administración sabe si ese día pueden con una más).
+// Un servicio rápido de Ingresar ahora pasa a ser cita normal de esas horas.
+router.patch('/:id/duracion', soloRoles('admin'), async (req, res) => {
+  try {
+    const duracion = Number(req.body.duracion_horas);
+    if (!duracionValida(duracion)) return res.status(400).json({ error: 'Duración no válida' });
+    const [[cita]] = await pool.query(
+      "SELECT id, estado, sucursal_id, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora FROM citas WHERE id = ?",
+      [req.params.id]
+    );
+    if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
+    if (['entregado', 'cancelado'].includes(cita.estado)) {
+      return res.status(409).json({ error: 'Esta cita ya está cerrada' });
+    }
+    const config = await getConfig();
+    const dia = await agendaDia(cita.fecha, cita.sucursal_id, config, { excluirId: cita.id });
+    const conflictos = conflictosDeCita(dia, cita.hora, duracion, Number(config.max_citas_hora) || 1);
+    if (conflictos.length && !req.body.forzar) {
+      return res.status(409).json({
+        requiere_confirmacion: true,
+        conflictos,
+        error: `En estas horas ya no hay lugar: ${textoConflictos(conflictos)}.`,
+      });
+    }
+    await pool.query('UPDATE citas SET duracion_horas = ?, duracion_min = NULL WHERE id = ?', [duracion, cita.id]);
+    res.json({ message: 'Duración actualizada', horas: horasDeCita(cita.hora, duracion, dia.horas) });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+router.patch('/:id/estado', exigirPermiso((req) => (req.body && req.body.estado === 'cancelado' ? 'citas.cancelar' : 'citas.agendar')), async (req, res) => {
   try {
     const { estado } = req.body;
     if (!ESTADOS.includes(estado)) return res.status(400).json({ error: 'Estado inválido' });
 
-    const [[cita]] = await req.db.query('SELECT id, tecnico_id, estado FROM citas WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
+    const [[cita]] = await pool.query('SELECT id, tecnico_id, estado FROM citas WHERE id = ?', [req.params.id]);
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
 
     // Un técnico solo puede mover SUS citas; admin (y recepción) pueden cualquiera.
@@ -153,9 +279,62 @@ router.patch('/:id/estado', async (req, res) => {
       return res.status(400).json({ error: `Transición no permitida: ${cita.estado} → ${estado}` });
     }
 
-    await req.db.query('UPDATE citas SET estado = ? WHERE tenant_id = @tenant AND id = ?', [estado, req.params.id]);
-    await notificarCambioEstado(req.db, req.params.id, estado);
+    await pool.query('UPDATE citas SET estado = ? WHERE id = ?', [estado, req.params.id]);
+    await notificarCambioEstado(req.params.id, estado);
     res.json({ message: 'Estado de cita actualizado' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// POST /api/citas/:id/entregar — la entrega la marca quien está en el mostrador
+// cuando el cliente se lleva la moto (recepción o administración), no el mecánico
+// ni el cliente: antes una cita sin orden solo la podía entregar el mecánico, y si
+// se le olvidaba quedaba "Lista" para siempre.
+// Body: { monto?, metodo_pago?, forzar? }. Si la cita todavía no estaba "Lista",
+// responde 409 con requiere_confirmacion salvo que venga forzar (la moto se fue
+// antes de que alguien actualizara el estado). Las citas CON orden se entregan
+// desde la orden, que además registra la garantía y la fidelización.
+router.post('/:id/entregar', soloRoles(...GESTIONA_AGENDA), exigirPermiso('ordenes.entregar'), async (req, res) => {
+  try {
+    const { monto, metodo_pago, forzar } = req.body || {};
+    const [[cita]] = await pool.query('SELECT id, estado, orden_id FROM citas WHERE id = ?', [req.params.id]);
+    if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
+    if (cita.orden_id) {
+      return res.status(409).json({ error: 'Esta cita tiene una orden de trabajo: entrégala desde la orden.', orden_id: cita.orden_id });
+    }
+    if (cita.estado === 'entregado' || cita.estado === 'cancelado') {
+      return res.status(400).json({ error: cita.estado === 'entregado' ? 'La cita ya estaba entregada' : 'La cita está cancelada' });
+    }
+    if (cita.estado !== 'listo' && forzar !== true) {
+      return res.status(409).json({ error: 'La cita todavía no estaba marcada como lista', requiere_confirmacion: true, estado_actual: cita.estado });
+    }
+    let montoNum = null;
+    if (monto !== undefined && monto !== null && monto !== '') {
+      montoNum = Number(monto);
+      if (!Number.isFinite(montoNum) || montoNum < 0) return invalido(res, 'monto', 'El monto no es válido');
+    }
+    let metodo = null;
+    if (metodo_pago) {
+      const config = await getConfig();
+      const validos = (config.metodos_pago || []).map((m) => m.valor);
+      if (!validos.includes(metodo_pago)) return res.status(400).json({ error: 'Forma de pago no válida' });
+      metodo = metodo_pago;
+    }
+    // Las fechas que faltan se completan: los reportes miden tiempos con ellas.
+    const sets = [
+      "estado = 'entregado'",
+      'fecha_inicio = COALESCE(fecha_inicio, NOW())',
+      'fecha_listo = COALESCE(fecha_listo, NOW())',
+      'fecha_fin = NOW()',
+    ];
+    const params = [];
+    if (montoNum !== null) { sets.push('monto = ?'); params.push(montoNum); }
+    if (metodo) { sets.push('metodo_pago = ?'); params.push(metodo); }
+    params.push(req.params.id);
+    await pool.query(`UPDATE citas SET ${sets.join(', ')} WHERE id = ?`, params);
+    await notificarCambioEstado(req.params.id, 'entregado');
+    res.json({ message: 'Cita entregada' });
   } catch (err) {
     fail(res, err);
   }
@@ -165,10 +344,10 @@ router.patch('/:id/estado', async (req, res) => {
 router.patch('/:id/asignar', requireRol('admin'), async (req, res) => {
   try {
     const { tecnico_id } = req.body;
-    await req.db.query('UPDATE citas SET tecnico_id = ? WHERE tenant_id = @tenant AND id = ?', [tecnico_id || null, req.params.id]);
+    await pool.query('UPDATE citas SET tecnico_id = ? WHERE id = ?', [tecnico_id || null, req.params.id]);
     if (tecnico_id) {
-      const [[cita]] = await req.db.query("SELECT DATE_FORMAT(fecha,'%Y-%m-%d') AS fecha, TIME_FORMAT(hora,'%H:%i') AS hora, tipo_servicio, motivo FROM citas WHERE tenant_id = @tenant AND id = ?", [req.params.id]);
-      if (cita) await notificarMecanico(req.db, tecnico_id, `Te asignaron una cita: ${cita.tipo_servicio || cita.motivo} el ${cita.fecha} a las ${cita.hora}`, req.usuario.id);
+      const [[cita]] = await pool.query("SELECT DATE_FORMAT(fecha,'%Y-%m-%d') AS fecha, TIME_FORMAT(hora,'%H:%i') AS hora, tipo_servicio, servicios, motivo FROM citas WHERE id = ?", [req.params.id]);
+      if (cita) await notificarMecanico(tecnico_id, `Te asignaron una cita: ${cita.servicios || cita.tipo_servicio || cita.motivo} el ${cita.fecha} a las ${cita.hora}`, req.usuario.id);
     }
     res.json({ message: tecnico_id ? 'Técnico asignado' : 'Asignación quitada' });
   } catch (err) {

@@ -22,7 +22,7 @@
     <div class="promo-tools">
       <div class="adm-buscador">
         <ion-icon name="search-outline" class="bs-lupa"></ion-icon>
-        <input type="text" [(ngModel)]="busqueda" placeholder="Buscar por título o descripción…">
+        <input type="text" [(ngModel)]="busqueda" name="busqueda" placeholder="Buscar por título o descripción…">
         <button type="button" class="bs-x" *ngIf="busqueda" (click)="busqueda = ''" aria-label="Limpiar búsqueda">
           <ion-icon name="close-circle"></ion-icon>
         </button>
@@ -44,10 +44,10 @@
         <div class="promo-img-ph" *ngIf="!imagenes[p.id!]"><ion-icon name="gift-outline"></ion-icon></div>
         <div class="promo-body">
           <div class="promo-head">
-            <h4>{{ p.titulo }}</h4>
+            <h4>{{ nombre(p) }}</h4>
             <span class="bg" [ngClass]="p.activa ? 'bg-em' : 'bg-rd'">{{ p.activa ? 'Activa' : 'Inactiva' }}</span>
           </div>
-          <p>{{ p.descripcion }}</p>
+          <p *ngIf="p.descripcion">{{ p.descripcion }}</p>
           <div class="promo-foot">
             <span class="promo-price" *ngIf="p.precio_final">{{ p.precio_final | currency:'CRC':'symbol-narrow':'1.0-0' }}</span>
             <span class="bg bg-cr" *ngIf="!p.precio_final && p.descuento">-{{ p.descuento }}%</span>
@@ -57,7 +57,7 @@
                       [title]="p.activa ? 'Dejar de mostrar' : 'Mostrar al cliente'">
                 <ion-icon [name]="p.activa ? 'pause-outline' : 'play-outline'"></ion-icon>
               </button>
-              <button class="btn btn-rd btn-sm" (click)="borrar(p)" title="Eliminar"><ion-icon name="trash-outline"></ion-icon></button>
+              <button class="btn btn-rd btn-sm" (click)="borrar(p)" title="Eliminar" aria-label="Eliminar"><ion-icon name="trash-outline"></ion-icon></button>
             </div>
           </div>
         </div>
@@ -86,11 +86,13 @@
       </div>
 
       <div class="amb-body">
-        <div class="fg"><label>Título *</label><input maxlength="120" [(ngModel)]="form.titulo" placeholder="Ej: 20% en cambio de aceite"></div>
-        <div class="fg"><label>Descripción *</label><textarea [(ngModel)]="form.descripcion" placeholder="Detalle, condiciones y vigencia…"></textarea></div>
+        <!-- Con imagen, los textos son opcionales: la imagen diseñada puede ir sola. -->
+        <div class="fg"><label>Título {{ form.imagen ? '(opcional con imagen)' : '*' }}</label><input maxlength="120" [(ngModel)]="form.titulo" name="titulo" placeholder="Ej: 20% en cambio de aceite"></div>
+        <div class="fg"><label>Descripción {{ form.imagen ? '(opcional con imagen)' : '*' }}</label><textarea [(ngModel)]="form.descripcion" name="descripcion" placeholder="Detalle, condiciones y vigencia…"></textarea></div>
+        <p class="promos-nota" *ngIf="!form.imagen" style="margin:-4px 0 12px;font-size:12px;color:var(--tx3)">¿Ya tienes la promoción diseñada en una imagen? Súbela abajo y puedes dejar los textos vacíos.</p>
         <div class="fg-row">
-          <div class="fg"><label>Descuento (%)</label><input type="number" min="0" max="100" [(ngModel)]="form.descuento" placeholder="20"></div>
-          <div class="fg"><label>Precio final (₡)</label><input type="number" min="0" [(ngModel)]="form.precio_final" placeholder="36000"></div>
+          <div class="fg"><label>Descuento (%)</label><input type="number" min="0" max="100" [(ngModel)]="form.descuento" name="descuento" placeholder="20"></div>
+          <div class="fg"><label>Precio final (₡)</label><input type="number" min="0" [(ngModel)]="form.precio_final" name="precio_final" placeholder="36000"></div>
         </div>
         <div class="fg">
           <label>Imagen de la promoción</label>
@@ -102,7 +104,7 @@
           <button type="button" class="btn btn-sm promo-quitar-img" *ngIf="form.imagen" (click)="quitarImagen()">Quitar imagen</button>
         </div>
         <label class="promo-activar">
-          <input type="checkbox" [(ngModel)]="form.activa">
+          <input type="checkbox" [(ngModel)]="form.activa" name="activa">
           <span>Mostrarla en el portal del cliente</span>
         </label>
       </div>

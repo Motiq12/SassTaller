@@ -1,11 +1,11 @@
 <ion-header>
-  <ion-toolbar>
+  <ion-toolbar class="admin-topbar">
     <ion-title>Mi Taller</ion-title>
     <app-portal-actions slot="end"></app-portal-actions>
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
+<ion-content class="admin-dark">
   <!-- Tour de bienvenida (se muestra una sola vez) -->
   <app-portal-onboarding></app-portal-onboarding>
 
@@ -14,35 +14,108 @@
   </ion-refresher>
 
   <div class="ini">
-    <div class="greet" *ngIf="portal.getCliente() as c">
+    <!-- Saludo -->
+    <header class="ini-hola" *ngIf="portal.getCliente() as c">
+      <span class="pg-ante">{{ fechaHoy }}</span>
       <h1>Hola, {{ c.nombre }}</h1>
-      <span class="greet-date mono">{{ fechaHoy }}</span>
-    </div>
+    </header>
 
-    <!-- Presupuestos por aprobar -->
-    <section class="card presu" *ngFor="let o of presupuestos">
-      <div class="presu-top">
-        <div>
-          <span class="presu-tag"><ion-icon name="receipt-outline"></ion-icon> Presupuesto por aprobar</span>
-          <h3>{{ o.marca }} {{ o.modelo }}</h3>
-          <p class="presu-sub mono">{{ o.numero_orden }}</p>
-        </div>
-        <span class="pill amber">Pendiente</span>
+    <!-- Aviso del taller (Configuración → Textos del portal) -->
+    <section class="aviso-taller" *ngIf="bienvenida">
+      <ion-icon name="megaphone-outline" aria-hidden="true"></ion-icon>
+      <div>
+        <strong *ngIf="bienvenida.titulo">{{ bienvenida.titulo }}</strong>
+        <p>{{ bienvenida.texto }}</p>
       </div>
-      <p class="presu-prob">{{ o.problema_reportado }}</p>
+    </section>
 
-      <button class="presu-ver" (click)="toggle(o)">
-        <ion-icon [name]="expandido === o.id ? 'chevron-up' : 'chevron-down'"></ion-icon>
-        {{ expandido === o.id ? 'Ocultar desglose' : 'Ver desglose y aprobar' }}
+    <!-- ═══ Lo principal: dónde está tu moto o cuándo es tu cita ═══ -->
+    <div class="sk-dark ini-sk-hero" *ngIf="cargando && !resumen"></div>
+
+    <ng-container *ngIf="resumen">
+      <!-- En el taller: la moto avanza por etapas -->
+      <section class="hero hero--curso" *ngIf="resumen.proxima_cita?.tipo === 'en_curso' && resumen.proxima_cita as p"
+               [style.--foto]="fotoDeCita(p)">
+        <div class="hero-velo"></div>
+        <div class="hero-cuerpo">
+          <span class="hero-rotulo"><i class="punto-vivo"></i> En el taller</span>
+          <h2>Tu {{ p.marca }} {{ p.modelo }}</h2>
+          <p class="hero-sub">{{ p.servicios || p.tipo_servicio || 'Servicio' }}<ng-container *ngIf="p.tecnico_nombre"> · con {{ p.tecnico_nombre }}</ng-container></p>
+
+          <ol class="etapas" [attr.aria-label]="'Etapa actual: ' + estadoLabel[p.estado]">
+            <li *ngFor="let e of etapas; let i = index" [class.hecha]="i < etapaActual(p.estado)" [class.actual]="i === etapaActual(p.estado)">
+              <span class="etapa-punto"><ion-icon *ngIf="i < etapaActual(p.estado)" name="checkmark" aria-hidden="true"></ion-icon></span>
+              <span class="etapa-txt">{{ e.label }}</span>
+            </li>
+          </ol>
+
+          <button type="button" class="hero-cta" (click)="verCita(p)">Ver el detalle <ion-icon name="arrow-forward" aria-hidden="true"></ion-icon></button>
+        </div>
+      </section>
+
+      <!-- Próxima cita: el día en grande -->
+      <section class="hero hero--proxima" *ngIf="resumen.proxima_cita?.tipo === 'proxima' && resumen.proxima_cita as p"
+               [style.--foto]="fotoDeCita(p)">
+        <div class="hero-velo"></div>
+        <div class="hero-cuerpo hero-cuerpo--fila">
+          <div class="dia" aria-hidden="true">
+            <span class="dia-mes">{{ mesCorto(p.fecha) }}</span>
+            <strong class="dia-n">{{ diaDelMes(p.fecha) }}</strong>
+            <span class="dia-sem">{{ diaSemana(p.fecha) }}</span>
+          </div>
+          <div class="hero-info">
+            <span class="hero-rotulo">Tu próxima cita <span class="prox-badge" *ngIf="badgeCita(p) as b" [ngClass]="'pb-' + b.tono">{{ b.texto }}</span></span>
+            <h2>{{ p.hora }} · {{ p.marca }} {{ p.modelo }}</h2>
+            <p class="hero-sub">{{ p.servicios || p.tipo_servicio || 'Servicio' }}</p>
+            <button type="button" class="hero-cta" (click)="verCita(p)">Ver la cita <ion-icon name="arrow-forward" aria-hidden="true"></ion-icon></button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Vencida: no llegó el ingreso -->
+      <section class="hero hero--vencida" *ngIf="resumen.proxima_cita?.tipo === 'vencida' && resumen.proxima_cita as p">
+        <div class="hero-cuerpo">
+          <span class="hero-rotulo"><ion-icon name="alert-circle" aria-hidden="true"></ion-icon> Cita vencida</span>
+          <h2>Tu cita del {{ diaMes(p.fecha) }} ya pasó</h2>
+          <p class="hero-sub">No se registró el ingreso de tu {{ p.marca }} {{ p.modelo }}. Reagenda cuando te quede bien o escríbele al taller.</p>
+          <button type="button" class="hero-cta" (click)="irAgendar()"><ion-icon name="calendar-outline" aria-hidden="true"></ion-icon> Reagendar</button>
+        </div>
+      </section>
+
+      <!-- Sin citas -->
+      <section class="hero hero--vacia" *ngIf="!resumen.proxima_cita">
+        <div class="hero-velo"></div>
+        <div class="hero-cuerpo">
+          <span class="hero-rotulo">Sin citas por ahora</span>
+          <h2>¿Le toca servicio a tu moto?</h2>
+          <p class="hero-sub">Elige el día y la hora que te queden mejor. Te avisamos cuando esté lista.</p>
+          <button type="button" class="hero-cta" (click)="irAgendar()"><ion-icon name="add" aria-hidden="true"></ion-icon> Agendar una cita</button>
+        </div>
+      </section>
+    </ng-container>
+
+    <!-- ═══ Presupuestos por aprobar: piden una decisión ═══ -->
+    <section class="presu" *ngFor="let o of presupuestos">
+      <div class="presu-top">
+        <span class="presu-ico"><ion-icon name="receipt-outline" aria-hidden="true"></ion-icon></span>
+        <div class="presu-tit">
+          <span class="presu-tag">{{ esAdicional(o) ? 'Trabajo adicional por aprobar' : 'Presupuesto por aprobar' }}</span>
+          <h3>{{ o.marca }} {{ o.modelo }} <span class="mono presu-num">{{ o.numero_orden }}</span></h3>
+        </div>
+      </div>
+      <p class="presu-prob" *ngIf="o.problema_reportado">{{ o.problema_reportado }}</p>
+
+      <button type="button" class="presu-ver" (click)="toggle(o)" [attr.aria-expanded]="expandido === o.id">
+        {{ expandido === o.id ? 'Ocultar el desglose' : 'Ver el desglose y decidir' }}
+        <ion-icon [name]="expandido === o.id ? 'chevron-up' : 'chevron-down'" aria-hidden="true"></ion-icon>
       </button>
 
-      <!-- Desglose -->
       <div class="presu-det" *ngIf="expandido === o.id">
         <ng-container *ngIf="detalle[o.id] as d; else cargandoDet">
           <p class="presu-diag" *ngIf="d.diagnostico"><strong>Diagnóstico:</strong> {{ d.diagnostico }}</p>
 
           <div class="presu-row" *ngFor="let r of d.repuestos">
-            <span>{{ r.nombre }}<span class="presu-cant" *ngIf="r.cantidad > 1"> ×{{ r.cantidad }}</span></span>
+            <span>{{ r.nombre }}<span class="presu-cant" *ngIf="r.cantidad > 1"> ×{{ r.cantidad }}</span><span class="pill amber presu-nuevo" *ngIf="r.adicional">Nuevo</span></span>
             <span class="mono">{{ (r.cantidad * r.costo_unitario) | currency:'CRC':'symbol-narrow':'1.0-0' }}</span>
           </div>
           <div class="presu-row">
@@ -53,77 +126,126 @@
             <span>Descuento</span>
             <span class="mono">− {{ d.descuento | currency:'CRC':'symbol-narrow':'1.0-0' }}</span>
           </div>
+          <ng-container *ngIf="esAdicional(o)">
+            <div class="presu-row">
+              <span>Ya aprobado</span>
+              <span class="mono">{{ (d.total_aprobado || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</span>
+            </div>
+            <div class="presu-row">
+              <span>Adicional</span>
+              <span class="mono">+ {{ montoAdicional(d) | currency:'CRC':'symbol-narrow':'1.0-0' }}</span>
+            </div>
+          </ng-container>
           <div class="presu-row total">
-            <span>Total</span>
+            <span>{{ esAdicional(o) ? 'Nuevo total' : 'Total' }}</span>
             <span class="mono">{{ (d.total || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</span>
           </div>
 
           <div class="presu-acc">
-            <button class="btn-rechazar" (click)="rechazar(o)" [disabled]="procesando">Rechazar</button>
-            <button class="btn-aprobar" (click)="aprobar(o)" [disabled]="procesando">Aprobar</button>
+            <button type="button" class="btn-rechazar" (click)="rechazar(o)" [disabled]="procesando">{{ esAdicional(o) ? 'No, gracias' : 'Rechazar' }}</button>
+            <button type="button" class="btn-aprobar" (click)="aprobar(o)" [disabled]="procesando">{{ esAdicional(o) ? 'Aprobar adicional' : 'Aprobar' }}</button>
           </div>
         </ng-container>
         <ng-template #cargandoDet>
-          <div class="skeleton" style="height:80px"></div>
+          <div class="sk-dark" style="height:80px"></div>
         </ng-template>
       </div>
     </section>
 
-    <!-- Métricas -->
-    <div class="sg">
-      <div class="st ac"><span class="st-n">{{ resumen?.citas_totales ?? 0 }}</span><span class="st-l">Citas totales</span></div>
-      <div class="st"><span class="st-n amber">{{ resumen?.citas_pendientes ?? 0 }}</span><span class="st-l">Pendientes</span></div>
-      <div class="st"><span class="st-n">{{ resumen?.motos_registradas ?? 0 }}</span><span class="st-l">Motos</span></div>
-      <div class="st ac"><span class="st-n emerald mono">{{ (resumen?.total_pagado || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</span><span class="st-l">Total pagado</span></div>
+    <!-- ═══ Accesos rápidos ═══ -->
+    <nav class="atajos" aria-label="Accesos rápidos">
+      <a routerLink="/portal/agendar" class="atajo atajo--rojo">
+        <span class="atajo-ico"><ion-icon name="add-circle-outline" aria-hidden="true"></ion-icon></span>
+        <span>Agendar</span>
+      </a>
+      <a routerLink="/portal/mis-citas" class="atajo">
+        <span class="atajo-ico"><ion-icon name="clipboard-outline" aria-hidden="true"></ion-icon></span>
+        <span>Mis citas</span>
+      </a>
+      <a routerLink="/portal/motos" class="atajo">
+        <span class="atajo-ico"><ion-icon name="bicycle-outline" aria-hidden="true"></ion-icon></span>
+        <span>Mis motos</span>
+      </a>
+      <a routerLink="/portal/ofertas" class="atajo">
+        <span class="atajo-ico"><ion-icon name="pricetags-outline" aria-hidden="true"></ion-icon></span>
+        <span>Ofertas</span>
+      </a>
+    </nav>
+
+    <div class="ini-cols">
+      <!-- ═══ Recompensas: tarjeta de sellos ═══ -->
+      <section class="sellos" *ngIf="resumen" [class.lista]="resumen.recompensas?.cortesia_disponible">
+        <div class="sellos-cab">
+          <div>
+            <span class="sellos-rotulo">Tarjeta de cliente</span>
+            <h3 *ngIf="!resumen.recompensas?.cortesia_disponible">
+              <strong>{{ resumen.recompensas?.ciclo ?? 0 }}</strong> de {{ metaSellos }} servicios
+            </h3>
+            <h3 *ngIf="resumen.recompensas?.cortesia_disponible">¡Tu próximo servicio es de cortesía!</h3>
+          </div>
+          <ion-icon name="gift" class="sellos-regalo" aria-hidden="true"></ion-icon>
+        </div>
+
+        <ol class="sellos-fila" [attr.aria-label]="(resumen.recompensas?.ciclo ?? 0) + ' de ' + metaSellos + ' sellos'">
+          <li *ngFor="let on of bloques; let i = index" class="sello" [class.on]="on" [class.premio]="i === bloques.length - 1">
+            <ion-icon *ngIf="i === bloques.length - 1" name="gift" aria-hidden="true"></ion-icon>
+            <ion-icon *ngIf="i < bloques.length - 1 && on" name="checkmark" aria-hidden="true"></ion-icon>
+            <span *ngIf="i < bloques.length - 1 && !on">{{ i + 1 }}</span>
+          </li>
+        </ol>
+
+        <p class="sellos-txt" *ngIf="!resumen.recompensas?.cortesia_disponible">
+          Te {{ resumen.recompensas?.faltan === 1 ? 'falta' : 'faltan' }} <strong>{{ resumen.recompensas?.faltan }}</strong>
+          {{ resumen.recompensas?.faltan === 1 ? 'servicio' : 'servicios' }} para el de cortesía.
+        </p>
+        <p class="sellos-txt" *ngIf="resumen.recompensas?.cortesia_disponible">Agéndalo cuando quieras: se aplica solo.</p>
+      </section>
+
+      <!-- ═══ Tus números ═══ -->
+      <section class="numeros" *ngIf="resumen" aria-label="Tus números">
+        <div class="num">
+          <strong>{{ resumen.citas_totales ?? 0 }}</strong>
+          <span>Citas</span>
+        </div>
+        <div class="num">
+          <strong>{{ resumen.citas_pendientes ?? 0 }}</strong>
+          <span>Pendientes</span>
+        </div>
+        <div class="num">
+          <strong>{{ resumen.motos_registradas ?? 0 }}</strong>
+          <span>{{ resumen.motos_registradas === 1 ? 'Moto' : 'Motos' }}</span>
+        </div>
+        <div class="num num--plata">
+          <strong>{{ (resumen.total_pagado || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</strong>
+          <span>Invertido en tu moto</span>
+        </div>
+      </section>
     </div>
 
-    <!-- Recompensas -->
-    <section class="card reward" *ngIf="resumen">
-      <div class="reward-top">
-        <span class="section-label">Recompensas</span>
-        <ion-icon name="gift"></ion-icon>
+    <!-- ═══ Tus motos ═══ -->
+    <section class="garaje" *ngIf="motos.length">
+      <div class="garaje-cab">
+        <h3>Tu garaje</h3>
+        <a routerLink="/portal/motos">Ver todas <ion-icon name="chevron-forward" aria-hidden="true"></ion-icon></a>
       </div>
-      <div class="reward-count">{{ resumen.recompensas?.ciclo ?? 0 }} de {{ (resumen.recompensas?.meta || 7) - 1 }} citas completadas</div>
-      <p class="reward-txt" *ngIf="resumen.recompensas?.cortesia_disponible"><strong>¡Tu próxima cita es de cortesía!</strong></p>
-      <p class="reward-txt" *ngIf="!resumen.recompensas?.cortesia_disponible">
-        Faltan <strong>{{ resumen.recompensas?.faltan }}</strong> cita(s) para tu servicio de cortesía
-      </p>
-      <div class="reward-blocks">
-        <span class="blk" *ngFor="let on of bloques; let i = index" [class.on]="on" [class.gift]="i === bloques.length - 1">
-          <ion-icon *ngIf="i === bloques.length - 1" name="gift"></ion-icon>
-        </span>
+      <div class="garaje-fila">
+        <a class="moto" *ngFor="let m of motos" [routerLink]="['/portal/moto', m.id, 'historial']">
+          <div class="moto-foto" [style.background-image]="m.foto ? 'url(' + m.foto + ')' : null">
+            <ion-icon *ngIf="!m.foto" name="bicycle" aria-hidden="true"></ion-icon>
+            <span class="moto-placa mono" *ngIf="m.placa">{{ m.placa }}</span>
+          </div>
+          <div class="moto-info">
+            <strong>{{ m.marca }} {{ m.modelo }}</strong>
+            <span>{{ m.ultimo_servicio ? 'Último servicio: ' + fechaLarga(m.ultimo_servicio) : 'Sin servicios todavía' }}</span>
+          </div>
+        </a>
+        <a class="moto moto--nueva" routerLink="/portal/motos">
+          <ion-icon name="add" aria-hidden="true"></ion-icon>
+          <span>Agregar moto</span>
+        </a>
       </div>
     </section>
 
-    <!-- Cita destacada: próxima / en curso / vencida -->
-    <section class="card next" *ngIf="resumen?.proxima_cita as p" [class.is-vencida]="p.tipo === 'vencida'" [class.is-curso]="p.tipo === 'en_curso'">
-      <div class="next-head">
-        <span class="section-label">{{ tituloCita(p.tipo) }}</span>
-        <span class="prox-badge" *ngIf="badgeCita(p) as b" [ngClass]="'pb-' + b.tono">{{ b.texto }}</span>
-      </div>
-      <div class="next-title">{{ p.marca }} {{ p.modelo }}</div>
-      <div class="nx-r"><span class="k">Servicio</span><span class="v">{{ p.tipo_servicio || 'Servicio' }}</span></div>
-      <div class="nx-r"><span class="k">{{ labelFecha(p.tipo) }}</span><span class="v mono">{{ p.fecha | date:'dd/MM/yyyy' }} · {{ p.hora }}</span></div>
-      <div class="nx-r"><span class="k">Mecánico</span><span class="v">{{ p.tecnico_nombre || 'Por asignar' }}</span></div>
-      <div class="nx-r"><span class="k">Estado</span><span class="pill" [ngClass]="p.tipo === 'vencida' ? 'amber' : 'rose'">{{ estadoLabel[p.estado] }}</span></div>
-
-      <!-- Aviso + reagendar para citas vencidas -->
-      <div class="next-aviso" *ngIf="p.tipo === 'vencida'">
-        <ion-icon name="alert-circle-outline"></ion-icon>
-        <span>Esta cita ya pasó y no se registró tu ingreso. Reagendá o comunicate con el taller.</span>
-      </div>
-      <button class="next-cta" *ngIf="p.tipo === 'vencida'" (click)="irAgendar()">
-        <ion-icon name="calendar-outline"></ion-icon> Reagendar
-      </button>
-      <button class="next-cta ghost" *ngIf="p.tipo !== 'vencida'" (click)="verCita(p)">
-        Ver detalle <ion-icon name="chevron-forward"></ion-icon>
-      </button>
-    </section>
-    <section class="card next vacia" *ngIf="resumen && !resumen.proxima_cita">
-      <p>No tenés citas próximas.</p>
-      <ion-button size="small" (click)="irAgendar()">Agendar una</ion-button>
-    </section>
-
-    <div style="height:30px"></div>
+    <div style="height:28px"></div>
   </div>
 </ion-content>

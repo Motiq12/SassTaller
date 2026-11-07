@@ -1,139 +1,151 @@
 <ion-header>
-  <ion-toolbar color="primary">
+  <ion-toolbar [class.admin-topbar]="dentroDelPanel">
     <ion-buttons slot="start">
-      <ion-back-button defaultHref="/tabs/clientes"></ion-back-button>
+      <ion-back-button [defaultHref]="listaClientes" text=""></ion-back-button>
     </ion-buttons>
-    <ion-title>{{ cliente?.nombre }} {{ cliente?.apellido }}</ion-title>
-    <ion-buttons slot="end">
-      <ion-button (click)="editarCliente()">
-        <ion-icon slot="icon-only" name="create-outline"></ion-icon>
-      </ion-button>
-    </ion-buttons>
+    <ion-title>{{ cliente ? cliente.nombre + ' ' + cliente.apellido : 'Cliente' }}</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content *ngIf="!cargando && cliente">
-  <!-- Datos personales -->
-  <ion-card>
-    <ion-card-header>
-      <ion-card-title>{{ cliente!.nombre }} {{ cliente!.apellido }}</ion-card-title>
-    </ion-card-header>
-    <ion-list>
-      <ion-item>
-        <ion-icon name="call-outline" slot="start"></ion-icon>
-        <ion-label>{{ cliente!.telefono }}</ion-label>
-      </ion-item>
-      <ion-item *ngIf="cliente!.email">
-        <ion-icon name="mail-outline" slot="start"></ion-icon>
-        <ion-label>{{ cliente!.email }}</ion-label>
-      </ion-item>
-      <ion-item *ngIf="cliente!.cedula">
-        <ion-icon name="card-outline" slot="start"></ion-icon>
-        <ion-label>{{ cliente!.cedula }}</ion-label>
-      </ion-item>
-      <ion-item *ngIf="cliente!.direccion">
-        <ion-icon name="location-outline" slot="start"></ion-icon>
-        <ion-label class="ion-text-wrap">{{ cliente!.direccion }}</ion-label>
-      </ion-item>
-    </ion-list>
-  </ion-card>
+<ion-content class="admin-dark">
+  <div class="cd-page" *ngIf="!cargando && cliente as c">
 
-  <!-- Fidelización -->
-  <ion-card class="fidelidad-card" [class.con-cortesia]="cliente!.cortesia_disponible">
-    <ion-card-content>
-      <div class="fidelidad-row">
-        <ion-icon [name]="cliente!.cortesia_disponible ? 'gift' : 'ribbon-outline'"
-          [color]="cliente!.cortesia_disponible ? 'success' : 'primary'"></ion-icon>
-        <div class="fidelidad-info">
-          <strong>Fidelización</strong>
-          <span>{{ cliente!.visitas || 0 }} visita(s)</span>
-          <span *ngIf="cliente!.cortesias_canjeadas">{{ cliente!.cortesias_canjeadas }} cortesía(s) canjeada(s)</span>
-          <span *ngIf="cliente!.cortesia_disponible" class="cortesia-on">¡Cortesía disponible!</span>
-        </div>
-        <ion-button *ngIf="cliente!.cortesia_disponible" size="small" color="success" (click)="canjearCortesia()">
-          Canjear
-        </ion-button>
-      </div>
-    </ion-card-content>
-  </ion-card>
-
-  <!-- Acceso al portal del cliente -->
-  <ion-card>
-    <ion-card-content>
-      <div class="portal-row">
-        <div class="portal-info">
-          <ion-icon [name]="cliente!.tiene_portal ? 'shield-checkmark' : 'shield-outline'"
-            [color]="cliente!.tiene_portal ? 'success' : 'medium'"></ion-icon>
-          <div>
-            <strong>Portal del cliente</strong>
-            <span *ngIf="cliente!.tiene_portal" class="activo">Acceso activado</span>
-            <span *ngIf="!cliente!.tiene_portal" class="inactivo">Sin acceso</span>
+    <!-- Cabecera: quién es y qué se puede hacer -->
+    <section class="cd cd-heroe">
+      <div class="cd-heroe-quien">
+        <div class="cd-av">{{ iniciales }}</div>
+        <div class="cd-heroe-texto">
+          <h1>{{ c.nombre }} {{ c.apellido }}</h1>
+          <p *ngIf="c.created_at">Cliente desde {{ clienteDesde }}</p>
+          <div class="cd-chips">
+            <span class="cd-chip" [class.ok]="c.tiene_portal">
+              <ion-icon [name]="c.tiene_portal ? 'shield-checkmark-outline' : 'shield-outline'"></ion-icon>
+              {{ c.tiene_portal ? 'Con portal' : 'Sin portal' }}
+            </span>
+            <span class="cd-chip regalo" *ngIf="c.cortesia_disponible"><ion-icon name="gift-outline"></ion-icon> Cortesía disponible</span>
+            <span class="cd-chip activo" *ngIf="ordenesActivas">{{ ordenesActivas }} {{ ordenesActivas === 1 ? 'orden' : 'órdenes' }} en curso</span>
           </div>
         </div>
       </div>
-      <div class="portal-acciones">
-        <ion-button size="small" fill="outline" (click)="activarPortal()">
-          <ion-icon [name]="cliente!.tiene_portal ? 'key-outline' : 'add-outline'" slot="start"></ion-icon>
-          {{ cliente!.tiene_portal ? 'Cambiar contraseña' : 'Activar acceso' }}
-        </ion-button>
-        <ion-button *ngIf="cliente!.tiene_portal" size="small" fill="clear" color="danger" (click)="desactivarPortal()">
-          Desactivar
-        </ion-button>
+      <div class="cd-heroe-acciones">
+        <a class="btn btn-ou btn-sm" *ngIf="c.telefono" [href]="'tel:' + c.telefono"><ion-icon name="call-outline"></ion-icon> Llamar</a>
+        <button type="button" class="btn btn-ou btn-sm cd-wa" *ngIf="c.telefono" (click)="whatsapp()"><ion-icon name="logo-whatsapp"></ion-icon> WhatsApp</button>
+        <a class="btn btn-ou btn-sm" *ngIf="c.email" [href]="'mailto:' + c.email"><ion-icon name="mail-outline"></ion-icon> Correo</a>
+        <button type="button" class="btn btn-cr btn-sm" (click)="editarCliente()"><ion-icon name="create-outline"></ion-icon> Editar</button>
       </div>
-    </ion-card-content>
-  </ion-card>
+    </section>
 
-  <!-- Motos -->
-  <ion-card>
-    <ion-card-header>
-      <ion-card-title>Motocicletas</ion-card-title>
-      <ion-button fill="clear" slot="end" (click)="nuevaMoto()">
-        <ion-icon name="add-outline"></ion-icon>
-      </ion-button>
-    </ion-card-header>
-    <ion-list>
-      <ion-item *ngFor="let m of vehiculos" button (click)="abrirHistorial(m)" detail="true">
-        <ion-icon name="bicycle-outline" slot="start" color="primary"></ion-icon>
-        <ion-label>
-          <h2>{{ m.marca }} {{ m.modelo }} {{ m.anio }}</h2>
-          <p *ngIf="m.placa">Placa: {{ m.placa }}</p>
-          <p>{{ m.kilometraje_actual | number }} km</p>
-        </ion-label>
-      </ion-item>
-      <ion-item *ngIf="vehiculos.length === 0">
-        <ion-label color="medium"><p>Sin vehiculos registradas</p></ion-label>
-      </ion-item>
-    </ion-list>
-  </ion-card>
+    <!-- Cifras -->
+    <section class="cd-cifras">
+      <div><strong>{{ c.visitas || 0 }}</strong><span>visita{{ c.visitas === 1 ? '' : 's' }}</span></div>
+      <div><strong>{{ motos.length }}</strong><span>moto{{ motos.length === 1 ? '' : 's' }}</span></div>
+      <div><strong>{{ ordenes.length }}</strong><span>{{ ordenes.length === 1 ? 'orden' : 'órdenes' }}</span></div>
+      <div *ngIf="verMontos"><strong>₡{{ totalCobrado | number:'1.0-0' }}</strong><span>cobrado en órdenes entregadas</span></div>
+    </section>
 
-  <!-- Historial de órdenes -->
-  <ion-card *ngIf="ordenes.length">
-    <ion-card-header><ion-card-title>Historial de órdenes</ion-card-title></ion-card-header>
-    <ion-list>
-      <ion-item *ngFor="let o of ordenes" button (click)="abrirOrden(o.id!)" detail="true">
-        <ion-label>
-          <h2>{{ o.numero_orden }}</h2>
-          <p>{{ o.marca }} {{ o.modelo }}</p>
-          <p>{{ o.fecha_ingreso | date:'dd/MM/yyyy' }}</p>
-        </ion-label>
-        <ion-badge slot="end" [color]="o.estado | estadoColor">{{ o.estado | estadoLabel }}</ion-badge>
-      </ion-item>
-    </ion-list>
-  </ion-card>
+    <div class="cd-grid">
+      <!-- Columna de datos -->
+      <div class="cd-col">
+        <section class="cd">
+          <span class="cd-title"><ion-icon name="person-outline"></ion-icon> Datos de contacto</span>
+          <dl class="cd-datos">
+            <div><dt><ion-icon name="call-outline"></ion-icon> Teléfono</dt><dd>{{ c.telefono || '—' }}</dd></div>
+            <div><dt><ion-icon name="mail-outline"></ion-icon> Correo</dt><dd [class.falta]="!c.email">{{ c.email || 'Sin correo' }}</dd></div>
+            <div><dt><ion-icon name="card-outline"></ion-icon> Cédula</dt><dd class="mono">{{ c.cedula || '—' }}</dd></div>
+            <div *ngIf="c.direccion"><dt><ion-icon name="location-outline"></ion-icon> Dirección</dt><dd>{{ c.direccion }}</dd></div>
+          </dl>
+        </section>
 
-  <!-- Zona de riesgo: al final, separada del resto, para no borrar por accidente -->
-  <ion-button expand="block" fill="outline" color="danger" class="ion-margin"
-              (click)="eliminarCliente()">
-    <ion-icon name="trash-outline" slot="start"></ion-icon>
-    Eliminar cliente
-  </ion-button>
-  <div style="height:24px"></div>
-</ion-content>
+        <section class="cd cd-fiel" [class.con-cortesia]="c.cortesia_disponible">
+          <span class="cd-title"><ion-icon name="ribbon-outline"></ion-icon> Fidelización</span>
+          <div class="cd-fiel-fila">
+            <ion-icon class="cd-fiel-icono" [name]="c.cortesia_disponible ? 'gift' : 'ribbon-outline'"></ion-icon>
+            <div class="cd-fiel-texto">
+              <strong>{{ c.cortesia_disponible ? '¡Tiene una cortesía disponible!' : (c.visitas || 0) + ' visita' + (c.visitas === 1 ? '' : 's') }}</strong>
+              <span *ngIf="c.cortesias_canjeadas">Ya canjeó {{ c.cortesias_canjeadas }} cortesía{{ c.cortesias_canjeadas === 1 ? '' : 's' }}.</span>
+              <span *ngIf="!c.cortesia_disponible && !c.cortesias_canjeadas">Cada orden entregada suma una visita.</span>
+            </div>
+            <button type="button" class="btn btn-cr btn-sm" *ngIf="c.cortesia_disponible" (click)="canjearCortesia()">Canjear</button>
+          </div>
+        </section>
 
-<ion-content *ngIf="cargando">
-  <div class="skeleton-wrap" style="max-width:860px">
-    <div class="skeleton" style="height:150px;margin-bottom:14px"></div>
-    <div class="skeleton" style="height:90px;margin-bottom:14px"></div>
-    <div class="skeleton" style="height:150px"></div>
+        <section class="cd">
+          <span class="cd-title"><ion-icon name="phone-portrait-outline"></ion-icon> Portal del cliente</span>
+          <div class="cd-portal">
+            <span class="cd-estado" [class.on]="c.tiene_portal">{{ c.tiene_portal ? 'Acceso activado' : 'Sin acceso' }}</span>
+            <p>{{ c.tiene_portal ? 'Entra con ' + c.email + ' y ve el avance de sus motos y sus presupuestos.' : (c.email ? 'Con acceso puede ver el avance y aprobar presupuestos desde el celular.' : 'Para darle acceso, primero agregale un correo.') }}</p>
+          </div>
+          <div class="cd-portal-acciones">
+            <button type="button" class="btn btn-ou btn-sm" (click)="activarPortal()">
+              <ion-icon [name]="c.tiene_portal ? 'key-outline' : 'add-outline'"></ion-icon>
+              {{ c.tiene_portal ? 'Cambiar contraseña' : 'Activar acceso' }}
+            </button>
+            <button type="button" class="btn btn-rd btn-sm" *ngIf="c.tiene_portal" (click)="desactivarPortal()">Desactivar</button>
+          </div>
+        </section>
+      </div>
+
+      <!-- Columna de trabajo -->
+      <div class="cd-col">
+        <section class="cd">
+          <div class="cd-sec-cab">
+            <span class="cd-title"><ion-icon name="bicycle-outline"></ion-icon> Motos</span>
+            <button type="button" class="btn btn-ou btn-sm" (click)="nuevaMoto()"><ion-icon name="add-outline"></ion-icon> Agregar moto</button>
+          </div>
+          <div class="cd-motos" *ngIf="motos.length">
+            <button type="button" class="cd-moto" *ngFor="let m of motos" (click)="abrirHistorial(m)">
+              <span class="cd-moto-icono"><ion-icon name="bicycle"></ion-icon></span>
+              <span class="cd-moto-texto">
+                <strong>{{ m.marca }} {{ m.modelo }}</strong>
+                <span>{{ m.anio || 'Año sin cargar' }}<ng-container *ngIf="m.kilometraje_actual"> · {{ m.kilometraje_actual | number }} km</ng-container></span>
+              </span>
+              <span class="placa" *ngIf="m.placa">{{ m.placa }}</span>
+              <ion-icon name="chevron-forward" class="cd-chev"></ion-icon>
+            </button>
+          </div>
+          <div class="cd-vacio" *ngIf="!motos.length">
+            <ion-icon name="bicycle-outline"></ion-icon>
+            <span>Sin motos registradas.</span>
+          </div>
+        </section>
+
+        <section class="cd">
+          <span class="cd-title"><ion-icon name="construct-outline"></ion-icon> Historial de órdenes <span class="cd-cuenta" *ngIf="ordenes.length">{{ ordenes.length }}</span></span>
+          <div class="cd-ordenes" *ngIf="ordenes.length">
+            <button type="button" class="cd-orden" *ngFor="let o of ordenes" (click)="abrirOrden(o.id!)">
+              <span class="cd-orden-texto">
+                <strong class="mono">{{ o.numero_orden }}</strong>
+                <span>{{ o.marca }} {{ o.modelo }}<ng-container *ngIf="o.placa"> · {{ o.placa }}</ng-container></span>
+                <span class="cd-orden-meta">{{ o.fecha_ingreso | date:'dd/MM/yyyy' }}<ng-container *ngIf="o.tecnico_nombre"> · {{ o.tecnico_nombre }}</ng-container></span>
+              </span>
+              <span class="cd-orden-der">
+                <ion-badge [color]="o.estado | estadoColor">{{ o.estado | estadoLabel }}</ion-badge>
+                <span class="cd-orden-monto mono" *ngIf="verMontos && totalDe(o) && o.estado !== 'cancelada'">₡{{ totalDe(o) | number:'1.0-0' }}</span>
+              </span>
+              <ion-icon name="chevron-forward" class="cd-chev"></ion-icon>
+            </button>
+          </div>
+          <div class="cd-vacio" *ngIf="!ordenes.length">
+            <ion-icon name="document-text-outline"></ion-icon>
+            <span>Todavía no tiene órdenes.</span>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- Zona de riesgo: al final, separada del resto, para no borrar por accidente -->
+    <section class="cd-riesgo">
+      <div>
+        <strong>Eliminar cliente</strong>
+        <span>Borra sus datos personales y su acceso al portal. Las órdenes y facturas se conservan. No se puede deshacer.</span>
+      </div>
+      <button type="button" class="btn btn-rd btn-sm" (click)="eliminarCliente()"><ion-icon name="trash-outline"></ion-icon> Eliminar</button>
+    </section>
+  </div>
+
+  <div class="cd-page" *ngIf="cargando">
+    <div class="sk-dark" style="height:150px;margin-bottom:14px"></div>
+    <div class="sk-dark" style="height:76px;margin-bottom:14px"></div>
+    <div class="sk-dark" style="height:220px"></div>
   </div>
 </ion-content>

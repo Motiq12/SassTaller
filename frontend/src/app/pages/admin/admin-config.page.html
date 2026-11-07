@@ -1,135 +1,298 @@
 <ion-header>
   <ion-toolbar class="admin-topbar">
     <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
-    <ion-title>Configuración</ion-title>
+    <ion-title>{{ config ? tituloSeccion : 'Configuración' }}</ion-title>
     <app-admin-actions slot="end"></app-admin-actions>
   </ion-toolbar>
 </ion-header>
 
 <ion-content class="admin-dark">
-  <div class="admin" *ngIf="config">
-    <div class="g2">
-      <!-- Columna izquierda -->
-      <div>
-        <!-- Info del taller -->
-        <div class="cd mb">
-          <span class="cd-title"><ion-icon name="storefront-outline"></ion-icon> Información del taller</span>
-          <div class="fg"><label>Nombre del negocio</label><input [(ngModel)]="config.nombre_taller" placeholder="Nombre de tu taller"></div>
-          <div class="fg"><label>Teléfono / WhatsApp</label><input [(ngModel)]="config.telefono" placeholder="+506 0000-0000"></div>
-          <div class="fg"><label>Correo de contacto</label><input type="email" [(ngModel)]="config.email" placeholder="info@tutaller.com"></div>
-          <div class="fg"><label>Dirección</label><input [(ngModel)]="config.direccion" placeholder="San José, Costa Rica"></div>
-          <!-- Color de marca: se aplica a botones, encabezados y acentos de toda la
-               app. El selector nativo y el campo de texto editan el mismo valor: el
-               primero para elegir a ojo, el segundo para pegar el hex exacto de la
-               identidad corporativa, que es lo que hace una empresa con manual de marca. -->
-          <div class="fg">
-            <label>Color de marca</label>
-            <div class="color-fila">
-              <input type="color" class="color-picker" [(ngModel)]="colorElegido" (ngModelChange)="previsualizarColor()">
-              <input class="color-hex" [(ngModel)]="colorElegido" (ngModelChange)="previsualizarColor()"
-                     placeholder="#1d4ed8" maxlength="7" autocapitalize="off" spellcheck="false">
-              <button type="button" class="btn btn-rd btn-sm" (click)="quitarColor()">Quitar</button>
+  <div class="admin cfg" *ngIf="config && seccion !== 'correo' && seccion !== 'respaldos'">
+    <!-- Una parte a la vez, según la opción del menú (seccion). En el celular todo va en
+         una columna; desde 992 px cada parte se reparte en columnas (ver el .scss). -->
+    <header class="cfg-cab">
+      <span class="cfg-migas">Configuración</span>
+      <h1>{{ tituloSeccion }}</h1>
+      <p>{{ descripciones[seccion] }}</p>
+    </header>
+
+    <!-- ── Información del taller ── -->
+    <ng-container *ngIf="seccion === 'taller'">
+      <div class="cfg-grid cfg-grid--lado">
+        <div class="cfg-lado">
+          <div class="cd">
+            <span class="cd-title"><ion-icon name="storefront-outline"></ion-icon> Datos del negocio</span>
+            <div class="fg"><label>Nombre del negocio</label><input [(ngModel)]="config.nombre_taller" name="nombre_taller" placeholder="MS Motos"></div>
+            <div class="fg-row">
+              <div class="fg"><label>Teléfono / WhatsApp</label><input [(ngModel)]="config.telefono" name="telefono" placeholder="+506 0000-0000"></div>
+              <div class="fg"><label>Correo de contacto</label><input type="email" [(ngModel)]="config.email" name="email" placeholder="info@msmotos.com"><div class="hint">Acá llegan las consultas nuevas del sitio web.</div></div>
             </div>
-            <small class="color-ayuda">Se ve al instante; se guarda al tocar Guardar.</small>
+            <div class="fg"><label>Dirección</label><input [(ngModel)]="config.direccion" name="direccion" placeholder="San José, Costa Rica"></div>
           </div>
 
-          <div class="fg">
-            <label>Logo del taller</label>
-            <div *ngIf="config.logo" class="config-logo-preview">
-              <img [src]="config.logo" alt="logo" class="config-logo">
-              <button class="btn btn-rd btn-sm" (click)="quitarLogo()">Quitar</button>
+          <div class="cd">
+            <span class="cd-title"><ion-icon name="receipt-outline"></ion-icon> Datos de facturación</span>
+            <div class="fg-row">
+              <div class="fg"><label>Razón social</label><input [(ngModel)]="config.razon_social" name="razon_social" maxlength="150" placeholder="El nombre legal de la empresa"></div>
+              <div class="fg"><label>Cédula jurídica</label><input [(ngModel)]="config.cedula_juridica" name="cedula_juridica" maxlength="30" placeholder="3-101-000000"></div>
             </div>
-            <label class="config-upload">
-              <div class="config-upload-icon"><ion-icon name="image-outline"></ion-icon></div>
-              <div class="config-upload-hint">Clic para subir logo</div>
-              <input type="file" accept="image/*" (change)="onLogoFile($event)" hidden>
-            </label>
+            <div class="fg">
+              <label>Nota al pie del comprobante</label>
+              <textarea [(ngModel)]="config.nota_factura" name="nota_factura" maxlength="300" rows="3" placeholder="Ej.: condiciones de la garantía, horario de retiro…"></textarea>
+              <div class="hint">Sale abajo del comprobante de cada orden, antes del agradecimiento. {{ (config.nota_factura || '').length }}/300</div>
+            </div>
+            <div class="hint">El comprobante de la orden no es la factura electrónica de Hacienda: no lleva IVA desglosado ni consecutivo de Hacienda.</div>
           </div>
-          <button class="btn btn-cr config-btn-full" [disabled]="guardando" (click)="guardarConfig()">Guardar información</button>
         </div>
 
-        <!-- Horarios -->
-        <div class="cd mb">
-          <span class="cd-title"><ion-icon name="time-outline"></ion-icon> Horario de atención</span>
-          <div *ngFor="let h of horariosVista"
-               class="config-schedule-day"
-               [style.opacity]="h.activo ? 1 : 0.5">
-            <span class="config-day-label">{{ h.label }}</span>
-            <input type="time" [(ngModel)]="h.abre" [disabled]="!h.activo" class="config-time-input">
-            <span class="config-time-sep">a</span>
-            <input type="time" [(ngModel)]="h.cierra" [disabled]="!h.activo" class="config-time-input">
-            <label class="config-toggle-label">
-              <input type="checkbox" [(ngModel)]="h.activo"> Abierto
-            </label>
-          </div>
-          <button class="btn btn-cr config-btn-full" [disabled]="guardando" (click)="guardarConfig()">Guardar horarios</button>
-        </div>
-
-        <!-- Sucursales (locales del taller) -->
-        <div class="cd">
-          <span class="cd-title"><ion-icon name="location-outline"></ion-icon> Sucursales</span>
-          <div class="hint config-hint">Locales donde el cliente puede agendar. El horario es compartido; el cupo se cuenta por sucursal.</div>
-
-          <div *ngFor="let s of sucursales"
-               class="config-branch-card"
-               [style.opacity]="s.activa ? 1 : 0.55">
-            <div class="config-branch-header">
-              <input [(ngModel)]="s.nombre" placeholder="Nombre"
-                     class="config-branch-input config-branch-input--name">
-              <button class="btn btn-sm" [ngClass]="s.activa ? 'btn-rd' : 'btn-cr'" (click)="toggleSucursal(s)">{{ s.activa ? 'Desactivar' : 'Activar' }}</button>
+        <div class="cfg-lado">
+          <div class="cd">
+            <span class="cd-title"><ion-icon name="image-outline"></ion-icon> Logo</span>
+            <div class="cfg-logo">
+              <img *ngIf="config.logo" [src]="config.logo" alt="Logo del taller">
+              <span *ngIf="!config.logo" class="cfg-logo-vacio">Sin logo</span>
             </div>
-            <input [(ngModel)]="s.direccion" placeholder="Dirección"
-                   class="config-branch-input config-branch-input--full">
-            <div class="config-branch-fields">
-              <input [(ngModel)]="s.telefono" placeholder="Teléfono"
-                     class="config-branch-input">
-              <button class="btn btn-ou btn-sm" (click)="guardarSucursal(s)">Guardar</button>
+            <div class="cfg-logo-acciones">
+              <label class="btn btn-ou btn-sm">
+                <ion-icon name="cloud-upload-outline"></ion-icon> {{ config.logo ? 'Cambiar' : 'Subir logo' }}
+                <input type="file" accept="image/*" (change)="onLogoFile($event)" hidden>
+              </label>
+              <button *ngIf="config.logo" type="button" class="btn btn-rd btn-sm" (click)="quitarLogo()">Quitar</button>
             </div>
+            <div class="hint">PNG o JPG con fondo transparente o blanco. Sin logo, los documentos usan el de MS Motos.</div>
           </div>
 
-          <!-- Agregar nueva sucursal -->
-          <div class="config-add-box">
-            <div class="config-add-title">Agregar sucursal</div>
-            <input [(ngModel)]="nuevaSucursal.nombre" placeholder="Nombre (ej. Liberia)" class="config-add-input">
-            <input [(ngModel)]="nuevaSucursal.direccion" placeholder="Dirección (opcional)" class="config-add-input">
-            <input [(ngModel)]="nuevaSucursal.telefono" placeholder="Teléfono (opcional)" class="config-add-input">
-            <button class="btn btn-cr config-btn-full" [disabled]="guardandoSucursal" (click)="agregarSucursal()">Agregar sucursal</button>
+          <!-- Dónde aparece cada dato: logo y nombre en la factura y los PDF (MarcaService);
+               teléfono y correo en el contacto de la política de privacidad del portal
+               (/api/marca/contacto). La factura toma la dirección y el teléfono de la sede. -->
+          <div class="cd cfg-nota">
+            <span class="cd-title"><ion-icon name="information-circle-outline"></ion-icon> Dónde se usa</span>
+            <ul class="cfg-usos">
+              <li [class.listo]="config.nombre_taller"><strong>Logo y nombre</strong><span>Comprobante de cada orden y PDF de reportes.</span></li>
+              <li [class.listo]="config.razon_social && config.cedula_juridica"><strong>Razón social y cédula jurídica</strong><span>Arriba en el comprobante de cada orden.</span></li>
+              <li [class.listo]="config.email"><strong>Correo</strong><span>Recibe las consultas nuevas del sitio web y el aviso si falla un respaldo. También sale en la política de privacidad del portal.</span></li>
+              <li [class.listo]="config.telefono"><strong>Teléfono</strong><span>Contacto en la política de privacidad del portal.</span></li>
+              <li class="neutro"><strong>Dirección y teléfono del comprobante</strong><span>Salen de cada sede: se cargan en <a routerLink="/admin/config/sucursales">Sucursales</a>.</span></li>
+            </ul>
           </div>
         </div>
       </div>
+      <div class="cfg-pie">
+        <span class="cfg-pie-nota">Los cambios no se guardan solos: tocá el botón al terminar.</span>
+        <button class="btn btn-cr" [disabled]="guardando" (click)="guardarConfig()">Guardar información</button>
+      </div>
+    </ng-container>
 
-      <!-- Columna derecha -->
-      <div>
-        <!-- Capacidad -->
-        <div class="cd mb">
-          <span class="cd-title"><ion-icon name="settings-outline"></ion-icon> Capacidad de atención</span>
-          <div class="fg"><label>Máx. citas por hora</label><input type="number" min="1" max="20" [(ngModel)]="config.max_citas_hora"><div class="hint">Cuántas citas puede atender el taller por franja horaria.</div></div>
-          <div class="fg"><label>Días de anticipación para agendar</label><input type="number" min="1" max="365" [(ngModel)]="config.dias_anticipacion"><div class="hint">Hasta cuántos días adelante puede reservar un cliente desde el portal.</div></div>
-          <div class="fg"><label>Duración promedio por cita (minutos)</label><input type="number" min="15" max="480" [(ngModel)]="config.duracion_cita_min"><div class="hint">Informativo (los cupos del portal son por hora).</div></div>
-          <div class="fg"><label>Horas mínimas para cancelar/editar</label><input type="number" min="0" max="168" [(ngModel)]="config.cancelacion_horas_min"><div class="hint">El cliente no puede cancelar ni reprogramar si faltan menos de estas horas para la cita (0 = sin límite).</div></div>
-          <button class="btn btn-cr config-btn-full" [disabled]="guardando" (click)="guardarConfig()">Guardar capacidad</button>
+    <!-- ── Horario y capacidad ── -->
+    <ng-container *ngIf="seccion === 'horario'">
+      <div class="cfg-grid cfg-grid--horario">
+        <div class="cd">
+          <span class="cd-title"><ion-icon name="time-outline"></ion-icon> Horario de atención</span>
+          <div class="cfg-semana" role="table" aria-label="Horario de atención">
+            <div class="cfg-semana-cab" role="row">
+              <span role="columnheader">Día</span><span role="columnheader">Abre</span><span aria-hidden="true"></span>
+              <span role="columnheader">Cierra</span><span role="columnheader">Horas</span>
+              <span role="columnheader">Abierto</span>
+            </div>
+            <div *ngFor="let h of horariosVista" class="config-schedule-day" [class.cerrado]="!h.activo" role="row">
+              <span class="config-day-label" role="cell">{{ h.label }}</span>
+              <input type="time" [(ngModel)]="h.abre" name="abre" [disabled]="!h.activo" class="config-time-input" [attr.aria-label]="h.label + ': abre'">
+              <span class="config-time-sep">a</span>
+              <input type="time" [(ngModel)]="h.cierra" name="cierra" [disabled]="!h.activo" class="config-time-input" [attr.aria-label]="h.label + ': cierra'">
+              <span class="cfg-horas" role="cell">{{ h.activo ? horasDe(h) + ' h' : 'Cerrado' }}</span>
+              <label class="config-toggle-label">
+                <input type="checkbox" [(ngModel)]="h.activo" name="activo"> <span>Abierto</span>
+              </label>
+            </div>
+          </div>
         </div>
 
-        <!-- Entrega: lo que trae precargado el cierre de una orden -->
-        <div class="cd mb">
-          <span class="cd-title"><ion-icon name="shield-checkmark-outline"></ion-icon> Entrega y cobro</span>
-
-          <div class="fg">
-            <label>Días de garantía por defecto</label>
-            <input type="number" min="0" max="730" [(ngModel)]="config.garantia_dias">
-            <div class="hint">Con esto llega precargado el cierre de cada orden. Se puede cambiar en una entrega puntual sin tocar este valor.</div>
+        <div class="cfg-lado">
+          <!-- Se cuenta igual que el servidor (utils/configuracion.js → horasDisponibles):
+               una hora para agendar por cada hora entera entre que abre y cierra. -->
+          <div class="cfg-resumen">
+            <div><strong>{{ resumenHorario.dias }}</strong><span>días abiertos</span></div>
+            <div><strong>{{ resumenHorario.horas }}</strong><span>horas para agendar</span></div>
+            <div><strong>{{ resumenHorario.lugares }}</strong><span>lugares por semana en cada sede</span></div>
           </div>
 
-          <div class="fg">
-            <label>Formas de pago</label>
-            <div class="hint config-pago-nota">
-              Son las opciones del cierre de orden. Quitar una no afecta a las órdenes ya
-              cobradas con ella: conservan su forma de pago.
+          <div class="cd">
+            <span class="cd-title"><ion-icon name="speedometer-outline"></ion-icon> Capacidad de atención</span>
+            <div class="fg"><label>Máx. citas por hora</label><input type="number" min="1" max="20" [(ngModel)]="config.max_citas_hora" name="max_citas_hora"><div class="hint">Cuántas citas puede atender cada sede por franja horaria.</div></div>
+            <div class="fg"><label>Días de anticipación para agendar</label><input type="number" min="1" max="365" [(ngModel)]="config.dias_anticipacion" name="dias_anticipacion"><div class="hint">Hasta cuántos días adelante puede reservar un cliente desde el portal.</div></div>
+            <div class="fg"><label>Duración promedio por cita (minutos)</label><input type="number" min="15" max="480" [(ngModel)]="config.duracion_cita_min" name="duracion_cita_min"><div class="hint">Informativo (los cupos del portal son por hora).</div></div>
+            <div class="fg"><label>Horas mínimas para cancelar o editar</label><input type="number" min="0" max="168" [(ngModel)]="config.cancelacion_horas_min" name="cancelacion_horas_min"><div class="hint">El cliente no puede cancelar ni reprogramar si faltan menos de estas horas para la cita (0 = sin límite).</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="cfg-pie">
+        <span class="cfg-pie-nota">Los cambios no se guardan solos: tocá el botón al terminar.</span>
+        <button class="btn btn-cr" [disabled]="guardando" (click)="guardarConfig()">Guardar horario y capacidad</button>
+      </div>
+    </ng-container>
+
+    <!-- ── Bloquear horario: horas o días en que no se agenda ── -->
+    <div class="cfg-grid cfg-grid--mitades" *ngIf="seccion === 'bloqueos'">
+      <div class="cd">
+        <span class="cd-title"><ion-icon name="ban-outline"></ion-icon> Nuevo bloqueo</span>
+        <div class="fg" *ngIf="sucursales.length > 1">
+          <label>Sede</label>
+          <select [(ngModel)]="nuevoBloqueo.sucursal_id" name="sucursal_id">
+            <option [ngValue]="null">Todas las sedes</option>
+            <option *ngFor="let s of sucursales" [ngValue]="s.id">{{ s.nombre }}</option>
+          </select>
+        </div>
+        <div class="fg-row">
+          <div class="fg"><label>Desde</label><input type="date" [min]="hoy" [(ngModel)]="nuevoBloqueo.fecha_desde" name="fecha_desde"></div>
+          <div class="fg"><label>Hasta (opcional)</label><input type="date" [min]="nuevoBloqueo.fecha_desde || hoy" [(ngModel)]="nuevoBloqueo.fecha_hasta" name="fecha_hasta"></div>
+        </div>
+        <label class="bloq-todo"><input type="checkbox" [(ngModel)]="nuevoBloqueo.todo_el_dia" name="todo_el_dia"> Todo el día</label>
+        <div class="fg-row" *ngIf="!nuevoBloqueo.todo_el_dia">
+          <div class="fg"><label>De</label><input type="time" [(ngModel)]="nuevoBloqueo.hora_desde" name="hora_desde"></div>
+          <div class="fg"><label>A</label><input type="time" [(ngModel)]="nuevoBloqueo.hora_hasta" name="hora_hasta"></div>
+        </div>
+        <div class="fg"><label>Motivo</label><input [(ngModel)]="nuevoBloqueo.motivo" name="motivo" maxlength="150" placeholder="Ej.: feriado, capacitación de Freedom…"></div>
+        <button class="btn btn-cr config-btn-full" [disabled]="guardandoBloqueo" (click)="crearBloqueo()">Bloquear</button>
+      </div>
+
+      <div class="cd">
+        <span class="cd-title"><ion-icon name="calendar-outline"></ion-icon> Próximos bloqueos <span class="cfg-cuenta" *ngIf="bloqueos.length">{{ bloqueos.length }}</span></span>
+        <div class="bloq-item" *ngFor="let b of bloqueos">
+          <div class="bloq-fecha">
+            <span>{{ mesCorto(b.fecha_desde) }}</span><strong>{{ diaDelMes(b.fecha_desde) }}</strong>
+          </div>
+          <div class="bloq-info">
+            <strong>{{ textoFechas(b) }}</strong>
+            <span>{{ b.hora_desde ? b.hora_desde + ' a ' + b.hora_hasta : 'Todo el día' }} · {{ b.sucursal_nombre || 'Todas las sedes' }}</span>
+            <span class="bloq-motivo">{{ b.motivo }}</span>
+            <span class="bloq-aviso" *ngIf="b.citas_afectadas">{{ b.citas_afectadas }} cita{{ b.citas_afectadas === 1 ? '' : 's' }} ya agendada{{ b.citas_afectadas === 1 ? '' : 's' }} en ese horario</span>
+          </div>
+          <button class="btn btn-ou btn-sm" (click)="quitarBloqueo(b)">Quitar</button>
+        </div>
+        <div class="cfg-vacio" *ngIf="!bloqueos.length">
+          <ion-icon name="calendar-clear-outline"></ion-icon>
+          <strong>No hay bloqueos próximos</strong>
+          <span>Todas las horas del horario se ofrecen para agendar.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Feriados que se repiten (en la misma parte que Bloquear horario) ── -->
+    <div class="cd cfg-feriados" *ngIf="seccion === 'bloqueos'">
+      <span class="cd-title"><ion-icon name="repeat-outline"></ion-icon> Feriados que se repiten <span class="cfg-cuenta" *ngIf="feriados.length">{{ feriados.length }}</span></span>
+      <p class="cfg-correo-texto">Marcalos una vez y se bloquean solos todos los años, el día entero. Jueves y Viernes Santo cambian de fecha cada año, y a veces el Gobierno pasa un feriado al lunes: esos se bloquean arriba, a mano.</p>
+
+      <div class="cfg-grid cfg-grid--mitades">
+        <div>
+          <div class="config-add-title">Marcados</div>
+          <div class="bloq-item" *ngFor="let f of feriados">
+            <div class="bloq-fecha"><span>{{ meses[f.mes - 1].slice(0, 3) }}</span><strong>{{ f.dia }}</strong></div>
+            <div class="bloq-info">
+              <strong class="sin-capital">{{ f.nombre }}</strong>
+              <span>{{ diaYMes(f) }} · {{ f.sucursal_nombre || 'Todas las sedes' }}</span>
+              <span>Próxima vez: {{ fechaCorta(f.proxima) }}</span>
+              <span class="bloq-aviso" *ngIf="f.citas_afectadas">{{ f.citas_afectadas }} cita{{ f.citas_afectadas === 1 ? '' : 's' }} ya agendada{{ f.citas_afectadas === 1 ? '' : 's' }} ese día: no se cancelan solas</span>
             </div>
+            <button class="btn btn-ou btn-sm" (click)="quitarFeriado(f)">Quitar</button>
+          </div>
+          <div class="cfg-vacio" *ngIf="!feriados.length">
+            <ion-icon name="calendar-clear-outline"></ion-icon>
+            <strong>Ningún feriado marcado</strong>
+            <span>Hoy se puede agendar en cualquier feriado que caiga en un día abierto.</span>
+          </div>
+        </div>
+
+        <div>
+          <ng-container *ngIf="sugeridos.length">
+            <div class="config-add-title">Feriados de ley con fecha fija</div>
+            <label class="cfg-sugerido" *ngFor="let s of sugeridos">
+              <input type="checkbox" [(ngModel)]="s.elegido" [name]="'sug-' + s.mes + '-' + s.dia">
+              <span><strong>{{ diaYMes(s) }}</strong> · {{ s.nombre }}</span>
+            </label>
+            <button class="btn btn-cr config-btn-full cfg-sugeridos-btn" [disabled]="guardandoFeriado || !sugeridosElegidos.length" (click)="marcarSugeridos()">
+              {{ sugeridosElegidos.length ? 'Marcar ' + sugeridosElegidos.length + ' para todas las sedes' : 'Elegí los días en que el taller cierra' }}
+            </button>
+          </ng-container>
+
+          <div class="config-add-title cfg-otro">Otro día que se repite</div>
+          <div class="fg-row">
+            <div class="fg"><label>Día</label><input type="number" min="1" max="31" [(ngModel)]="nuevoFeriado.dia" name="fer_dia" placeholder="25"></div>
+            <div class="fg"><label>Mes</label>
+              <select [(ngModel)]="nuevoFeriado.mes" name="fer_mes">
+                <option *ngFor="let m of meses; let i = index" [ngValue]="i + 1">{{ m }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="fg"><label>Nombre</label><input [(ngModel)]="nuevoFeriado.nombre" name="fer_nombre" maxlength="80" placeholder="Ej.: fiestas de Liberia"></div>
+          <div class="fg" *ngIf="sucursales.length > 1">
+            <label>Sede</label>
+            <select [(ngModel)]="nuevoFeriado.sucursal_id" name="fer_sucursal">
+              <option [ngValue]="null">Todas las sedes</option>
+              <option *ngFor="let s of sucursales" [ngValue]="s.id">{{ s.nombre }}</option>
+            </select>
+          </div>
+          <button class="btn btn-ou config-btn-full" [disabled]="guardandoFeriado" (click)="agregarFeriado()">Agregar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Sucursales (locales del taller) ── -->
+    <div class="cfg-sedes" *ngIf="seccion === 'sucursales'">
+      <div class="cd cfg-sede" *ngFor="let s of sucursales" [class.inactiva]="!activa(s)">
+        <div class="cfg-sede-cab">
+          <span class="cfg-sede-icono"><ion-icon name="location-outline"></ion-icon></span>
+          <span class="cfg-estado" [class.on]="activa(s)">{{ activa(s) ? 'Activa' : 'Inactiva' }}</span>
+        </div>
+        <div class="fg"><label>Nombre</label><input [(ngModel)]="s.nombre" name="nombre" placeholder="Nombre"></div>
+        <div class="fg"><label>Dirección</label><input [(ngModel)]="s.direccion" name="direccion" placeholder="Señas para llegar"></div>
+        <div class="fg"><label>Teléfono</label><input [(ngModel)]="s.telefono" name="telefono" placeholder="+506 0000-0000"></div>
+        <div class="cfg-sede-pie">
+          <button class="btn btn-sm" [ngClass]="activa(s) ? 'btn-ou' : 'btn-cr'" (click)="toggleSucursal(s)">{{ activa(s) ? 'Desactivar' : 'Activar' }}</button>
+          <button class="btn btn-cr btn-sm" (click)="guardarSucursal(s)">Guardar</button>
+        </div>
+      </div>
+
+      <!-- Agregar nueva sucursal -->
+      <div class="cd cfg-sede cfg-sede--nueva">
+        <div class="cfg-sede-cab">
+          <span class="cfg-sede-icono"><ion-icon name="add-outline"></ion-icon></span>
+          <span class="config-add-title">Agregar sucursal</span>
+        </div>
+        <div class="fg"><label>Nombre</label><input [(ngModel)]="nuevaSucursal.nombre" name="nombre" placeholder="Ej.: Liberia"></div>
+        <div class="fg"><label>Dirección (opcional)</label><input [(ngModel)]="nuevaSucursal.direccion" name="direccion" placeholder="Señas para llegar"></div>
+        <div class="fg"><label>Teléfono (opcional)</label><input [(ngModel)]="nuevaSucursal.telefono" name="telefono" placeholder="+506 0000-0000"></div>
+        <div class="cfg-sede-pie">
+          <button class="btn btn-cr btn-sm" [disabled]="guardandoSucursal" (click)="agregarSucursal()">Agregar sucursal</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Entrega: lo que trae precargado el cierre de una orden ── -->
+    <ng-container *ngIf="seccion === 'entrega'">
+      <div class="cfg-grid cfg-grid--entrega">
+        <div class="cd">
+          <span class="cd-title"><ion-icon name="shield-checkmark-outline"></ion-icon> Garantía</span>
+          <div class="fg">
+            <label>Días de garantía por defecto</label>
+            <div class="cfg-con-unidad">
+              <input type="number" min="0" max="730" [(ngModel)]="config.garantia_dias" name="garantia_dias">
+              <span>días</span>
+            </div>
+            <div class="hint">Con esto llega precargado el cierre de cada orden. Se puede cambiar en una entrega puntual sin tocar este valor.</div>
+          </div>
+        </div>
+
+        <div class="cd">
+          <span class="cd-title"><ion-icon name="wallet-outline"></ion-icon> Formas de pago</span>
+          <div class="hint config-pago-nota">
+            Son las opciones del cierre de orden. Quitar una no afecta a las órdenes ya
+            cobradas con ella: conservan su forma de pago.
+          </div>
+          <div class="fg">
             <div class="config-pago-row" *ngFor="let m of config.metodos_pago; let i = index">
-              <input type="text" maxlength="40" [(ngModel)]="m.etiqueta" placeholder="Ej: Crédito del taller">
+              <input type="text" maxlength="40" [(ngModel)]="m.etiqueta" name="etiqueta" placeholder="Ej: Crédito del taller">
               <button type="button" class="config-pago-x" (click)="quitarMetodoPago(i)"
-                      [disabled]="config.metodos_pago.length <= 1" title="Quitar">
+                      [disabled]="config.metodos_pago.length <= 1" title="Quitar" aria-label="Quitar">
                 <ion-icon name="close"></ion-icon>
               </button>
             </div>
@@ -137,39 +300,371 @@
               <ion-icon name="add"></ion-icon> Agregar forma de pago
             </button>
           </div>
+        </div>
+      </div>
+      <div class="cfg-pie">
+        <span class="cfg-pie-nota">Los cambios no se guardan solos: tocá el botón al terminar.</span>
+        <button class="btn btn-cr" [disabled]="guardando" (click)="guardarConfig()">Guardar entrega y cobro</button>
+      </div>
+    </ng-container>
 
-          <button class="btn btn-cr config-btn-full" [disabled]="guardando" (click)="guardarConfig()">Guardar entrega y cobro</button>
+    <!-- ── Seguridad del personal ── -->
+    <ng-container *ngIf="seccion === 'seguridad'">
+      <div class="cfg-grid cfg-grid--lado">
+        <div class="cfg-lado">
+          <div class="cd">
+            <span class="cd-title"><ion-icon name="people-outline"></ion-icon> Personal <span class="cfg-cuenta" *ngIf="personal">{{ activos }}</span></span>
+            <div *ngIf="!personal" class="sk-dark" style="height:160px"></div>
+            <div class="cfg-persona" *ngFor="let p of personal" [class.inactiva]="!p.activo">
+              <div class="cfg-persona-info">
+                <strong>{{ p.nombre }} <span class="cfg-yo" *ngIf="p.es_yo">vos</span></strong>
+                <span>{{ nombreRol[p.rol] || p.rol }}{{ p.activo ? '' : ' · desactivado' }} · {{ p.ultimo_ingreso ? 'entró ' + haceCuanto(p.ultimo_ingreso) : 'sin ingresos anotados' }}</span>
+                <span *ngIf="p.sesiones_cerradas" class="cfg-persona-nota">Sesiones cerradas {{ haceCuanto(p.sesiones_cerradas) }}</span>
+              </div>
+              <span class="cfg-estado" [ngClass]="p.totp_activado ? 'on' : ''" [title]="p.totp_activado ? 'Verificación en dos pasos activada' : 'Sin verificación en dos pasos'">
+                {{ p.totp_activado ? 'Dos pasos' : 'Solo contraseña' }}
+              </span>
+              <button type="button" class="btn btn-ou btn-sm" *ngIf="!p.es_yo && p.activo" (click)="cerrarSesion(p)">Cerrar sesión</button>
+            </div>
+            <button type="button" class="btn btn-rd config-btn-full cfg-cerrar-todas" *ngIf="personal && personal.length > 1" (click)="cerrarSesion(null)">
+              <ion-icon name="log-out-outline"></ion-icon> Cerrar las sesiones de todo el personal
+            </button>
+          </div>
         </div>
 
-        <!-- Notificaciones -->
-        <div class="cd mb">
-          <span class="cd-title"><ion-icon name="notifications-outline"></ion-icon> Notificaciones</span>
-          <div class="config-notif-list">
-            <label class="config-notif-row">
-              <span>Notificar al cliente al cambiar estado</span>
-              <ion-toggle [(ngModel)]="config.notif_estado"></ion-toggle>
-            </label>
-            <label class="config-notif-row">
-              <span>Notificar cuando la cotización está lista</span>
-              <ion-toggle [(ngModel)]="config.notif_cotizacion"></ion-toggle>
-            </label>
-            <label class="config-notif-row">
-              <span>Recordatorio al cliente el día antes de la cita</span>
-              <ion-toggle [(ngModel)]="config.notif_recordatorio"></ion-toggle>
-            </label>
-            <label class="config-notif-row">
-              <span>Avisar por email cuando la vehiculo está lista o entregada</span>
-              <ion-toggle [(ngModel)]="config.notif_email_entrega"></ion-toggle>
+        <div class="cfg-lado">
+          <div class="cd">
+            <span class="cd-title"><ion-icon name="key-outline"></ion-icon> Contraseñas del personal</span>
+            <div class="fg">
+              <label>Largo mínimo</label>
+              <div class="cfg-con-unidad">
+                <input type="number" min="8" max="32" [(ngModel)]="config.pass_min_largo" name="pass_min_largo">
+                <span>caracteres</span>
+              </div>
+              <div class="hint">Entre 8 y 32. Una frase de varias palabras es más segura y fácil de recordar que una palabra rara.</div>
+            </div>
+            <label class="bloq-todo"><input type="checkbox" [(ngModel)]="config.pass_variedad" name="pass_variedad"> Pedir letras y números</label>
+            <div class="hint">Siempre se rechazan las más usadas (12345678, password, msmotos123…), un solo carácter repetido, el correo de la cuenta y el nombre con números.</div>
+            <div class="hint">Vale para las contraseñas nuevas: las que ya están siguen sirviendo hasta que cada uno la cambie.</div>
+          </div>
+
+          <div class="cd cfg-nota">
+            <span class="cd-title"><ion-icon name="information-circle-outline"></ion-icon> Si se pierde un celular o se va alguien</span>
+            <p>Cerrá sus sesiones acá y desactivalo en <a routerLink="/admin/empleados">Gestión de empleados</a>. Desactivado ya no entra, ni con una sesión que tuviera abierta.</p>
+            <p>La verificación en dos pasos la activa cada uno en <strong>Mi perfil</strong>: pide un código del celular además de la contraseña. {{ personal ? activosConDosPasos + ' de ' + activos + ' la tienen.' : '' }}</p>
+          </div>
+        </div>
+      </div>
+      <div class="cfg-pie">
+        <span class="cfg-pie-nota">Los cambios no se guardan solos: tocá el botón al terminar.</span>
+        <button class="btn btn-cr" [disabled]="guardando" (click)="guardarConfig()">Guardar contraseñas</button>
+      </div>
+    </ng-container>
+
+    <!-- ── Textos del portal ── -->
+    <ng-container *ngIf="seccion === 'portal'">
+      <div class="cd cfg-mensajes">
+        <span class="cd-title"><ion-icon name="megaphone-outline"></ion-icon> Aviso en el inicio del portal</span>
+        <div class="cfg-mensaje-cuerpo">
+          <div>
+            <div class="fg"><label>Título (opcional)</label><input [(ngModel)]="bienvenida.titulo" name="bv_titulo" maxlength="80" placeholder="Ej.: Horario de diciembre"></div>
+            <div class="fg">
+              <label>Texto</label>
+              <textarea [(ngModel)]="bienvenida.texto" name="bv_texto" rows="4" maxlength="500" placeholder="Ej.: El 24 y el 31 cerramos a mediodía."></textarea>
+              <div class="hint">Sale arriba en el inicio, debajo del saludo. Vacío, no sale nada. Al cliente se le escribe de tú. {{ bienvenida.texto.length }}/500</div>
+            </div>
+          </div>
+          <div class="cfg-portal-muestra" *ngIf="bienvenida.texto.trim(); else sinAviso">
+            <span class="cfg-portal-hola">Hola, Ana</span>
+            <div class="cfg-portal-aviso">
+              <ion-icon name="megaphone-outline"></ion-icon>
+              <div><strong *ngIf="bienvenida.titulo.trim()">{{ bienvenida.titulo }}</strong><p>{{ bienvenida.texto }}</p></div>
+            </div>
+          </div>
+          <ng-template #sinAviso><div class="cfg-vacio"><ion-icon name="eye-off-outline"></ion-icon><strong>Sin aviso</strong><span>El inicio del portal se ve como siempre.</span></div></ng-template>
+        </div>
+      </div>
+
+      <div class="cd cfg-mensajes">
+        <span class="cd-title"><ion-icon name="document-text-outline"></ion-icon> Condiciones del servicio</span>
+        <p class="cfg-correo-texto">
+          Es la página «Términos y condiciones» del portal, la que acepta el cliente al registrarse.
+          <ng-container *ngIf="condicionesDeFabrica">Ahora tiene el texto de fábrica.</ng-container>
+          <ng-container *ngIf="!condicionesDeFabrica && textoActualizado">Última actualización: {{ textoActualizado }}.</ng-container>
+          Conviene que la revise un abogado. Para separar párrafos, dejá una línea en blanco.
+        </p>
+        <div class="cfg-mensaje" *ngFor="let s of condiciones; let i = index">
+          <div class="cfg-mensaje-cab">
+            <strong>{{ i + 1 }}.</strong>
+            <button type="button" class="config-pago-x" (click)="moverCondicion(i, -1)" [disabled]="i === 0" title="Subir" aria-label="Subir"><ion-icon name="arrow-up"></ion-icon></button>
+            <button type="button" class="config-pago-x" (click)="moverCondicion(i, 1)" [disabled]="i === condiciones.length - 1" title="Bajar" aria-label="Bajar"><ion-icon name="arrow-down"></ion-icon></button>
+            <button type="button" class="config-pago-x" (click)="quitarCondicion(i)" title="Quitar" aria-label="Quitar sección"><ion-icon name="close"></ion-icon></button>
+          </div>
+          <div class="fg"><label>Título</label><input [(ngModel)]="s.titulo" [name]="'cond-t-' + i" maxlength="100"></div>
+          <div class="fg"><label>Texto</label><textarea [(ngModel)]="s.texto" [name]="'cond-x-' + i" rows="4" maxlength="2000"></textarea></div>
+        </div>
+        <div class="cfg-portal-acciones">
+          <button type="button" class="btn btn-sm config-pago-add" (click)="agregarCondicion()" [disabled]="condiciones.length >= 20"><ion-icon name="add"></ion-icon> Agregar sección</button>
+          <button type="button" class="btn btn-ou btn-sm" *ngIf="!condicionesDeFabrica" (click)="condicionesAFabrica()">Volver al texto de fábrica</button>
+        </div>
+        <div class="hint">La política de privacidad no se edita acá: la pide la Ley 8968, y su contacto sale de <a routerLink="/admin/config/taller">Información del taller</a>.</div>
+      </div>
+
+      <div class="cfg-pie">
+        <span class="cfg-pie-nota">Los cambios no se guardan solos: tocá el botón al terminar.</span>
+        <button class="btn btn-cr" [disabled]="guardando" (click)="guardarPortal()">Guardar textos</button>
+      </div>
+    </ng-container>
+
+    <!-- ── Mensajes al cliente ── -->
+    <ng-container *ngIf="seccion === 'mensajes'">
+      <div class="cd cfg-nota cfg-mensajes-ayuda">
+        <span class="cd-title"><ion-icon name="help-circle-outline"></ion-icon> Cómo se escriben</span>
+        <p>Los datos van entre llaves, por ejemplo <code>{{ '{' }}nombre{{ '}' }}</code> o <code>{{ '{' }}moto{{ '}' }}</code>, y se cambian solos por los de cada cliente. Lo que va entre corchetes solo sale si existe ese dato: <code>listo[ por {{ '{' }}total{{ '}' }}]</code> queda «listo» si la orden todavía no tiene total.</p>
+        <p>Abajo de cada mensaje está cómo le llega a un cliente de ejemplo.</p>
+      </div>
+
+      <div class="cd cfg-mensajes" *ngFor="let g of gruposWa">
+        <span class="cd-title"><ion-icon [name]="g.icono"></ion-icon> {{ g.titulo }}</span>
+        <div class="cfg-mensaje" *ngFor="let p of g.plantillas">
+          <div class="cfg-mensaje-cab">
+            <strong>{{ p.label }}</strong>
+            <span class="cfg-estado medio" *ngIf="cambiadoWa(p)">Cambiado</span>
+            <button type="button" class="btn btn-ou btn-sm" *ngIf="cambiadoWa(p)" (click)="deFabricaWa(p)">Volver al de fábrica</button>
+          </div>
+          <div class="cfg-mensaje-cuerpo">
+            <div class="fg">
+              <textarea [(ngModel)]="textosWa[p.clave]" [name]="'wa-' + p.clave" rows="4" maxlength="700" [attr.aria-label]="p.label"></textarea>
+              <div class="cfg-datos">
+                <span *ngFor="let d of p.datos"><code>{{ '{' + d + '}' }}</code> {{ nombreDato[d] }}</span>
+              </div>
+            </div>
+            <div class="cfg-burbuja" aria-label="Vista previa">{{ muestraWa(p) }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cd cfg-mensajes">
+        <span class="cd-title"><ion-icon name="mail-outline"></ion-icon> Correos al cliente</span>
+        <p class="cfg-correo-texto">Salen si está encendido «Correo cuando la moto está lista» en <a routerLink="/admin/config/notificaciones">Notificaciones</a>. Datos: <code>{{ '{' }}nombre{{ '}' }}</code> y <code>{{ '{' }}moto{{ '}' }}</code>.</p>
+        <div class="cfg-mensaje" *ngFor="let c of correosHito">
+          <ng-container *ngIf="textosCorreo[c.clave] as t">
+            <div class="cfg-mensaje-cab">
+              <strong>{{ c.label }}</strong>
+              <span class="cfg-estado medio" *ngIf="cambiadoCorreo(c.clave)">Cambiado</span>
+              <button type="button" class="btn btn-ou btn-sm" *ngIf="cambiadoCorreo(c.clave)" (click)="deFabricaCorreo(c.clave)">Volver al de fábrica</button>
+            </div>
+            <div class="cfg-mensaje-cuerpo">
+              <div>
+                <div class="fg"><label>Asunto y título</label><input [(ngModel)]="t.titulo" [name]="'co-t-' + c.clave" maxlength="120"></div>
+                <div class="fg"><label>Mensaje</label><textarea [(ngModel)]="t.mensaje" [name]="'co-m-' + c.clave" rows="3" maxlength="500"></textarea></div>
+              </div>
+              <div class="cfg-correo-muestra">
+                <strong>{{ muestraCorreo(t.titulo) }}</strong>
+                <span>{{ muestraCorreo(t.mensaje) }}</span>
+              </div>
+            </div>
+          </ng-container>
+        </div>
+      </div>
+
+      <div class="cfg-pie">
+        <span class="cfg-pie-nota">Los cambios no se guardan solos: tocá el botón al terminar.</span>
+        <button class="btn btn-cr" [disabled]="guardando" (click)="guardarMensajes()">Guardar mensajes</button>
+      </div>
+    </ng-container>
+
+    <!-- ── Notificaciones ── -->
+    <ng-container *ngIf="seccion === 'notificaciones'">
+      <div class="cfg-grid cfg-grid--lado">
+        <div class="cd">
+          <span class="cd-title"><ion-icon name="notifications-outline"></ion-icon> Avisos al cliente</span>
+          <div class="cfg-avisos">
+            <label class="cfg-aviso" *ngFor="let n of avisos"
+                   [class.apagado]="n.necesita && !config[n.necesita]">
+              <span class="cfg-aviso-icono"><ion-icon [name]="n.icono"></ion-icon></span>
+              <span class="cfg-aviso-texto">
+                <strong>{{ n.titulo }}</strong>
+                <span>{{ n.detalle }}</span>
+                <em *ngIf="n.necesita && !config[n.necesita]">Necesita encendido «Cambios de estado».</em>
+              </span>
+              <ion-toggle [(ngModel)]="config[n.campo]" [name]="n.campo" [attr.aria-label]="n.titulo"></ion-toggle>
             </label>
           </div>
-          <button class="btn btn-cr config-btn-full" [disabled]="guardando" (click)="guardarConfig()">Guardar</button>
         </div>
 
+        <div class="cfg-lado">
+          <div class="cd cfg-nota">
+            <span class="cd-title"><ion-icon name="information-circle-outline"></ion-icon> Cómo llegan</span>
+            <p>Los avisos aparecen en el portal del cliente. El recordatorio y el aviso de moto lista también salen por correo, si el cliente dejó uno.</p>
+            <p>Cada cliente puede apagar los avisos de avance y los recordatorios desde su perfil en el portal: lo que apague él manda sobre lo de acá.</p>
+          </div>
+        </div>
+      </div>
+      <div class="cfg-pie">
+        <span class="cfg-pie-nota">Los cambios no se guardan solos: tocá el botón al terminar.</span>
+        <button class="btn btn-cr" [disabled]="guardando" (click)="guardarConfig()">Guardar notificaciones</button>
+      </div>
+    </ng-container>
+  </div>
+
+  <!-- ── Correo de envío: no depende de la configuración guardada ── -->
+  <div class="admin cfg" *ngIf="seccion === 'correo'">
+    <header class="cfg-cab">
+      <span class="cfg-migas">Configuración</span>
+      <h1>{{ tituloSeccion }}</h1>
+      <p>{{ descripciones[seccion] }}</p>
+    </header>
+
+    <div class="cfg-grid cfg-grid--lado">
+      <div class="cfg-lado">
+        <div class="cd">
+          <span class="cd-title"><ion-icon name="mail-outline"></ion-icon> Remitente</span>
+          <div *ngIf="!correo && !errorCorreo" class="sk-dark" style="height:96px"></div>
+          <div *ngIf="errorCorreo" class="cfg-vacio">
+            <ion-icon name="cloud-offline-outline"></ion-icon>
+            <strong>No se pudo leer el estado del correo</strong>
+            <button type="button" class="btn btn-ou btn-sm" (click)="cargarCorreo()">Reintentar</button>
+          </div>
+          <ng-container *ngIf="correo">
+            <div class="cfg-remitente">
+              <strong>{{ correo.remitente }}</strong>
+              <span class="cfg-estado" [ngClass]="estadoCorreo.clase">{{ estadoCorreo.etiqueta }}</span>
+            </div>
+            <p class="cfg-correo-texto">{{ estadoCorreo.texto }}</p>
+            <button type="button" class="btn btn-ou btn-sm" (click)="cargarCorreo()" [disabled]="cargandoCorreo">
+              <ion-icon name="refresh-outline"></ion-icon> Volver a revisar
+            </button>
+          </ng-container>
+        </div>
+
+        <div class="cd" *ngIf="correo && correo.verificacion !== 'verificado'">
+          <span class="cd-title"><ion-icon name="construct-outline"></ion-icon> Cómo dejarlo listo</span>
+          <ol class="cfg-pasos">
+            <li *ngIf="!correo.configurado">En Railway, servicio <strong>sistema</strong> → Variables, poné <code>RESEND_API_KEY</code> con la clave de la cuenta de Resend.</li>
+            <li>En <strong>resend.com → Domains</strong>, agregá el dominio del negocio (por ejemplo, msmotos.com).</li>
+            <li>Quien maneja ese dominio pone en el DNS los registros que da Resend (SPF y DKIM) y espera a que Resend lo marque como verificado.</li>
+            <li>En Railway, servicio <strong>sistema</strong> → Variables, poné <code>MAIL_FROM</code> con una dirección de ese dominio, por ejemplo <code>MS Motos &lt;avisos&#64;msmotos.com&gt;</code>.</li>
+            <li>Volvé acá y mandate un correo de prueba.</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="cfg-lado">
+        <div class="cd">
+          <span class="cd-title"><ion-icon name="paper-plane-outline"></ion-icon> Probar</span>
+          <p class="cfg-correo-texto">Te manda un correo a la dirección de tu usuario. Si llega, el envío funciona.</p>
+          <button type="button" class="btn btn-cr config-btn-full" [disabled]="probando" (click)="probarCorreo()">Mandarme un correo de prueba</button>
+          <p class="cfg-prueba" *ngIf="resultadoPrueba" [class.mal]="!pruebaOk" role="status">{{ resultadoPrueba }}</p>
+        </div>
+
+        <!-- Quién recibe qué: services/mailer.js y los que lo llaman. -->
+        <div class="cd cfg-nota">
+          <span class="cd-title"><ion-icon name="information-circle-outline"></ion-icon> Qué correos salen</span>
+          <ul class="cfg-usos">
+            <li class="neutro"><strong>A los clientes</strong><span>Códigos para registrarse, ingresar, recuperar la contraseña y cambiar el correo; recordatorio de la cita; aviso de moto lista y entregada.</span></li>
+            <li class="neutro"><strong>Al taller</strong><span>Consultas nuevas del sitio web, el seguimiento de las que no tienen a nadie asignado y el aviso si falla un respaldo. Van al correo de <a routerLink="/admin/config/taller">Información del taller</a>.</span></li>
+            <li class="neutro"><strong>Al personal</strong><span>El seguimiento del día de las consultas del sitio que cada uno tiene asignadas.</span></li>
+          </ul>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="admin" *ngIf="cargando && !config">
+  <!-- ── Respaldos de la base ── -->
+  <div class="admin cfg" *ngIf="seccion === 'respaldos'">
+    <header class="cfg-cab">
+      <span class="cfg-migas">Configuración</span>
+      <h1>{{ tituloSeccion }}</h1>
+      <p>{{ descripciones[seccion] }}</p>
+    </header>
+
+    <div *ngIf="!respaldos && !errorRespaldos" class="sk-dark" style="height:160px"></div>
+    <div *ngIf="errorRespaldos" class="cd cfg-vacio">
+      <ion-icon name="cloud-offline-outline"></ion-icon>
+      <strong>No se pudo leer el estado de los respaldos</strong>
+      <button type="button" class="btn btn-ou btn-sm" (click)="cargarRespaldos()">Reintentar</button>
+    </div>
+
+    <ng-container *ngIf="respaldos as r">
+      <div class="cfg-grid cfg-grid--lado">
+        <div class="cfg-lado">
+          <!-- Estado -->
+          <div class="cd cfg-resp-estado" [ngClass]="'cfg-resp-estado--' + estadoRespaldos.clase">
+            <div class="cfg-resp-cab">
+              <span class="cfg-estado" [ngClass]="estadoRespaldos.clase">{{ estadoRespaldos.etiqueta }}</span>
+              <button type="button" class="btn btn-cr btn-sm" *ngIf="r.configuracion.activo" [disabled]="respaldando" (click)="respaldarAhora()">
+                <ion-icon name="save-outline"></ion-icon> {{ respaldando ? 'Respaldando…' : 'Respaldar ahora' }}
+              </button>
+            </div>
+            <h2>{{ estadoRespaldos.titulo }}</h2>
+            <p class="cfg-resp-fecha" *ngIf="r.ultimo_ok">{{ fechaHora(r.ultimo_ok, true) }}</p>
+
+            <div class="cfg-resumen" *ngIf="ultimoRegistroOk as u">
+              <div><strong>{{ u.tablas }}</strong><span>tablas</span></div>
+              <div><strong>{{ u.filas | number:'1.0-0' }}</strong><span>filas</span></div>
+              <div><strong>{{ megas(u.bytes) }}</strong><span>{{ u.cifrado ? 'cifrado' : 'sin cifrar' }}</span></div>
+            </div>
+
+            <p class="cfg-prueba mal" *ngIf="ultimoError as e">
+              <strong>Último intento, {{ fechaHora(e.created_at) }}:</strong> {{ e.error }}
+            </p>
+            <p class="cfg-prueba mal" *ngIf="!r.configuracion.activo">
+              Faltan en Railway (servicio <strong>sistema</strong>) estas variables: {{ r.configuracion.faltan.join(', ') }}. Los pasos están en <code>docs/RESPALDOS.md</code>.
+            </p>
+            <p class="cfg-prueba medio" *ngIf="r.configuracion.activo && !r.configuracion.cifrado">
+              Los respaldos se suben <strong>sin cifrar</strong> al almacenamiento privado: falta poner <code>RESPALDO_CLAVE</code> en Railway.
+            </p>
+          </div>
+
+          <!-- Copias guardadas -->
+          <div class="cd" *ngIf="r.configuracion.activo">
+            <span class="cd-title"><ion-icon name="albums-outline"></ion-icon> Copias guardadas <span class="cfg-cuenta" *ngIf="r.guardados?.length">{{ r.guardados?.length }}</span></span>
+            <p class="cfg-prueba mal" *ngIf="r.error_almacen">{{ r.error_almacen }}</p>
+            <div class="cfg-tabla" *ngIf="r.guardados?.length">
+              <div class="cfg-fila" *ngFor="let g of r.guardados; let i = index">
+                <span class="cfg-fila-fecha">{{ fechaHora(g.fecha, true) }} <em *ngIf="i === 0">más nueva</em></span>
+                <span>{{ megas(g.bytes) }}</span>
+                <span class="cfg-fila-candado" [class.no]="!g.cifrado"><ion-icon [name]="g.cifrado ? 'lock-closed-outline' : 'lock-open-outline'"></ion-icon> {{ g.cifrado ? 'Cifrado' : 'Sin cifrar' }}</span>
+              </div>
+            </div>
+            <div class="cfg-vacio" *ngIf="r.guardados && !r.guardados.length">
+              <ion-icon name="albums-outline"></ion-icon><strong>Todavía no hay copias guardadas</strong>
+            </div>
+            <div class="hint">Se guardan las últimas {{ r.configuracion.conservar }}; cada noche se borra la más vieja.</div>
+          </div>
+        </div>
+
+        <div class="cfg-lado">
+          <!-- Historial -->
+          <div class="cd">
+            <span class="cd-title"><ion-icon name="list-outline"></ion-icon> Historial</span>
+            <div class="cfg-hist" *ngFor="let x of r.registro">
+              <ion-icon [name]="x.ok ? 'checkmark-circle' : 'close-circle'" [class.mal]="!x.ok"></ion-icon>
+              <div>
+                <strong>{{ fechaHora(x.created_at) }}</strong>
+                <span>{{ x.origen === 'panel' ? 'A mano' + (x.usuario_nombre ? ', ' + x.usuario_nombre : '') : 'Automático' }}{{ x.ok ? ' · ' + x.tablas + ' tablas · ' + megas(x.bytes) : '' }}</span>
+                <span class="cfg-hist-error" *ngIf="!x.ok">{{ x.error }}</span>
+              </div>
+            </div>
+            <div class="cfg-vacio" *ngIf="!r.registro.length">
+              <ion-icon name="time-outline"></ion-icon>
+              <strong>Sin historial todavía</strong>
+              <span>Se empieza a anotar con el próximo respaldo.</span>
+            </div>
+          </div>
+
+          <div class="cd cfg-nota">
+            <span class="cd-title"><ion-icon name="information-circle-outline"></ion-icon> Para restaurar</span>
+            <p>Volver la base a un respaldo reemplaza todo lo que hay ahora. Se hace desde una computadora, siguiendo <code>docs/RESPALDOS.md</code>, y no desde el panel.</p>
+            <p>Si un respaldo de la noche falla, también llega un correo al de <a routerLink="/admin/config/taller">Información del taller</a>.</p>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+  </div>
+
+  <div class="admin" *ngIf="cargando && !config && seccion !== 'correo' && seccion !== 'respaldos'">
     <div class="cd"><div class="placeholder">Cargando configuración…</div></div>
   </div>
 </ion-content>

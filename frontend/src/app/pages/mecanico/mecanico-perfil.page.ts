@@ -1,29 +1,50 @@
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
-import { Router } from '@angular/router';
-import { ToastController } from '@ionic/angular';
-import { Subject } from 'rxjs';
+import { Component, OnDestroy, OnInit } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { Location } from '@angular/common';
+import { ModalController, ToastController } from '@ionic/angular';
 import { takeUntil } from 'rxjs/operators';
 import { MecanicoService } from '../../services/mecanico.service';
 import { AuthService } from '../../services/auth.service';
 import { AccesibilidadService } from '../../services/accesibilidad.service';
-import { comprimirImagen } from '../../shared/utils/image.util';
+import { MiPerfilService } from '../../services/mi-perfil.service';
+import { recortarFoto } from '../../shared/perfil/recortar-foto.component';
+import { GrupoPerfil, PerfilListaBase } from '../../shared/perfil/perfil-lista.base';
 
+// Mi perfil del taller: la misma lista de ajustes que el panel (shared/perfil), más
+// "Mi desempeño". El nombre y el correo los cambia administración.
 @Component({
   standalone: false,
   selector: 'app-mecanico-perfil',
   templateUrl: './mecanico-perfil.page.html',
   styleUrls: ['./mecanico-perfil.page.scss'],
 })
-export class MecanicoPerfilPage implements OnInit, OnDestroy {
-  private mecanico = inject(MecanicoService);
-  private auth = inject(AuthService);
-  a11y = inject(AccesibilidadService);
-  private router = inject(Router);
-  private toast = inject(ToastController);
+export class MecanicoPerfilPage extends PerfilListaBase implements OnInit, OnDestroy {
+  readonly rol = 'tecnico' as const;
+  readonly grupos: GrupoPerfil[] = [
+    { titulo: 'Mi trabajo', items: [
+      { id: 'desempeno', nombre: 'Mi desempeño', icono: 'stats-chart-outline' },
+    ] },
+    { titulo: 'Información personal', items: [
+      { id: 'datos', nombre: 'Datos de trabajo', icono: 'person-outline' },
+      { id: 'foto', nombre: 'Foto de perfil', icono: 'image-outline' },
+    ] },
+    { titulo: 'Seguridad', items: [
+      { id: 'contrasena', nombre: 'Cambiar contraseña', icono: 'lock-closed-outline' },
+      { id: 'dosfa', nombre: 'Verificación en dos pasos', icono: 'shield-checkmark-outline' },
+      { id: 'sesiones', nombre: 'Dónde estás conectado', icono: 'laptop-outline' },
+    ] },
+    { titulo: 'Preferencias', items: [
+      { id: 'apariencia', nombre: 'Apariencia', icono: 'color-palette-outline' },
+      { id: 'inicio', nombre: 'Al entrar y avisos', icono: 'options-outline' },
+    ] },
+    { titulo: 'Actividad', items: [
+      { id: 'actividad', nombre: 'Mi actividad', icono: 'time-outline' },
+    ] },
+  ];
 
-  private destroy$ = new Subject<void>();
   perfil: any = null;
   cuenta = { telefono: '', especialidades: '', horario: '' };
+  private cuentaGuardada = { telefono: '', especialidades: '', horario: '' };
   pass = { actual: '', nueva: '' };
   cargando = true;
   guardando = false;
@@ -32,18 +53,25 @@ export class MecanicoPerfilPage implements OnInit, OnDestroy {
   verActual = false;
   verNueva = false;
 
-  readonly nivelesTexto = [
-    { i: 0, etiqueta: 'A', nombre: 'Normal' },
-    { i: 1, etiqueta: 'A', nombre: 'Grande' },
-    { i: 2, etiqueta: 'A', nombre: 'Muy grande' },
-  ];
+  constructor(
+    private mecanico: MecanicoService,
+    private toast: ToastController,
+    private modal: ModalController,
+    route: ActivatedRoute,
+    router: Router,
+    location: Location,
+    miPerfil: MiPerfilService,
+    auth: AuthService,
+    a11y: AccesibilidadService,
+  ) {
+    super(route, router, location, miPerfil, auth, a11y);
+  }
 
-  ngOnInit() { this.cargar(); }
+  ngOnInit() { this.iniciarLista(); this.cargar(); }
   ionViewWillEnter() { this.cargar(); }
-  ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
+  ngOnDestroy() { this.terminarLista(); }
 
-  cargar(ev?: any) {
-    this.cargando = true;
+  cargar() {
     this.mecanico.getPerfil().pipe(takeUntil(this.destroy$)).subscribe({
       next: r => {
         this.perfil = r.data;
@@ -52,23 +80,26 @@ export class MecanicoPerfilPage implements OnInit, OnDestroy {
           especialidades: r.data.especialidades || '',
           horario: r.data.horario || '',
         };
+        this.cuentaGuardada = { ...this.cuenta };
         this.cargando = false;
-        if (ev) ev.target.complete();
       },
-      error: () => { this.cargando = false; if (ev) ev.target.complete(); },
+      error: () => { this.cargando = false; this.aviso('No se pudo cargar el perfil', 'danger'); },
     });
   }
 
-  get iniciales(): string {
-    const p = (this.perfil?.nombre || 'M').trim().split(/\s+/);
-    return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || 'M';
+  protected get fotoActual(): string | null { return this.perfil?.foto || null; }
+  get iniciales(): string { return this.inicialesDe(this.perfil?.nombre || '', 'M'); }
+  get sedeLabel(): string { return this.perfil?.sucursal_nombre || 'Todas las sedes'; }
+  get rolNombre(): string { return this.auth.getUsuario()?.rol_nombre || 'Mecánico'; }
+  get miembroDesde(): string { return this.fechaDesde(this.perfil?.created_at); }
+  get fuerza() { return this.fuerzaDe(this.pass.nueva); }
+  get cuentaCambiada(): boolean {
+    return (['telefono', 'especialidades', 'horario'] as const).some(k => this.cuenta[k].trim() !== this.cuentaGuardada[k]);
   }
 
-  get sedeLabel(): string { return this.perfil?.sucursal_nombre || 'Todas las sedes'; }
-
-  get miembroDesde(): string {
-    if (!this.perfil?.created_at) return '—';
-    return new Date(this.perfil.created_at).toLocaleDateString('es-CR', { month: 'long', year: 'numeric' });
+  override valor(id: string): string {
+    if (id === 'desempeno') return this.perfil?.calificacion_promedio ? `★ ${this.perfil.calificacion_promedio}` : '';
+    return super.valor(id);
   }
 
   estrellas(prom: number | null): string {
@@ -84,8 +115,6 @@ export class MecanicoPerfilPage implements OnInit, OnDestroy {
     return h ? `${h}h ${m}min` : `${m} min`;
   }
 
-  setTexto(i: number) { this.a11y.setNivel(i); }
-
   pedirFoto(input: HTMLInputElement) { if (!this.subiendoFoto) input.click(); }
 
   async onFoto(ev: Event) {
@@ -93,9 +122,11 @@ export class MecanicoPerfilPage implements OnInit, OnDestroy {
     const file = input.files?.[0];
     input.value = '';
     if (!file) return;
-    this.subiendoFoto = true;
     try {
-      const dataUrl = await comprimirImagen(file, { maxLado: 400, calidad: 0.8 });
+      // Primero se encuadra (y sale ya en 400 px); cancelar no sube nada.
+      const dataUrl = await recortarFoto(this.modal, file);
+      if (!dataUrl) return;
+      this.subiendoFoto = true;
       this.mecanico.updateFoto(dataUrl).pipe(takeUntil(this.destroy$)).subscribe({
         next: r => {
           this.perfil = { ...this.perfil, foto: r.data.foto };
@@ -141,7 +172,7 @@ export class MecanicoPerfilPage implements OnInit, OnDestroy {
 
   cambiarPassword() {
     if (!this.pass.actual || !this.pass.nueva) { this.aviso('Completá ambas contraseñas', 'warning'); return; }
-    if (this.pass.nueva.length < 8) { this.aviso('La nueva debe tener al menos 8 caracteres', 'warning'); return; }
+    if (this.pass.nueva.length < this.minimo) { this.aviso(`Mínimo ${this.minimo} caracteres`, 'warning'); return; }
     this.guardandoPass = true;
     this.mecanico.cambiarPassword(this.pass).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => { this.guardandoPass = false; this.pass = { actual: '', nueva: '' }; this.aviso('Contraseña actualizada'); },

@@ -6,10 +6,12 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="admin-dark">
-  <ion-refresher slot="fixed" (ionRefresh)="cargar($event)"><ion-refresher-content></ion-refresher-content></ion-refresher>
+<!-- Con un chat abierto la página no se desplaza: el chat ocupa todo el alto y
+     solo se mueven sus mensajes (ver .chat-pantalla en global.scss). -->
+<ion-content class="admin-dark" [scrollY]="!enChat">
+  <ion-refresher slot="fixed" [disabled]="enChat" (ionRefresh)="cargar($event)"><ion-refresher-content></ion-refresher-content></ion-refresher>
 
-  <div class="admin">
+  <div class="admin" [class.chat-pantalla]="enChat">
     <div class="filter-bar" *ngIf="!chatAbierto && !verAvisos">
       <button class="filter-btn" [class.on]="vista==='taller'" (click)="vista='taller'">Equipo</button>
       <button class="filter-btn" [class.on]="vista==='mecanicos'" (click)="vista='mecanicos'">Avances mecánicos</button>
@@ -53,12 +55,12 @@
         <div class="fg">
           <label>Cliente</label>
           <select [(ngModel)]="form.cliente_id">
-            <option [ngValue]="null">Seleccionar...</option>
+            <option [ngValue]="null">Seleccionar…</option>
             <option *ngFor="let c of clientes" [ngValue]="c.id">{{ c.nombre }} {{ c.apellido }}</option>
           </select>
         </div>
         <div class="fg"><label>Título</label><input [(ngModel)]="form.titulo" placeholder="Título del aviso"></div>
-        <div class="fg"><label>Mensaje</label><input [(ngModel)]="form.mensaje" placeholder="Detalle..."></div>
+        <div class="fg"><label>Mensaje</label><input [(ngModel)]="form.mensaje" placeholder="Detalle…"></div>
         <button class="btn btn-cr btn-block" (click)="enviarNotificacion()" [disabled]="enviando || !form.cliente_id || !form.titulo.trim() || !form.mensaje.trim()">
           <ion-icon name="send-outline"></ion-icon> Enviar notificación
         </button>

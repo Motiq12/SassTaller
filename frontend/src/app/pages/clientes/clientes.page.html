@@ -1,14 +1,10 @@
 <ion-header>
-  <ion-toolbar>
-    <ion-buttons slot="start">
+  <ion-toolbar [class.admin-topbar]="dentroDelPanel">
+    <ion-buttons slot="start" *ngIf="dentroDelPanel"><ion-menu-button></ion-menu-button></ion-buttons>
+    <ion-buttons slot="start" *ngIf="!dentroDelPanel">
       <ion-back-button defaultHref="/admin" text=""></ion-back-button>
     </ion-buttons>
     <ion-title>Clientes</ion-title>
-    <ion-buttons slot="end">
-      <ion-button (click)="nuevoCliente()">
-        <ion-icon slot="icon-only" name="add-circle-outline"></ion-icon>
-      </ion-button>
-    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
@@ -18,38 +14,84 @@
   </ion-refresher>
 
   <div class="cli-page">
+    <!-- Encabezado: cuántos hay y crear uno -->
+    <div class="cli-cab">
+      <div>
+        <h1>Clientes</h1>
+        <p *ngIf="!cargando">{{ textoCuenta }}</p>
+      </div>
+      <button type="button" class="btn btn-cr" (click)="nuevoCliente()">
+        <ion-icon name="person-add-outline"></ion-icon> Nuevo cliente
+      </button>
+    </div>
+
     <!-- Buscador -->
     <div class="cli-search">
       <ion-icon name="search-outline"></ion-icon>
-      <input type="text" [(ngModel)]="busqueda" (ngModelChange)="buscar({ detail: { value: busqueda } })"
-             placeholder="Buscar por nombre, teléfono o cédula">
-      <button *ngIf="busqueda" class="cli-clear" (click)="busqueda=''; buscar({ detail: { value: '' } })">
+      <input type="search" [(ngModel)]="busqueda" (ngModelChange)="buscar({ detail: { value: busqueda } })"
+             placeholder="Buscar por nombre, teléfono o cédula" aria-label="Buscar cliente">
+      <button *ngIf="busqueda" class="cli-clear" (click)="busqueda=''; buscar({ detail: { value: '' } })" aria-label="Borrar búsqueda">
         <ion-icon name="close-circle"></ion-icon>
+      </button>
+    </div>
+
+    <!-- Filtros rápidos (sobre lo ya cargado) -->
+    <div class="cli-filtros" role="tablist" *ngIf="!cargando && clientes.length">
+      <button type="button" *ngFor="let f of filtros" class="chip-filtro" role="tab"
+              [class.on]="filtro === f.id" [attr.aria-selected]="filtro === f.id" (click)="filtro = f.id">
+        {{ f.label }} <span>{{ cuenta(f.id) }}</span>
       </button>
     </div>
 
     <!-- Skeleton -->
     <div *ngIf="cargando" class="cli-list">
-      <div class="sk-dark" style="height:72px" *ngFor="let i of [1,2,3,4]"></div>
+      <div class="sk-dark" style="height:74px" *ngFor="let i of [1,2,3,4]"></div>
     </div>
 
     <!-- Lista -->
     <div class="cli-list" *ngIf="!cargando">
-      <div class="cli-card" *ngFor="let c of clientes" (click)="abrirDetalle(c.id!)">
-        <div class="cli-av">{{ iniciales(c) }}</div>
-        <div class="cli-info">
-          <strong>{{ c.nombre }} {{ c.apellido }}</strong>
-          <span *ngIf="c.telefono"><ion-icon name="call-outline"></ion-icon> {{ c.telefono }}</span>
-          <span *ngIf="c.cedula"><ion-icon name="card-outline"></ion-icon> {{ c.cedula }}</span>
-        </div>
-        <ion-icon name="chevron-forward" class="cli-chev"></ion-icon>
+      <div class="cli-tabla-cab" *ngIf="visibles.length" aria-hidden="true">
+        <span>Cliente</span><span>Teléfono</span><span>Cédula</span><span>Estado</span><span></span>
       </div>
 
-      <div class="cli-empty" *ngIf="clientes.length === 0">
-        <ion-icon name="people-outline"></ion-icon>
-        <p>No se encontraron clientes</p>
+      <div class="cli-card" *ngFor="let c of visibles" (click)="abrirDetalle(c.id!)" (keydown.enter)="abrirDetalle(c.id!)" tabindex="0" role="button"
+           [attr.aria-label]="'Abrir ' + c.nombre + ' ' + c.apellido">
+        <div class="cli-quien">
+          <div class="cli-av">{{ iniciales(c) }}</div>
+          <div class="cli-info">
+            <strong>{{ c.nombre }} {{ c.apellido }}</strong>
+            <span class="cli-mail" *ngIf="c.email">{{ c.email }}</span>
+            <span class="cli-solo-cel" *ngIf="c.telefono"><ion-icon name="call-outline"></ion-icon> {{ c.telefono }}</span>
+          </div>
+        </div>
+        <span class="cli-dato cli-solo-esc">{{ c.telefono || '—' }}</span>
+        <span class="cli-dato cli-solo-esc mono">{{ c.cedula || '—' }}</span>
+        <div class="cli-chips">
+          <span class="cli-chip ok" *ngIf="c.tiene_portal"><ion-icon name="shield-checkmark-outline"></ion-icon> Portal</span>
+          <span class="cli-chip regalo" *ngIf="c.cortesia_disponible"><ion-icon name="gift-outline"></ion-icon> Cortesía</span>
+          <span class="cli-chip" *ngIf="c.visitas">{{ c.visitas }} visita{{ c.visitas === 1 ? '' : 's' }}</span>
+        </div>
+        <div class="cli-acciones">
+          <a class="cli-accion" *ngIf="c.telefono" [href]="'tel:' + c.telefono" (click)="$event.stopPropagation()" aria-label="Llamar" title="Llamar">
+            <ion-icon name="call-outline"></ion-icon>
+          </a>
+          <button type="button" class="cli-accion wa" *ngIf="c.telefono" (click)="whatsapp(c, $event)" aria-label="WhatsApp" title="WhatsApp">
+            <ion-icon name="logo-whatsapp"></ion-icon>
+          </button>
+          <ion-icon name="chevron-forward" class="cli-chev" aria-hidden="true"></ion-icon>
+        </div>
+      </div>
+
+      <!-- Vacío -->
+      <div class="cli-empty" *ngIf="visibles.length === 0">
+        <ion-icon [name]="busqueda ? 'search-outline' : 'people-outline'"></ion-icon>
+        <strong>{{ busqueda ? 'Ningún cliente coincide con «' + busqueda + '»' : (filtro !== 'todos' ? 'Ningún cliente con ese filtro' : 'Todavía no hay clientes') }}</strong>
+        <p>{{ busqueda ? 'Probá con el teléfono o la cédula, o crealo.' : 'Los clientes se crean acá o al recibir una moto.' }}</p>
+        <button type="button" class="btn btn-ou btn-sm" *ngIf="filtro !== 'todos' && !busqueda" (click)="filtro = 'todos'">Ver todos</button>
+        <button type="button" class="btn btn-cr btn-sm" *ngIf="filtro === 'todos'" (click)="nuevoCliente()">
+          <ion-icon name="person-add-outline"></ion-icon> Nuevo cliente
+        </button>
       </div>
     </div>
   </div>
-
 </ion-content>

@@ -1,247 +1,85 @@
-.rec {
-  max-width: 920px;
-  margin: 0 auto;
-  padding: 14px 16px 0;
+// Inicio de recepción. El encabezado, las cifras, las tarjetas, el buscador y los
+// botones son el estándar del panel (global.scss: .pg-*, .cd, .btn). Acá va solo lo
+// propio del mostrador: los resultados del buscador y las filas de citas.
+
+// ── Buscador con resultados ──
+.rec-buscar { position: relative; margin-bottom: 14px; .pg-buscar { margin-bottom: 0; } }
+.rec-res {
+  margin-top: 6px; overflow: hidden;
+  background: var(--sur); border: 1px solid var(--bd2); border-radius: 8px; box-shadow: 0 12px 28px rgba(0, 0, 0, .14);
+}
+.rec-res-msg { padding: 14px 16px; font-size: 13px; color: var(--tx3); text-align: center; }
+.rec-res-item {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 14px;
+  border: none; background: none; cursor: pointer; font: inherit; text-align: left; color: var(--tx);
+  & + .rec-res-item { border-top: 1px solid var(--bd); }
+  &:hover { background: var(--sur2); }
+  > ion-icon { font-size: 16px; color: var(--tx3); flex-shrink: 0; }
+}
+.rec-av {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--adm-cr-bg); color: var(--adm-cr-fg); font-weight: 800; font-size: 13px;
 }
 
-.greet {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  margin: 2px 2px 16px;
-  .greet-l { display: flex; align-items: center; gap: 10px; min-width: 0; }
-  h1 { font-family: var(--font-display); font-size: 24px; font-weight: 800; letter-spacing: -0.04em; margin: 0; white-space: nowrap; }
-  .greet-date { font-size: 12px; color: var(--n-400); text-transform: capitalize; flex-shrink: 0; }
-}
+// ── Listas para entregar ──
+.rec-orden { color: var(--cr-tx) !important; font-weight: 600; }
 
-/* Grilla 2×2 de stat-cards con acento de esquina */
-.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-
-.stat {
-  background: var(--ion-card-background);
-  border: 1px solid var(--hairline);
-  border-radius: 24px;
-  box-shadow: var(--shadow-sm);
-  padding: 16px; text-align: center;
-  position: relative; overflow: hidden;
-  animation: cardRise .4s var(--ease, cubic-bezier(0.32, 0.72, 0, 1)) both;
-
-  &::after {
-    content: ''; position: absolute; top: 0; right: 0;
-    width: 56px; height: 56px; background: var(--n-100);
-    border-bottom-left-radius: 999px;
-  }
-  &.accent::after { background: var(--rose-50); }
-
-  .stat-num {
-    font-family: var(--font-display); font-size: 34px; font-weight: 900;
-    color: var(--ion-color-primary); line-height: 1; letter-spacing: -0.04em;
-    position: relative; z-index: 1;
-    &.amber { color: var(--amber-700); }
-    &.ink { color: var(--ion-text-color); }
-  }
-  .stat-lbl {
-    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
-    color: var(--n-500); margin-top: 6px; position: relative; z-index: 1;
-  }
+// ── Citas de hoy ──
+.rec-conf {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: -4px 0 12px;
+  .ok { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 700; color: var(--em); ion-icon { font-size: 15px; } }
+  .chip-filtro ion-icon { vertical-align: -2px; }
 }
+.rec-link { padding: 0; border: none; background: none; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--cr-tx); text-decoration: underline; }
 
-.card {
-  background: var(--ion-card-background);
-  border: 1px solid var(--hairline);
-  border-radius: 24px;
-  box-shadow: var(--shadow-sm);
-  padding: 18px;
-  margin-top: 16px;
+.rec-grupos { display: flex; flex-direction: column; gap: 14px; }
+.rec-grupo-cab {
+  display: flex; align-items: center; gap: 6px; padding-bottom: 6px;
+  font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--tx3);
+  ion-icon { font-size: 14px; }
 }
-.card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.section-label { display: block; margin: 0; }
-.cnt-badge { font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 999px; background: var(--ion-color-primary); color: #fff; }
+.rec-grupo-n { padding: 1px 7px; border-radius: 2px; background: var(--sur2); color: var(--tx2); font-size: 10.5px; }
+.rec-grupo[data-grp="esperando"] .rec-grupo-cab { color: var(--cr-tx); }
 
-/* Lista de citas de hoy */
-.cita-list { display: flex; flex-direction: column; }
-.cita-row {
-  display: flex; align-items: center; gap: 12px; padding: 10px 0;
-  & + .cita-row { border-top: 1px solid var(--hairline); }
-  .cita-hora { font-size: 13px; font-weight: 700; color: var(--text-accent); min-width: 44px; }  // AA
-  .cita-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px;
-    strong { font-size: 14px; font-weight: 700; }
-    span { font-size: 12px; color: var(--n-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    // Señal de confirmación de asistencia del cliente (no-show).
-    .conf { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-size: 11px; margin-top: 2px;
-      ion-icon { font-size: 13px; }
-      &.ok { color: var(--emerald-700); }
-      &.pend { color: var(--amber-700); } }
-  }
-  .cita-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
-  .cita-act {
-    display: inline-flex; align-items: center; gap: 4px; cursor: pointer;
-    padding: 5px 10px; border-radius: 999px; border: 1px solid var(--ion-color-primary);
-    background: var(--ion-color-primary); color: #fff; font-family: inherit; font-size: 11px; font-weight: 700;
-    ion-icon { font-size: 13px; }
-    &:active { transform: scale(.96); }
-    &:disabled { opacity: .6; }
-    &.ver { background: none; color: var(--text-accent); }  // AA (el borde sigue carmín)
-    // Marcar llegada: acción neutra (no es el carmín de "crear orden").
-    &.llegada { background: none; border-color: var(--hairline); color: var(--ion-text-color); }
-    // WhatsApp: verde de la marca, outline.
-    &.wa { background: none; border-color: var(--emerald-700); color: var(--emerald-700);
-      ion-icon { font-size: 14px; } }
-    // Entregar: acción de cierre, esmeralda sólido.
-    &.entregar { background: var(--emerald-700); border-color: var(--emerald-700); color: #fff; }
-  }
+.rec-cita {
+  display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 1px solid var(--bd);
+  &.proxima, &.espera-larga { margin: 0 -10px; padding-left: 10px; padding-right: 10px; border-radius: 2px; }
+  &.proxima { background: color-mix(in srgb, var(--cr) 7%, transparent); box-shadow: inset 3px 0 0 var(--cr); }
+  &.espera-larga { background: color-mix(in srgb, var(--am) 10%, transparent); box-shadow: inset 3px 0 0 var(--am); }
+  &.atrasada .rec-hora { color: var(--am); }
 }
-
-/* Órdenes listas para entregar */
-.entregas .cita-info .ent-orden { font-size: 11.5px; color: var(--text-accent); margin-top: 2px; }
-
-/* Fila viva: grupos del flujo de mostrador */
-.cita-groups { display: flex; flex-direction: column; gap: 6px; }
-.cita-group + .cita-group { margin-top: 10px; }
-.grp-head {
-  display: flex; align-items: center; gap: 6px; margin-bottom: 2px;
-  ion-icon { font-size: 14px; color: var(--n-400); }
-  .grp-label { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--n-400); }
-  .grp-cnt { font-size: 10px; font-weight: 800; color: var(--n-500);
-    background: var(--n-100); border-radius: 999px; padding: 1px 7px; }
-}
-.cita-group[data-grp="esperando"] .grp-head { ion-icon, .grp-label { color: var(--text-accent); } }
-
-/* Tiempo de espera del cliente (grupo Esperando) */
-.cita-info .conf.espera {
-  color: var(--text-accent);
-  &.larga { color: var(--amber-700); }
-  .undo-llegada { background: none; border: none; padding: 0 0 0 6px; cursor: pointer;
-    font-family: inherit; font-size: 10.5px; font-weight: 700; color: var(--n-400);
-    text-decoration: underline; }
-}
-.cita-row.espera-larga { background: rgba(245, 158, 11, 0.10); box-shadow: inset 3px 0 0 var(--amber-700); }
-
-/* Lista de alertas */
-.alert-list { display: flex; flex-direction: column; }
-.alert-row {
-  display: flex; align-items: flex-start; gap: 10px; padding: 9px 0;
-  & + .alert-row { border-top: 1px solid var(--hairline); }
-}
-.alert-ico {
-  flex-shrink: 0; display: flex; margin-top: 1px;
-  ion-icon { font-size: 19px; }
-  &.rose ion-icon { color: var(--ion-color-primary); }
-  &.green ion-icon { color: var(--emerald-700); }
-  &.amber ion-icon { color: var(--amber-700); }
-  &.indigo ion-icon { color: var(--indigo-600); }
-}
-.alert-body { flex: 1; min-width: 0;
-  .alert-txt { font-size: 13px; color: var(--ion-text-color); line-height: 1.4; display: block; }
-  .alert-time { font-size: 10px; color: var(--n-400); margin-top: 2px; display: block; }
-}
-
-.empty-row {
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
-  text-align: center; padding: 28px 16px; color: var(--n-400); font-size: 13px;
-  ion-icon { font-size: 34px; opacity: .4; }
-}
-
-/* Acceso rápido "Cliente sin cita" */
-.walkin-cta {
-  display: flex; align-items: center; gap: 10px; width: 100%;
-  margin: 0 0 16px; padding: 14px 16px; cursor: pointer;
-  background: var(--ion-color-primary); color: #fff; border: none; border-radius: 18px;
-  font-family: inherit; font-size: 14px; font-weight: 800;
-  box-shadow: 0 8px 20px rgba(var(--ion-color-primary-rgb), 0.22);
-  transition: transform .14s;
-  ion-icon { font-size: 20px; }
-  span { flex: 1; text-align: left; }
-  .wc-go { font-size: 17px; opacity: .85; }
-  &:active { transform: scale(.985); }
-}
-
-/* Buscador rápido */
-.quick-search { margin: 4px 0 16px; position: relative; }
-.qs-box {
-  display: flex; align-items: center; gap: 8px;
-  background: var(--ion-card-background); border: 1px solid var(--hairline);
-  border-radius: 16px; padding: 10px 12px; box-shadow: var(--shadow-sm);
-  .qs-ico { font-size: 18px; color: var(--n-400); flex-shrink: 0; }
-  input { flex: 1; border: none; background: none; outline: none;
-    font-family: inherit; font-size: 14px; color: var(--ion-text-color); }
-  input::placeholder { color: var(--n-400); }
-  .qs-x { background: none; border: none; padding: 0; cursor: pointer; color: var(--n-400);
-    display: flex; ion-icon { font-size: 18px; } }
-}
-.qs-results {
-  margin-top: 8px; background: var(--ion-card-background);
-  border: 1px solid var(--hairline); border-radius: 16px; overflow: hidden;
-  box-shadow: var(--shadow-md, var(--shadow-sm));
-}
-.qs-msg { padding: 14px 16px; font-size: 13px; color: var(--n-400); text-align: center; }
-.qs-item {
-  display: flex; align-items: center; gap: 12px; width: 100%;
-  padding: 11px 14px; background: none; border: none; cursor: pointer;
-  font-family: inherit; text-align: left;
-  & + .qs-item { border-top: 1px solid var(--hairline); }
-  &:active { background: var(--n-50); }
-  .qs-ava { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--rose-50); color: var(--rose-700);
-    font-weight: 800; font-size: 13px; }  // AA: iniciales sobre pastilla clara
-  .qs-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px;
-    strong { font-size: 14px; font-weight: 700; color: var(--ion-text-color); }
-    span { font-size: 12px; color: var(--n-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } }
-  ion-icon { font-size: 16px; color: var(--n-400); flex-shrink: 0; }
-}
-
-/* Resumen de confirmación de citas */
-.conf-resumen {
-  display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: -2px 0 10px;
-  .cr { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700;
-    ion-icon { font-size: 14px; }
-    &.ok { color: var(--emerald-700); }
-    &.pend { color: var(--amber-700); } }
-  // "Sin confirmar" como botón-filtro (chip ámbar que se rellena al activarse).
-  .cr.btn { cursor: pointer; font-family: inherit; padding: 4px 10px; border-radius: 999px;
-    border: 1px solid var(--amber-700); background: none;
-    &.on { background: var(--amber-700); color: #fff; }
-    &:active { transform: scale(.97); } }
-  .cr.clear { cursor: pointer; font-family: inherit; background: none; border: none;
-    color: var(--n-500); text-decoration: underline; font-size: 11.5px; padding: 0; }
-}
-
-/* Filtro por sucursal (chips) sobre las citas de hoy */
-.suc-filtro {
-  display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 12px;
-  .suc-chip {
-    display: inline-flex; align-items: center; gap: 4px; cursor: pointer;
-    padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700;
-    border: 1px solid var(--hairline); background: var(--ion-card-background); color: var(--n-500);
-    ion-icon { font-size: 13px; }
-    &.on { background: var(--ion-color-primary); color: #fff; border-color: transparent; }
-    &:active { transform: scale(.97); }
-  }
-}
-
-/* Sucursal de la cita (bajo la vehiculo/servicio) */
-.cita-info .cita-suc {
-  display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700;
-  color: var(--text-accent); margin-top: 2px;
+.rec-hora { min-width: 44px; padding-top: 1px; font-size: 13px; font-weight: 700; color: var(--cr-tx); }
+.rec-tag { margin-left: 6px; vertical-align: 1px; text-transform: uppercase; letter-spacing: .04em; }
+.rec-suc { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; ion-icon { font-size: 13px; } }
+.rec-senal {
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; font-size: 11.5px !important; font-weight: 700;
   ion-icon { font-size: 13px; }
+  &.ok { color: var(--em) !important; }
+  &.pend { color: var(--am) !important; }
+  &.espera { color: var(--cr-tx) !important; &.larga { color: var(--am) !important; } }
+}
+.rec-deshacer {
+  padding: 0 0 0 6px; border: none; background: none; cursor: pointer;
+  font: inherit; font-size: 11px; font-weight: 700; color: var(--tx3); text-decoration: underline;
+}
+.rec-cita-acc { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; max-width: 55%; }
+
+// En el celular las acciones de la cita bajan debajo del texto.
+@media (max-width: 640px) {
+  .rec-cita { flex-wrap: wrap; }
+  .rec-cita-acc { flex-basis: 100%; max-width: none; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; padding-left: 56px; }
 }
 
-/* Resaltado próxima/espera-larga: velo tenue + barra de acento (legible en claro y oscuro). */
-.cita-row.proxima, .cita-row.espera-larga { border-radius: 12px;
-  margin: 0 -8px; padding-left: 11px; padding-right: 8px; }
-.cita-row.proxima { background: rgba(var(--ion-color-primary-rgb), 0.07); box-shadow: inset 3px 0 0 var(--ion-color-primary); }
-.cita-row.atrasada .cita-hora { color: var(--amber-700); }
-.tag-prox, .tag-atr {
-  font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em;
-  padding: 2px 6px; border-radius: 999px; margin-left: 6px; vertical-align: middle;
+// ── Alertas ──
+.rec-alerta { align-items: flex-start; &.tocable { cursor: pointer; } &.tocable:hover .rec-alerta-txt { text-decoration: underline; } }
+.rec-alerta-txt { font-size: 13px !important; font-weight: 500 !important; line-height: 1.4; }
+.rec-alerta-ico {
+  display: flex; flex-shrink: 0; margin-top: 1px;
+  ion-icon { font-size: 19px; }
+  &.rose ion-icon { color: var(--cr-tx); }
+  &.green ion-icon { color: var(--em); }
+  &.amber ion-icon { color: var(--am); }
+  &.indigo ion-icon { color: var(--in); }
 }
-.tag-prox { background: var(--ion-color-primary); color: #fff; }
-.tag-atr { background: var(--amber-100); color: var(--amber-700); }
-
-/* Alertas clickeables */
-.alert-row.tappable { cursor: pointer; margin: 0 -8px; padding-left: 8px; padding-right: 8px; border-radius: 10px;
-  &:active { background: var(--n-50); } }
-.alert-go { font-size: 15px; color: var(--n-400); flex-shrink: 0; align-self: center; }
-
-@media (min-width: 820px) {
-  .stat-grid { grid-template-columns: repeat(4, 1fr); }
-}
+.rec-alerta-ir { font-size: 15px; color: var(--tx3); flex-shrink: 0; align-self: center; }

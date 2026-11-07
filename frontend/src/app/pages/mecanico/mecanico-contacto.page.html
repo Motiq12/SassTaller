@@ -1,12 +1,20 @@
 <ion-header>
-  <ion-toolbar>
+  <ion-toolbar class="admin-topbar">
     <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
     <ion-title>Mensajes</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
-  <div class="mec">
+<!-- Con un chat abierto la página no se desplaza (ver .chat-pantalla en global.scss). -->
+<ion-content class="admin-dark" [scrollY]="!enChat">
+  <div class="pg mc-chat" [class.chat-pantalla]="enChat">
+    <header class="pg-cab" *ngIf="!enChat">
+      <div>
+        <h1>Mensajes</h1>
+        <p>Chat con recepción, administración y el resto del equipo.</p>
+      </div>
+    </header>
+
     <app-chat-contactos *ngIf="!chatAbierto && !verAvisos"
                         (abrir)="abrirChat($event)"
                         (abrirAvisos)="verAvisos = true"></app-chat-contactos>

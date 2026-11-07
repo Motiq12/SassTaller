@@ -1,0 +1,415 @@
+// ────────────────────────────────────────────────
+// Sitio web (catálogo, promoción, publicar) — estilos de las tres pantallas.
+// Tokens de .admin-dark; la cáscara del modal y los .btn/.fg/.bg son globales.
+// ────────────────────────────────────────────────
+
+// Texto base claro. ion-content pinta el texto con el color de Ionic (oscuro en el
+// tema claro), no con el de .admin-dark, así que todo lo que no tenía un color
+// propio (nombres de motos, pendientes, historial) salía casi invisible.
+.admin { color: var(--tx); }
+
+.web-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+
+  .cd-title { margin: 0; display: inline-flex; align-items: center; gap: 6px; }
+}
+
+.web-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  ion-icon { font-size: 15px; }
+}
+
+.web-intro {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--tx3);
+  margin: 0 0 14px;
+
+  a { color: var(--tx2); text-decoration: underline; }
+}
+
+.web-tools { margin-bottom: 10px; .filter-bar { margin: 10px 0 0; } }
+
+.web-progress { font-size: 12px; color: var(--tx2); margin-bottom: 12px; }
+
+.web-lista { display: flex; flex-direction: column; gap: 10px; }
+
+// ── Formulario de la moto ──
+
+.web-aviso {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -6px 0 14px;
+  font-size: 12px;
+  color: var(--am);
+}
+
+.web-foto-prev {
+  display: block;
+  max-width: 100%;
+  max-height: 160px;
+  margin-top: 10px;
+  border-radius: 2px;
+  object-fit: contain;
+  background: var(--sur3);
+}
+
+.web-spec {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr auto;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.web-stock {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+
+  > div {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--tx2);
+  }
+  input { width: 90px !important; }
+}
+
+.web-check { display: flex; align-items: flex-end; }
+
+.web-activar {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-weight: 600 !important;
+  color: var(--tx) !important;
+  margin: 0 0 12px !important;
+
+  input { width: 18px !important; height: 18px; accent-color: var(--cr); padding: 0 !important; }
+}
+
+// ── Promoción ──
+
+.web-promo {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+
+  @media (min-width: 960px) { grid-template-columns: 1.3fr 1fr; align-items: start; }
+}
+
+// Vista previa con el aspecto del aviso del sitio (fondo claro, como lo ve el cliente).
+.web-promo-prev {
+  position: sticky;
+  top: 12px;
+  background: #fff;
+  color: #14171c;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .45);
+
+  img { width: 100%; height: 170px; object-fit: cover; display: block; background: #eee; }
+  .wpp-texto { padding: 16px 18px 18px; }
+  h3 { font-family: var(--fd); font-size: 20px; font-weight: 800; margin: 0 0 4px; }
+  .wpp-destacado { font-weight: 700; color: var(--cr); margin: 0 0 10px; }
+  .wpp-etiqueta { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: #666; margin: 0 0 2px; }
+  .wpp-como { font-size: 13px; line-height: 1.5; margin: 0 0 8px; }
+  .wpp-letra { font-size: 11px; color: #666; margin: 0; }
+  .wpp-cta { display: inline-block; margin-top: 12px; padding: 9px 16px; border-radius: 2px; background: var(--cr); color: #fff; font-weight: 700; font-size: 13px; }
+  .wpp-apagada { padding: 30px 18px; text-align: center; color: #666; font-size: 13px; }
+
+  // Solo la imagen: entera, sin recortar, como sale en el sitio.
+  &.wpp-solo { background: #14171c; }
+  &.wpp-solo img { height: auto; max-height: 520px; object-fit: contain; background: #0b0d10; }
+  &.wpp-solo .wpp-texto { text-align: center; padding-top: 0; }
+}
+
+.web-prev-titulo { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--tx3); margin: 0 0 8px; }
+
+.web-guardar { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+
+// ── Publicar ──
+
+.web-pub {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+
+  @media (min-width: 960px) { grid-template-columns: 1fr 1fr; align-items: start; }
+}
+
+.web-estado {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--tx2);
+  line-height: 1.5;
+  margin-bottom: 14px;
+
+  ion-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+  &.ok ion-icon { color: var(--em); }
+  &.av ion-icon { color: var(--am); }
+  a { color: var(--cr-tx); }
+  // `mal` ya se usaba en varias pantallas sin estar definida: el icono salía del
+  // color del texto y un aviso que frena algo se leía igual que uno informativo.
+  &.mal ion-icon { color: var(--rd); }
+}
+
+.web-cambios {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px;
+
+  li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 9px 12px;
+    background: var(--sur2);
+    border: 1px solid var(--bd);
+    border-radius: 2px;
+    margin-bottom: 6px;
+    font-size: 13px;
+
+    ion-icon { color: var(--cr); flex-shrink: 0; margin-top: 2px; }
+  }
+}
+
+.web-publicar-btn { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; ion-icon { font-size: 18px; } }
+
+.web-hist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  li {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--bd);
+    font-size: 13px;
+    line-height: 1.45;
+
+    &:last-child { border-bottom: none; }
+    strong { color: var(--tx); }
+    .wh-fecha { display: block; font-size: 11px; color: var(--tx3); margin-top: 2px; }
+  }
+}
+
+// Campos bloqueados por falta de permiso (precio sin permiso de precios, promoción
+// sin permiso de promo): que se note que no se pueden tocar.
+.fg input:disabled, .fg select:disabled, .fg textarea:disabled, fieldset:disabled .web-activar {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+// ── Publicar: versiones y programación ──
+
+.web-versiones {
+  list-style: none; padding: 0; margin: 0;
+  li {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 10px 0; border-bottom: 1px solid var(--bd); font-size: 13px;
+    &:last-child { border-bottom: none; }
+    .wv-info { flex: 1 1 200px; min-width: 0; }
+    strong { color: var(--tx); display: block; }
+    span { color: var(--tx3); font-size: 11px; }
+  }
+}
+.web-programar {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px;
+  input { padding: 9px 12px; border: 1px solid var(--bd); border-radius: 2px; background: var(--sur2); color: var(--tx); font-family: inherit; font-size: 13px; color-scheme: dark; }
+}
+
+// ── Inicio ──
+
+.web-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.web-kpi {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 16px 18px; border-radius: 8px; text-decoration: none;
+  background: var(--sur); border: 1px solid var(--bd); color: var(--tx);
+  transition: border-color .15s;
+
+  &:is(a):hover { border-color: var(--bd2); }
+  &.alerta { border-color: var(--cr); }
+  .wk-num { font-family: var(--fd); font-size: 32px; font-weight: 800; line-height: 1; }
+  .wk-txt { font-size: 13px; color: var(--tx2); }
+  .wk-sub { font-size: 11px; color: var(--tx3); margin-top: 4px; }
+  &.alerta .wk-num { color: var(--adm-cr-fg); }
+}
+.web-falta {
+  border-top: 1px solid var(--bd);
+  padding: 10px 0;
+  summary {
+    cursor: pointer; font-size: 13px; list-style: none;
+    strong { color: var(--tx); display: block; }
+    span { color: var(--tx3); font-size: 12px; }
+    &::-webkit-details-marker { display: none; }
+  }
+  ul { list-style: none; padding: 8px 0 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  a { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--tx); text-decoration: none; background: var(--sur2); border: 1px solid var(--bd); padding: 5px 10px; border-radius: 2px; &:hover { border-color: var(--cr); } }
+}
+.web-barras {
+  .wb-fila { display: grid; grid-template-columns: minmax(90px, 1.2fr) 2fr auto; gap: 10px; align-items: center; padding: 6px 0; font-size: 13px; }
+  .wb-nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wb-barra { height: 8px; border-radius: 2px; background: var(--sur2); overflow: hidden; span { display: block; height: 100%; background: var(--cr); border-radius: 2px; } }
+  .wb-n { font-family: var(--fm); font-weight: 700; color: var(--tx2); }
+}
+
+// ── Datos del negocio ──
+
+.web-negocio { border: 0; padding: 0; margin: 0; min-width: 0; }
+.web-horario {
+  display: flex; flex-direction: column; gap: 4px;
+  .wh-dia {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 4px 0;
+    &.cerrado { opacity: .6; }
+    input[type=time] { width: auto !important; padding: 7px 10px !important; color-scheme: dark; }
+  }
+  .wh-check { width: 118px; margin: 0 !important; }
+  .wh-a { font-size: 12px; color: var(--tx3); }
+  .wh-cerrado { font-size: 12px; color: var(--tx3); }
+}
+.wh-dif { margin: 10px 0 8px; font-size: 12px; }
+.wh-botones { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+
+
+// Estrellas de una reseña (el texto ★☆ ya dice el puntaje; el aria-label lo repite).
+.wr-estrellas { color: var(--am); letter-spacing: 1px; font-size: 14px; }
+
+// ── Preguntas frecuentes ──
+
+.web-faq-grupo { margin-bottom: 14px; }
+.wf-cabeza {
+  display: flex; gap: 6px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;
+  .wf-titulo {
+    flex: 1; min-width: 160px; padding: 9px 12px; border: 1px solid var(--bd); border-radius: 2px;
+    background: var(--sur2); color: var(--tx); font-family: inherit; font-size: 14px; font-weight: 700; outline: none;
+    &:focus { border-color: var(--cr); }
+  }
+}
+.web-faq-pregunta {
+  padding-left: 10px; border-left: 2px solid var(--bd);
+  &.sin-respuesta { border-left-color: var(--am); }
+}
+.wf-pregunta-fila { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; input { flex: 1; min-width: 140px; } }
+
+// ── Servicios ──
+
+.web-grupo-srv {
+  display: grid; grid-template-columns: minmax(120px, 1fr) minmax(160px, 2fr) auto; gap: 8px;
+  align-items: center; margin-bottom: 8px;
+  input {
+    padding: 9px 12px; border: 1px solid var(--bd); border-radius: 2px; background: var(--sur2);
+    color: var(--tx); font-family: inherit; font-size: 13px; outline: none;
+    &:focus { border-color: var(--cr); }
+  }
+}
+.web-servicio.oculto { opacity: .6; }
+.ws-cabeza {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  .ws-check { flex: 1 1 200px; margin: 0 !important; }
+  select { width: auto !important; min-width: 140px; padding: 7px 10px !important; }
+}
+
+// ── Importar el catálogo ──
+
+.wi-pasos {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px;
+  .wi-archivo { font-size: 12px; color: var(--tx2); }
+}
+.web-filas { max-height: 320px; overflow-y: auto; margin-top: 10px; }
+.wf-fila {
+  display: flex; gap: 10px; align-items: baseline; padding: 7px 10px; border-radius: 2px; font-size: 13px;
+  background: var(--sur2); margin-bottom: 4px;
+  &.mala { background: var(--adm-rd-bg); }
+  .wf-linea { font-family: var(--fm); font-size: 11px; color: var(--tx3); min-width: 22px; }
+  .wf-nombre { font-weight: 600; }
+  .wf-detalle { color: var(--tx3); font-size: 12px; &.error { color: var(--rd); } }
+}
+
+// ── Nosotros: las cifras y la foto ──
+// Una cifra es un número corto y una etiqueta que dice de qué es, así que el
+// número va angosto y la etiqueta se lleva el resto de la fila.
+.wn-cifra {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+
+  // Las casillas del panel toman su estilo dentro de `.fg` (global.scss); estas
+  // van en fila, fuera de un `.fg`, así que llevan el mismo a mano. Sin esto
+  // salían blancas, con el texto casi invisible.
+  input {
+    flex: 1; min-width: 0;
+    padding: 11px 14px; border: 1px solid var(--bd); border-radius: 2px;
+    font-family: inherit; font-size: 14px; background: var(--sur2); color: var(--tx);
+    outline: none; transition: border-color .2s;
+    &:focus { border-color: var(--cr); }
+  }
+  .wn-valor { flex: 0 0 90px; font-family: var(--fd); font-size: 16px; }
+}
+
+.wn-foto {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+
+  // Vertical, como sale en el sitio (4:5), para que se vea encuadrada igual.
+  img {
+    width: 120px;
+    aspect-ratio: 4 / 5;
+    object-fit: cover;
+    border-radius: 2px;
+    background: var(--sur2);
+    border: 1px solid var(--bd);
+  }
+}
+
+// Nosotros: las fotos de las sedes, una al lado de la otra (apiladas en el
+// celular).
+.wn-sedes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+.wn-sede {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  > strong { font-family: var(--fd); font-size: 15px; color: var(--tx); }
+  .wn-foto { margin-bottom: 0; }
+}
+// `.hint` solo toma su letra chica dentro de un `.fg` (global.scss); aquí no lo
+// está, y sin esto salía en letra de párrafo.
+.wn-sede .hint, .wn-sedes + .hint { font-size: 12px; color: var(--tx3); margin: 4px 0 8px; line-height: 1.4; }
+
+// Interruptor de encender / apagar en la lista de promociones.
+.wp-interruptor {
+  --track-background-checked: var(--cr);
+  --handle-background-checked: #fff;
+  flex-shrink: 0;
+  margin-right: 4px;
+}

@@ -1,68 +1,81 @@
 <ion-header>
-  <ion-toolbar>
+  <ion-toolbar class="admin-topbar">
     <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
     <ion-title>Tareas</ion-title>
-    <ion-buttons slot="end">
-      <ion-button (click)="mostrarForm = !mostrarForm" title="Nueva tarea">
-        <ion-icon slot="icon-only" [name]="mostrarForm ? 'close-outline' : 'add-outline'"></ion-icon>
-      </ion-button>
-    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
+<ion-content class="admin-dark">
   <ion-refresher slot="fixed" (ionRefresh)="cargar($event)">
     <ion-refresher-content pullingIcon="chevron-down" refreshingSpinner="crescent"></ion-refresher-content>
   </ion-refresher>
 
-  <div class="mec">
-    <div class="head">
-      <h1>Tareas pendientes</h1>
-      <p>{{ pendientes }} sin completar</p>
-    </div>
+  <div class="pg">
+    <header class="pg-cab">
+      <div>
+        <h1>Tareas pendientes</h1>
+        <p>{{ pendientes }} sin completar</p>
+      </div>
+      <div class="pg-acciones">
+        <button type="button" class="btn" [ngClass]="mostrarForm ? 'btn-ou' : 'btn-cr'" (click)="mostrarForm = !mostrarForm">
+          <ion-icon [name]="mostrarForm ? 'close-outline' : 'add-outline'"></ion-icon> {{ mostrarForm ? 'Cancelar' : 'Nueva tarea' }}
+        </button>
+      </div>
+    </header>
 
     <!-- Nueva tarea -->
-    <section class="card form-card" *ngIf="mostrarForm">
-      <div class="fld"><input type="text" [(ngModel)]="nueva.titulo" placeholder="¿Qué hay que hacer?"></div>
-      <div class="fld"><input type="text" [(ngModel)]="nueva.detalle" placeholder="Detalle (opcional)"></div>
-      <div class="fld">
-        <select [(ngModel)]="nueva.prioridad">
-          <option value="normal">Prioridad normal</option>
-          <option value="alta">Prioridad alta</option>
-        </select>
+    <section class="cd pg-card mt-form" *ngIf="mostrarForm">
+      <div class="pg-card-cab"><span class="cd-title"><ion-icon name="add-circle-outline"></ion-icon> Nueva tarea</span></div>
+      <div class="fg">
+        <label for="mt-titulo">¿Qué hay que hacer?</label>
+        <input id="mt-titulo" type="text" [(ngModel)]="nueva.titulo" name="titulo">
       </div>
-      <button class="btn-solid" (click)="agregar()" [disabled]="guardando">{{ guardando ? 'Guardando…' : 'Agregar tarea' }}</button>
+      <div class="fg-row">
+        <div class="fg">
+          <label for="mt-detalle">Detalle (opcional)</label>
+          <input id="mt-detalle" type="text" [(ngModel)]="nueva.detalle" name="detalle">
+        </div>
+        <div class="fg">
+          <label for="mt-prio">Prioridad</label>
+          <select id="mt-prio" [(ngModel)]="nueva.prioridad" name="prioridad">
+            <option value="normal">Normal</option>
+            <option value="alta">Alta</option>
+          </select>
+        </div>
+      </div>
+      <button type="button" class="btn btn-cr btn-block" (click)="agregar()" [disabled]="guardando">{{ guardando ? 'Guardando…' : 'Agregar tarea' }}</button>
     </section>
 
-    <!-- Skeleton -->
-    <div *ngIf="cargando" style="display:flex;flex-direction:column;gap:10px">
-      <div class="skeleton" style="height:64px"></div>
-      <div class="skeleton" style="height:64px"></div>
+    <!-- Cargando -->
+    <div class="mt-lista" *ngIf="cargando">
+      <div class="sk-dark" style="height:68px"></div>
+      <div class="sk-dark" style="height:68px"></div>
     </div>
 
     <!-- Lista -->
-    <div *ngIf="!cargando">
-      <div class="task" [class.high]="esAlta(t)" [class.done]="t.hecha" *ngFor="let t of tareas">
-        <div class="task-check" [class.checked]="t.hecha" (click)="toggle(t)">
+    <div class="mt-lista" *ngIf="!cargando">
+      <div class="mt-tarea" [class.alta]="esAlta(t)" [class.hecha]="t.hecha" *ngFor="let t of tareas">
+        <button type="button" class="mt-check" [class.on]="t.hecha" (click)="toggle(t)" [attr.aria-pressed]="t.hecha"
+                [attr.aria-label]="(t.hecha ? 'Marcar pendiente: ' : 'Marcar hecha: ') + t.titulo">
           <ion-icon name="checkmark" *ngIf="t.hecha"></ion-icon>
-        </div>
-        <div class="task-body" (click)="toggle(t)">
-          <h5>{{ t.titulo }} <span class="prio" [class.urg]="t.prioridad === 'urgente'" *ngIf="prioLabel(t) && !t.hecha">{{ prioLabel(t) }}</span></h5>
-          <p *ngIf="t.detalle">{{ t.detalle }}</p>
-          <div class="task-meta" *ngIf="t.asignado_por || t.vence">
-            <span class="meta-tag asg" *ngIf="t.asignado_por"><ion-icon name="person-outline"></ion-icon> {{ t.asignado_por_nombre || 'Jefe' }}</span>
-            <span class="meta-tag" [class.venc]="vencida(t)" *ngIf="t.vence"><ion-icon name="calendar-outline"></ion-icon> {{ t.vence | date:'dd/MM' }}</span>
-          </div>
-        </div>
-        <button class="task-del" *ngIf="!t.asignado_por" (click)="eliminar(t)" title="Eliminar"><ion-icon name="trash-outline"></ion-icon></button>
+        </button>
+        <button type="button" class="mt-cuerpo" (click)="toggle(t)">
+          <span class="mt-titulo">
+            {{ t.titulo }}
+            <span class="bg" [ngClass]="t.prioridad === 'urgente' ? 'bg-rd' : 'bg-am'" *ngIf="prioLabel(t) && !t.hecha">{{ prioLabel(t) }}</span>
+          </span>
+          <span class="mt-detalle" *ngIf="t.detalle">{{ t.detalle }}</span>
+          <span class="mt-meta" *ngIf="t.asignado_por || t.vence">
+            <span class="bg bg-in" *ngIf="t.asignado_por"><ion-icon name="person-outline"></ion-icon> {{ t.asignado_por_nombre || 'Jefe' }}</span>
+            <span class="bg" [ngClass]="vencida(t) ? 'bg-rd' : 'bg-n'" *ngIf="t.vence"><ion-icon name="calendar-outline"></ion-icon> {{ t.vence | date:'dd/MM' }}</span>
+          </span>
+        </button>
+        <button type="button" class="mt-x" *ngIf="!t.asignado_por" (click)="eliminar(t)" [attr.aria-label]="'Eliminar ' + t.titulo"><ion-icon name="trash-outline"></ion-icon></button>
       </div>
 
-      <div class="empty" *ngIf="!tareas.length">
-        <ion-icon class="ico" name="checkmark-done-circle-outline"></ion-icon>
-        <p>No tenés tareas. ¡Todo al día!</p>
+      <div class="pg-vacio" *ngIf="!tareas.length">
+        <ion-icon name="checkmark-done-circle-outline"></ion-icon> No tenés tareas. ¡Todo al día!
       </div>
     </div>
-
-    <div style="height:80px"></div>
   </div>
 </ion-content>

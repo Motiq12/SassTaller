@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { MecanicoService } from '../../services/mecanico.service';
 
@@ -50,8 +50,8 @@ function haceTexto(fecha: string): string {
       min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box;
       display: flex; align-items: center; justify-content: center;
       font-size: 10px; font-weight: 800; line-height: 1;
-      color: #fff; background: var(--ion-color-danger, #e11d48);
-      border-radius: 999px; border: 1.5px solid var(--ion-toolbar-background, #fff);
+      color: #fff; background: var(--ion-color-danger, #e2231a);
+      border-radius: 2px; border: 1.5px solid var(--ion-toolbar-background, #fff);
       pointer-events: none;
     }
     .bell-pop { --padding-top: 6px; --padding-bottom: 6px; }
@@ -83,13 +83,12 @@ function haceTexto(fecha: string): string {
   `],
 })
 export class MecanicoActionsComponent implements OnInit {
-  private mecanico = inject(MecanicoService);
-  private router = inject(Router);
-
   alertas: any[] = [];
   noVistas = 0;
   private readonly KEY = 'mec_alertas_visto';
   hace = haceTexto;
+
+  constructor(private mecanico: MecanicoService, private router: Router) {}
 
   ngOnInit() { this.cargar(); }
 

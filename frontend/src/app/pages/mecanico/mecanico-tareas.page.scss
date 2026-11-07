@@ -1,55 +1,30 @@
-.mec { max-width: 760px; margin: 0 auto; padding: 14px 16px 0; }
-
-.head {
-  margin: 2px 2px 16px;
-  h1 { font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
-  p { font-size: 13px; color: var(--n-500); margin: 4px 0 0; }
+// Tareas del mecánico. Encabezado, campos, etiquetas y botones: el estándar del
+// panel (global.scss). Acá, la fila de cada tarea.
+.mt-form { border-color: var(--cr); .fg-row { margin-bottom: 0; } .btn { margin-top: 4px; } }
+.mt-lista { display: flex; flex-direction: column; gap: 8px; }
+.mt-tarea {
+  display: flex; align-items: flex-start; gap: 12px; padding: 12px 12px 12px 14px;
+  background: var(--sur); border: 1px solid var(--bd); border-left: 3px solid var(--am); border-radius: 8px;
+  &.alta { border-left-color: var(--rd); }
+  &.hecha { border-left-color: var(--em); .mt-titulo { text-decoration: line-through; color: var(--tx3); } }
 }
-
-.card { background: var(--ion-card-background); border: 1px solid var(--hairline); border-radius: 20px; box-shadow: var(--shadow-sm); padding: 16px; margin-bottom: 14px; }
-.form-card { border: 1.5px solid var(--ion-color-primary); }
-.fld { margin-bottom: 10px;
-  input, select { width: 100%; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: 12px;
-    font-size: 14px; background: var(--ion-card-background); color: var(--ion-text-color); outline: none;
-    &:focus { border-color: var(--ion-color-primary); } }
+.mt-check {
+  width: 24px; height: 24px; flex-shrink: 0; margin-top: 1px; padding: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  border: 1.5px solid var(--bd2); border-radius: 2px; background: var(--sur); color: #fff;
+  ion-icon { font-size: 15px; }
+  &.on { background: var(--em); border-color: var(--em); }
 }
-.btn-solid { width: 100%; padding: 11px; border: none; border-radius: 12px; cursor: pointer;
-  background: var(--ion-color-primary); color: #fff; font-size: 14px; font-weight: 700; &:disabled { opacity: .5; } }
-
-/* Tarea */
-.task {
-  display: flex; align-items: flex-start; gap: 12px;
-  background: var(--ion-card-background); border: 1px solid var(--hairline);
-  border-left: 4px solid var(--amber-700); border-radius: 12px;
-  box-shadow: var(--shadow-xs); padding: 12px; margin-bottom: 10px;
-  &.high { border-left-color: var(--ion-color-danger, #dc2626); }
-  &.done { opacity: .6; border-left-color: var(--emerald-700); }
-  &.done .task-body h5 { text-decoration: line-through; }
+.mt-cuerpo {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 0;
+  border: none; background: none; cursor: pointer; font: inherit; color: inherit; text-align: left;
 }
-.task-check {
-  width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0; cursor: pointer; margin-top: 1px;
-  border: 1.5px solid var(--n-300); display: flex; align-items: center; justify-content: center;
-  transition: all .2s var(--ease, cubic-bezier(0.32, 0.72, 0, 1));
-  ion-icon { font-size: 15px; color: #fff; }
-  &.checked { background: var(--emerald-700); border-color: var(--emerald-700); }
+.mt-titulo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: var(--tx); }
+.mt-detalle { font-size: 12.5px; color: var(--tx3); }
+.mt-meta { display: flex; flex-wrap: wrap; gap: 6px; .bg { align-items: center; gap: 3px; } }
+.mt-x {
+  width: 34px; height: 34px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  border: none; border-radius: 2px; background: none; color: var(--tx3); cursor: pointer;
+  ion-icon { font-size: 17px; }
+  &:hover { background: var(--sur2); color: var(--rd); }
 }
-.task-body { flex: 1; min-width: 0; cursor: pointer;
-  h5 { margin: 0; font-size: 13.5px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-  p { margin: 4px 0 0; font-size: 11.5px; color: var(--n-500); }
-  .prio { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em;
-    background: rgba(220, 38, 38, .08); color: var(--ion-color-danger, #dc2626); padding: 2px 7px; border-radius: 999px; }
-}
-.prio.urg { background: var(--ion-color-danger, #dc2626); color: #fff; }
-/* Meta de tareas asignadas por el admin: origen y vencimiento. */
-.task-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-.meta-tag { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600;
-  color: var(--n-500); background: var(--n-100); padding: 2px 8px; border-radius: 999px;
-  ion-icon { font-size: 11px; } }
-.meta-tag.asg { background: rgba(99, 102, 241, .1); color: var(--indigo-600, #4f46e5); }
-.meta-tag.venc { background: rgba(220, 38, 38, .08); color: var(--ion-color-danger, #dc2626); }
-
-.task-del { background: none; border: none; color: var(--n-400); cursor: pointer; padding: 2px; flex-shrink: 0;
-  ion-icon { font-size: 18px; } }
-
-.empty { text-align: center; padding: 44px 16px; color: var(--n-400); font-size: 13px;
-  .ico { font-size: 44px; opacity: .35; display: block; margin: 0 auto 8px; color: var(--emerald-700); } p { margin: 0; } }

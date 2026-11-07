@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
@@ -6,15 +6,19 @@ import { Usuario } from '../models/usuario.model';
 
 @Injectable({ providedIn: 'root' })
 export class UsuariosService {
-  private http = inject(HttpClient);
-
   private url = `${environment.apiUrl}/usuarios`;
+  constructor(private http: HttpClient) {}
 
   getAll(): Observable<{ data: Usuario[] }> {
     return this.http.get<{ data: Usuario[] }>(this.url);
   }
 
-  create(data: { nombre: string; email: string; password: string; rol: string; telefono?: string; sucursal_id?: number | null }): Observable<{ data: Usuario }> {
+  // Las casillas de permisos del sitio web que el admin puede marcar a un empleado.
+  getPermisosWeb(): Observable<{ data: { id: string; nombre: string; descripcion: string }[] }> {
+    return this.http.get<{ data: { id: string; nombre: string; descripcion: string }[] }>(`${this.url}/permisos-web`);
+  }
+
+  create(data: { nombre: string; email: string; password: string; rol: string; rol_id?: number | null; telefono?: string; sucursal_id?: number | null; permisos_web?: Record<string, boolean> }): Observable<{ data: Usuario }> {
     return this.http.post<{ data: Usuario }>(this.url, data);
   }
 

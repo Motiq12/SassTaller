@@ -7,7 +7,9 @@ export const environment = {
   apiUrl: 'http://localhost:3000/api',
   nativeApiUrl: 'http://localhost:3000',
   // Site key de Cloudflare Turnstile (captcha anti-bot). Vacío = desactivado.
-  turnstileSiteKey: ''
+  turnstileSiteKey: '',
+  // El sitio web público, para "Volver al sitio web" (shared/volver-web.component.ts).
+  sitioWebUrl: 'http://localhost:5500/'
 };
 
 /*

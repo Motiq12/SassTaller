@@ -1,6 +1,6 @@
 const router = require('express').Router();
-// Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
-const { fail } = require('../utils/responder');
+const { pool } = require('../db/pool');
+const { fail, invalido } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 
@@ -17,7 +17,7 @@ const COLS_LISTA = `id, titulo, descripcion, descuento, precio_final, activa, cr
 // GET /api/promos — todas (para gestión del personal)
 router.get('/', async (req, res) => {
   try {
-    const [rows] = await req.db.query(`SELECT ${COLS_LISTA} FROM promos WHERE tenant_id = @tenant ORDER BY created_at DESC`);
+    const [rows] = await pool.query(`SELECT ${COLS_LISTA} FROM promos ORDER BY created_at DESC`);
     res.json({ data: rows });
   } catch (err) {
     fail(res, err);
@@ -30,7 +30,7 @@ router.get('/', async (req, res) => {
 // así que el frontend la trae por HttpClient y la asigna cuando llega.
 router.get('/:id/imagen', async (req, res) => {
   try {
-    const [[p]] = await req.db.query('SELECT imagen FROM promos WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
+    const [[p]] = await pool.query('SELECT imagen FROM promos WHERE id = ?', [req.params.id]);
     if (!p || !p.imagen) return res.status(404).json({ error: 'Sin imagen' });
     res.json({ data: p.imagen });
   } catch (err) {
@@ -42,12 +42,16 @@ router.get('/:id/imagen', async (req, res) => {
 router.post('/', requireRol('admin'), async (req, res) => {
   try {
     const { titulo, descripcion, descuento, activa, imagen, precio_final } = req.body;
-    if (!titulo || !descripcion) return res.status(400).json({ error: 'Título y descripción son requeridos' });
-    const [result] = await req.db.query(
-      'INSERT INTO promos (tenant_id,titulo, descripcion, descuento, activa, imagen, precio_final) VALUES (@tenant, ?, ?, ?, ?, ?, ?)',
-      [titulo, descripcion, descuento || 0, activa === false ? 0 : 1, imagen || null, precio_final || null]
+    // Título y descripción, o una imagen: la que el taller diseña con todo puesto
+    // (precio, texto) puede ir sola. Las columnas son NOT NULL: sin texto va ''.
+    if (!imagen && (!String(titulo || '').trim() || !String(descripcion || '').trim())) {
+      return invalido(res, 'titulo', 'Pon un título y una descripción, o sube una imagen');
+    }
+    const [result] = await pool.query(
+      'INSERT INTO promos (titulo, descripcion, descuento, activa, imagen, precio_final) VALUES (?, ?, ?, ?, ?, ?)',
+      [String(titulo || '').trim(), String(descripcion || '').trim(), descuento || 0, activa === false ? 0 : 1, imagen || null, precio_final || null]
     );
-    const [[nueva]] = await req.db.query('SELECT * FROM promos WHERE tenant_id = @tenant AND id = ?', [result.insertId]);
+    const [[nueva]] = await pool.query('SELECT * FROM promos WHERE id = ?', [result.insertId]);
     res.status(201).json({ data: nueva, message: 'Promoción creada' });
   } catch (err) {
     fail(res, err);
@@ -58,12 +62,16 @@ router.post('/', requireRol('admin'), async (req, res) => {
 router.put('/:id', requireRol('admin'), async (req, res) => {
   try {
     const { titulo, descripcion, descuento, imagen, precio_final } = req.body;
-    if (!titulo || !descripcion) return res.status(400).json({ error: 'Título y descripción son requeridos' });
-    await req.db.query(
-      'UPDATE promos SET titulo = ?, descripcion = ?, descuento = ?, imagen = ?, precio_final = ? WHERE tenant_id = @tenant AND id = ?',
-      [titulo, descripcion, descuento || 0, imagen || null, precio_final || null, req.params.id]
+    // Título y descripción, o una imagen: la que el taller diseña con todo puesto
+    // (precio, texto) puede ir sola. Las columnas son NOT NULL: sin texto va ''.
+    if (!imagen && (!String(titulo || '').trim() || !String(descripcion || '').trim())) {
+      return invalido(res, 'titulo', 'Pon un título y una descripción, o sube una imagen');
+    }
+    await pool.query(
+      'UPDATE promos SET titulo = ?, descripcion = ?, descuento = ?, imagen = ?, precio_final = ? WHERE id = ?',
+      [String(titulo || '').trim(), String(descripcion || '').trim(), descuento || 0, imagen || null, precio_final || null, req.params.id]
     );
-    const [[promo]] = await req.db.query('SELECT * FROM promos WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
+    const [[promo]] = await pool.query('SELECT * FROM promos WHERE id = ?', [req.params.id]);
     if (!promo) return res.status(404).json({ error: 'Promoción no encontrada' });
     res.json({ data: promo, message: 'Promoción actualizada' });
   } catch (err) {
@@ -73,8 +81,8 @@ router.put('/:id', requireRol('admin'), async (req, res) => {
 
 router.patch('/:id/toggle', requireRol('admin'), async (req, res) => {
   try {
-    await req.db.query('UPDATE promos SET activa = NOT activa WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
-    const [[promo]] = await req.db.query('SELECT * FROM promos WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
+    await pool.query('UPDATE promos SET activa = NOT activa WHERE id = ?', [req.params.id]);
+    const [[promo]] = await pool.query('SELECT * FROM promos WHERE id = ?', [req.params.id]);
     if (!promo) return res.status(404).json({ error: 'Promoción no encontrada' });
     res.json({ data: promo, message: promo.activa ? 'Promoción activada' : 'Promoción desactivada' });
   } catch (err) {
@@ -84,7 +92,7 @@ router.patch('/:id/toggle', requireRol('admin'), async (req, res) => {
 
 router.delete('/:id', requireRol('admin'), async (req, res) => {
   try {
-    await req.db.query('DELETE FROM promos WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
+    await pool.query('DELETE FROM promos WHERE id = ?', [req.params.id]);
     res.json({ message: 'Promoción eliminada' });
   } catch (err) {
     fail(res, err);

@@ -2,6 +2,6 @@
 
 .chart-bars { display: flex; align-items: flex-end; gap: 3px; height: 150px; }
 .chart-bar { flex: 1; min-width: 6px; height: 100%; display: flex; align-items: flex-end; }
-.chart-fill { width: 100%; min-height: 2px; background: linear-gradient(180deg, var(--cr), var(--cr-d)); border-radius: 4px 4px 0 0; }
+.chart-fill { width: 100%; min-height: 2px; background: linear-gradient(180deg, var(--cr), var(--cr-d)); border-radius: 2px 2px 0 0; }
 .chart-labels { display: flex; gap: 3px; margin-top: 6px; }
 .chart-label { flex: 1; min-width: 6px; text-align: center; font-size: 9px; color: var(--tx3); white-space: nowrap; }

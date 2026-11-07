@@ -6,7 +6,8 @@
 const cron = require('node-cron');
 const { enviarRecordatorios } = require('./recordatorios');
 const { marcarNoShows } = require('./no-show');
-const { revisarVencimientos } = require('./vencimientos');
+const { publicarProgramada, reconstruirSitio, recordarSeguimientos } = require('./sitio-web');
+const { respaldoDiario, describirRespaldo } = require('./respaldo');
 
 let iniciado = false;
 
@@ -26,11 +27,19 @@ function iniciarJobs() {
   // No-show: 07:00 UTC ≈ 01:00 en CR, con el día anterior ya cerrado.
   cron.schedule('0 7 * * *', () => ejecutar('no-show', marcarNoShows));
 
-  // Vencimientos de prueba: 13:00 UTC ≈ 07:00 en CR. Temprano y antes del correo de
-  // recordatorios, para que quien abra el sistema en la mañana ya vea su plan al día.
-  cron.schedule('0 13 * * *', () => ejecutar('vencimientos', revisarVencimientos));
+  // Sitio web: publicación programada (cada 5 min) y reconstrucción diaria
+  // (06:10 UTC ≈ 00:10 en CR, apenas cambia el día).
+  cron.schedule('*/5 * * * *', () => ejecutar('sitio-web programada', publicarProgramada));
+  cron.schedule('10 6 * * *', () => ejecutar('sitio-web diario', reconstruirSitio));
+  // Seguimientos de consultas del sitio: 14:05 UTC ≈ 08:05 en CR.
+  cron.schedule('5 14 * * *', () => ejecutar('sitio-web seguimientos', recordarSeguimientos));
 
-  console.log('⏰ Jobs programados: recordatorios (14:00 UTC), no-show (07:00 UTC), vencimientos (13:00 UTC)');
+  // Respaldo de la base: 08:30 UTC ≈ 02:30 en CR, con el taller cerrado y lejos de
+  // los demás jobs. Si no está configurado, respaldoDiario no hace nada.
+  cron.schedule('30 8 * * *', () => ejecutar('respaldo', respaldoDiario));
+
+  console.log('⏰ Jobs programados: recordatorios (14:00 UTC), no-show (07:00 UTC), sitio web (cada 5 min y 06:10 UTC)');
+  console.log(describirRespaldo());
 }
 
 // Corre un job con manejo de errores: un fallo se loguea y no tumba el proceso.

@@ -1,58 +1,69 @@
 <ion-header>
-  <ion-toolbar>
+  <ion-toolbar class="admin-topbar">
     <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
     <ion-title>Historial</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
+<ion-content class="admin-dark">
   <ion-refresher slot="fixed" (ionRefresh)="cargar($event)">
     <ion-refresher-content pullingIcon="chevron-down" refreshingSpinner="crescent"></ion-refresher-content>
   </ion-refresher>
 
-  <div class="mec">
-    <div class="greet">
-      <h1>Mi historial</h1>
-      <p class="hist-sub">Citas que completaste.</p>
-    </div>
+  <div class="pg">
+    <header class="pg-cab">
+      <div>
+        <h1>Mi historial</h1>
+        <p>Citas que completaste.</p>
+      </div>
+    </header>
 
     <!-- Resumen acumulado -->
-    <section class="card">
-      <span class="section-label">Resumen acumulado</span>
-      <div class="avg-row"><span class="lbl">Total completadas</span><span class="val mono">{{ acum?.completadas ?? 0 }}</span></div>
-      <div class="avg-row"><span class="lbl">Tiempo promedio</span><span class="val mono">{{ formatMin(acum?.tiempo_promedio_min) }}</span></div>
-      <div class="avg-row"><span class="lbl">Calificación promedio</span><span class="val stars">{{ estrellas(acum?.calificacion_promedio ?? null) }} {{ acum?.calificacion_promedio || '' }}</span></div>
+    <section class="pg-kpis">
+      <div class="pg-kpi em">
+        <span class="pg-kpi-icono"><ion-icon name="checkmark-done-outline"></ion-icon></span>
+        <span class="pg-kpi-label">Completadas</span>
+        <strong class="pg-kpi-val">{{ acum?.completadas ?? 0 }}</strong>
+        <span class="pg-kpi-sub">En total</span>
+      </div>
+      <div class="pg-kpi in">
+        <span class="pg-kpi-icono"><ion-icon name="time-outline"></ion-icon></span>
+        <span class="pg-kpi-label">Tiempo promedio</span>
+        <strong class="pg-kpi-val">{{ formatMin(acum?.tiempo_promedio_min) }}</strong>
+        <span class="pg-kpi-sub">Por cita</span>
+      </div>
+      <div class="pg-kpi am">
+        <span class="pg-kpi-icono"><ion-icon name="star-outline"></ion-icon></span>
+        <span class="pg-kpi-label">Calificación</span>
+        <strong class="pg-kpi-val">{{ acum?.calificacion_promedio || '—' }}</strong>
+        <span class="pg-kpi-sub mc-estrellas">{{ estrellas(acum?.calificacion_promedio ?? null) }}</span>
+      </div>
     </section>
 
-    <!-- Lista de citas entregadas -->
-    <div *ngIf="cargando" style="display:flex;flex-direction:column;gap:10px">
-      <div class="skeleton" style="height:104px"></div>
-      <div class="skeleton" style="height:104px"></div>
-      <div class="skeleton" style="height:104px"></div>
+    <!-- Citas entregadas -->
+    <div class="mc-citas" *ngIf="cargando">
+      <div class="sk-dark" style="height:110px" *ngFor="let i of [1,2,3]"></div>
     </div>
 
-    <div class="cita-list" *ngIf="!cargando">
-      <div class="cita-card" *ngFor="let c of citas">
-        <div class="cita-head">
-          <h4>{{ c.marca || 'Vehiculo' }} {{ c.modelo || '' }}<span class="placa mono" *ngIf="c.placa"> · {{ c.placa }}</span></h4>
-          <span class="st-badge entregado">Entregado</span>
+    <div class="mc-citas" *ngIf="!cargando">
+      <article class="mc-cita mh-cita" *ngFor="let c of citas">
+        <div class="mc-cita-top">
+          <strong class="mc-moto">{{ c.marca || 'Moto' }} {{ c.modelo || '' }}<span class="mono" *ngIf="c.placa"> · {{ c.placa }}</span></strong>
+          <span class="pill gris">Entregado</span>
         </div>
-        <div class="cita-info">
-          <strong>{{ c.tipo_servicio || 'Servicio' }}</strong><br>
-          {{ (c.fecha_fin || c.fecha) | date:'dd/MM/yy' }} · {{ c.cliente_nombre }} {{ c.cliente_apellido }}
+        <div class="pg-item-txt">
+          <span><strong class="mc-servicio">{{ c.servicios || c.tipo_servicio || 'Servicio' }}</strong></span>
+          <span>{{ (c.fecha_fin || c.fecha) | date:'dd/MM/yy' }} · {{ c.cliente_nombre }} {{ c.cliente_apellido }}</span>
         </div>
-        <div class="hist-foot">
-          <span class="stars" *ngIf="c.calificacion">{{ estrellas(c.calificacion) }}</span>
-          <span class="sin-calif" *ngIf="!c.calificacion">Sin calificar</span>
+        <div class="mh-pie">
+          <span class="mc-estrellas" *ngIf="c.calificacion">{{ estrellas(c.calificacion) }}</span>
+          <span class="mh-sin" *ngIf="!c.calificacion">Sin calificar</span>
         </div>
-      </div>
+      </article>
 
-      <div class="empty" *ngIf="!citas.length">
-        <ion-icon class="ico" name="time-outline"></ion-icon>
-        <p>Todavía no completaste citas.</p>
+      <div class="pg-vacio mc-vacio" *ngIf="!citas.length">
+        <ion-icon name="time-outline"></ion-icon> Todavía no completaste citas.
       </div>
     </div>
-
-    <div style="height:80px"></div>
   </div>
 </ion-content>

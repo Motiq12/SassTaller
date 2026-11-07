@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PortalService } from '../../services/portal.service';
@@ -10,8 +10,6 @@ import { PortalService } from '../../services/portal.service';
   styleUrls: ['./portal-ofertas.page.scss'],
 })
 export class PortalOfertasPage implements OnInit, OnDestroy {
-  private portal = inject(PortalService);
-
   private destroy$ = new Subject<void>();
   promos: any[] = [];
   fidelidad: { visitas: number; cortesia_disponible: boolean; meta: number; faltan: number } | null = null;
@@ -33,6 +31,8 @@ export class PortalOfertasPage implements OnInit, OnDestroy {
   // Emoji decorativo para el placeholder cuando la oferta no trae imagen.
   phIcono(i: number): string { return this.iconos[i % this.iconos.length]; }
 
+  constructor(private portal: PortalService) {}
+
   ngOnInit() { this.cargar(); }
   ionViewWillEnter() { this.cargar(); }
 
@@ -43,6 +43,8 @@ export class PortalOfertasPage implements OnInit, OnDestroy {
         this.promos = r.data;
         this.cargando = false;
         r.data.filter((p: any) => p.tiene_imagen).slice(0, 3).forEach((p: any) => this.cargarImagen(p));
+        // Las que son solo una imagen no tienen otra cosa que mostrar: se cargan todas.
+        r.data.filter((p: any) => p.tiene_imagen && !p.titulo && !p.descripcion).forEach((p: any) => this.cargarImagen(p));
       },
       error: () => { this.cargando = false; },
     });

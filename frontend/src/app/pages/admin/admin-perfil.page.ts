@@ -1,76 +1,94 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
-import { Router } from '@angular/router';
-import { ToastController } from '@ionic/angular';
-import { Subject } from 'rxjs';
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { Location } from '@angular/common';
+import { ModalController, ToastController } from '@ionic/angular';
+import { Observable, forkJoin } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { AdminService } from '../../services/admin.service';
-import { DashboardService } from '../../services/dashboard.service';
 import { AuthService } from '../../services/auth.service';
 import { AccesibilidadService } from '../../services/accesibilidad.service';
-import { comprimirImagen } from '../../shared/utils/image.util';
+import { MiPerfilService } from '../../services/mi-perfil.service';
+import { recortarFoto } from '../../shared/perfil/recortar-foto.component';
+import { GrupoPerfil, PerfilListaBase } from '../../shared/perfil/perfil-lista.base';
 
 @Component({
   standalone: false,
   selector: 'app-admin-perfil',
   templateUrl: './admin-perfil.page.html',
-  styleUrls: ['./admin-perfil.page.scss'],
 })
-export class AdminPerfilPage implements OnInit, OnDestroy {
-  private admin = inject(AdminService);
-  private dash = inject(DashboardService);
-  private auth = inject(AuthService);
-  a11y = inject(AccesibilidadService);
-  private router = inject(Router);
-  private toast = inject(ToastController);
+export class AdminPerfilPage extends PerfilListaBase implements OnInit, OnDestroy {
+  readonly rol = 'admin' as const;
+  // Las filas de Mi perfil, por grupo. Cada una abre su sección (?ver=<id>).
+  readonly grupos: GrupoPerfil[] = [
+    { titulo: 'Información personal', items: [
+      { id: 'datos', nombre: 'Datos personales', icono: 'person-outline' },
+      { id: 'foto', nombre: 'Foto de perfil', icono: 'image-outline' },
+      { id: 'firma', nombre: 'Mi firma', icono: 'pencil-outline' },
+    ] },
+    { titulo: 'Seguridad', items: [
+      { id: 'contrasena', nombre: 'Cambiar contraseña', icono: 'lock-closed-outline' },
+      { id: 'dosfa', nombre: 'Verificación en dos pasos', icono: 'shield-checkmark-outline' },
+      { id: 'sesiones', nombre: 'Dónde estás conectado', icono: 'laptop-outline' },
+    ] },
+    { titulo: 'Preferencias', items: [
+      { id: 'apariencia', nombre: 'Apariencia', icono: 'color-palette-outline' },
+      { id: 'inicio', nombre: 'Al entrar', icono: 'options-outline' },
+    ] },
+    { titulo: 'Actividad', items: [
+      { id: 'actividad', nombre: 'Mi actividad', icono: 'time-outline' },
+    ] },
+  ];
 
-  private destroy$ = new Subject<void>();
   perfil: any = null;
-  resumen: any = null;
-  cuenta = { nombre: '', email: '' };
+  cuenta = { nombre: '', email: '', telefono: '' };
+  cuentaGuardada = { nombre: '', email: '', telefono: '' };
   pass = { actual: '', nueva: '' };
-  cargando = true;
   guardando = false;
   guardandoPass = false;
   subiendoFoto = false;
   verActual = false;
   verNueva = false;
 
-  readonly nivelesTexto = [
-    { i: 0, etiqueta: 'A', nombre: 'Normal' },
-    { i: 1, etiqueta: 'A', nombre: 'Grande' },
-    { i: 2, etiqueta: 'A', nombre: 'Muy grande' },
-  ];
+  constructor(
+    private admin: AdminService,
+    private toast: ToastController,
+    private modal: ModalController,
+    route: ActivatedRoute,
+    router: Router,
+    location: Location,
+    miPerfil: MiPerfilService,
+    auth: AuthService,
+    a11y: AccesibilidadService,
+  ) {
+    super(route, router, location, miPerfil, auth, a11y);
+  }
 
-  ngOnInit() { this.cargar(); }
+  ngOnInit() { this.iniciarLista(); this.cargar(); }
   ionViewWillEnter() { this.cargar(); }
-  ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
+  ngOnDestroy() { this.terminarLista(); }
 
   cargar() {
-    this.cargando = true;
     const u = this.auth.getUsuario();
     this.perfil = { ...u, foto: (u as any)?.foto || null };
-    this.cuenta = { nombre: u?.nombre || '', email: u?.email || '' };
-    this.cargando = false;
-
-    this.admin.getResumen().pipe(takeUntil(this.destroy$)).subscribe({
-      next: r => this.resumen = r.data,
-    });
-    this.dash.getResumen().pipe(takeUntil(this.destroy$)).subscribe({
-      next: r => this.resumen = { ...this.resumen, ...r.data },
+    this.cuenta = { nombre: u?.nombre || '', email: u?.email || '', telefono: '' };
+    this.cuentaGuardada = { ...this.cuenta };
+    // El teléfono no viaja en la sesión: se pide aparte.
+    this.miPerfil.get().pipe(takeUntil(this.destroy$)).subscribe({
+      next: r => { this.cuenta.telefono = r.data.telefono || ''; this.cuentaGuardada.telefono = this.cuenta.telefono; },
+      error: () => {},
     });
   }
 
-  get iniciales(): string {
-    const p = (this.cuenta.nombre || 'A').trim().split(/\s+/);
-    return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || 'A';
+  protected get fotoActual(): string | null { return this.perfil?.foto || null; }
+  get rolNombre(): string { return this.perfil?.rol_nombre || 'Administrador'; }
+  get sede(): string { return this.perfil?.sucursal_nombre || 'Todas las sedes'; }
+  get iniciales(): string { return this.inicialesDe(this.cuentaGuardada.nombre); }
+  get miembroDesde(): string { return this.fechaDesde(this.perfil?.created_at); }
+  get fuerza() { return this.fuerzaDe(this.pass.nueva); }
+  get cuentaCambiada(): boolean {
+    return this.cuenta.nombre.trim() !== this.cuentaGuardada.nombre || this.cuenta.email.trim() !== this.cuentaGuardada.email
+      || this.cuenta.telefono.trim() !== this.cuentaGuardada.telefono;
   }
-
-  get miembroDesde(): string {
-    if (!this.perfil?.created_at) return '—';
-    return new Date(this.perfil.created_at).toLocaleDateString('es-CR', { month: 'long', year: 'numeric' });
-  }
-
-  setTexto(i: number) { this.a11y.setNivel(i); }
 
   pedirFoto(input: HTMLInputElement) { if (!this.subiendoFoto) input.click(); }
 
@@ -79,9 +97,11 @@ export class AdminPerfilPage implements OnInit, OnDestroy {
     const file = input.files?.[0];
     input.value = '';
     if (!file) return;
-    this.subiendoFoto = true;
     try {
-      const dataUrl = await comprimirImagen(file, { maxLado: 400, calidad: 0.8 });
+      // Primero se encuadra (y sale ya en 400 px); cancelar no sube nada.
+      const dataUrl = await recortarFoto(this.modal, file);
+      if (!dataUrl) return;
+      this.subiendoFoto = true;
       this.admin.updateFoto(dataUrl).pipe(takeUntil(this.destroy$)).subscribe({
         next: r => {
           this.perfil = { ...this.perfil, foto: r.data.foto };
@@ -113,10 +133,19 @@ export class AdminPerfilPage implements OnInit, OnDestroy {
 
   guardarCuenta() {
     if (!this.cuenta.nombre.trim() || !this.cuenta.email.trim()) { this.aviso('Nombre y correo son requeridos', 'warning'); return; }
+    const nombre = this.cuenta.nombre.trim();
+    const email = this.cuenta.email.trim();
+    const telefono = this.cuenta.telefono.trim();
+    // Solo se manda lo que cambió: nombre y correo van al panel, el teléfono a Mi perfil.
+    const pedidos: Observable<any>[] = [];
+    if (nombre !== this.cuentaGuardada.nombre || email !== this.cuentaGuardada.email) pedidos.push(this.admin.updateCuenta({ nombre, email }));
+    if (telefono !== this.cuentaGuardada.telefono) pedidos.push(this.miPerfil.guardarTelefono(telefono));
+    if (!pedidos.length) return;
     this.guardando = true;
-    this.admin.updateCuenta({ nombre: this.cuenta.nombre.trim(), email: this.cuenta.email.trim() }).pipe(takeUntil(this.destroy$)).subscribe({
-      next: r => {
-        this.sincronizarSesion({ nombre: this.cuenta.nombre.trim(), email: this.cuenta.email.trim() });
+    forkJoin(pedidos).pipe(takeUntil(this.destroy$)).subscribe({
+      next: () => {
+        this.sincronizarSesion({ nombre, email });
+        this.cuentaGuardada = { nombre, email, telefono };
         this.guardando = false;
         this.aviso('Cuenta actualizada');
       },
@@ -126,7 +155,7 @@ export class AdminPerfilPage implements OnInit, OnDestroy {
 
   cambiarPassword() {
     if (!this.pass.actual || !this.pass.nueva) { this.aviso('Completá ambas contraseñas', 'warning'); return; }
-    if (this.pass.nueva.length < 8) { this.aviso('Mínimo 8 caracteres', 'warning'); return; }
+    if (this.pass.nueva.length < this.minimo) { this.aviso(`Mínimo ${this.minimo} caracteres`, 'warning'); return; }
     this.guardandoPass = true;
     this.admin.updatePassword(this.pass).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => { this.guardandoPass = false; this.pass = { actual: '', nueva: '' }; this.aviso('Contraseña actualizada'); },

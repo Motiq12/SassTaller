@@ -1,515 +1,624 @@
 <ion-header>
-  <ion-toolbar>
+  <ion-toolbar class="admin-topbar">
     <ion-buttons slot="start">
-      <ion-back-button defaultHref="/tabs/ordenes"></ion-back-button>
+      <ion-back-button [defaultHref]="listaOrdenes" text=""></ion-back-button>
     </ion-buttons>
-    <ion-title>{{ orden?.numero_orden || 'Orden' }}</ion-title>
-    <ion-buttons slot="end">
-      <ion-button (click)="notificarWhatsApp()" title="Notificar por WhatsApp" *ngIf="orden?.cliente_telefono && !auth.tieneRol('tecnico')">
-        <ion-icon slot="icon-only" name="logo-whatsapp" color="success"></ion-icon>
+    <ion-title><span class="mono">{{ orden?.numero_orden || 'Orden' }}</span></ion-title>
+    <ion-buttons slot="end" *ngIf="orden">
+      <ion-button (click)="notificarWhatsApp()" *ngIf="orden.cliente_telefono && !esTecnico" aria-label="Avisar al cliente por WhatsApp">
+        <ion-icon name="logo-whatsapp" aria-hidden="true"></ion-icon><span class="tb-txt">Avisar por WhatsApp</span>
+      </ion-button>
+      <ion-button (click)="verFactura()" *ngIf="!esTecnico" aria-label="Factura e impresión">
+        <ion-icon name="print-outline" aria-hidden="true"></ion-icon><span class="tb-txt">{{ orden.estado === 'entregada' ? 'Factura' : 'Imprimir' }}</span>
+      </ion-button>
+      <ion-button (click)="abrirMas($event)" *ngIf="puedeEditar || puedeEliminar || !esTecnico" aria-label="Más acciones">
+        <ion-icon name="ellipsis-vertical" aria-hidden="true"></ion-icon>
       </ion-button>
     </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
-<ion-content *ngIf="!cargando && orden">
+<ion-content class="admin-dark" *ngIf="!cargando && orden">
   <div class="ot">
 
-    <!-- Hero: estado + vehiculo + stepper -->
-    <div class="ot-hero">
-      <span class="status-pill">{{ estadoLabel(orden.estado!) }}</span>
-      <h2 class="ot-model">{{ orden.marca }} {{ orden.modelo }} {{ orden.anio }}</h2>
-      <span class="placa-pill mono" *ngIf="orden.placa">Placa: {{ orden.placa }}</span>
-      <p class="ot-cliente">{{ orden.cliente_nombre }} {{ orden.cliente_apellido }} · {{ orden.cliente_telefono }}</p>
-
-      <!-- Progress stepper -->
-      <div class="progress-stepper">
-        <div class="stepper-track">
-          <ng-container *ngFor="let paso of flujoOrden; let i = index; let last = last">
-            <div class="stepper-step" [class.completed]="i < pasoActual" [class.active]="i === pasoActual" [class.future]="i > pasoActual">
-              <div class="stepper-dot">
-                <ion-icon name="checkmark" *ngIf="i < pasoActual"></ion-icon>
-                <span *ngIf="i >= pasoActual" class="dot-inner"></span>
-              </div>
-              <span class="stepper-label">{{ flujoLabel[paso] }}</span>
-            </div>
-            <div class="stepper-line" *ngIf="!last" [class.filled]="i < pasoActual"></div>
-          </ng-container>
-        </div>
-      </div>
-
-      <!-- Progress bar -->
-      <div class="progress-bar-wrap">
-        <div class="progress-bar">
-          <div class="progress-fill" [style.width.%]="porcentajeProgreso"></div>
-        </div>
-        <span class="progress-pct mono">{{ porcentajeProgreso }}%</span>
-      </div>
-    </div>
-
-    <div class="ot-grid">
-
-    <!-- Mini cards: vehiculo + client -->
-    <div class="info-duo">
-      <div class="mini-card">
-        <div class="mini-icon vehiculo-icon"><ion-icon name="bicycle-outline"></ion-icon></div>
-        <div class="mini-body">
-          <span class="mini-title">{{ orden.marca }} {{ orden.modelo }}</span>
-          <span class="mini-sub" *ngIf="orden.placa">Placa: {{ orden.placa }}</span>
-          <span class="mini-sub" *ngIf="orden.anio">Año: {{ orden.anio }}</span>
-        </div>
-      </div>
-      <div class="mini-card">
-        <div class="mini-icon client-icon"><ion-icon name="person-outline"></ion-icon></div>
-        <div class="mini-body">
-          <span class="mini-title">{{ orden.cliente_nombre }} {{ orden.cliente_apellido }}</span>
-          <span class="mini-sub" *ngIf="orden.cliente_telefono">{{ orden.cliente_telefono }}</span>
-          <span class="mini-sub" *ngIf="orden.sucursal_nombre">{{ orden.sucursal_nombre }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Info details -->
-    <section class="card ot-info">
-      <p><span class="k">Problema</span>{{ orden.problema_reportado }}</p>
-      <p *ngIf="orden.diagnostico"><span class="k">Diagnostico</span>{{ orden.diagnostico }}</p>
-      <p *ngIf="orden.tecnico_nombre"><span class="k">Tecnico</span>{{ orden.tecnico_nombre }}</p>
-      <p *ngIf="orden.fecha_estimada_entrega"><span class="k">Entrega estimada</span>{{ orden.fecha_estimada_entrega | date:'dd/MM/yyyy' }}</p>
-    </section>
-
-    <!-- Aprobación del cliente -->
-    <section class="card banner"
-             *ngIf="orden.aprobacion_cliente && orden.aprobacion_cliente !== 'pendiente'"
-             [class.ok]="orden.aprobacion_cliente === 'aprobado'"
-             [class.no]="orden.aprobacion_cliente === 'rechazado'">
-      <ion-icon [name]="orden.aprobacion_cliente === 'aprobado' ? 'checkmark-circle' : 'close-circle'"></ion-icon>
-      <div>
-        <strong *ngIf="orden.aprobacion_cliente === 'aprobado'">Presupuesto aprobado por el cliente</strong>
-        <strong *ngIf="orden.aprobacion_cliente === 'rechazado'">Presupuesto rechazado por el cliente</strong>
-        <p *ngIf="orden.motivo_rechazo">{{ orden.motivo_rechazo }}</p>
-      </div>
-    </section>
-    <section class="card banner wait"
-             *ngIf="orden.estado === 'esperando_aprobacion' && (!orden.aprobacion_cliente || orden.aprobacion_cliente === 'pendiente')">
-      <ion-icon name="hourglass-outline"></ion-icon>
-      <div><strong>Esperando que el cliente apruebe en el portal</strong></div>
-    </section>
-
-    <!-- Cambiar estado -->
-    <section class="card" *ngIf="siguientes.length > 0">
-      <span class="section-label">Cambiar estado</span>
-      <div class="state-grid">
-        <button *ngFor="let s of siguientes" (click)="cambiarEstado(s)"
-          class="state-pill" [attr.data-state]="s">
-          <ion-icon [name]="s === 'diagnostico' ? 'search-outline' : s === 'esperando_aprobacion' ? 'time-outline' : s === 'esperando_repuestos' ? 'cube-outline' : s === 'en_reparacion' ? 'construct-outline' : s === 'lista_entrega' ? 'checkmark-circle-outline' : s === 'entregada' ? 'checkmark-done-outline' : s === 'cancelada' ? 'close-circle-outline' : 'ellipse-outline'"></ion-icon>
-          {{ estadoLabel(s) }}
-        </button>
-      </div>
-    </section>
-
-    <!-- Asignar mecánico (admin y recepción) -->
-    <section class="card" *ngIf="auth.tieneRol('admin', 'recepcion') && tecnicos.length">
-      <span class="section-label">Asignar mecánico</span>
-      <ion-select placeholder="Seleccionar mecánico" [(ngModel)]="orden.tecnico_id"
-        (ngModelChange)="asignarTecnico($event)" interface="action-sheet" class="sel-line">
-        <ion-select-option *ngFor="let t of tecnicos" [value]="t.id">{{ t.nombre }}</ion-select-option>
-      </ion-select>
-    </section>
-
-    <!-- Costos (solo recepción/admin) -->
-    <section class="card costos accent-rose" *ngIf="!auth.tieneRol('tecnico')">
-      <div class="card-head">
-        <span class="section-label">Costos</span>
-        <span class="tiny mono">Simulación de factura</span>
-      </div>
-      <div class="cost-row"><span>Mano de obra</span><span class="mono">₡{{ orden.costo_mano_obra | number:'1.0-0' }}</span></div>
-      <div class="cost-row"><span>Repuestos</span><span class="mono">₡{{ totalRepuestos | number:'1.0-0' }}</span></div>
-      <div class="cost-row neg" *ngIf="orden.descuento"><span>Descuento</span><span class="mono">-₡{{ orden.descuento | number:'1.0-0' }}</span></div>
-      <div class="cost-total"><span>Total</span><span class="mono">₡{{ totalOrden | number:'1.0-0' }}</span></div>
-      <button class="btn-line" (click)="verFactura()">
-        <ion-icon name="print-outline"></ion-icon> Factura / Imprimir
-      </button>
-    </section>
-
-    <!-- Repuestos -->
-    <section class="card accent-amber">
-      <div class="card-head">
-        <span class="section-label">Repuestos</span>
-        <button class="link-add" (click)="mostrarFormRepuesto = !mostrarFormRepuesto" *ngIf="!auth.tieneRol('tecnico')">
-          <ion-icon name="add"></ion-icon> Agregar
-        </button>
-        <button class="link-add" (click)="mostrarFormSolicitud = !mostrarFormSolicitud" *ngIf="auth.tieneRol('tecnico')">
-          <ion-icon name="add"></ion-icon> Solicitar
-        </button>
-      </div>
-
-      <!-- Formulario completo para recepción/admin -->
-      <div *ngIf="mostrarFormRepuesto && !auth.tieneRol('tecnico')" class="inline-form">
-        <ion-item>
-          <ion-label position="floating">Nombre</ion-label>
-          <ion-input [(ngModel)]="nuevoRepuesto.nombre"></ion-input>
-        </ion-item>
-        <ion-item>
-          <ion-label position="floating">Cantidad</ion-label>
-          <ion-input type="number" [(ngModel)]="nuevoRepuesto.cantidad"></ion-input>
-        </ion-item>
-        <ion-item>
-          <ion-label position="floating">Costo unitario (₡)</ion-label>
-          <ion-input type="number" [(ngModel)]="nuevoRepuesto.costo_unitario"></ion-input>
-        </ion-item>
-        <ion-button expand="block" class="ion-margin-top" (click)="agregarRepuesto()">Agregar</ion-button>
-      </div>
-
-      <!-- Formulario simplificado para mecánico (sin precio) -->
-      <div *ngIf="mostrarFormSolicitud && auth.tieneRol('tecnico')" class="inline-form">
-        <div class="solicitud-row">
-          <ion-item class="sol-input">
-            <ion-label position="floating">Repuesto</ion-label>
-            <ion-input [(ngModel)]="nuevoRepuesto.nombre" (keyup.enter)="agregarALista()"></ion-input>
-          </ion-item>
-          <ion-item class="sol-cant">
-            <ion-label position="floating">Cant.</ion-label>
-            <ion-input type="number" [(ngModel)]="nuevoRepuesto.cantidad"></ion-input>
-          </ion-item>
-          <ion-button fill="clear" (click)="agregarALista()" [disabled]="!nuevoRepuesto.nombre.trim()">
-            <ion-icon slot="icon-only" name="add-circle"></ion-icon>
-          </ion-button>
-        </div>
-
-        <!-- Lista pendiente de envío -->
-        <div class="sol-lista" *ngIf="listaSolicitud.length">
-          <div class="sol-item" *ngFor="let p of listaSolicitud; let i = index">
-            <span class="sol-nombre">{{ p.nombre }}</span>
-            <span class="sol-qty mono">×{{ p.cantidad }}</span>
-            <button class="sol-del" (click)="quitarDeLista(i)"><ion-icon name="close-circle-outline"></ion-icon></button>
+    <!-- ═══ Encabezado: qué moto, de quién, en qué va y qué sigue ═══ -->
+    <section class="ot-card ot-cab">
+      <div class="ot-cab-top">
+        <div class="ot-cab-info">
+          <div class="ot-meta">
+            <span class="mono ot-num">{{ orden.numero_orden }}</span>
+            <span class="bg" [ngClass]="claseDeEstado(orden.estado)">{{ estadoLabel(orden.estado!) }}</span>
+            <span class="bg bg-n ot-chip" *ngIf="orden.sucursal_nombre">{{ orden.sucursal_nombre }}</span>
+            <span class="bg bg-rd" *ngIf="orden.prioridad && orden.prioridad !== 'normal'">{{ prioridadLabel }}</span>
           </div>
+          <h1 class="ot-titulo">
+            {{ orden.marca }} {{ orden.modelo }} {{ orden.anio }}
+            <span class="mono ot-placa" *ngIf="orden.placa">{{ orden.placa }}</span>
+          </h1>
+          <p class="ot-sub">
+            {{ orden.cliente_nombre }} {{ orden.cliente_apellido }}
+            <ng-container *ngIf="orden.cliente_telefono && !esTecnico"> · {{ orden.cliente_telefono }}</ng-container>
+            <ng-container *ngIf="orden.fecha_ingreso || orden.created_at"> · Ingresó el {{ (orden.fecha_ingreso || orden.created_at) | date:'dd/MM/yy, h:mm a' }}</ng-container>
+          </p>
         </div>
 
-        <ion-button expand="block" class="ion-margin-top" (click)="enviarSolicitudes()" [disabled]="!listaSolicitud.length || enviandoSolicitud">
-          <ion-icon name="send-outline" slot="start"></ion-icon>
-          Enviar {{ listaSolicitud.length }} pieza{{ listaSolicitud.length !== 1 ? 's' : '' }} a recepción
-        </ion-button>
+        <div class="ot-cab-acciones" *ngIf="accionPrincipal || otrosCambios.length || (orden.estado === 'entregada' && !esTecnico)">
+          <button type="button" class="btn btn-ou" *ngIf="otrosCambios.length" (click)="abrirOtros($event)" [disabled]="cambiando" aria-haspopup="menu">
+            Otro cambio <ion-icon name="chevron-down" aria-hidden="true"></ion-icon>
+          </button>
+          <button type="button" class="btn btn-cr ot-principal" *ngIf="accionPrincipal as a" (click)="ejecutar(a)" [disabled]="cambiando">
+            {{ a.texto }}<ng-container *ngIf="a.entregar && !esTecnico"> · ₡{{ totalOrden | number:'1.0-0' }}</ng-container>
+            <ion-icon [name]="a.entregar ? 'checkmark-done-outline' : 'arrow-forward'" aria-hidden="true"></ion-icon>
+          </button>
+          <button type="button" class="btn btn-ou" *ngIf="orden.estado === 'entregada' && !esTecnico" (click)="verFactura()">
+            <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon> Ver factura
+          </button>
+        </div>
       </div>
 
-      <div class="rep-list">
-        <ion-item-sliding *ngFor="let r of repuestos">
-          <ion-item lines="none" class="rep-item" [class.rep-solicitado]="r.estado === 'solicitado'">
-            <ion-label>
-              <h3>{{ r.nombre }}</h3>
-              <p class="mono" *ngIf="!auth.tieneRol('tecnico')">{{ r.cantidad }} × ₡{{ r.costo_unitario | number:'1.0-0' }} = ₡{{ r.cantidad * r.costo_unitario | number:'1.0-0' }}</p>
-              <p *ngIf="auth.tieneRol('tecnico')">Cantidad: {{ r.cantidad }}</p>
-            </ion-label>
-            <div slot="end" style="display:flex;align-items:center;gap:8px">
-              <button *ngIf="r.estado === 'solicitado' && !auth.tieneRol('tecnico')" class="rep-edit-btn" (click)="editarRepuesto(r)">
-                <ion-icon name="create-outline"></ion-icon> Cotizar
-              </button>
-              <span class="pill" [ngClass]="r.estado === 'disponible' ? 'solid' : r.estado === 'pedido_especial' ? 'amber' : r.estado === 'solicitado' ? 'rose' : 'gris'">
-                {{ r.estado }}
+      <!-- Una sola línea de punta a punta, con lo que duró cada etapa debajo -->
+      <div class="ot-linea" [class.cancelada]="orden.estado === 'cancelada'">
+        <ol class="ot-pasos" aria-label="Avance de la orden">
+          <li *ngFor="let p of pasos; let j = index; let last = last" class="ot-paso" [ngClass]="p.tipo"
+              [attr.aria-current]="p.tipo === 'actual' ? 'step' : null">
+            <div class="ot-paso-eje">
+              <span class="ot-tramo" [class.on]="p.alcanzado" [class.vacio]="j === 0"></span>
+              <span class="ot-punto">
+                <ion-icon *ngIf="p.tipo === 'hecho'" name="checkmark" aria-hidden="true"></ion-icon>
               </span>
+              <span class="ot-tramo" [class.on]="!last && pasos[j + 1].alcanzado" [class.vacio]="last"></span>
             </div>
-          </ion-item>
-          <ion-item-options side="end" *ngIf="!auth.tieneRol('tecnico')">
-            <ion-item-option color="danger" (click)="eliminarRepuesto(r)">
-              <ion-icon name="trash-outline"></ion-icon>
-            </ion-item-option>
-          </ion-item-options>
-        </ion-item-sliding>
-        <p *ngIf="repuestos.length === 0" class="empty-row">Sin repuestos registrados</p>
-      </div>
-    </section>
-
-    <!-- Línea de tiempo (solo admin/recepción) -->
-    <section class="card timeline-card" *ngIf="tiempos.length && !auth.tieneRol('tecnico')">
-      <div class="card-head">
-        <span class="section-label">
-          <ion-icon name="git-branch-outline" style="vertical-align:-2px;margin-right:4px"></ion-icon>
-          Línea de tiempo
-        </span>
-        <span class="tiny mono">Total: {{ duracionTotal }}</span>
-      </div>
-      <div class="tl-phases">
-        <div class="tl-phase" *ngFor="let t of tiempos; let last = last" [class.active]="!t.fin" [class.done]="!!t.fin">
-          <div class="tl-dot"><ion-icon [name]="etapaIcono[t.etapa] || 'ellipse'"></ion-icon></div>
-          <div class="tl-body">
-            <strong>{{ etapaLabel[t.etapa] || t.etapa }}</strong>
-            <div class="tl-dates">
-              <span><ion-icon name="play-outline"></ion-icon> {{ formatFecha(t.inicio) }}</span>
-              <span *ngIf="t.fin"><ion-icon name="stop-outline"></ion-icon> {{ formatFecha(t.fin) }}</span>
-              <span *ngIf="!t.fin" class="tl-en-curso"><ion-icon name="time-outline"></ion-icon> En curso</span>
-            </div>
-            <span class="tl-dur mono">{{ duracion(t.inicio, t.fin) }}</span>
-          </div>
-          <div class="tl-line" *ngIf="!last"></div>
+            <span class="ot-paso-label">{{ p.label }}</span>
+            <span class="ot-paso-sub mono">{{ p.sub }}</span>
+          </li>
+        </ol>
+        <div class="ot-linea-resumen">
+          <strong>{{ resumenPaso }}</strong>
+          <span class="mono">{{ resumenPasoSub }}</span>
         </div>
       </div>
     </section>
 
-    <!-- Avances / Timeline -->
-    <section class="card accent-indigo">
-      <div class="card-head">
-        <span class="section-label">Avances</span>
+    <!-- ═══ Avisos que importan antes de seguir (solo cuando aplican) ═══ -->
+    <div class="adm-aviso rd" *ngIf="orden.estado === 'cancelada'">
+      <ion-icon name="close-circle-outline" aria-hidden="true"></ion-icon>
+      <div><strong>Orden cancelada.</strong> {{ orden.motivo_cancelacion || 'No se registró el motivo.' }}</div>
+    </div>
+    <div class="adm-aviso rd" *ngIf="orden.aprobacion_cliente === 'rechazado' && orden.estado !== 'cancelada'">
+      <ion-icon name="close-circle-outline" aria-hidden="true"></ion-icon>
+      <div><strong>El cliente rechazó el presupuesto.</strong> {{ orden.motivo_rechazo }}</div>
+    </div>
+    <!-- Aprobado con motivo = el cliente rechazó un adicional (lo anterior sigue aprobado). -->
+    <div class="adm-aviso am" *ngIf="orden.aprobacion_cliente === 'aprobado' && orden.motivo_rechazo">
+      <ion-icon name="alert-circle-outline" aria-hidden="true"></ion-icon>
+      <div><strong>El cliente rechazó el adicional:</strong> {{ orden.motivo_rechazo }}</div>
+    </div>
+    <div class="adm-aviso in" *ngIf="orden.estado === 'esperando_aprobacion' && (!orden.aprobacion_cliente || orden.aprobacion_cliente === 'pendiente')">
+      <ion-icon name="hourglass-outline" aria-hidden="true"></ion-icon>
+      <div *ngIf="!tieneAprobado"><strong>Esperando que el cliente apruebe el presupuesto en el portal.</strong> Cuando apruebe, se puede pasar a reparación.</div>
+      <div *ngIf="tieneAprobado">
+        <strong>Esperando que el cliente apruebe un adicional.</strong>
+        <ng-container *ngIf="!esTecnico && orden.monto_sin_aprobar"> ₡{{ orden.monto_sin_aprobar | number:'1.0-0' }} sobre ₡{{ orden.total_aprobado | number:'1.0-0' }} ya aprobados.</ng-container>
+        El trabajo nuevo queda en pausa hasta que responda.
       </div>
-      <div class="inline-form">
-        <ion-item>
-          <ion-textarea [(ngModel)]="nuevoAvance" placeholder="Descripción del avance..." rows="2"></ion-textarea>
-        </ion-item>
-        <ion-button expand="block" class="ion-margin-top" (click)="agregarAvance()">Registrar avance</ion-button>
-      </div>
-      <div class="timeline" *ngIf="avances.length">
-        <div class="tl-item done" *ngFor="let a of avances">
-          <div class="avance-fecha mono">{{ a.created_at | date:'dd/MM/yyyy HH:mm' }} • {{ a.usuario_nombre }}</div>
-          <p class="tl-desc">{{ a.descripcion }}</p>
-        </div>
-      </div>
-      <p *ngIf="avances.length === 0" class="empty-row">Sin avances registrados</p>
-    </section>
-
-    <!-- Mensajes de la orden (recepción/admin ↔ mecánico) -->
-    <section class="card msg-card">
-      <span class="section-label">
-        <ion-icon name="chatbubbles-outline" style="vertical-align:-2px;margin-right:4px"></ion-icon>
-        Mensajes de la orden
-      </span>
-      <div class="msg-thread" *ngIf="mensajes.length">
-        <div class="msg-row" *ngFor="let m of mensajes" [class.mio]="esMensajeMio(m)">
-          <div class="msg-bubble">
-            <img *ngIf="m.foto" [src]="m.foto" class="msg-img" alt="Foto adjunta" />
-            <p *ngIf="m.mensaje">{{ m.mensaje }}</p>
-            <span class="msg-meta">
-              {{ esMensajeMio(m) ? 'Vos' : m.remitente_nombre }}
-              <span class="msg-rol">· {{ m.remitente_rol === 'tecnico' ? 'Mecánico' : m.remitente_rol === 'admin' ? 'Admin' : 'Recepción' }}</span>
-              · {{ m.created_at | date:'dd/MM HH:mm' }}
-            </span>
-          </div>
-        </div>
-      </div>
-      <p *ngIf="!mensajes.length" class="empty-row">Sin mensajes sobre esta orden todavía</p>
-      <div class="msg-send">
-        <input type="text" [(ngModel)]="nuevoMensaje" placeholder="Escribí un mensaje…" (keyup.enter)="enviarMensaje()" />
-        <button (click)="enviarMensaje()" [disabled]="enviandoMensaje || !nuevoMensaje.trim()" aria-label="Enviar">
-          <ion-icon name="send"></ion-icon>
-        </button>
-      </div>
-    </section>
-
-    <!-- Checklist de entrega -->
-    <section class="card" *ngIf="orden.estado === 'lista_entrega' || orden.estado === 'entregada'">
-      <span class="section-label">
-        <ion-icon name="checkbox-outline" style="vertical-align:-2px;margin-right:4px;color:var(--ion-color-success)"></ion-icon>
-        Checklist de entrega
-      </span>
-      <ion-list class="check-list">
-        <ion-item lines="full">
-          <ion-checkbox slot="start" [(ngModel)]="checklist.prueba_realizada" [disabled]="orden.estado === 'entregada'"></ion-checkbox>
-          <ion-label>Prueba de manejo realizada</ion-label>
-        </ion-item>
-        <ion-item lines="full">
-          <ion-checkbox slot="start" [(ngModel)]="checklist.lavado" [disabled]="orden.estado === 'entregada'"></ion-checkbox>
-          <ion-label>Lavado</ion-label>
-        </ion-item>
-        <ion-item lines="full">
-          <ion-checkbox slot="start" [(ngModel)]="checklist.calidad_revisada" [disabled]="orden.estado === 'entregada'"></ion-checkbox>
-          <ion-label>Calidad revisada</ion-label>
-        </ion-item>
-        <ion-item lines="full">
-          <ion-checkbox slot="start" [(ngModel)]="checklist.facturacion_lista" [disabled]="orden.estado === 'entregada'"></ion-checkbox>
-          <ion-label>Facturación lista</ion-label>
-        </ion-item>
-        <ion-item lines="full">
-          <ion-checkbox slot="start" [(ngModel)]="checklist.cliente_notificado" [disabled]="orden.estado === 'entregada'"></ion-checkbox>
-          <ion-label>Cliente notificado</ion-label>
-        </ion-item>
-        <ion-item lines="none">
-          <ion-textarea label="Observaciones" labelPlacement="floating"
-            [(ngModel)]="checklist.observaciones" rows="2"
-            [disabled]="orden.estado === 'entregada'"></ion-textarea>
-        </ion-item>
-      </ion-list>
-      <ion-button *ngIf="orden.estado === 'lista_entrega'" expand="block" fill="outline" (click)="guardarChecklist()" class="ion-margin-top">
-        <ion-icon name="save-outline" slot="start"></ion-icon>
-        Guardar checklist
-      </ion-button>
-    </section>
-
-    <!-- Facturación y entrega -->
-    <section class="card" *ngIf="puedeEntregar">
-      <span class="section-label">
-        <ion-icon name="cash-outline" style="vertical-align:-2px;margin-right:4px;color:var(--ion-color-success)"></ion-icon>
-        Facturación y entrega
-      </span>
-      <div class="total-cobrar">
-        <span>Total a cobrar</span>
-        <strong class="mono">₡{{ totalOrden | number:'1.0-0' }}</strong>
-      </div>
-      <ion-item>
-        <ion-select label="Método de pago" labelPlacement="floating" [(ngModel)]="cierre.metodo_pago" interface="action-sheet">
-          <ion-select-option *ngFor="let m of metodosPago" [value]="m.valor">{{ m.etiqueta }}</ion-select-option>
-        </ion-select>
-      </ion-item>
-      <ion-item>
-        <ion-input label="Garantía (días)" labelPlacement="floating" type="number" [(ngModel)]="cierre.garantia_dias"></ion-input>
-      </ion-item>
-      <ion-item lines="none">
-        <ion-textarea label="Observaciones finales" labelPlacement="floating" [(ngModel)]="cierre.observaciones_finales" rows="2"></ion-textarea>
-      </ion-item>
-      <ion-button expand="block" color="success" class="ion-margin-top cta-upper" (click)="facturarYEntregar()" [disabled]="!checklistCompleto">
-        <ion-icon name="checkmark-done-outline" slot="start"></ion-icon>
-        Facturar y entregar
-      </ion-button>
-      <p *ngIf="!checklistCompleto" class="checklist-aviso">
-        <ion-icon name="information-circle-outline"></ion-icon>
-        Completá prueba, lavado, calidad y facturación para habilitar la entrega.
-      </p>
-    </section>
-
-    <!-- Resumen de entrega (solo recepción/admin) -->
-    <section class="card" *ngIf="orden.estado === 'entregada' && !auth.tieneRol('tecnico')">
-      <span class="section-label">Entrega</span>
-      <div class="cost-row"><span>Método de pago</span><span>{{ orden.metodo_pago || '—' }}</span></div>
-      <div class="cost-row"><span>Garantía</span><span class="mono">{{ orden.garantia_dias || 0 }} días</span></div>
-      <div class="cost-row" *ngIf="orden.fecha_entrega_real"><span>Entregada</span><span class="mono">{{ orden.fecha_entrega_real | date:'dd/MM/yyyy HH:mm' }}</span></div>
-      <p *ngIf="orden.observaciones_finales" class="obs"><span class="k">Observaciones</span>{{ orden.observaciones_finales }}</p>
-    </section>
-
-    <!-- Calificación del cliente (solo recepción/admin, cuando ya calificó) -->
-    <section class="card califa-card" *ngIf="orden.estado === 'entregada' && orden.calificacion && !auth.tieneRol('tecnico')">
-      <span class="section-label">
-        <ion-icon name="star-outline" style="vertical-align:-2px;margin-right:4px;color:var(--amber-500)"></ion-icon>
-        Calificación del cliente
-      </span>
-      <div class="califa-stars">
-        <ion-icon *ngFor="let n of estrellas" [name]="n <= orden.calificacion! ? 'star' : 'star-outline'"
-                  [class.on]="n <= orden.calificacion!"></ion-icon>
-        <span class="califa-num mono">{{ orden.calificacion }}/5</span>
-      </div>
-      <p class="califa-com" *ngIf="orden.comentario_satisfaccion">"{{ orden.comentario_satisfaccion }}"</p>
-      <p class="califa-com califa-sincom" *ngIf="!orden.comentario_satisfaccion">El cliente no dejó comentario.</p>
-    </section>
-
-    <!-- Garantía y reclamos (solo recepción/admin) -->
-    <section class="card" *ngIf="orden.estado === 'entregada' && !auth.tieneRol('tecnico')">
-      <span class="section-label">
-        <ion-icon name="shield-checkmark-outline" style="vertical-align:-2px;margin-right:4px"></ion-icon>
-        Garantía
-      </span>
-      <div class="banner inner" [class.ok]="garantiaVigente" [class.no]="!garantiaVigente">
-        <ng-container *ngIf="orden.garantia_dias && orden.garantia_dias > 0; else sinGarantia">
-          <ion-icon [name]="garantiaVigente ? 'shield-checkmark' : 'shield-outline'"></ion-icon>
-          <div>
-            <strong *ngIf="garantiaVigente">Garantía vigente</strong>
-            <strong *ngIf="!garantiaVigente">Garantía vencida</strong>
-            <p>
-              {{ orden.garantia_dias }} días ·
-              <ng-container *ngIf="garantiaVigente">quedan {{ diasGarantiaRestantes }} día(s)</ng-container>
-              <ng-container *ngIf="!garantiaVigente">venció hace {{ -(diasGarantiaRestantes || 0) }} día(s)</ng-container>
-            </p>
-          </div>
-        </ng-container>
-        <ng-template #sinGarantia>
-          <ion-icon name="shield-outline"></ion-icon>
-          <div><strong>Sin garantía</strong><p>No se registró garantía al cierre</p></div>
-        </ng-template>
-      </div>
-
-      <ion-button expand="block" fill="outline" color="danger" class="ion-margin-top"
-        (click)="mostrarFormReclamo = !mostrarFormReclamo">
-        <ion-icon name="alert-circle-outline" slot="start"></ion-icon>
-        Registrar reclamo
-      </ion-button>
-
-      <div *ngIf="mostrarFormReclamo" class="inline-form">
-        <ion-item>
-          <ion-textarea label="¿Qué problema presenta?" labelPlacement="floating"
-            [(ngModel)]="nuevoReclamo.descripcion_problema" rows="3"></ion-textarea>
-        </ion-item>
-        <ion-item>
-          <ion-checkbox slot="start" [(ngModel)]="nuevoReclamo.cubre_repuestos"></ion-checkbox>
-          <ion-label>Cubre repuestos</ion-label>
-        </ion-item>
-        <ion-item lines="none">
-          <ion-checkbox slot="start" [(ngModel)]="nuevoReclamo.cubre_mano_obra"></ion-checkbox>
-          <ion-label>Cubre mano de obra</ion-label>
-        </ion-item>
-        <ion-button expand="block" color="danger" class="ion-margin-top"
-          (click)="registrarReclamo()" [disabled]="!nuevoReclamo.descripcion_problema.trim()">
-          Guardar reclamo
-        </ion-button>
-      </div>
-
-      <div class="rep-list ion-margin-top" *ngIf="garantias.length">
-        <ion-item *ngFor="let g of garantias" button detail="true" (click)="irAGarantias()" lines="full">
-          <ion-label class="ion-text-wrap">
-            <h3>{{ g.descripcion_problema }}</h3>
-            <p>{{ g.created_at | date:'dd/MM/yyyy' }}
-              <span *ngIf="g.cubre_repuestos"> · repuestos</span>
-              <span *ngIf="g.cubre_mano_obra"> · mano de obra</span>
-            </p>
-          </ion-label>
-          <ion-badge slot="end" [color]="estadoGarantiaColor(g.estado!)">
-            {{ estadoGarantiaLabel(g.estado!) }}
-          </ion-badge>
-        </ion-item>
-      </div>
-    </section>
-
-    <!-- Evidencia fotográfica -->
-    <section class="card accent-emerald">
-      <span class="section-label">
-        <ion-icon name="camera-outline" style="vertical-align:-2px;margin-right:4px"></ion-icon>
-        Evidencia fotográfica
-      </span>
-      <ion-segment [(ngModel)]="tipoFoto" scrollable="true" class="ion-margin-bottom">
-        <ion-segment-button *ngFor="let t of tiposFoto" [value]="t.valor">
-          <ion-label>{{ t.label }}</ion-label>
-        </ion-segment-button>
-      </ion-segment>
-
-      <input #fileInput type="file" accept="image/*" capture="environment"
-             hidden (change)="onArchivoSeleccionado($event)" />
-      <ion-button expand="block" fill="outline" (click)="fileInput.click()" [disabled]="subiendoFoto">
-        <ion-spinner *ngIf="subiendoFoto" name="crescent" slot="start"></ion-spinner>
-        <ion-icon *ngIf="!subiendoFoto" name="camera-outline" slot="start"></ion-icon>
-        {{ subiendoFoto ? 'Subiendo...' : 'Agregar foto (' + tipoFoto + ')' }}
-      </ion-button>
-
-      <p *ngIf="fotos.length === 0" class="empty-row">Sin fotos registradas</p>
-
-      <div *ngFor="let grupo of fotosPorTipo" class="foto-grupo">
-        <p class="foto-grupo-titulo">{{ grupo.label }} ({{ grupo.fotos.length }})</p>
-        <div class="foto-grid">
-          <div class="foto-thumb" *ngFor="let f of grupo.fotos">
-            <img [src]="f.url" (click)="verFoto(f)" alt="evidencia" />
-            <ion-button class="foto-del" fill="clear" size="small" (click)="eliminarFoto(f)">
-              <ion-icon name="close-circle" color="danger"></ion-icon>
-            </ion-button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    </div><!-- /ot-grid -->
-
-    <!-- WhatsApp (solo recepción/admin) -->
-    <div class="wa-wrap" *ngIf="orden.cliente_telefono && !auth.tieneRol('tecnico')">
-      <button class="wa-btn" (click)="notificarWhatsApp()">
-        <ion-icon name="logo-whatsapp"></ion-icon>
-        Notificar al cliente por WhatsApp
-      </button>
+    </div>
+    <!-- Plata en la cuenta que el cliente no aprobó y nadie se lo está pidiendo (p. ej.
+         rechazó el adicional y no se quitó): se ve antes de cobrar. -->
+    <div class="adm-aviso rd" *ngIf="orden.monto_sin_aprobar && orden.estado !== 'esperando_aprobacion' && abierta && !esTecnico">
+      <ion-icon name="alert-circle-outline" aria-hidden="true"></ion-icon>
+      <div><strong>₡{{ orden.monto_sin_aprobar | number:'1.0-0' }} sin aprobación del cliente.</strong> Quitá lo que no aprobó o pedile que lo apruebe antes de cobrar.</div>
     </div>
 
-    <div style="height: 32px"></div>
+    <div class="ot-cols">
+
+      <!-- ═══ Columna principal: el trabajo ═══ -->
+      <div class="ot-main">
+
+        <!-- Trabajo (y edición de los datos de ingreso) -->
+        <section class="ot-card">
+          <div class="ot-card-cab">
+            <h2 class="ot-h2">{{ editando ? 'Editar datos de ingreso' : 'Trabajo' }}</h2>
+            <button type="button" class="btn btn-ou btn-sm" *ngIf="puedeEditar && !editando" (click)="abrirEdicion()">
+              <ion-icon name="create-outline" aria-hidden="true"></ion-icon> Editar
+            </button>
+          </div>
+
+          <div class="ot-card-cuerpo" *ngIf="!editando">
+            <div class="ot-dos">
+              <div>
+                <div class="ot-k">Lo que reporta el cliente</div>
+                <p class="ot-v">{{ orden.problema_reportado }}</p>
+              </div>
+              <div>
+                <div class="ot-k">Diagnóstico del taller</div>
+                <p class="ot-v" [class.ot-vacio]="!orden.diagnostico">{{ orden.diagnostico || 'Todavía sin diagnóstico.' }}</p>
+              </div>
+            </div>
+            <dl class="ot-datos">
+              <div><dt>Kilometraje</dt><dd class="mono">{{ tieneKm ? (orden.kilometraje_ingreso | number:'1.0-0') + ' km' : '—' }}</dd></div>
+              <div><dt>Combustible</dt><dd>{{ combustibleLabel }}</dd></div>
+              <div><dt>Prioridad</dt><dd>{{ prioridadLabel }}</dd></div>
+              <div><dt>Entrega estimada</dt><dd>{{ orden.fecha_estimada_entrega ? (orden.fecha_estimada_entrega | date:'dd/MM/yy') : '—' }}</dd></div>
+            </dl>
+            <p class="ot-extra" *ngIf="orden.accesorios_entregados || orden.estado_fisico">
+              <ng-container *ngIf="orden.accesorios_entregados"><strong>Accesorios:</strong> {{ orden.accesorios_entregados }}. </ng-container>
+              <ng-container *ngIf="orden.estado_fisico"><strong>Estado físico:</strong> {{ orden.estado_fisico }}</ng-container>
+            </p>
+          </div>
+
+          <div class="ot-card-cuerpo" *ngIf="editando">
+            <div class="fg-row">
+              <div class="fg">
+                <label for="ed-moto">Moto</label>
+                <select id="ed-moto" name="moto_id" [(ngModel)]="edicion.moto_id">
+                  <option *ngFor="let m of motosCliente" [ngValue]="m.id">{{ m.marca }} {{ m.modelo }}{{ m.placa ? ' · ' + m.placa : '' }}</option>
+                </select>
+              </div>
+              <div class="fg" *ngIf="sucursales.length > 1">
+                <label for="ed-sede">Sede</label>
+                <select id="ed-sede" name="sucursal_id" [(ngModel)]="edicion.sucursal_id">
+                  <option *ngFor="let s of sucursales" [ngValue]="s.id">{{ s.nombre }}</option>
+                </select>
+              </div>
+            </div>
+            <div class="fg">
+              <label for="ed-problema">Problema reportado *</label>
+              <textarea id="ed-problema" name="problema_reportado" rows="3" maxlength="2000" [(ngModel)]="edicion.problema_reportado"></textarea>
+            </div>
+            <div class="fg-row">
+              <div class="fg">
+                <label for="ed-prioridad">Prioridad</label>
+                <select id="ed-prioridad" name="prioridad" [(ngModel)]="edicion.prioridad">
+                  <option *ngFor="let p of prioridades" [ngValue]="p.v">{{ p.l }}</option>
+                </select>
+              </div>
+              <div class="fg">
+                <label for="ed-km">Kilometraje de ingreso</label>
+                <input id="ed-km" name="kilometraje_ingreso" type="number" min="0" inputmode="numeric" [(ngModel)]="edicion.kilometraje_ingreso" />
+              </div>
+            </div>
+            <div class="fg-row">
+              <div class="fg">
+                <label for="ed-comb">Nivel de combustible</label>
+                <select id="ed-comb" name="nivel_combustible" [(ngModel)]="edicion.nivel_combustible">
+                  <option *ngFor="let c of combustibles" [ngValue]="c.v">{{ c.l }}</option>
+                </select>
+              </div>
+              <div class="fg">
+                <label for="ed-fecha">Fecha estimada de entrega</label>
+                <input id="ed-fecha" name="fecha_estimada_entrega" type="date" [(ngModel)]="edicion.fecha_estimada_entrega" />
+              </div>
+            </div>
+            <div class="fg">
+              <label for="ed-acc">Accesorios entregados</label>
+              <textarea id="ed-acc" name="accesorios_entregados" rows="2" [(ngModel)]="edicion.accesorios_entregados"></textarea>
+            </div>
+            <div class="fg">
+              <label for="ed-fisico">Estado físico de la moto</label>
+              <textarea id="ed-fisico" name="estado_fisico" rows="2" [(ngModel)]="edicion.estado_fisico"></textarea>
+            </div>
+            <div class="ot-botones">
+              <button type="button" class="btn btn-ou" (click)="editando = false" [disabled]="guardandoEdicion">Cancelar</button>
+              <button type="button" class="btn btn-cr" (click)="guardarEdicion()" [disabled]="guardandoEdicion || !edicion.problema_reportado?.trim()">
+                {{ guardandoEdicion ? 'Guardando…' : 'Guardar cambios' }}
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Repuestos y costos -->
+        <section class="ot-card">
+          <div class="ot-card-cab">
+            <h2 class="ot-h2">{{ esTecnico ? 'Repuestos' : 'Repuestos y costos' }}</h2>
+            <button type="button" class="btn btn-ou btn-sm" *ngIf="editaRepuestos && !mostrarFormRepuesto" (click)="mostrarFormRepuesto = true">
+              <ion-icon name="add" aria-hidden="true"></ion-icon> Agregar repuesto
+            </button>
+            <button type="button" class="btn btn-ou btn-sm" *ngIf="pideRepuestos && !mostrarFormSolicitud" (click)="mostrarFormSolicitud = true">
+              <ion-icon name="add" aria-hidden="true"></ion-icon> Pedir repuestos
+            </button>
+          </div>
+
+          <!-- Agregar (recepción/admin) -->
+          <div class="ot-form-rep" *ngIf="mostrarFormRepuesto && !esTecnico">
+            <div class="fg ot-f-nombre">
+              <label for="rep-nombre">Repuesto</label>
+              <input id="rep-nombre" name="nombre" [(ngModel)]="nuevoRepuesto.nombre" (keyup.enter)="agregarRepuesto()" />
+            </div>
+            <div class="fg ot-f-cant">
+              <label for="rep-cant">Cant.</label>
+              <input id="rep-cant" name="cantidad" type="number" min="1" inputmode="numeric" [(ngModel)]="nuevoRepuesto.cantidad" />
+            </div>
+            <div class="fg ot-f-precio">
+              <label for="rep-precio">Precio unitario (₡)</label>
+              <input id="rep-precio" name="costo_unitario" type="number" min="0" inputmode="decimal" [(ngModel)]="nuevoRepuesto.costo_unitario" />
+            </div>
+            <div class="fg ot-f-estado">
+              <label for="rep-estado">Estado</label>
+              <select id="rep-estado" name="estado" [(ngModel)]="nuevoRepuesto.estado">
+                <option *ngFor="let e of estadosRepuesto" [ngValue]="e.valor" [disabled]="e.valor === 'solicitado'">{{ e.label }}</option>
+              </select>
+            </div>
+            <div class="ot-botones ot-f-botones">
+              <button type="button" class="btn btn-ou" (click)="mostrarFormRepuesto = false">Cancelar</button>
+              <button type="button" class="btn btn-cr" (click)="agregarRepuesto()" [disabled]="!nuevoRepuesto.nombre.trim()">Agregar</button>
+            </div>
+          </div>
+
+          <!-- Pedir (mecánico, sin precio): se arma la lista y va en un solo envío -->
+          <div class="ot-form-rep ot-form-sol" *ngIf="mostrarFormSolicitud && esTecnico">
+            <div class="fg ot-f-nombre">
+              <label for="sol-nombre">Repuesto</label>
+              <input id="sol-nombre" name="nombre" [(ngModel)]="nuevoRepuesto.nombre" (keyup.enter)="agregarALista()" />
+            </div>
+            <div class="fg ot-f-cant">
+              <label for="sol-cant">Cant.</label>
+              <input id="sol-cant" name="cantidad" type="number" min="1" inputmode="numeric" [(ngModel)]="nuevoRepuesto.cantidad" />
+            </div>
+            <div class="ot-f-mas">
+              <button type="button" class="btn btn-ou" (click)="agregarALista()" [disabled]="!nuevoRepuesto.nombre.trim()">
+                <ion-icon name="add" aria-hidden="true"></ion-icon> A la lista
+              </button>
+            </div>
+            <ul class="ot-sol-lista" *ngIf="listaSolicitud.length">
+              <li *ngFor="let p of listaSolicitud; let i = index">
+                <span>{{ p.nombre }}</span><span class="mono">×{{ p.cantidad }}</span>
+                <button type="button" class="ot-x" (click)="quitarDeLista(i)" [attr.aria-label]="'Quitar ' + p.nombre"><ion-icon name="close"></ion-icon></button>
+              </li>
+            </ul>
+            <div class="ot-botones ot-f-botones">
+              <button type="button" class="btn btn-ou" (click)="mostrarFormSolicitud = false">Cancelar</button>
+              <button type="button" class="btn btn-cr" (click)="enviarSolicitudes()" [disabled]="!listaSolicitud.length || enviandoSolicitud">
+                Enviar {{ listaSolicitud.length }} pieza{{ listaSolicitud.length !== 1 ? 's' : '' }} a recepción
+              </button>
+            </div>
+          </div>
+
+          <div class="ot-rep" [class.sin-precios]="esTecnico" [class.sin-acciones]="!esTecnico && !editaRepuestos" role="table" aria-label="Repuestos" *ngIf="repuestos.length">
+            <div class="ot-rep-fila ot-rep-titulos" role="row">
+              <span role="columnheader">Repuesto</span>
+              <span role="columnheader" class="c-cant">Cant.</span>
+              <span role="columnheader">Estado</span>
+              <span role="columnheader" class="c-num" *ngIf="!esTecnico">Unitario</span>
+              <span role="columnheader" class="c-num" *ngIf="!esTecnico">Total</span>
+              <span role="columnheader" class="c-acc" *ngIf="editaRepuestos"><span class="sr-only">Acciones</span></span>
+            </div>
+            <ng-container *ngFor="let r of repuestos">
+              <!-- Edición en línea (recepción/admin) -->
+              <div class="ot-rep-edit" *ngIf="editandoRepuesto?.id === r.id && editandoRepuesto as e; else filaRepuesto">
+                <div class="fg ot-f-nombre"><label [for]="'e-nom-' + r.id">Repuesto</label><input [id]="'e-nom-' + r.id" name="nombre" [(ngModel)]="e.nombre" /></div>
+                <div class="fg ot-f-cant"><label [for]="'e-cant-' + r.id">Cant.</label><input [id]="'e-cant-' + r.id" name="cantidad" type="number" min="1" [(ngModel)]="e.cantidad" /></div>
+                <div class="fg ot-f-precio"><label [for]="'e-pre-' + r.id">Precio unitario (₡)</label><input [id]="'e-pre-' + r.id" name="costo_unitario" type="number" min="0" [(ngModel)]="e.costo_unitario" /></div>
+                <div class="fg ot-f-estado">
+                  <label [for]="'e-est-' + r.id">Estado</label>
+                  <select [id]="'e-est-' + r.id" name="estado" [(ngModel)]="e.estado">
+                    <option *ngFor="let op of estadosRepuesto" [ngValue]="op.valor">{{ op.label }}</option>
+                  </select>
+                </div>
+                <div class="ot-botones ot-f-botones">
+                  <button type="button" class="btn btn-ou" (click)="cancelarEdicionRepuesto()">Cancelar</button>
+                  <button type="button" class="btn btn-cr" (click)="guardarEdicionRepuesto()" [disabled]="!e.nombre.trim()">Guardar</button>
+                </div>
+              </div>
+              <ng-template #filaRepuesto>
+                <div class="ot-rep-fila" role="row" [class.solicitado]="r.estado === 'solicitado'">
+                  <span role="cell" class="c-nombre">{{ r.nombre }} <span class="bg bg-cr" *ngIf="r.adicional">Adicional</span></span>
+                  <span role="cell" class="c-cant mono">×{{ r.cantidad }}</span>
+                  <span role="cell" class="c-estado"><span class="bg" [ngClass]="claseDeRepuesto(r.estado)">{{ estadoRepuestoLabel(r.estado) }}</span></span>
+                  <span role="cell" class="c-num c-unit mono" *ngIf="!esTecnico">₡{{ r.costo_unitario | number:'1.0-0' }}</span>
+                  <span role="cell" class="c-num c-total mono" *ngIf="!esTecnico">₡{{ r.cantidad * r.costo_unitario | number:'1.0-0' }}</span>
+                  <span role="cell" class="c-acc" *ngIf="editaRepuestos">
+                    <button type="button" class="btn btn-em btn-sm" *ngIf="r.estado !== 'disponible' && r.estado !== 'solicitado'" (click)="marcarDisponible(r)" title="Marcar que el repuesto ya está en el taller">
+                      <ion-icon name="checkmark" aria-hidden="true"></ion-icon> Llegó
+                    </button>
+                    <button type="button" class="btn btn-ou btn-sm" (click)="editarRepuesto(r)">{{ r.estado === 'solicitado' ? 'Cotizar' : 'Editar' }}</button>
+                    <button type="button" class="ot-x" (click)="eliminarRepuesto(r)" [attr.aria-label]="'Eliminar ' + r.nombre"><ion-icon name="trash-outline"></ion-icon></button>
+                  </span>
+                </div>
+              </ng-template>
+            </ng-container>
+          </div>
+          <p class="ot-vacio-fila" *ngIf="!repuestos.length">Sin repuestos registrados.</p>
+
+          <div class="ot-totales" *ngIf="!esTecnico">
+            <dl>
+              <dt>Repuestos</dt><dd class="mono">₡{{ totalRepuestos | number:'1.0-0' }}</dd>
+              <dt>Mano de obra</dt><dd class="mono">₡{{ orden.costo_mano_obra | number:'1.0-0' }}</dd>
+              <ng-container *ngIf="descuento > 0"><dt>Descuento</dt><dd class="mono">−₡{{ descuento | number:'1.0-0' }}</dd></ng-container>
+              <dt class="t-total">Total</dt><dd class="t-total">₡{{ totalOrden | number:'1.0-0' }}</dd>
+            </dl>
+          </div>
+          <p class="ot-aprobado" *ngIf="orden.aprobacion_cliente === 'aprobado'">
+            <ion-icon name="checkmark-circle" aria-hidden="true"></ion-icon>
+            <span *ngIf="!esTecnico && tieneAprobado">El cliente aprobó ₡{{ orden.total_aprobado | number:'1.0-0' }}<ng-container *ngIf="orden.fecha_aprobacion"> el {{ orden.fecha_aprobacion | date:'dd/MM, h:mm a' }}</ng-container>.</span>
+            <span *ngIf="esTecnico || !tieneAprobado">El cliente aprobó el presupuesto.</span>
+          </p>
+        </section>
+
+        <!-- Avances (los ve el cliente en el portal) -->
+        <section class="ot-card">
+          <div class="ot-card-cab">
+            <h2 class="ot-h2">Avances</h2>
+            <span class="ot-nota">Los ve el cliente en el portal</span>
+          </div>
+          <div class="ot-card-cuerpo">
+            <div class="ot-enviar">
+              <label class="sr-only" for="ot-avance">Nuevo avance</label>
+              <textarea id="ot-avance" name="nuevoAvance" rows="2" maxlength="2000" placeholder="Escribí qué se hizo…" [(ngModel)]="nuevoAvance"></textarea>
+              <button type="button" class="btn btn-ou" (click)="agregarAvance()" [disabled]="!nuevoAvance.trim()">Registrar</button>
+            </div>
+            <ul class="ot-avances" *ngIf="avances.length">
+              <li *ngFor="let a of avancesRecientes">
+                <span class="ot-av" aria-hidden="true">{{ iniciales(a.usuario_nombre) }}</span>
+                <div>
+                  <div class="ot-av-meta"><strong>{{ a.usuario_nombre }}</strong> · {{ a.created_at | date:'dd/MM/yy, h:mm a' }}</div>
+                  <p>{{ a.descripcion }}</p>
+                </div>
+              </li>
+            </ul>
+            <p class="ot-vacio-fila" *ngIf="!avances.length">Sin avances registrados.</p>
+          </div>
+        </section>
+
+        <!-- Fotos de evidencia -->
+        <section class="ot-card">
+          <div class="ot-card-cab ot-card-cab--wrap">
+            <h2 class="ot-h2">Fotos de evidencia</h2>
+            <div class="ot-tabs" role="tablist" aria-label="Tipo de foto">
+              <button type="button" role="tab" *ngFor="let t of tiposFoto" class="ot-tab" [class.on]="tipoFoto === t.valor"
+                      [attr.aria-selected]="tipoFoto === t.valor" (click)="elegirTipo(t.valor)">{{ t.label }} · {{ contarFotos(t.valor) }}</button>
+            </div>
+          </div>
+          <div class="ot-card-cuerpo">
+            <div class="adm-aviso am adm-aviso--interno" *ngIf="faltanFotosIngreso">
+              <ion-icon name="camera-outline" aria-hidden="true"></ion-icon>
+              <div><strong>Faltan las fotos de ingreso.</strong> Son el respaldo del taller si el cliente reclama un golpe o un rayón que ya traía.</div>
+            </div>
+            <input #fileInput type="file" accept="image/*" capture="environment" hidden (change)="onArchivoSeleccionado($event)" />
+            <div class="ot-fotos">
+              <div class="ot-foto" *ngFor="let f of fotosDelTipo">
+                <img [src]="f.url" (click)="verFoto(f)" [alt]="'Foto de ' + tipoFotoLabel.toLowerCase()" />
+                <button type="button" class="ot-foto-x" (click)="eliminarFoto(f)" aria-label="Eliminar foto"><ion-icon name="close"></ion-icon></button>
+              </div>
+              <button type="button" class="ot-foto-subir" *ngIf="subeFotos" (click)="fileInput.click()" [disabled]="subiendoFoto">
+                <ion-spinner *ngIf="subiendoFoto" name="crescent"></ion-spinner>
+                <ion-icon *ngIf="!subiendoFoto" name="camera-outline" aria-hidden="true"></ion-icon>
+                {{ subiendoFoto ? 'Subiendo…' : 'Subir foto de ' + tipoFotoLabel.toLowerCase() }}
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ═══ Columna lateral: entrega y contexto ═══ -->
+      <div class="ot-side">
+
+        <!-- Entrega: checklist que ayuda sin bloquear + el botón de entregar -->
+        <section class="ot-card ot-entrega" *ngIf="(orden.estado === 'lista_entrega' && auth.puede('ordenes.entregar')) || orden.estado === 'entregada'"
+                 [class.lista]="orden.estado === 'lista_entrega'">
+          <div class="ot-card-cab">
+            <h2 class="ot-h2">Entrega</h2>
+            <span class="ot-nota" *ngIf="estadoChecklist" role="status">{{ estadoChecklist }}</span>
+          </div>
+          <div class="ot-card-cuerpo">
+            <ng-container *ngIf="orden.estado === 'entregada'">
+              <p class="ot-entregada">
+                <ion-icon name="checkmark-circle" aria-hidden="true"></ion-icon>
+                Entregada<ng-container *ngIf="orden.fecha_entrega_real"> el {{ orden.fecha_entrega_real | date:'dd/MM/yy, h:mm a' }}</ng-container>
+              </p>
+              <dl class="ot-dl" *ngIf="!esTecnico">
+                <dt>Forma de pago</dt><dd>{{ metodoPagoLabel }}</dd>
+                <dt>Garantía</dt><dd>{{ orden.garantia_dias || 0 }} días</dd>
+                <ng-container *ngIf="orden.observaciones_finales"><dt>Observaciones</dt><dd>{{ orden.observaciones_finales }}</dd></ng-container>
+              </dl>
+            </ng-container>
+
+            <ng-container *ngIf="orden.estado === 'lista_entrega'">
+              <div class="ot-checks">
+                <ion-checkbox *ngFor="let c of checklistItems" labelPlacement="end" justify="start"
+                              [ngModel]="checklist[c.campo]" (ngModelChange)="marcarCheck(c.campo, $event)" [name]="c.campo">{{ c.label }}</ion-checkbox>
+              </div>
+              <div class="fg">
+                <label for="ot-check-obs">Observaciones de la revisión</label>
+                <textarea id="ot-check-obs" name="observaciones" rows="2" [(ngModel)]="checklist.observaciones" (blur)="guardarChecklist()"></textarea>
+              </div>
+            </ng-container>
+            <ng-container *ngIf="orden.estado === 'entregada'">
+              <ul class="ot-revisado" aria-label="Checklist de entrega">
+                <li *ngFor="let c of checklistItems" [class.no]="!checklist[c.campo]">
+                  <ion-icon [name]="checklist[c.campo] ? 'checkmark' : 'remove'" aria-hidden="true"></ion-icon>
+                  {{ c.label }}<span class="sr-only">{{ checklist[c.campo] ? ': sí' : ': no' }}</span>
+                </li>
+              </ul>
+              <p class="ot-sub2" *ngIf="checklist.observaciones">{{ checklist.observaciones }}</p>
+            </ng-container>
+            <p class="adm-aviso am adm-aviso--interno" *ngIf="orden.estado === 'lista_entrega' && faltantesEntrega.length">
+              <ion-icon name="list-outline" aria-hidden="true"></ion-icon>
+              <span>Falta: {{ faltantesEntrega.join(', ').toLowerCase() }}. Se puede entregar igual.</span>
+            </p>
+            <button type="button" class="btn btn-cr btn-block" *ngIf="orden.estado === 'lista_entrega' && puedeEntregar" (click)="entregar()">
+              <ion-icon name="checkmark-done-outline" aria-hidden="true"></ion-icon> Entregar al cliente · ₡{{ totalOrden | number:'1.0-0' }}
+            </button>
+          </div>
+        </section>
+
+        <!-- Cliente y moto -->
+        <section class="ot-card">
+          <div class="ot-card-cab"><h2 class="ot-h2">Cliente y moto</h2></div>
+          <div class="ot-card-cuerpo">
+            <div>
+              <div class="ot-nombre">{{ orden.cliente_nombre }} {{ orden.cliente_apellido }}</div>
+              <div class="ot-sub2" *ngIf="!esTecnico">
+                {{ orden.cliente_telefono || 'Sin teléfono' }}<ng-container *ngIf="orden.cliente_email"> · {{ orden.cliente_email }}</ng-container>
+              </div>
+            </div>
+            <div class="ot-par" *ngIf="orden.cliente_telefono && !esTecnico">
+              <a class="btn btn-ou" [href]="telefonoLlamar"><ion-icon name="call-outline" aria-hidden="true"></ion-icon> Llamar</a>
+              <button type="button" class="btn btn-ou" (click)="notificarWhatsApp()"><ion-icon name="logo-whatsapp" aria-hidden="true"></ion-icon> WhatsApp</button>
+            </div>
+            <hr class="ot-hr" />
+            <div>
+              <div class="ot-nombre ot-nombre--moto">{{ orden.marca }} {{ orden.modelo }}<ng-container *ngIf="orden.anio"> · {{ orden.anio }}</ng-container></div>
+              <div class="ot-sub2">
+                <ng-container *ngIf="orden.placa">Placa <span class="mono ot-fuerte">{{ orden.placa }}</span></ng-container>
+                <ng-container *ngIf="orden.color"> · {{ orden.color }}</ng-container>
+              </div>
+            </div>
+            <div class="ot-enlaces" *ngIf="!esTecnico">
+              <button type="button" class="ot-link" (click)="verCliente()">Ficha del cliente</button>
+              <button type="button" class="ot-link" (click)="verHistorialMoto()">Historial de la moto</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Asignación y tiempos -->
+        <section class="ot-card">
+          <div class="ot-card-cab"><h2 class="ot-h2">Asignación</h2></div>
+          <div class="ot-card-cuerpo">
+            <div class="fg ot-fg-pegado" *ngIf="puedeAsignar">
+              <label for="ot-mecanico">Mecánico</label>
+              <select id="ot-mecanico" name="tecnico_id" [ngModel]="orden.tecnico_id ?? null" (ngModelChange)="asignarTecnico($event)">
+                <option [ngValue]="null" disabled>Elegí un mecánico</option>
+                <option *ngFor="let t of tecnicos" [ngValue]="t.id">{{ t.nombre }}</option>
+              </select>
+            </div>
+            <dl class="ot-dl">
+              <ng-container *ngIf="!puedeAsignar"><dt>Mecánico</dt><dd>{{ orden.tecnico_nombre || 'Sin asignar' }}</dd></ng-container>
+              <ng-container *ngIf="orden.sucursal_nombre"><dt>Sede</dt><dd>{{ orden.sucursal_nombre }}</dd></ng-container>
+              <dt>Recibió</dt><dd>{{ orden.recepcionista_nombre || '—' }}</dd>
+              <dt>Tiempo total</dt><dd class="mono">{{ duracionTotal }}</dd>
+            </dl>
+            <button type="button" class="ot-link" *ngIf="tiempos.length" (click)="verEtapas = !verEtapas" [attr.aria-expanded]="verEtapas">
+              {{ verEtapas ? 'Ocultar el detalle por etapa' : 'Ver el detalle por etapa' }}
+            </button>
+            <ol class="ot-etapas" *ngIf="verEtapas">
+              <li *ngFor="let t of tiempos" [class.en-curso]="!t.fin">
+                <strong>{{ etapaLabel[t.etapa] || t.etapa }}</strong>
+                <span>{{ formatFecha(t.inicio) }} → {{ t.fin ? formatFecha(t.fin) : 'en curso' }}</span>
+                <span class="mono">{{ duracion(t.inicio, t.fin) }}</span>
+              </li>
+            </ol>
+          </div>
+        </section>
+
+        <!-- Mensajes internos de la orden (recepción/admin ↔ mecánico) -->
+        <section class="ot-card">
+          <div class="ot-card-cab"><h2 class="ot-h2">{{ esTecnico ? 'Mensajes con recepción' : 'Mensajes con el mecánico' }}</h2></div>
+          <div class="ot-card-cuerpo">
+            <div class="ot-msgs" *ngIf="mensajes.length">
+              <div class="ot-msg" *ngFor="let m of mensajes" [class.mio]="esMensajeMio(m)" [class.sistema]="m.tipo === 'sistema'">
+                <img *ngIf="m.foto" [src]="m.foto" class="ot-msg-img" alt="Foto adjunta" />
+                <p *ngIf="m.mensaje">{{ m.mensaje }}</p>
+                <span class="ot-msg-meta" *ngIf="m.tipo === 'sistema'">Aviso automático · {{ m.created_at | date:'dd/MM, h:mm a' }}</span>
+                <span class="ot-msg-meta" *ngIf="m.tipo !== 'sistema'">
+                  {{ esMensajeMio(m) ? 'Vos' : m.remitente_nombre }}
+                  · {{ m.remitente_rol === 'tecnico' ? 'Mecánico' : m.remitente_rol === 'admin' ? 'Admin' : 'Recepción' }}
+                  · {{ m.created_at | date:'dd/MM, h:mm a' }}
+                </span>
+              </div>
+            </div>
+            <p class="ot-vacio-fila" *ngIf="!mensajes.length">Sin mensajes sobre esta orden todavía.</p>
+            <div class="ot-enviar ot-enviar--linea">
+              <label class="sr-only" for="ot-msg">Mensaje</label>
+              <input id="ot-msg" type="text" name="nuevoMensaje" maxlength="1000" placeholder="Escribí un mensaje…" [(ngModel)]="nuevoMensaje" (keyup.enter)="enviarMensaje()" />
+              <button type="button" class="btn btn-ou" (click)="enviarMensaje()" [disabled]="enviandoMensaje || !nuevoMensaje.trim()" aria-label="Enviar mensaje">
+                <ion-icon name="send" aria-hidden="true"></ion-icon>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Calificación del cliente (cuando ya calificó) -->
+        <section class="ot-card" *ngIf="orden.estado === 'entregada' && orden.calificacion && !esTecnico">
+          <div class="ot-card-cab"><h2 class="ot-h2">Calificación del cliente</h2></div>
+          <div class="ot-card-cuerpo">
+            <div class="ot-estrellas" [attr.aria-label]="orden.calificacion + ' de 5 estrellas'">
+              <ion-icon *ngFor="let n of estrellas" [name]="n <= orden.calificacion! ? 'star' : 'star-outline'" [class.on]="n <= orden.calificacion!" aria-hidden="true"></ion-icon>
+              <span class="mono">{{ orden.calificacion }}/5</span>
+            </div>
+            <p class="ot-v" *ngIf="orden.comentario_satisfaccion">“{{ orden.comentario_satisfaccion }}”</p>
+            <p class="ot-v ot-vacio" *ngIf="!orden.comentario_satisfaccion">El cliente no dejó comentario.</p>
+          </div>
+        </section>
+
+        <!-- Garantía y reclamos -->
+        <section class="ot-card" *ngIf="orden.estado === 'entregada' && !esTecnico">
+          <div class="ot-card-cab">
+            <h2 class="ot-h2">Garantía</h2>
+            <button type="button" class="btn btn-rd btn-sm" *ngIf="!mostrarFormReclamo" (click)="mostrarFormReclamo = true">Registrar reclamo</button>
+          </div>
+          <div class="ot-card-cuerpo">
+            <p class="ot-garantia" [class.vigente]="garantiaVigente">
+              <ion-icon [name]="garantiaVigente ? 'shield-checkmark-outline' : 'shield-outline'" aria-hidden="true"></ion-icon>
+              <ng-container *ngIf="orden.garantia_dias && orden.garantia_dias > 0; else sinGarantia">
+                <span *ngIf="garantiaVigente"><strong>Vigente.</strong> {{ orden.garantia_dias }} días · quedan {{ diasGarantiaRestantes }}.</span>
+                <span *ngIf="!garantiaVigente"><strong>Vencida.</strong> {{ orden.garantia_dias }} días · venció hace {{ -(diasGarantiaRestantes || 0) }}.</span>
+              </ng-container>
+              <ng-template #sinGarantia><span><strong>Sin garantía.</strong> No se registró al entregar.</span></ng-template>
+            </p>
+
+            <div *ngIf="mostrarFormReclamo">
+              <div class="fg">
+                <label for="ot-reclamo">¿Qué problema presenta?</label>
+                <textarea id="ot-reclamo" name="descripcion_problema" rows="3" [(ngModel)]="nuevoReclamo.descripcion_problema"></textarea>
+              </div>
+              <div class="ot-checks ot-checks--compacto">
+                <ion-checkbox labelPlacement="end" justify="start" [(ngModel)]="nuevoReclamo.cubre_repuestos" name="cubre_repuestos">Cubre repuestos</ion-checkbox>
+                <ion-checkbox labelPlacement="end" justify="start" [(ngModel)]="nuevoReclamo.cubre_mano_obra" name="cubre_mano_obra">Cubre mano de obra</ion-checkbox>
+              </div>
+              <div class="ot-botones">
+                <button type="button" class="btn btn-ou" (click)="mostrarFormReclamo = false">Cancelar</button>
+                <button type="button" class="btn btn-cr" (click)="registrarReclamo()" [disabled]="!nuevoReclamo.descripcion_problema.trim()">Guardar reclamo</button>
+              </div>
+            </div>
+
+            <ul class="ot-reclamos" *ngIf="garantias.length">
+              <li *ngFor="let g of garantias">
+                <button type="button" (click)="irAGarantias()">
+                  <span class="ot-reclamo-txt">
+                    <strong>{{ g.descripcion_problema }}</strong>
+                    <span>{{ g.created_at | date:'dd/MM/yy' }}<ng-container *ngIf="g.cubre_repuestos"> · repuestos</ng-container><ng-container *ngIf="g.cubre_mano_obra"> · mano de obra</ng-container></span>
+                  </span>
+                  <span class="bg" [ngClass]="claseGarantia(g.estado)">{{ estadoGarantiaLabel(g.estado!) }}</span>
+                </button>
+              </li>
+            </ul>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- Celular: la acción principal queda fija abajo -->
+    <div class="ot-barra" *ngIf="accionPrincipal || otrosCambios.length">
+      <button type="button" class="btn btn-ou ot-barra-otros" *ngIf="otrosCambios.length && accionPrincipal" (click)="abrirOtros($event, 'top')"
+              [disabled]="cambiando" aria-label="Otro cambio de estado" aria-haspopup="menu">
+        <ion-icon name="ellipsis-horizontal" aria-hidden="true"></ion-icon>
+      </button>
+      <button type="button" class="btn btn-cr ot-barra-pri" *ngIf="accionPrincipal as a" (click)="ejecutar(a)" [disabled]="cambiando">
+        {{ a.texto }}
+      </button>
+      <button type="button" class="btn btn-ou ot-barra-pri" *ngIf="!accionPrincipal" (click)="abrirOtros($event, 'top')" [disabled]="cambiando" aria-haspopup="menu">
+        Cambiar estado <ion-icon name="chevron-up" aria-hidden="true"></ion-icon>
+      </button>
+    </div>
   </div>
+
+  <!-- Menús desplegables (Otro cambio / Más): uno solo, se llena según el botón -->
+  <ion-popover class="adm-menu-pop" [isOpen]="menu.abierto" [event]="menu.evento" (didDismiss)="menu.abierto = false" [side]="menu.lado" alignment="end">
+    <ng-template>
+      <div class="adm-menu" role="menu">
+        <button type="button" role="menuitem" *ngFor="let it of menu.items" class="adm-menu-it" [class.peligro]="it.peligro" (click)="elegirDelMenu(it)">
+          <ion-icon *ngIf="it.icono" [name]="it.icono" aria-hidden="true"></ion-icon>
+          {{ it.texto }}
+        </button>
+      </div>
+    </ng-template>
+  </ion-popover>
 </ion-content>
 
-<ion-content *ngIf="cargando">
+<ion-content class="admin-dark" *ngIf="cargando">
   <div class="ot">
-    <div style="text-align:center;padding:18px 8px">
-      <div class="skeleton skeleton-pill" style="margin:0 auto 14px"></div>
-      <div class="skeleton skeleton-line sk-50" style="height:22px;margin:0 auto 8px"></div>
-      <div class="skeleton skeleton-line sk-35" style="height:12px;margin:0 auto"></div>
-    </div>
-    <div class="skeleton" style="height:118px;margin-bottom:14px"></div>
-    <div class="skeleton" style="height:168px;margin-bottom:14px"></div>
-    <div class="skeleton" style="height:140px"></div>
+    <div class="skeleton" style="height:190px;margin-bottom:16px"></div>
+    <div class="skeleton" style="height:220px;margin-bottom:16px"></div>
+    <div class="skeleton" style="height:160px"></div>
   </div>
 </ion-content>

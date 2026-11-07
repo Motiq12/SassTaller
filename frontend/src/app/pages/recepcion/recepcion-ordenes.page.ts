@@ -1,11 +1,12 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { RecepcionService } from '../../services/recepcion.service';
-import { comprimirImagen } from '../../shared/utils/image.util';
-import { abrirWhatsApp } from '../../shared/utils/whatsapp.util';
+import { comprimirImagen } from '../../shared/image.util';
+import { abrirWhatsApp, motoDe } from '../../shared/whatsapp.util';
+import { MensajesService } from '../../services/mensajes.service';
 
 @Component({
   standalone: false,
@@ -14,10 +15,6 @@ import { abrirWhatsApp } from '../../shared/utils/whatsapp.util';
   styleUrls: ['./recepcion-ordenes.page.scss'],
 })
 export class RecepcionOrdenesPage implements OnInit, OnDestroy {
-  private rec = inject(RecepcionService);
-  private router = inject(Router);
-  private toast = inject(ToastController);
-
   private destroy$ = new Subject<void>();
   vista: 'activas' | 'completadas' = 'activas';
   ordenes: any[] = [];
@@ -71,7 +68,9 @@ export class RecepcionOrdenesPage implements OnInit, OnDestroy {
     cancelada: 'gris',
   };
 
-  ngOnInit() { this.cargar(); }
+  constructor(private rec: RecepcionService, private router: Router, private toast: ToastController, private mensajes: MensajesService) {}
+
+  ngOnInit() { this.mensajes.precargar(); this.cargar(); }
 
   // Abre el detalle completo de la orden (diagnóstico, costos, estados, tiempos).
   abrirDetalle(o: any) { this.router.navigate(['/detalle-orden', o.id]); }
@@ -194,7 +193,7 @@ export class RecepcionOrdenesPage implements OnInit, OnDestroy {
       if (!file) return;
       this.subiendo.add(o.id);
       try {
-        const url = await comprimirImagen(file, { maxLado: 1024, calidad: 0.7 });
+        const url = await comprimirImagen(file);
         this.rec.subirFoto(o.id, { url, tipo: 'avance' }).pipe(takeUntil(this.destroy$)).subscribe({
           next: r => {
             this.fotos[o.id] = [...(this.fotos[o.id] || []), r.data];
@@ -215,9 +214,7 @@ export class RecepcionOrdenesPage implements OnInit, OnDestroy {
   enviarAlCliente(o: any) {
     const link = `${window.location.origin}/portal`;
     const nota = (this.notas[o.id] || '').trim();
-    const base = `Hola ${o.cliente_nombre}, novedad de tu ${o.marca} ${o.modelo} (orden ${o.numero_orden}).`;
-    const cuerpo = nota ? ` ${nota}` : ' Te enviamos evidencias del avance.';
-    const msg = `${base}${cuerpo} Revisalas en el portal: ${link}`;
+    const msg = this.mensajes.armar('orden_avance', { nombre: o.cliente_nombre, moto: motoDe(o), orden: o.numero_orden, nota, portal: link });
     abrirWhatsApp(o.cliente_telefono, msg);
   }
 

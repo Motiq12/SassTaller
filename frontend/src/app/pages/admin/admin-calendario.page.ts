@@ -1,9 +1,11 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { AdminService } from '../../services/admin.service';
 
-interface Color { bg: string; fg: string; }
+// bg: el tinte; fg: el texto sobre el tinte (cambia con el tema); solido: el fondo de
+// la bolita de iniciales y de la leyenda, con texto blanco encima (oscuro siempre).
+interface Color { bg: string; fg: string; solido: string; }
 interface MecDia { tecnico_id: number | null; nombre: string; iniciales: string; n: number; color: Color; }
 interface DiaCal {
   dia: number | null;
@@ -20,19 +22,19 @@ interface DiaCal {
   styleUrls: ['./admin-calendario.page.scss'],
 })
 export class AdminCalendarioPage implements OnInit, OnDestroy {
-  private admin = inject(AdminService);
-
   private destroy$ = new Subject<void>();
   // Paleta de colores asignada por mecánico (cicla si hay más que colores).
   private readonly PALETA: Color[] = [
-    { bg: 'rgba(225, 29, 72, .15)', fg: '#E11D48' },
-    { bg: 'rgba(99, 102, 241, .15)', fg: '#6366F1' },
-    { bg: 'rgba(16, 185, 129, .15)', fg: '#10B981' },
-    { bg: 'rgba(245, 158, 11, .15)', fg: '#F59E0B' },
-    { bg: 'rgba(56, 189, 248, .15)', fg: '#38BDF8' },
-    { bg: 'rgba(168, 85, 247, .15)', fg: '#A855F7' },
+    // El texto usa el tono de cada color según el tema (variables --cal-*): los tonos
+    // medios de antes daban 3,2 a 3,8:1 sobre su propio tinte.
+    { bg: 'rgba(226, 35, 26, .15)', fg: 'var(--cal-1)', solido: '#c2201a' },
+    { bg: 'rgba(99, 102, 241, .15)', fg: 'var(--cal-2)', solido: '#4f46e5' },
+    { bg: 'rgba(16, 185, 129, .15)', fg: 'var(--cal-3)', solido: '#047857' },
+    { bg: 'rgba(245, 158, 11, .15)', fg: 'var(--cal-4)', solido: '#b45309' },
+    { bg: 'rgba(56, 189, 248, .15)', fg: 'var(--cal-5)', solido: '#0369a1' },
+    { bg: 'rgba(168, 85, 247, .15)', fg: 'var(--cal-6)', solido: '#7e22ce' },
   ];
-  private readonly NEUTRO: Color = { bg: 'rgba(163, 163, 163, .1)', fg: '#737373' };
+  private readonly NEUTRO: Color = { bg: 'rgba(163, 163, 163, .1)', fg: 'var(--cal-n)', solido: '#525252' };
   readonly dows = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
   readonly meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
@@ -47,6 +49,8 @@ export class AdminCalendarioPage implements OnInit, OnDestroy {
   diaSel: DiaCal | null = null;
 
   private colorPorTec = new Map<number, Color>();
+
+  constructor(private admin: AdminService) {}
 
   ngOnInit() { this.cargar(); }
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }

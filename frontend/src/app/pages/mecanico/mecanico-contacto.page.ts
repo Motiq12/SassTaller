@@ -12,6 +12,7 @@ import { ChatContacto } from '../../services/mensajeria.service';
 export class MecanicoContactoPage {
   chatAbierto: ChatContacto | null = null;
   verAvisos = false;
+  get enChat(): boolean { return !!this.chatAbierto || this.verAvisos; }
 
   abrirChat(c: ChatContacto) { this.chatAbierto = c; this.verAvisos = false; }
   cerrar() { this.chatAbierto = null; this.verAvisos = false; }

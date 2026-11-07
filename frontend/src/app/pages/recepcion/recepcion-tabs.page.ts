@@ -1,10 +1,9 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 import { Subject, interval } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { MensajeriaService } from '../../services/mensajeria.service';
-import { MarcaService } from '../../services/marca.service';
 
 @Component({
   standalone: false,
@@ -12,20 +11,21 @@ import { MarcaService } from '../../services/marca.service';
   templateUrl: './recepcion-tabs.page.html',
 })
 export class RecepcionTabsPage implements OnInit, OnDestroy {
-  private auth = inject(AuthService);
-  private router = inject(Router);
-  private msj = inject(MensajeriaService);
-  marca = inject(MarcaService);
-
   noLeidos = 0;
   private destroy$ = new Subject<void>();
 
+  constructor(private auth: AuthService, private router: Router, private msj: MensajeriaService) {}
+
   ngOnInit() {
+    // Las casillas de su rol, al día (si administración se las cambió, sin volver a entrar).
+    this.auth.refrescarUsuario().pipe(takeUntil(this.destroy$)).subscribe({ error: () => {} });
     this.consultarNoLeidos();
     interval(20000).pipe(takeUntil(this.destroy$)).subscribe(() => this.consultarNoLeidos());
   }
 
   private consultarNoLeidos() {
+    // Con la sesión cerrada o vencida no se pregunta: cada vez sería un rechazo.
+    if (!this.auth.isLoggedIn() || this.auth.isTokenExpired()) return;
     this.msj.getNoLeidos().pipe(takeUntil(this.destroy$)).subscribe({
       next: r => this.noLeidos = r.data.count,
     });

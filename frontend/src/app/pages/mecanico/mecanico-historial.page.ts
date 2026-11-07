@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -12,14 +12,16 @@ import { AuthService } from '../../services/auth.service';
   styleUrls: ['./mecanico.page.scss', './mecanico-historial.page.scss'],
 })
 export class MecanicoHistorialPage implements OnInit, OnDestroy {
-  private mecanico = inject(MecanicoService);
-  private auth = inject(AuthService);
-  private router = inject(Router);
-
   private destroy$ = new Subject<void>();
   acum: any = null;       // acumulado (de /perfil): completadas, ingresos, calificación
   citas: any[] = [];      // citas entregadas (más recientes primero)
   cargando = true;
+
+  constructor(
+    private mecanico: MecanicoService,
+    private auth: AuthService,
+    private router: Router,
+  ) {}
 
   ngOnInit() { this.cargar(); }
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }

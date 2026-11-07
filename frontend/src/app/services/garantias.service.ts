@@ -1,17 +1,17 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { limpiarParams } from '../shared/params.util';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { Garantia, GarantiaFoto, EstadoGarantia } from '../models/garantia.model';
 
 @Injectable({ providedIn: 'root' })
 export class GarantiasService {
-  private http = inject(HttpClient);
-
   private url = `${environment.apiUrl}/garantias`;
+  constructor(private http: HttpClient) {}
 
   getAll(params?: { estado?: string; orden_id?: number }): Observable<{ data: Garantia[] }> {
-    return this.http.get<{ data: Garantia[] }>(this.url, { params: params as any });
+    return this.http.get<{ data: Garantia[] }>(this.url, { params: limpiarParams(params) });
   }
 
   getById(id: number): Observable<{ data: Garantia }> {

@@ -2,73 +2,192 @@
   <ion-menu contentId="admin-content" type="overlay" class="admin-sidebar">
     <ion-content class="admin-dark sidebar-content">
       <div class="sb-logo">
-        <app-marca-logo [tamano]="44"></app-marca-logo>
-        <div class="sb-logo-txt">
-          <strong>{{ (marca.marca$ | async)?.nombre_taller }}</strong>
-          <span>Panel Administrativo</span>
-        </div>
+        <img class="sb-brand light-only" src="assets/logo/ms-logo.png" alt="MS Motos" />
+        <img class="sb-brand dark-only" src="assets/logo/ms-logo-white.png" alt="" />
+        <span class="sb-rotulo">{{ esAdmin ? 'Panel administrativo' : 'Sitio web' }}</span>
       </div>
 
+      <!-- El menú va en carpetas que se abren y cierran (cuáles quedan abiertas se
+           recuerda en este navegador). El botón de cada carpeta corta el clic con
+           stopPropagation: si no, ion-menu-toggle cerraría el menú en el celular. -->
       <ion-menu-toggle auto-hide="false">
         <nav class="sb-nav">
-          <div class="sb-section">Principal</div>
-          <a class="nav-item" routerLink="/admin/resumen" routerLinkActive="on">
-            <ion-icon name="grid-outline"></ion-icon> Resumen ejecutivo
-          </a>
-          <a class="nav-item" routerLink="/admin/citas" routerLinkActive="on">
-            <ion-icon name="calendar-outline"></ion-icon> Gestión de citas
-          </a>
-          <a class="nav-item" routerLink="/admin/calendario" routerLinkActive="on">
-            <ion-icon name="calendar-number-outline"></ion-icon> Calendario
-          </a>
+          <!-- Quien entra solo por la web (rol Contenido, o un empleado con permisos
+               web) ve únicamente esta sección; el admin la ve junto a todo lo demás. -->
+          <ng-container *ngIf="veWeb">
+            <button type="button" class="sb-carpeta" [class.actual]="actual('web')" (click)="alternar('web', $event)" [attr.aria-expanded]="abierta('web')">
+              <ion-icon name="globe-outline"></ion-icon>
+              <span class="sb-carpeta-txt">Sitio web</span>
+              <span class="nav-badge" *ngIf="!abierta('web') && (consultasWeb + resenasWeb + pendientesWeb) > 0">{{ consultasWeb + resenasWeb + pendientesWeb }}</span>
+              <ion-icon class="sb-chev" [class.abierta]="abierta('web')" name="chevron-forward"></ion-icon>
+            </button>
+            <div class="sb-carpeta-items" *ngIf="abierta('web')">
+              <a class="nav-item" routerLink="/admin/web/inicio" routerLinkActive="on">
+                <ion-icon name="globe-outline"></ion-icon> Inicio del sitio
+              </a>
+              <a class="nav-item" routerLink="/admin/web/catalogo" routerLinkActive="on">
+                <ion-icon name="bicycle-outline"></ion-icon> Catálogo de motos
+              </a>
+              <a class="nav-item" routerLink="/admin/web/promo" routerLinkActive="on">
+                <ion-icon name="megaphone-outline"></ion-icon> Promociones del inicio
+              </a>
+              <a class="nav-item" routerLink="/admin/web/ofertas" routerLinkActive="on">
+                <ion-icon name="pricetag-outline"></ion-icon> Ofertas
+              </a>
+              <a class="nav-item" routerLink="/admin/web/galeria" routerLinkActive="on" *ngIf="vePaginas">
+                <ion-icon name="images-outline"></ion-icon> Galería
+              </a>
+              <a class="nav-item" routerLink="/admin/web/preguntas" routerLinkActive="on" *ngIf="vePaginas">
+                <ion-icon name="help-circle-outline"></ion-icon> Preguntas frecuentes
+              </a>
+              <a class="nav-item" routerLink="/admin/web/nosotros" routerLinkActive="on" *ngIf="vePaginas">
+                <ion-icon name="people-outline"></ion-icon> Nosotros
+              </a>
+              <a class="nav-item" routerLink="/admin/web/servicios" routerLinkActive="on" *ngIf="veNegocio">
+                <ion-icon name="construct-outline"></ion-icon> Servicios en el sitio
+              </a>
+              <a class="nav-item" routerLink="/admin/web/negocio" routerLinkActive="on">
+                <ion-icon name="business-outline"></ion-icon> Datos del negocio
+              </a>
+              <a class="nav-item" routerLink="/admin/web/consultas" routerLinkActive="on" *ngIf="veConsultas">
+                <ion-icon name="mail-unread-outline"></ion-icon> Consultas del sitio
+                <span class="nav-badge" *ngIf="consultasWeb > 0" [attr.aria-label]="consultasWeb + ' consultas sin atender'">{{ consultasWeb }}</span>
+              </a>
+              <a class="nav-item" routerLink="/admin/web/resenas" routerLinkActive="on" *ngIf="veResenas">
+                <ion-icon name="star-outline"></ion-icon> Reseñas de clientes
+                <span class="nav-badge" *ngIf="resenasWeb > 0" [attr.aria-label]="resenasWeb + ' reseñas por revisar'">{{ resenasWeb }}</span>
+              </a>
+              <a class="nav-item" routerLink="/admin/web/publicar" routerLinkActive="on">
+                <ion-icon name="cloud-upload-outline"></ion-icon> Publicar cambios
+                <span class="nav-badge" *ngIf="pendientesWeb > 0" [attr.aria-label]="pendientesWeb + ' cambios sin publicar'">{{ pendientesWeb }}</span>
+              </a>
+            </div>
+          </ng-container>
 
-          <div class="sb-section">Equipo</div>
-          <a class="nav-item" routerLink="/admin/empleados" routerLinkActive="on">
-            <ion-icon name="people-outline"></ion-icon> Gestión de empleados
-          </a>
-          <a class="nav-item" routerLink="/admin/tareas" routerLinkActive="on">
-            <ion-icon name="checkmark-done-outline"></ion-icon> Asignar tareas
-          </a>
-          <a class="nav-item" routerLink="/admin/mensajes" routerLinkActive="on">
-            <ion-icon name="chatbubbles-outline"></ion-icon> Mensajes
-            <span class="nav-badge" *ngIf="noLeidos > 0">{{ noLeidos }}</span>
-          </a>
+          <ng-container *ngIf="esAdmin">
+            <a class="nav-item sb-suelto" routerLink="/admin/resumen" routerLinkActive="on">
+              <ion-icon name="grid-outline"></ion-icon> Resumen ejecutivo
+            </a>
 
-          <div class="sb-section">Análisis</div>
-          <a class="nav-item" routerLink="/admin/reportes" routerLinkActive="on">
-            <ion-icon name="bar-chart-outline"></ion-icon> Reportes
-          </a>
-          <a class="nav-item" routerLink="/admin/opiniones" routerLinkActive="on">
-            <ion-icon name="star-outline"></ion-icon> Opiniones
-          </a>
-          <a class="nav-item" routerLink="/admin/promos" routerLinkActive="on">
-            <ion-icon name="pricetags-outline"></ion-icon> Promociones
-          </a>
+            <button type="button" class="sb-carpeta" [class.actual]="actual('agenda')" (click)="alternar('agenda', $event)" [attr.aria-expanded]="abierta('agenda')">
+              <ion-icon name="calendar-outline"></ion-icon>
+              <span class="sb-carpeta-txt">Agenda</span>
+              <ion-icon class="sb-chev" [class.abierta]="abierta('agenda')" name="chevron-forward"></ion-icon>
+            </button>
+            <div class="sb-carpeta-items" *ngIf="abierta('agenda')">
+              <a class="nav-item" routerLink="/admin/recibir" [queryParams]="{ modo: 'agendar' }" routerLinkActive="on">
+                <ion-icon name="add-circle-outline"></ion-icon> Nueva cita u orden
+              </a>
+              <a class="nav-item" routerLink="/admin/citas" routerLinkActive="on">
+                <ion-icon name="calendar-outline"></ion-icon> Gestión de citas
+              </a>
+              <a class="nav-item" routerLink="/admin/calendario" routerLinkActive="on">
+                <ion-icon name="calendar-number-outline"></ion-icon> Calendario
+              </a>
+              <a class="nav-item" routerLink="/admin/config/bloqueos" routerLinkActive="on">
+                <ion-icon name="ban-outline"></ion-icon> Bloquear horario
+              </a>
+            </div>
 
-          <div class="sb-section">Operación</div>
-          <a class="nav-item" routerLink="/tabs/ordenes">
-            <ion-icon name="document-text-outline"></ion-icon> Órdenes de trabajo
-          </a>
-          <a class="nav-item" routerLink="/tabs/clientes">
-            <ion-icon name="people-outline"></ion-icon> Clientes
-          </a>
-          <a class="nav-item" routerLink="/admin/servicios" routerLinkActive="on">
-            <ion-icon name="construct-outline"></ion-icon> Servicios
-          </a>
-          <!-- Ruta admin-only que hasta ahora solo se alcanzaba escribiendo la URL. -->
-          <a class="nav-item" routerLink="/garantias" routerLinkActive="on">
-            <ion-icon name="shield-checkmark-outline"></ion-icon> Garantías
-          </a>
-          <a class="nav-item" routerLink="/admin/portal" routerLinkActive="on">
-            <ion-icon name="qr-code-outline"></ion-icon> Portal de clientes
-          </a>
+            <button type="button" class="sb-carpeta" [class.actual]="actual('equipo')" (click)="alternar('equipo', $event)" [attr.aria-expanded]="abierta('equipo')">
+              <ion-icon name="people-outline"></ion-icon>
+              <span class="sb-carpeta-txt">Equipo</span>
+              <span class="nav-badge" *ngIf="!abierta('equipo') && noLeidos > 0" [attr.aria-label]="noLeidos + ' mensajes sin leer'">{{ noLeidos }}</span>
+              <ion-icon class="sb-chev" [class.abierta]="abierta('equipo')" name="chevron-forward"></ion-icon>
+            </button>
+            <div class="sb-carpeta-items" *ngIf="abierta('equipo')">
+              <a class="nav-item" routerLink="/admin/empleados" routerLinkActive="on">
+                <ion-icon name="people-outline"></ion-icon> Gestión de empleados
+              </a>
+              <a class="nav-item" routerLink="/admin/roles" routerLinkActive="on">
+                <ion-icon name="key-outline"></ion-icon> Roles
+              </a>
+              <a class="nav-item" routerLink="/admin/tareas" routerLinkActive="on">
+                <ion-icon name="checkmark-done-outline"></ion-icon> Asignar tareas
+              </a>
+              <a class="nav-item" routerLink="/admin/mensajes" routerLinkActive="on">
+                <ion-icon name="chatbubbles-outline"></ion-icon> Mensajes
+                <span class="nav-badge" *ngIf="noLeidos > 0">{{ noLeidos }}</span>
+              </a>
+            </div>
 
-          <div class="sb-section">Sistema</div>
-          <a class="nav-item" routerLink="/admin/perfil" routerLinkActive="on">
-            <ion-icon name="person-circle-outline"></ion-icon> Mi perfil
-          </a>
-          <a class="nav-item" routerLink="/admin/config" routerLinkActive="on">
-            <ion-icon name="settings-outline"></ion-icon> Configuración
+            <button type="button" class="sb-carpeta" [class.actual]="actual('analisis')" (click)="alternar('analisis', $event)" [attr.aria-expanded]="abierta('analisis')">
+              <ion-icon name="analytics-outline"></ion-icon>
+              <span class="sb-carpeta-txt">Análisis</span>
+              <ion-icon class="sb-chev" [class.abierta]="abierta('analisis')" name="chevron-forward"></ion-icon>
+            </button>
+            <div class="sb-carpeta-items" *ngIf="abierta('analisis')">
+              <a class="nav-item" routerLink="/admin/reportes" routerLinkActive="on">
+                <ion-icon name="bar-chart-outline"></ion-icon> Reportes
+              </a>
+              <a class="nav-item" routerLink="/admin/opiniones" routerLinkActive="on">
+                <ion-icon name="star-outline"></ion-icon> Opiniones
+              </a>
+              <a class="nav-item" routerLink="/admin/promos" routerLinkActive="on">
+                <ion-icon name="pricetags-outline"></ion-icon> Promociones
+              </a>
+            </div>
+
+            <button type="button" class="sb-carpeta" [class.actual]="actual('operacion')" (click)="alternar('operacion', $event)" [attr.aria-expanded]="abierta('operacion')">
+              <ion-icon name="construct-outline"></ion-icon>
+              <span class="sb-carpeta-txt">Operación</span>
+              <ion-icon class="sb-chev" [class.abierta]="abierta('operacion')" name="chevron-forward"></ion-icon>
+            </button>
+            <div class="sb-carpeta-items" *ngIf="abierta('operacion')">
+              <a class="nav-item" routerLink="/admin/clientes" routerLinkActive="on">
+                <ion-icon name="people-outline"></ion-icon> Clientes
+              </a>
+              <a class="nav-item" routerLink="/admin/servicios" routerLinkActive="on">
+                <ion-icon name="construct-outline"></ion-icon> Servicios
+              </a>
+              <!-- Órdenes, clientes y garantías se abren dentro del panel (shared/ruta-panel.ts). -->
+              <a class="nav-item" routerLink="/admin/garantias" routerLinkActive="on">
+                <ion-icon name="shield-checkmark-outline"></ion-icon> Garantías
+              </a>
+            </div>
+
+            <button type="button" class="sb-carpeta" [class.actual]="actual('config')" (click)="alternar('config', $event)" [attr.aria-expanded]="abierta('config')">
+              <ion-icon name="settings-outline"></ion-icon>
+              <span class="sb-carpeta-txt">Configuración</span>
+              <ion-icon class="sb-chev" [class.abierta]="abierta('config')" name="chevron-forward"></ion-icon>
+            </button>
+            <div class="sb-carpeta-items" *ngIf="abierta('config')">
+              <a class="nav-item" routerLink="/admin/config/taller" routerLinkActive="on">
+                <ion-icon name="storefront-outline"></ion-icon> Información del taller
+              </a>
+              <a class="nav-item" routerLink="/admin/config/horario" routerLinkActive="on">
+                <ion-icon name="time-outline"></ion-icon> Horario y capacidad
+              </a>
+              <a class="nav-item" routerLink="/admin/config/sucursales" routerLinkActive="on">
+                <ion-icon name="location-outline"></ion-icon> Sucursales
+              </a>
+              <a class="nav-item" routerLink="/admin/config/entrega" routerLinkActive="on">
+                <ion-icon name="cash-outline"></ion-icon> Entrega y cobro
+              </a>
+              <a class="nav-item" routerLink="/admin/config/notificaciones" routerLinkActive="on">
+                <ion-icon name="notifications-outline"></ion-icon> Notificaciones
+              </a>
+              <a class="nav-item" routerLink="/admin/config/mensajes" routerLinkActive="on">
+                <ion-icon name="chatbox-ellipses-outline"></ion-icon> Mensajes al cliente
+              </a>
+              <a class="nav-item" routerLink="/admin/config/portal" routerLinkActive="on">
+                <ion-icon name="phone-portrait-outline"></ion-icon> Textos del portal
+              </a>
+              <a class="nav-item" routerLink="/admin/config/correo" routerLinkActive="on">
+                <ion-icon name="mail-outline"></ion-icon> Correo de envío
+              </a>
+              <a class="nav-item" routerLink="/admin/config/respaldos" routerLinkActive="on">
+                <ion-icon name="server-outline"></ion-icon> Respaldos
+              </a>
+              <a class="nav-item" routerLink="/admin/config/seguridad" routerLinkActive="on">
+                <ion-icon name="shield-half-outline"></ion-icon> Seguridad
+              </a>
+            </div>
+
+          </ng-container>
+          <!-- Para todos los que entran al panel, tengan el rol que tengan. -->
+          <a class="nav-item nav-item--web" *ngIf="sitioWebActivo" [href]="sitioWeb">
+            <ion-icon name="globe-outline"></ion-icon> Volver al sitio web
           </a>
         </nav>
       </ion-menu-toggle>
@@ -76,9 +195,15 @@
 
     <ion-footer class="admin-dark">
       <div class="sb-user">
-        <div class="sb-av">{{ iniciales }}</div>
-        <div class="sb-info"><strong>{{ nombre }}</strong><span>{{ rolLabel }}</span></div>
-        <button class="sb-logout" (click)="logout()" title="Cerrar sesión"><ion-icon name="log-out-outline"></ion-icon></button>
+        <!-- Tocar la persona abre su perfil (antes era "Mi perfil" en el menú). -->
+        <ion-menu-toggle auto-hide="false" class="sb-perfil-toggle">
+          <a class="sb-perfil" routerLink="/admin/perfil" routerLinkActive="on" title="Mi perfil" aria-label="Mi perfil">
+            <div class="sb-av"><img *ngIf="foto; else sbIni" [src]="foto" alt="" /><ng-template #sbIni>{{ iniciales }}</ng-template></div>
+            <div class="sb-info"><strong>{{ nombre }}</strong><span>{{ rolLabel }}</span></div>
+            <ion-icon name="chevron-forward" class="sb-perfil-chev" aria-hidden="true"></ion-icon>
+          </a>
+        </ion-menu-toggle>
+        <button class="sb-logout" (click)="logout()" title="Cerrar sesión" aria-label="Cerrar sesión"><ion-icon name="log-out-outline"></ion-icon></button>
       </div>
     </ion-footer>
   </ion-menu>

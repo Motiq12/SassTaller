@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { AlertController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -13,11 +13,6 @@ import { Usuario } from '../../models/usuario.model';
   styleUrls: ['./admin-tareas.page.scss'],
 })
 export class AdminTareasPage implements OnInit, OnDestroy {
-  private admin = inject(AdminService);
-  private usuarios = inject(UsuariosService);
-  private toast = inject(ToastController);
-  private alert = inject(AlertController);
-
   private destroy$ = new Subject<void>();
   tareas: any[] = [];
   tecnicos: Usuario[] = [];
@@ -40,6 +35,11 @@ export class AdminTareasPage implements OnInit, OnDestroy {
     { v: 'baja', l: 'Baja' }, { v: 'normal', l: 'Normal' }, { v: 'alta', l: 'Alta' }, { v: 'urgente', l: 'Urgente' },
   ];
   readonly prioBadge: Record<string, string> = { baja: 'bg-n', normal: 'bg-in', alta: 'bg-am', urgente: 'bg-rd' };
+
+  constructor(
+    private admin: AdminService, private usuarios: UsuariosService,
+    private toast: ToastController, private alert: AlertController,
+  ) {}
 
   ngOnInit() {
     this.usuarios.getAll().pipe(takeUntil(this.destroy$)).subscribe({

@@ -1,15 +1,16 @@
+// Estándar de diseño: colores del panel (.admin-dark en global.scss), que siguen el tema.
 .citas { max-width: 760px; margin: 0 auto; padding: 12px 16px 0; }
 
 /* Segment */
 .segment {
-  display: flex; border-radius: 14px; overflow: hidden;
-  background: var(--n-100); border: 1px solid var(--hairline); margin-bottom: 16px;
+  display: flex; border-radius: 2px; overflow: hidden;
+  background: var(--sur2); border: 1px solid var(--bd); margin-bottom: 16px;
   .seg-btn {
     flex: 1; padding: 11px 0; border: none; background: none; cursor: pointer;
-    font-family: inherit; font-size: 14px; font-weight: 700; color: var(--n-500);
-    transition: all .2s;
-    &.on { background: var(--ion-color-primary); color: #fff; border-radius: 12px;
-      box-shadow: 0 2px 10px rgba(var(--ion-color-primary-rgb), .3); }
+    font-family: inherit; font-size: 14px; font-weight: 700; color: var(--tx3);
+    transition: background-color .2s, border-color .2s, color .2s, box-shadow .2s, transform .2s, opacity .2s;
+    &.on { background: var(--ion-color-primary); color: #fff; border-radius: 2px;
+      box-shadow: 0 2px 10px rgba(226, 35, 26, .3); }
   }
 }
 
@@ -17,54 +18,54 @@
 .filtros { margin-bottom: 14px; }
 .buscador {
   display: flex; align-items: center; gap: 10px;
-  background: var(--ion-card-background); border: 1px solid var(--hairline);
-  border-radius: 14px; padding: 11px 16px; transition: border-color .2s;
-  &:focus-within { border-color: rgba(var(--ion-color-primary-rgb), .3); }
-  > ion-icon { font-size: 18px; color: var(--n-400); flex-shrink: 0; }
-  input { flex: 1; border: none; outline: none; background: none; color: var(--ion-text-color);
+  background: var(--sur); border: 1px solid var(--bd);
+  border-radius: 2px; padding: 11px 16px; transition: border-color .2s;
+  &:focus-within { border-color: rgba(226, 35, 26, .3); }
+  > ion-icon { font-size: 18px; color: var(--tx3); flex-shrink: 0; }
+  input { flex: 1; border: none; outline: none; background: none; color: var(--tx);
     font-family: inherit; font-size: 14px;
-    &::placeholder { color: var(--n-500); } }
-  .bx { background: none; border: none; padding: 0; cursor: pointer; color: var(--n-400); display: flex;
+    &::placeholder { color: var(--tx3); } }
+  .bx { background: none; border: none; padding: 0; cursor: pointer; color: var(--tx3); display: flex;
     ion-icon { font-size: 18px; } }
 }
 .chips { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
 .chip {
-  border: 1px solid var(--hairline); background: var(--ion-card-background); cursor: pointer;
-  border-radius: 999px; padding: 7px 14px;
-  font-family: inherit; font-size: 12px; font-weight: 700; color: var(--n-500);
-  transition: all .2s;
+  border: 1px solid var(--bd); background: var(--sur); cursor: pointer;
+  border-radius: 2px; padding: 7px 14px;
+  font-family: inherit; font-size: 12px; font-weight: 700; color: var(--tx3);
+  transition: background-color .2s, border-color .2s, color .2s, box-shadow .2s, transform .2s, opacity .2s;
   &.on { background: var(--ion-color-primary); color: #fff; border-color: transparent;
-    box-shadow: 0 2px 8px rgba(var(--ion-color-primary-rgb), .2); }
+    box-shadow: 0 2px 8px rgba(226, 35, 26, .2); }
   &:active { transform: scale(.96); }
 }
 
 /* Tarjeta de cita */
 .cita-card {
-  background: var(--ion-card-background); border: 1px solid var(--hairline);
-  border-radius: 22px; box-shadow: var(--shadow-sm); padding: 0; margin-bottom: 14px;
+  background: var(--sur); border: 1px solid var(--bd);
+  border-radius: 8px; padding: 0; margin-bottom: 14px;
   overflow: hidden; transition: border-color .2s, box-shadow .2s;
-  &:hover { border-color: rgba(var(--ion-color-primary-rgb), .12); box-shadow: 0 4px 20px rgba(0, 0, 0, .1); }
+  &:hover { border-color: rgba(226, 35, 26, .12); box-shadow: 0 4px 20px rgba(0, 0, 0, .1); }
   &.cancelada { opacity: .55; }
 
   .cita-head {
     display: flex; align-items: center; justify-content: space-between; gap: 8px;
     padding: 18px 18px 0;
-    h4 { margin: 0; font-size: 16px; font-weight: 800; letter-spacing: -.01em; }
+    h4 { margin: 0; font-size: 16px; font-weight: 800; letter-spacing: 0; }
     .head-tags { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
   }
 
   .cita-info {
     margin: 6px 0 0; padding: 0 18px;
-    font-size: 13px; color: var(--n-500); line-height: 1.4;
+    font-size: 13px; color: var(--tx3); line-height: 1.4;
   }
   .cita-suc {
     margin: 5px 0 0; padding: 0 18px;
-    font-size: 12.5px; color: var(--n-500); display: flex; align-items: center; gap: 5px;
-    ion-icon { font-size: 14px; color: var(--ion-color-primary); }
+    font-size: 12.5px; color: var(--tx3); display: flex; align-items: center; gap: 5px;
+    ion-icon { font-size: 14px; color: var(--cr-tx); }
   }
   .cita-tec {
     margin: 8px 0 0; padding: 0 18px;
-    font-size: 12.5px; color: var(--n-500); display: flex; align-items: center; gap: 5px;
+    font-size: 12.5px; color: var(--tx3); display: flex; align-items: center; gap: 5px;
     ion-icon { font-size: 14px; }
   }
 }
@@ -73,8 +74,8 @@
 .presu-aviso {
   width: calc(100% - 36px); margin: 12px 18px 0; padding: 11px 14px; cursor: pointer;
   display: flex; align-items: center; gap: 8px;
-  border: 1px solid rgba(245, 158, 11, .2); border-radius: 14px;
-  background: rgba(245, 158, 11, .08); color: var(--amber-700);
+  border: 1px solid rgba(245, 158, 11, .2); border-radius: 2px;
+  background: rgba(245, 158, 11, .08); color: var(--am);
   font-family: inherit; font-size: 12.5px; font-weight: 700; text-align: left;
   span { flex: 1; }
   ion-icon { font-size: 16px; } .chev { font-size: 14px; opacity: .7; }
@@ -83,19 +84,19 @@
 
 /* Progreso */
 .prog { margin: 14px 18px 0; }
-.pr-t { height: 5px; border-radius: 999px; background: var(--n-200); overflow: hidden; }
+.pr-t { height: 5px; border-radius: 2px; background: var(--bd); overflow: hidden; }
 .pr-f {
-  height: 100%; border-radius: 999px;
-  background: linear-gradient(90deg, var(--ion-color-primary), var(--ion-color-primary-tint));
+  height: 100%; border-radius: 2px;
+  background: linear-gradient(90deg, var(--ion-color-primary), #f24a3d);
   transition: width .5s cubic-bezier(.4, 0, .2, 1);
 }
-.pr-l { font-size: 11px; color: var(--n-400); margin-top: 4px; font-weight: 600; }
+.pr-l { font-size: 11px; color: var(--tx3); margin-top: 4px; font-weight: 600; }
 
 /* Confirmar asistencia */
 .confirmar-btn {
   width: calc(100% - 36px); margin: 12px 18px 0; padding: 11px 12px; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  border: none; border-radius: 14px;
+  border: none; border-radius: 2px;
   background: rgba(16, 185, 129, .1); color: #10B981;
   font-family: inherit; font-size: 13px; font-weight: 800;
   transition: background .2s;
@@ -105,7 +106,7 @@
   &:disabled { opacity: .5; }
 }
 .confirmada-chip {
-  margin: 12px 18px 0; padding: 10px 12px; border-radius: 14px;
+  margin: 12px 18px 0; padding: 10px 12px; border-radius: 2px;
   display: inline-flex; align-items: center; gap: 6px; width: calc(100% - 36px); justify-content: center;
   background: rgba(16, 185, 129, .1); color: #10B981; font-size: 12.5px; font-weight: 700;
   ion-icon { font-size: 16px; }
@@ -115,35 +116,35 @@
 .ver-detalle {
   width: 100%; margin-top: 14px; padding: 13px 18px; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  border: none; border-top: 1px solid var(--hairline); border-radius: 0;
+  border: none; border-top: 1px solid var(--bd); border-radius: 0;
   background: transparent;
-  font-family: inherit; font-size: 13px; font-weight: 700; color: var(--text-accent);
+  font-family: inherit; font-size: 13px; font-weight: 700; color: var(--cr-tx);
   transition: background .2s;
   ion-icon { font-size: 16px; }
-  &:hover { background: rgba(var(--ion-color-primary-rgb), .04); }
-  &:active { background: rgba(var(--ion-color-primary-rgb), .08); }
+  &:hover { background: rgba(226, 35, 26, .04); }
+  &:active { background: rgba(226, 35, 26, .08); }
 }
 
 /* Total pagado */
 .tp {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   background: rgba(16, 185, 129, .08); border: 1px solid rgba(16, 185, 129, .15);
-  border-radius: 16px; padding: 14px 18px; margin-bottom: 16px;
+  border-radius: 2px; padding: 14px 18px; margin-bottom: 16px;
   span { font-size: 13px; font-weight: 600; color: #10B981; }
   strong { font-size: 24px; font-weight: 800; font-family: var(--font-display); color: #10B981; }
 }
 
 /* Acciones de historial */
 .actions {
-  display: flex; gap: 8px; padding: 14px 18px 18px; border-top: 1px solid var(--hairline);
+  display: flex; gap: 8px; padding: 14px 18px 18px; border-top: 1px solid var(--bd);
   margin-top: 14px; flex-wrap: wrap; align-items: center;
   button {
     flex: 1; min-width: 110px; padding: 10px 14px; cursor: pointer;
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-    border: 1px solid var(--hairline); border-radius: 12px; background: transparent;
-    font-family: inherit; font-size: 12px; font-weight: 700; color: var(--ion-text-color);
-    transition: all .2s; ion-icon { font-size: 16px; }
-    &:hover { border-color: rgba(var(--ion-color-primary-rgb), .15); }
+    border: 1px solid var(--bd); border-radius: 2px; background: transparent;
+    font-family: inherit; font-size: 12px; font-weight: 700; color: var(--tx);
+    transition: background-color .2s, border-color .2s, color .2s, box-shadow .2s, transform .2s, opacity .2s; ion-icon { font-size: 16px; }
+    &:hover { border-color: rgba(226, 35, 26, .15); }
     &:active { transform: scale(.97); }
     &.btn-calif { background: rgba(245, 158, 11, .1); color: #F59E0B;
       border: 1px solid rgba(245, 158, 11, .15);
@@ -154,7 +155,7 @@
 
 /* Badge de proximidad */
 .prox-badge {
-  font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 999px;
+  font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 2px;
   &.pb-green { background: rgba(16, 185, 129, .12); color: #10B981; }
   &.pb-amber { background: rgba(245, 158, 11, .12); color: #F59E0B; }
   &.pb-red { background: rgba(239, 68, 68, .12); color: #EF4444; }
@@ -162,17 +163,28 @@
 
 /* Empty state */
 .empty-state {
-  text-align: center; padding: 56px 24px; color: var(--n-400);
+  text-align: center; padding: 56px 24px; color: var(--tx3);
   ion-icon { font-size: 56px; opacity: .3; display: block; margin: 0 auto 14px; }
   p { font-size: 14px; margin: 0 0 16px; line-height: 1.5; }
   .empty-cta {
     display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
-    padding: 12px 22px; border-radius: 14px; border: none;
+    padding: 12px 22px; border-radius: 2px; border: none;
     background: var(--ion-color-primary); color: #fff;
     font-family: inherit; font-size: 13.5px; font-weight: 700;
-    box-shadow: 0 4px 14px rgba(var(--ion-color-primary-rgb), .2);
+    box-shadow: 0 4px 14px rgba(226, 35, 26, .2);
     ion-icon { font-size: 17px; }
     &:active { transform: scale(.97); }
-    &.ghost { background: none; border: 1.5px solid var(--hairline); color: var(--text-accent); box-shadow: none; }
+    &.ghost { background: none; border: 1.5px solid var(--bd); color: var(--cr-tx); box-shadow: none; }
+  }
+}
+
+/* Escritorio: las citas en dos columnas; los filtros no se estiran. */
+@media (min-width: 1200px) {
+  .citas { max-width: 1120px; padding: 20px 32px 0; }
+  .segment, .buscador { max-width: 460px; }
+  .lista {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 16px; align-items: start;
+    > .empty-state, > .tp { grid-column: 1 / -1; }
   }
 }

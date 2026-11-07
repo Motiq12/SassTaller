@@ -1,11 +1,13 @@
-import { Component, EventEmitter, Input, OnChanges, OnDestroy, OnInit, Output, inject } from '@angular/core';
+import { Component, ElementRef, EventEmitter, Input, OnChanges, OnDestroy, OnInit, Output, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
-import { IonContent, ToastController } from '@ionic/angular';
+import { rutaPanel } from '../ruta-panel';
+import { ToastController } from '@ionic/angular';
 import { Subject, interval } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { MensajeriaService, ChatContacto } from '../../services/mensajeria.service';
 import { AuthService } from '../../services/auth.service';
-import { abrirWhatsApp } from '../utils/whatsapp.util';
+import { abrirWhatsApp } from '../whatsapp.util';
+import { hoyCR, sumarDias, diaTaller } from '../../utils/fecha-cita';
 
 // Hilo de conversación 1:1 (o feed de Avisos del taller con modo="avisos").
 // Burbujas, separadores por día, acuse ✓/✓✓, foto y chip de orden. Lo usan los 3 roles.
@@ -16,16 +18,12 @@ import { abrirWhatsApp } from '../utils/whatsapp.util';
   styleUrls: ['./chat-hilo.component.scss'],
 })
 export class ChatHiloComponent implements OnInit, OnChanges, OnDestroy {
-  private msj = inject(MensajeriaService);
-  private auth = inject(AuthService);
-  private router = inject(Router);
-  private toast = inject(ToastController);
-  private content = inject(IonContent, { optional: true });
-
   private destroy$ = new Subject<void>();
   @Input() contacto: ChatContacto | null = null;
   @Input() modo: 'dm' | 'avisos' = 'dm';
   @Output() volver = new EventEmitter<void>();
+  // La zona de los mensajes es la que se desplaza (no la página que contiene el chat).
+  @ViewChild('zonaMensajes') zonaMensajes?: ElementRef<HTMLElement>;
 
   mensajes: any[] = [];
   cargando = true;
@@ -47,9 +45,16 @@ export class ChatHiloComponent implements OnInit, OnChanges, OnDestroy {
     'Listo para entregar',
     'Necesito repuesto',
     'Esperando aprobación del cliente',
-    'Vehiculo lista para prueba',
-    'Necesito ayuda con esta vehiculo',
+    'Moto lista para prueba',
+    'Necesito ayuda con esta moto',
   ];
+
+  constructor(
+    private msj: MensajeriaService,
+    private auth: AuthService,
+    private router: Router,
+    private toast: ToastController,
+  ) {}
 
   ngOnInit() {
     this.cargar();
@@ -161,7 +166,7 @@ export class ChatHiloComponent implements OnInit, OnChanges, OnDestroy {
   quitarFoto() { this.fotoPreview = null; }
 
   esMio(m: any): boolean { return m.remitente_id === this.miId; }
-  abrirOrden(id: number) { if (id) this.router.navigate(['/detalle-orden', id]); }
+  abrirOrden(id: number) { if (id) this.router.navigate([rutaPanel(this.router, '/detalle-orden'), id]); }
   whatsapp() { if (this.contacto?.telefono) abrirWhatsApp(this.contacto.telefono, ''); }
 
   iniciales(nombre?: string): string {
@@ -169,7 +174,12 @@ export class ChatHiloComponent implements OnInit, OnChanges, OnDestroy {
     return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase();
   }
 
-  private scrollAbajo() { setTimeout(() => this.content?.scrollToBottom(150), 80); }
+  private scrollAbajo() {
+    setTimeout(() => {
+      const el = this.zonaMensajes?.nativeElement;
+      if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    }, 80);
+  }
 
   mostrarSeparador(i: number): boolean {
     if (i === 0) return true;
@@ -178,9 +188,9 @@ export class ChatHiloComponent implements OnInit, OnChanges, OnDestroy {
 
   etiquetaDia(fecha: string): string {
     if (!fecha) return '';
-    const hoy = new Date().toISOString().slice(0, 10);
-    const ayer = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-    const d = fecha.slice(0, 10);
+    const hoy = hoyCR();
+    const ayer = sumarDias(hoy, -1);
+    const d = diaTaller(fecha);
     if (d === hoy) return 'Hoy';
     if (d === ayer) return 'Ayer';
     return new Date(fecha).toLocaleDateString('es-CR', { day: 'numeric', month: 'short' });

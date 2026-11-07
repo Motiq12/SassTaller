@@ -1,5 +1,6 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { limpiarParams } from '../shared/params.util';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 
@@ -16,16 +17,15 @@ export interface ResumenMecanico {
 
 @Injectable({ providedIn: 'root' })
 export class MecanicoService {
-  private http = inject(HttpClient);
-
   private url = `${environment.apiUrl}/mecanico`;
+  constructor(private http: HttpClient) {}
 
   getResumen(): Observable<{ data: ResumenMecanico }> {
     return this.http.get<{ data: ResumenMecanico }>(`${this.url}/resumen`);
   }
 
   getCitas(params?: { fecha?: string; estado?: string }): Observable<{ data: any[] }> {
-    return this.http.get<{ data: any[] }>(`${this.url}/citas`, { params: params as any });
+    return this.http.get<{ data: any[] }>(`${this.url}/citas`, { params: limpiarParams(params) });
   }
 
   getAgenda(desde: string, hasta: string): Observable<{ data: any[] }> {
@@ -70,9 +70,10 @@ export class MecanicoService {
     return this.http.get<{ data: any[] }>(`${this.url}/alertas`);
   }
 
-  // Solicitar repuestos (sin precio)
-  solicitarRepuesto(ordenId: number, nombre: string, cantidad: number): Observable<{ data: any }> {
-    return this.http.post<{ data: any }>(`${this.url}/ordenes/${ordenId}/repuestos`, { nombre, cantidad });
+  // Solicitar repuestos (sin precio). La lista va en un solo pedido: o quedan todas o
+  // ninguna, así reintentar después de un error no duplica piezas.
+  solicitarRepuestos(ordenId: number, piezas: { nombre: string; cantidad: number }[]): Observable<{ data: any[]; message: string }> {
+    return this.http.post<{ data: any[]; message: string }>(`${this.url}/ordenes/${ordenId}/repuestos`, { piezas });
   }
 
   // Perfil

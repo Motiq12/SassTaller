@@ -2,11 +2,9 @@
   <ion-menu contentId="recepcion-content" type="overlay" class="admin-sidebar">
     <ion-content class="admin-dark sidebar-content">
       <div class="sb-logo">
-        <app-marca-logo [tamano]="44"></app-marca-logo>
-        <div class="sb-logo-txt">
-          <strong>{{ (marca.marca$ | async)?.nombre_taller }}</strong>
-          <span>Recepción</span>
-        </div>
+        <img class="sb-brand light-only" src="assets/logo/ms-logo.png" alt="MS Motos" />
+        <img class="sb-brand dark-only" src="assets/logo/ms-logo-white.png" alt="" />
+        <span>Recepción</span>
       </div>
 
       <ion-menu-toggle auto-hide="false">
@@ -36,18 +34,21 @@
           <a class="nav-item" routerLink="/recepcion/recibir" routerLinkActive="on">
             <ion-icon name="person-add-outline"></ion-icon> Recibir cliente
           </a>
-          <a class="nav-item" routerLink="/recepcion/perfil" routerLinkActive="on">
-            <ion-icon name="person-circle-outline"></ion-icon> Mi perfil
-          </a>
         </nav>
       </ion-menu-toggle>
     </ion-content>
 
     <ion-footer class="admin-dark">
       <div class="sb-user">
-        <div class="sb-av"><img *ngIf="foto; else sbIni" [src]="foto" alt="Foto" /><ng-template #sbIni>{{ iniciales }}</ng-template></div>
-        <div class="sb-info"><strong>{{ nombre }}</strong><span>{{ rolLabel }}</span></div>
-        <button class="sb-logout" (click)="logout()" title="Cerrar sesión"><ion-icon name="log-out-outline"></ion-icon></button>
+        <!-- Tocar la persona abre su perfil (antes era "Mi perfil" en el menú). -->
+        <ion-menu-toggle auto-hide="false" class="sb-perfil-toggle">
+          <a class="sb-perfil" routerLink="/recepcion/perfil" routerLinkActive="on" title="Mi perfil" aria-label="Mi perfil">
+            <div class="sb-av"><img *ngIf="foto; else sbIni" [src]="foto" alt="Foto" /><ng-template #sbIni>{{ iniciales }}</ng-template></div>
+            <div class="sb-info"><strong>{{ nombre }}</strong><span>{{ rolLabel }}</span></div>
+            <ion-icon name="chevron-forward" class="sb-perfil-chev" aria-hidden="true"></ion-icon>
+          </a>
+        </ion-menu-toggle>
+        <button class="sb-logout" (click)="logout()" title="Cerrar sesión" aria-label="Cerrar sesión"><ion-icon name="log-out-outline"></ion-icon></button>
       </div>
     </ion-footer>
   </ion-menu>

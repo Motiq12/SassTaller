@@ -1,6 +1,6 @@
 .promo-card {
   margin: 10px 8px;
-  border-radius: 14px;
+  border-radius: 2px;
   transition: opacity .2s;
 
   &.inactiva { opacity: .55; }
@@ -13,7 +13,7 @@
   cursor: pointer; padding: 8px 0;
   ion-icon { font-size: 18px; }
 }
-.img-preview { display: block; width: 100%; max-height: 180px; object-fit: cover; border-radius: 14px; margin-top: 8px; }
+.img-preview { display: block; width: 100%; max-height: 180px; object-fit: cover; border-radius: 2px; margin-top: 8px; }
 
 .promo-top {
   display: flex;

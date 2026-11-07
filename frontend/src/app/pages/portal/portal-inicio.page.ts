@@ -1,11 +1,11 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 import { AlertController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PortalService } from '../../services/portal.service';
-import { ESTADO_CITA_LABEL } from '../../shared/utils/servicios.util';
-import { badgeProximidad, BadgeProximidad } from '../../shared/utils/fecha-cita.util';
+import { ESTADO_CITA_LABEL } from '../../utils/servicios';
+import { badgeProximidad, BadgeProximidad } from '../../utils/fecha-cita';
 
 @Component({
   standalone: false,
@@ -14,11 +14,6 @@ import { badgeProximidad, BadgeProximidad } from '../../shared/utils/fecha-cita.
   styleUrls: ['./portal-inicio.page.scss'],
 })
 export class PortalInicioPage implements OnInit, OnDestroy {
-  portal = inject(PortalService);
-  private router = inject(Router);
-  private alert = inject(AlertController);
-  private toast = inject(ToastController);
-
   private destroy$ = new Subject<void>();
   resumen: any = null;
   presupuestos: any[] = [];      // órdenes esperando la aprobación del cliente
@@ -29,7 +24,57 @@ export class PortalInicioPage implements OnInit, OnDestroy {
   readonly estadoLabel = ESTADO_CITA_LABEL;
   readonly fechaHoy = new Date().toLocaleDateString('es-CR', { weekday: 'short', day: 'numeric', month: 'short' });
 
-  ngOnInit() { this.cargar(); }
+  constructor(
+    public portal: PortalService,
+    private router: Router,
+    private alert: AlertController,
+    private toast: ToastController
+  ) {}
+
+  // Aviso del taller arriba del inicio (Configuración → Textos del portal).
+  bienvenida: { titulo: string; texto: string } | null = null;
+
+  // Las motos del cliente: "Tu garaje" y la foto de la tarjeta principal.
+  motos: any[] = [];
+
+  // Las etapas de una moto en el taller, en orden (los estados de la cita).
+  readonly etapas = [
+    { estado: 'agendado', label: 'Agendada' },
+    { estado: 'en_revision', label: 'Revisión' },
+    { estado: 'en_mantenimiento', label: 'Reparación' },
+    { estado: 'listo', label: 'Lista' },
+    { estado: 'entregado', label: 'Entregada' },
+  ];
+  etapaActual(estado: string): number { return Math.max(0, this.etapas.findIndex(e => e.estado === estado)); }
+
+  // Sellos de la tarjeta de cliente: los normales, sin contar el de cortesía.
+  get metaSellos(): number { return (this.resumen?.recompensas?.meta || 7) - 1; }
+
+  // La foto de la moto de la cita (por la placa), para el fondo de la tarjeta principal.
+  fotoDeCita(p: any): string | null {
+    const m = p?.placa ? this.motos.find(x => x.placa === p.placa) : null;
+    return m?.foto ? `url(${m.foto})` : null;
+  }
+
+  // Fechas "AAAA-MM-DD" armadas desde el texto: el pipe date las leería como
+  // medianoche UTC, que en Costa Rica cae el día anterior.
+  private fecha(f?: string): Date | null {
+    const [a, m, d] = String(f || '').slice(0, 10).split('-').map(Number);
+    return a && m && d ? new Date(a, m - 1, d) : null;
+  }
+  diaDelMes(f?: string): number | string { return this.fecha(f)?.getDate() ?? ''; }
+  mesCorto(f?: string): string { return this.fecha(f)?.toLocaleDateString('es-CR', { month: 'short' }).replace('.', '') ?? ''; }
+  diaSemana(f?: string): string { return this.fecha(f)?.toLocaleDateString('es-CR', { weekday: 'long' }) ?? ''; }
+  diaMes(f?: string): string { const x = this.fecha(f); return x ? x.toLocaleDateString('es-CR', { day: 'numeric', month: 'long' }) : ''; }
+  fechaLarga(f?: string): string { const x = this.fecha(f); return x ? x.toLocaleDateString('es-CR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''; }
+
+  ngOnInit() {
+    this.cargar();
+    this.portal.getTextos().pipe(takeUntil(this.destroy$)).subscribe({
+      next: r => this.bienvenida = r.data?.bienvenida?.texto ? r.data.bienvenida : null,
+      error: () => {},
+    });
+  }
   ionViewWillEnter() { this.cargar(); }
 
   cargar() {
@@ -39,6 +84,10 @@ export class PortalInicioPage implements OnInit, OnDestroy {
       error: () => { this.cargando = false; },
     });
     this.cargarPresupuestos();
+    this.portal.getMotos().pipe(takeUntil(this.destroy$)).subscribe({
+      next: r => this.motos = r.data || [],
+      error: () => { this.motos = []; },
+    });
   }
 
   // Solo los presupuestos que esperan una decisión del cliente.
@@ -68,11 +117,22 @@ export class PortalInicioPage implements OnInit, OnDestroy {
     }
   }
 
+  // Si ya había aprobado antes, lo que se le pide ahora es un adicional.
+  esAdicional(o: any): boolean { return o?.total_aprobado !== null && o?.total_aprobado !== undefined; }
+
+  // Diferencia entre el total de hoy y lo que ya aprobó.
+  montoAdicional(d: any): number {
+    return Math.max(0, Number(d?.total || 0) - Number(d?.total_aprobado || 0));
+  }
+
   async aprobar(o: any) {
+    const d = this.detalle[o.id];
     const al = await this.alert.create({
       cssClass: 'portal-alert',
-      header: 'Aprobar presupuesto',
-      message: `¿Aprobás el presupuesto de la orden ${o.numero_orden}? El taller comenzará la reparación.`,
+      header: this.esAdicional(o) ? 'Aprobar adicional' : 'Aprobar presupuesto',
+      message: this.esAdicional(o) && d
+        ? `¿Apruebas el adicional de ₡${Number(this.montoAdicional(d) || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 })}? El nuevo total de la orden ${o.numero_orden} es ₡${Number(d.total || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 })}.`
+        : `¿Apruebas el presupuesto de la orden ${o.numero_orden}? El taller comenzará la reparación.`,
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         { text: 'Aprobar', cssClass: 'portal-alert-confirm', handler: () => this.enviarDecision(o, 'aprobar') },
@@ -84,8 +144,10 @@ export class PortalInicioPage implements OnInit, OnDestroy {
   async rechazar(o: any) {
     const al = await this.alert.create({
       cssClass: 'portal-alert',
-      header: 'Rechazar presupuesto',
-      message: `Contanos por qué rechazás el presupuesto de la orden ${o.numero_orden} (opcional).`,
+      header: this.esAdicional(o) ? 'Rechazar adicional' : 'Rechazar presupuesto',
+      message: this.esAdicional(o)
+        ? `Lo que ya aprobaste sigue en pie: el taller hace solo eso. Cuéntanos por qué no quieres el adicional (opcional).`
+        : `Cuéntanos por qué rechazas el presupuesto de la orden ${o.numero_orden} (opcional).`,
       inputs: [{ name: 'motivo', type: 'textarea', placeholder: 'Motivo (opcional)' }],
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
@@ -113,7 +175,7 @@ export class PortalInicioPage implements OnInit, OnDestroy {
       },
       error: async () => {
         this.procesando = false;
-        const t = await this.toast.create({ message: 'No se pudo procesar, intentá de nuevo', duration: 2200, color: 'danger' });
+        const t = await this.toast.create({ message: 'No se pudo procesar, intenta de nuevo', duration: 2200, color: 'danger' });
         await t.present();
       },
     });

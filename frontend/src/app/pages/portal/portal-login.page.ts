@@ -1,5 +1,4 @@
-import { Component, ElementRef, OnInit, OnDestroy, ViewChild, inject } from '@angular/core';
-import { MarcaService } from '../../services/marca.service';
+import { Component, ElementRef, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -7,8 +6,9 @@ import { takeUntil } from 'rxjs/operators';
 import { PortalService } from '../../services/portal.service';
 import { AuthService } from '../../services/auth.service';
 import { BiometriaService } from '../../services/biometria.service';
-import { emailValido } from '../../shared/utils/validar.util';
-import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../shared/utils/turnstile.util';
+import { emailValido } from '../../utils/validar';
+import { sitioWeb } from '../../sitio-web-activo';
+import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../shared/turnstile.util';
 
 @Component({
   standalone: false,
@@ -17,14 +17,6 @@ import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../sha
   styleUrls: ['./portal-login.page.scss'],
 })
 export class PortalLoginPage implements OnInit, OnDestroy {
-  private portal = inject(PortalService);
-  private auth = inject(AuthService);
-  private bio = inject(BiometriaService);
-  private router = inject(Router);
-  private loading = inject(LoadingController);
-  private toast = inject(ToastController);
-  marca = inject(MarcaService);
-
   private destroy$ = new Subject<void>();
   email = '';
   password = '';
@@ -44,11 +36,6 @@ export class PortalLoginPage implements OnInit, OnDestroy {
   codigo2fa = '';
   verificando2fa = false;
 
-  // Se enciende cuando el ingreso es rechazado y se apaga solo. Sacude el formulario:
-  // el aviso sale en un toast abajo, lejos de donde está mirando quien acaba de
-  // escribir, y con el sacudón se entiende que falló antes de leer nada.
-  fallo = false;
-
   // Anti-bot para el pedido de código OTP: honeypot + captcha Turnstile.
   website = '';
   mostrarCaptcha = turnstileHabilitado();
@@ -59,10 +46,19 @@ export class PortalLoginPage implements OnInit, OnDestroy {
     if (el && !this.ts) montarTurnstile(el.nativeElement).then(w => (this.ts = w));
   }
 
+  constructor(
+    private portal: PortalService,
+    private auth: AuthService,
+    private bio: BiometriaService,
+    private router: Router,
+    private loading: LoadingController,
+    private toast: ToastController
+  ) {}
+
   ngOnInit() {
     // Si ya hay una sesión activa, mandamos a la zona que corresponde.
     if (this.portal.isLoggedIn()) this.router.navigate(['/portal'], { replaceUrl: true });
-    else if (this.auth.isLoggedIn()) this.router.navigate([this.rutaStaff()], { replaceUrl: true });
+    else if (this.auth.isLoggedIn()) this.irStaff();
     // ¿Está activado el ingreso biométrico en este dispositivo? (solo nativo)
     this.bio.activado().then(v => (this.bioActivado = v));
   }
@@ -96,18 +92,56 @@ export class PortalLoginPage implements OnInit, OnDestroy {
     await t.present();
   }
 
-  // Cada rol arranca en su panel: técnico y recepción tienen el suyo; el resto, el dashboard.
+  // Con el sitio web en pausa, quien tiene solo el rol Contenido no tiene a dónde
+  // entrar: se le explica y se cierra la sesión, en vez de devolverlo a esta
+  // pantalla sin decir nada.
+  private async irStaff() {
+    if (!sitioWeb.activo && this.auth.getUsuario()?.rol === 'contenido') {
+      this.auth.logout();
+      const t = await this.toast.create({
+        message: 'El sitio web está pausado por ahora, y tu usuario solo tiene esa sección.',
+        duration: 4000,
+        color: 'warning',
+      });
+      await t.present();
+      return;
+    }
+    this.router.navigate([this.rutaStaff()], { replaceUrl: true });
+  }
+
+  // Cada rol arranca en su panel: técnico y recepción tienen el suyo; el resto, el
+  // dashboard. Si eligió otra pantalla de inicio en Mi perfil (de su panel), esa.
   private rutaStaff(): string {
-    const rol = this.auth.getUsuario()?.rol;
-    if (rol === 'tecnico') return '/mecanico';
-    if (rol === 'recepcion') return '/recepcion';
+    const u = this.auth.getUsuario();
+    const rol = u?.rol;
+    const inicio = u?.preferencias?.inicio || '';
+    if (rol === 'tecnico') return inicio.startsWith('/mecanico/') ? inicio : '/mecanico';
+    if (rol === 'recepcion') return inicio.startsWith('/recepcion/') ? inicio : '/recepcion';
+    if (rol === 'admin' && inicio.startsWith('/admin/')) return inicio;
+    if (rol === 'contenido') return '/admin/web';
     return '/tabs';
+  }
+
+  // Continuar con Google: si la cuenta existe, entra; si no, va a crear cuenta con
+  // lo que dio Google, donde solo faltan teléfono y cédula.
+  async conGoogle(credential: string) {
+    const l = await this.loading.create({ message: 'Entrando con Google...', cssClass: 'portal-loading', spinner: 'crescent' });
+    await l.present();
+    this.portal.conGoogle(credential).pipe(takeUntil(this.destroy$)).subscribe({
+      next: async (d) => {
+        await l.dismiss();
+        if (d.token) this.router.navigate(['/portal'], { replaceUrl: true });
+        else if (d.requiere_datos) this.router.navigate(['/portal/registro'], { state: { google: d } });
+      },
+      // El aviso con el motivo lo pone el interceptor de errores.
+      error: async () => { await l.dismiss(); },
+    });
   }
 
   async ingresar() {
     if (!this.email || !this.password) return;
     if (!emailValido(this.email)) {
-      const t = await this.toast.create({ message: 'Ingresá un correo válido', duration: 2500, color: 'warning' });
+      const t = await this.toast.create({ message: 'Ingresa un correo válido', duration: 2500, color: 'warning' });
       return await t.present();
     }
     const l = await this.loading.create({ message: 'Ingresando...', cssClass: 'portal-loading', spinner: 'crescent' });
@@ -126,7 +160,7 @@ export class PortalLoginPage implements OnInit, OnDestroy {
         if (res.data.tipo === 'staff' && res.data.usuario && res.data.token) {
           this.auth.aplicarSesionStaff(res.data.token, res.data.usuario);
           await this.ofrecerBiometria(cred.email, cred.password);
-          this.router.navigate([this.rutaStaff()], { replaceUrl: true });
+          this.irStaff();
         } else if (res.data.cliente && res.data.token) {
           this.portal.aplicarSesion(res.data.token, res.data.cliente);
           await this.ofrecerBiometria(cred.email, cred.password);
@@ -135,7 +169,6 @@ export class PortalLoginPage implements OnInit, OnDestroy {
       },
       error: async (err) => {
         await l.dismiss();
-        this.sacudir();
         const t = await this.toast.create({
           message: err.error?.error || 'No se pudo iniciar sesión',
           duration: 2500,
@@ -160,12 +193,11 @@ export class PortalLoginPage implements OnInit, OnDestroy {
       next: async (res) => {
         this.verificando2fa = false;
         this.auth.aplicarSesionStaff(res.data.token, res.data.usuario);
-        this.router.navigate([this.rutaStaff()], { replaceUrl: true });
+        this.irStaff();
       },
       error: async (err) => {
         this.verificando2fa = false;
         this.codigo2fa = '';
-        this.sacudir();
         // Si venció el token parcial (5 min), hay que empezar el login de nuevo.
         if (err.status === 401) this.cancelar2fa();
         const t = await this.toast.create({
@@ -174,18 +206,6 @@ export class PortalLoginPage implements OnInit, OnDestroy {
         });
         await t.present();
       },
-    });
-  }
-
-  // Marca el formulario como rechazado y lo desmarca cuando termina la animación,
-  // para que el siguiente intento fallido vuelva a dispararla. Sin apagarlo, la
-  // clase queda puesta y el segundo error no se nota.
-  private sacudir() {
-    this.fallo = false;
-    // En el mismo tick Angular no ve el cambio y la animación no se reinicia.
-    setTimeout(() => {
-      this.fallo = true;
-      setTimeout(() => (this.fallo = false), 500);
     });
   }
 
@@ -204,7 +224,7 @@ export class PortalLoginPage implements OnInit, OnDestroy {
   // Paso 1 del OTP: pide el código al correo. Respuesta genérica (no revela si la cuenta existe).
   async enviarCodigo() {
     if (!emailValido(this.email)) {
-      const t = await this.toast.create({ message: 'Ingresá un correo válido', duration: 2500, color: 'warning' });
+      const t = await this.toast.create({ message: 'Ingresa un correo válido', duration: 2500, color: 'warning' });
       return await t.present();
     }
     this.procesandoCodigo = true;

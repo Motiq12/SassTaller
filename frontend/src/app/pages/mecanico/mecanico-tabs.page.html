@@ -2,11 +2,9 @@
   <ion-menu contentId="mecanico-content" type="overlay" class="admin-sidebar">
     <ion-content class="admin-dark sidebar-content">
       <div class="sb-logo">
-        <app-marca-logo [tamano]="44"></app-marca-logo>
-        <div class="sb-logo-txt">
-          <strong>{{ (marca.marca$ | async)?.nombre_taller }}</strong>
-          <span>Mecánico</span>
-        </div>
+        <img class="sb-brand light-only" src="assets/logo/ms-logo.png" alt="MS Motos" />
+        <img class="sb-brand dark-only" src="assets/logo/ms-logo-white.png" alt="" />
+        <span>Mecánico</span>
       </div>
 
       <ion-menu-toggle auto-hide="false">
@@ -29,19 +27,21 @@
             <span class="nav-badge" *ngIf="noLeidos > 0">{{ noLeidos }}</span>
           </a>
 
-          <div class="sb-section">Cuenta</div>
-          <a class="nav-item" routerLink="/mecanico/perfil" routerLinkActive="on">
-            <ion-icon name="person-circle-outline"></ion-icon> Mi perfil
-          </a>
         </nav>
       </ion-menu-toggle>
     </ion-content>
 
     <ion-footer class="admin-dark">
       <div class="sb-user">
-        <div class="sb-av">{{ iniciales }}</div>
-        <div class="sb-info"><strong>{{ nombre }}</strong><span>Mecánico</span></div>
-        <button class="sb-logout" (click)="logout()" title="Cerrar sesión"><ion-icon name="log-out-outline"></ion-icon></button>
+        <!-- Tocar la persona abre su perfil (antes era "Mi perfil" en el menú). -->
+        <ion-menu-toggle auto-hide="false" class="sb-perfil-toggle">
+          <a class="sb-perfil" routerLink="/mecanico/perfil" routerLinkActive="on" title="Mi perfil" aria-label="Mi perfil">
+            <div class="sb-av">{{ iniciales }}</div>
+            <div class="sb-info"><strong>{{ nombre }}</strong><span>Mecánico</span></div>
+            <ion-icon name="chevron-forward" class="sb-perfil-chev" aria-hidden="true"></ion-icon>
+          </a>
+        </ion-menu-toggle>
+        <button class="sb-logout" (click)="logout()" title="Cerrar sesión" aria-label="Cerrar sesión"><ion-icon name="log-out-outline"></ion-icon></button>
       </div>
     </ion-footer>
   </ion-menu>

@@ -1,0 +1,29 @@
+// Nueva orden: el estándar de pantallas (.pg-*) en una sola columna angosta,
+// porque es un formulario de tres pasos.
+.no-pg { max-width: 760px; }
+
+.no-pasos button:disabled { opacity: .45; cursor: default; }
+.no-n {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: rgba(0, 0, 0, .14); font-size: 11px; font-weight: 800;
+}
+
+// Renglones que se eligen con un toque: botón a todo el ancho.
+.no-elegir {
+  width: 100%; background: none; border-left: 0; border-right: 0; border-bottom: 0;
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
+  &:hover .no-chev { color: var(--tx); }
+  &:focus-visible { outline: 2px solid var(--cr); outline-offset: 2px; }
+}
+.no-chev { font-size: 18px; color: var(--tx3); flex-shrink: 0; transition: color .15s; }
+
+.no-nuevo { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+
+.no-opciones { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.no-pie {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px;
+  margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--bd);
+  a.btn { text-decoration: none; }
+}

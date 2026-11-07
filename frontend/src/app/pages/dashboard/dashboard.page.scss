@@ -42,7 +42,7 @@
     font-family: var(--font-display);
     font-size: 30px;
     font-weight: 800;
-    letter-spacing: -0.04em;
+    letter-spacing: 0;
     margin: 0;
     color: var(--ion-text-color);
   }
@@ -104,7 +104,7 @@
     font-family: var(--font-display);
     font-size: 30px; font-weight: 800;
     color: var(--rose-600);
-    letter-spacing: -0.04em; line-height: 1;
+    letter-spacing: 0; line-height: 1;
   }
   .fact-sub { font-size: 12px; color: var(--n-400); margin: 4px 0 0; }
 }
@@ -114,7 +114,7 @@
 
   .fact-cell {
     background: var(--n-50);
-    border-radius: 16px;
+    border-radius: 2px;
     padding: 10px 12px;
     display: flex; flex-direction: column; gap: 3px;
 
@@ -128,7 +128,7 @@
   display: flex; gap: 4px;
   background: var(--n-100);
   padding: 4px;
-  border-radius: 16px;
+  border-radius: 2px;
   margin: 14px 0;
 
   button {
@@ -136,31 +136,31 @@
     display: flex; align-items: center; justify-content: center; gap: 6px;
     border: none; background: transparent;
     padding: 9px 6px;
-    border-radius: 12px;
+    border-radius: 2px;
     font-family: var(--ion-font-family);
     font-size: 12px; font-weight: 700;
     color: var(--n-500);
-    transition: all .2s var(--ease-out);
+    transition: background-color .2s var(--ease-out), border-color .2s var(--ease-out), color .2s var(--ease-out), box-shadow .2s var(--ease-out), transform .2s var(--ease-out), opacity .2s var(--ease-out);
     cursor: pointer;
 
     .cnt {
       font-size: 10px; font-weight: 800;
       padding: 1px 7px; border-radius: var(--radius-pill);
       background: var(--n-200); color: var(--n-500);
-      &.on { background: var(--rose-700); color: #fff; }
+      &.on { background: var(--ion-color-primary-shade); color: #fff; }
     }
-    &.active { background: var(--ion-color-primary); color: #fff; box-shadow: 0 2px 8px rgba(var(--ion-color-primary-rgb),.3); }
+    &.active { background: var(--ion-color-primary); color: #fff; box-shadow: 0 2px 8px rgba(226,35,26,.3); }
   }
 }
 
-// Lista de vehiculos del semáforo
+// Lista de motos del semáforo
 .bike-list { display: flex; flex-direction: column; gap: 10px; }
 .bike-row {
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px;
   border: 1px solid var(--hairline);
   background: var(--n-50);
-  border-radius: 18px;
+  border-radius: 8px;
   cursor: pointer;
   transition: transform .15s var(--ease-out), background .15s var(--ease-out);
   &:active { transform: scale(0.99); background: var(--rose-50); }
@@ -168,17 +168,17 @@
   .bike-l { display: flex; align-items: center; gap: 12px; }
   .bike-ico {
     width: 38px; height: 38px;
-    border-radius: 12px;
+    border-radius: 2px;
     background: var(--ion-card-background);
     border: 1px solid var(--hairline);
     box-shadow: var(--shadow-xs);
     display: flex; align-items: center; justify-content: center;
-    color: var(--ion-color-primary);
+    color: var(--text-accent);
     ion-icon { font-size: 20px; }
   }
   .bike-meta {
     .bike-id { display: block; font-size: 11px; font-weight: 600; color: var(--n-500); }
-    h4 { margin: 2px 0 0; font-size: 14px; font-weight: 700; color: var(--ion-text-color); letter-spacing: -0.01em; }
+    h4 { margin: 2px 0 0; font-size: 14px; font-weight: 700; color: var(--ion-text-color); letter-spacing: 0; }
   }
   .tag {
     font-size: 10px; font-weight: 800;
@@ -208,7 +208,7 @@
   .kpi {
     background: var(--ion-card-background);
     border: 1px solid var(--hairline);
-    border-radius: 18px;
+    border-radius: 8px;
     box-shadow: var(--shadow-xs);
     padding: 16px;
     display: flex; flex-direction: column; gap: 8px;
@@ -218,7 +218,7 @@
       font-family: var(--font-display);
       font-size: 24px; font-weight: 800;
       color: var(--rose-600);
-      letter-spacing: -0.03em; line-height: 1;
+      letter-spacing: 0; line-height: 1;
     }
   }
 }
@@ -255,7 +255,7 @@
   &:last-child { border-bottom: none; }
 
   .avatar-circle {
-    width: 40px; height: 40px; border-radius: 12px;
+    width: 40px; height: 40px; border-radius: 2px;
     background: var(--ion-color-primary); color: #fff;
     display: flex; align-items: center; justify-content: center;
     font-size: 17px; font-weight: 800; flex-shrink: 0;
@@ -272,7 +272,7 @@
 .btn-out, .btn-rose {
   border: none;
   padding: 14px;
-  border-radius: 16px;
+  border-radius: 2px;
   font-family: var(--ion-font-family);
   font-size: 12px; font-weight: 800;
   text-transform: uppercase; letter-spacing: 0.06em;
@@ -289,6 +289,6 @@
 .btn-rose {
   background: var(--ion-color-primary);
   color: #fff;
-  box-shadow: 0 6px 16px rgba(var(--ion-color-primary-rgb),.22);
+  box-shadow: 0 6px 16px rgba(226,35,26,.22);
 }
 .btn-out.wide { width: 100%; }

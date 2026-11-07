@@ -8,12 +8,12 @@ import { PortalTabsPage } from './portal-tabs.page';
 import { PortalInicioPage } from './portal-inicio.page';
 import { PortalAgendarPage } from './portal-agendar.page';
 import { PortalCitasPage } from './portal-citas.page';
-import { PortalVehiculosPage } from './portal-vehiculos.page';
+import { PortalMotosPage } from './portal-motos.page';
 import { PortalOfertasPage } from './portal-ofertas.page';
 import { PortalPerfilPage } from './portal-perfil.page';
 import { PortalLegalPage } from './portal-legal.page';
 import { PortalCitaDetallePage } from './portal-cita-detalle.page';
-import { PortalVehiculoHistorialPage } from './portal-vehiculo-historial.page';
+import { PortalMotoHistorialPage } from './portal-moto-historial.page';
 import { PortalNotificacionesPage } from './portal-notificaciones.page';
 
 const routes: Routes = [
@@ -23,7 +23,7 @@ const routes: Routes = [
   { path: 'legal/:doc', component: PortalLegalPage },
   { path: 'cita/:id', component: PortalCitaDetallePage, canActivate: [PortalGuard] },
   { path: 'cita/:id/editar', component: PortalAgendarPage, canActivate: [PortalGuard] },
-  { path: 'vehiculo/:id/historial', component: PortalVehiculoHistorialPage, canActivate: [PortalGuard] },
+  { path: 'moto/:id/historial', component: PortalMotoHistorialPage, canActivate: [PortalGuard] },
   { path: 'notificaciones', component: PortalNotificacionesPage, canActivate: [PortalGuard] },
   {
     path: '',
@@ -34,7 +34,7 @@ const routes: Routes = [
       { path: 'inicio', component: PortalInicioPage },
       { path: 'agendar', component: PortalAgendarPage },
       { path: 'mis-citas', component: PortalCitasPage },
-      { path: 'vehiculos', component: PortalVehiculosPage },
+      { path: 'motos', component: PortalMotosPage },
       { path: 'perfil', component: PortalPerfilPage },
       { path: 'ofertas', component: PortalOfertasPage },
     ],

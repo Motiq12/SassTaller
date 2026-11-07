@@ -20,21 +20,21 @@
       <div class="grid2">
         <div class="ig">
           <label>Nombre *</label>
-          <input [(ngModel)]="form.nombre" placeholder="Nombre" autocapitalize="words">
+          <input [(ngModel)]="form.nombre" name="nombre" placeholder="Nombre" autocapitalize="words">
         </div>
         <div class="ig">
           <label>Apellido *</label>
-          <input [(ngModel)]="form.apellido" placeholder="Apellido" autocapitalize="words">
+          <input [(ngModel)]="form.apellido" name="apellido" placeholder="Apellido" autocapitalize="words">
         </div>
       </div>
       <div class="grid2">
         <div class="ig">
           <label>Teléfono *</label>
-          <input type="tel" inputmode="tel" [(ngModel)]="form.telefono" placeholder="8888-8888">
+          <input type="tel" inputmode="tel" [(ngModel)]="form.telefono" name="telefono" placeholder="8888-8888">
         </div>
         <div class="ig">
           <label>Cédula {{ esEdicion ? '' : '*' }}</label>
-          <input [(ngModel)]="form.cedula" placeholder="1-2345-6789">
+          <input [(ngModel)]="form.cedula" name="cedula" placeholder="1-2345-6789">
         </div>
       </div>
     </section>
@@ -44,11 +44,11 @@
       <span class="section-label">Contacto</span>
       <div class="ig">
         <label>Email</label>
-        <input type="email" inputmode="email" autocapitalize="off" [(ngModel)]="form.email" placeholder="correo@ejemplo.com">
+        <input type="email" inputmode="email" autocapitalize="off" [(ngModel)]="form.email" name="email" placeholder="correo@ejemplo.com">
       </div>
       <div class="ig" style="margin-bottom:4px">
         <label>Dirección</label>
-        <textarea [(ngModel)]="form.direccion" rows="2" placeholder="Provincia, cantón, señas..."></textarea>
+        <textarea [(ngModel)]="form.direccion" name="direccion" rows="2" placeholder="Provincia, cantón, señas…"></textarea>
       </div>
     </section>
 

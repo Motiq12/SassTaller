@@ -1,202 +1,47 @@
-.perfil { max-width: 600px; margin: 0 auto; padding: 14px 16px 0; }
+// Mi perfil del cliente: el marco, la lista y las secciones son los de Mi perfil del
+// panel (shared/perfil/perfil-lista.scss, todo bajo .pf). Acá solo lo propio del cliente.
 
-/* Header con gradiente y avatar grande */
-.profile-header {
-  display: flex; flex-direction: column; align-items: center; text-align: center;
-  background: linear-gradient(160deg, rgba(var(--ion-color-primary-rgb), .08), rgba(16, 185, 129, .06));
-  border: 1px solid var(--hairline); border-radius: 26px; padding: 28px 20px 22px; margin-bottom: 18px;
-  position: relative; overflow: hidden;
+.pf-sk { display: flex; flex-direction: column; gap: 14px; }
 
-  &::before {
-    content: ''; position: absolute; top: -40px; right: -40px;
-    width: 120px; height: 120px; border-radius: 50%;
-    background: rgba(var(--ion-color-primary-rgb), .06);
-  }
-
-  .avatar-wrap { position: relative; flex-shrink: 0; width: 80px; height: 80px; margin-bottom: 14px; }
-  .avatar {
-    width: 80px; height: 80px; border-radius: 50%; padding: 0; overflow: hidden; cursor: pointer;
-    background: var(--ion-color-primary); color: #fff; border: 3px solid rgba(255, 255, 255, .15);
-    display: flex; align-items: center; justify-content: center;
-    font-family: var(--font-display); font-size: 30px; font-weight: 800;
-    box-shadow: 0 6px 20px rgba(var(--ion-color-primary-rgb), .25);
-    img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    &:active { transform: scale(.96); }
-    &:disabled { opacity: .7; cursor: default; }
-  }
-  .avatar-cam {
-    position: absolute; right: -2px; bottom: -2px; width: 28px; height: 28px; border-radius: 50%;
-    background: var(--ion-color-primary); border: 2px solid var(--ion-card-background); cursor: pointer; padding: 0;
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 2px 8px rgba(var(--ion-color-primary-rgb), .3);
-    ion-icon { font-size: 14px; color: #fff; }
-    &.cargando ion-icon { color: rgba(255, 255, 255, .6); }
-    &:active { transform: scale(.9); }
-    &:disabled { opacity: .7; }
-  }
-  .quitar-foto {
-    margin-top: 6px; background: none; border: none; padding: 0; cursor: pointer;
-    font-family: inherit; font-size: 11px; font-weight: 700; color: var(--ion-color-danger);
-    &:disabled { opacity: .6; }
-  }
-
-  .info { min-width: 0; position: relative; z-index: 1;
-    h2 { font-family: var(--font-display); font-size: 22px; font-weight: 800;
-      margin: 0; color: var(--ion-text-color); letter-spacing: -.02em; }
-    .contact { font-size: 13px; color: var(--n-500); margin: 4px 0 0; word-break: break-word;
-      display: flex; align-items: center; justify-content: center; gap: 5px;
-      ion-icon { font-size: 14px; } }
-  }
+// Debajo del nombre: hay un correo nuevo esperando el código.
+.pf-aviso-correo {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 7px 12px;
+  border: 1px solid var(--am); border-radius: 2px; background: var(--adm-am-bg); color: var(--am);
+  font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
+  ion-icon { font-size: 16px; }
 }
 
-/* Visor (lightbox) con zoom */
-.foto-zoom {
-  position: fixed; inset: 0; z-index: 1000;
-  background: rgba(0, 0, 0, .93); animation: fzIn .18s ease;
-  .fz-stage {
-    position: absolute; inset: 0; overflow: auto;
-    display: flex; align-items: center; justify-content: center; padding: 24px;
-    img {
-      margin: auto; max-width: 94vw; max-height: 82vh; object-fit: contain;
-      border-radius: 14px; cursor: zoom-in; user-select: none;
-      transition: max-width .2s ease, max-height .2s ease;
-    }
-    &.zoom img { max-width: none; max-height: none; width: 175vw; cursor: zoom-out; border-radius: 0; }
-  }
-  .fz-close {
-    position: absolute; top: 14px; right: 14px; z-index: 2;
-    width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
-    background: rgba(255, 255, 255, .14); color: #fff;
-    display: flex; align-items: center; justify-content: center;
-    ion-icon { font-size: 22px; }
-    &:active { transform: scale(.92); }
-  }
-  .fz-hint {
-    position: absolute; left: 0; right: 0; bottom: 22px; text-align: center;
-    color: rgba(255, 255, 255, .7); font-size: 12px; font-weight: 600; pointer-events: none;
-  }
-}
-@keyframes fzIn { from { opacity: 0; } to { opacity: 1; } }
+// La tarjeta del correo pendiente, con borde ámbar.
+.pf-pendiente { border-left: 3px solid var(--am) !important; }
+.pf-codigo { font-family: var(--fm); font-size: 22px !important; letter-spacing: .3em; }
 
-/* Cards */
-.card {
-  background: var(--ion-card-background); border: 1px solid var(--hairline);
-  border-radius: 22px; box-shadow: var(--shadow-sm); padding: 20px; margin-bottom: 14px;
-  transition: border-color .2s;
-}
-.section-label {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 11px; font-weight: 800; text-transform: uppercase;
-  letter-spacing: .1em; color: var(--n-400); margin-bottom: 16px;
-}
+.pf-pie--entre { justify-content: space-between !important; flex-wrap: wrap; gap: 10px; }
+.pf-pie-enlaces { display: flex; flex-wrap: wrap; gap: 4px 16px; }
 
-/* Inputs */
-.ig {
-  margin-bottom: 14px;
-  label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .06em; color: var(--n-500); margin-bottom: 6px; }
-  input {
-    width: 100%; padding: 12px 14px; border: 1px solid var(--hairline); border-radius: 14px;
-    font-family: inherit; font-size: 14px; background: rgba(255, 255, 255, .03);
-    color: var(--ion-text-color); outline: none; transition: border-color .2s, box-shadow .2s;
-    &:focus { border-color: var(--ion-color-primary); box-shadow: 0 0 0 3px rgba(var(--ion-color-primary-rgb), .08); }
-    &::placeholder { color: var(--n-500); }
-  }
-}
-
-/* Accesibilidad */
-.a11y-row {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  .a11y-info { display: flex; flex-direction: column; gap: 3px;
-    strong { font-size: 14px; font-weight: 700; }
-    span { font-size: 12px; color: var(--n-500); } }
-  .a11y-opts { display: flex; gap: 6px; flex-shrink: 0; }
-  .a11y-opt {
-    width: 42px; height: 42px; border-radius: 12px; cursor: pointer;
-    border: 1.5px solid var(--hairline); background: rgba(255, 255, 255, .03); color: var(--n-600);
-    font-family: inherit; font-weight: 800; line-height: 1;
-    display: flex; align-items: center; justify-content: center; transition: all .2s;
-    &.on { background: var(--ion-color-primary); border-color: var(--ion-color-primary); color: #fff;
-      box-shadow: 0 2px 8px rgba(var(--ion-color-primary-rgb), .25); }
-    &:active { transform: scale(.94); }
-  }
-}
-
-/* Notificaciones */
-.notif-row {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 12px 0; border-bottom: 1px solid var(--hairline);
-  &:last-child { border-bottom: none; }
-  .notif-info { display: flex; flex-direction: column; gap: 3px;
-    strong { font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
-    span { font-size: 12px; color: var(--n-500); } }
-  ion-toggle { flex-shrink: 0; }
-}
-.tag-pronto {
-  font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
-  padding: 2px 7px; border-radius: 999px; background: rgba(245, 158, 11, .12); color: #F59E0B;
-}
-
-/* Biometría */
-.bio-btn {
-  flex-shrink: 0; display: flex; align-items: center; gap: 6px;
-  padding: 10px 16px; border-radius: 12px; cursor: pointer;
-  font-family: inherit; font-size: 13px; font-weight: 700; line-height: 1;
-  background: var(--ion-color-primary); color: #fff; border: none;
-  box-shadow: 0 2px 8px rgba(var(--ion-color-primary-rgb), .2);
-  transition: transform .15s;
-  ion-icon { font-size: 17px; }
-  &.on { background: none; color: var(--ion-color-danger); border: 1.5px solid var(--ion-color-danger);
-    box-shadow: none; }
-  &:active { transform: scale(.96); }
+.pf-enlace {
+  padding: 4px 0; border: none; background: none; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 700; color: var(--cr-tx);
+  text-decoration: underline; text-underline-offset: 3px;
   &:disabled { opacity: .5; cursor: default; }
 }
 
-/* Legal */
-.legal-row {
-  display: flex; align-items: center; gap: 14px;
-  padding: 14px 2px; cursor: pointer; text-decoration: none;
-  color: var(--ion-text-color); border-bottom: 1px solid var(--hairline);
-  transition: background .2s; border-radius: 8px;
-  &:last-child { border-bottom: none; }
-  &:hover { background: rgba(255, 255, 255, .03); }
-  ion-icon:first-child { font-size: 20px; color: var(--ion-color-primary); flex-shrink: 0; }
-  span { flex: 1; font-size: 14px; font-weight: 600; }
-  .chev { font-size: 16px; color: var(--n-400); flex-shrink: 0; }
+// Términos y privacidad: filas como las de la lista.
+.pf-enlace-fila {
+  display: flex; align-items: center; gap: 12px; padding: 14px 2px;
+  border-top: 1px solid var(--bd); color: var(--tx); text-decoration: none; font-size: 14px; font-weight: 600;
+  ion-icon { font-size: 19px; color: var(--tx3); }
+  span { flex: 1; }
+  ion-icon:last-child { font-size: 16px; }
+  &:hover { color: var(--cr-tx); }
+  &:focus-visible { outline: 2px solid var(--cr); outline-offset: 2px; }
+  & + app-volver-web { display: block; margin-top: 14px; }
 }
 
-/* Botones de acción */
-.cta {
-  width: 100%; padding: 14px; border: none; border-radius: 14px;
-  background: var(--ion-color-primary); color: #fff;
-  font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  box-shadow: 0 4px 14px rgba(var(--ion-color-primary-rgb), .2);
-  transition: transform .15s, box-shadow .15s;
-  &:hover { box-shadow: 0 6px 20px rgba(var(--ion-color-primary-rgb), .3); }
-  &:active { transform: scale(.98); }
-  &:disabled { opacity: .5; cursor: default; box-shadow: none; }
-  &.outline { background: none; border: 1.5px solid var(--hairline); color: var(--ion-text-color); box-shadow: none; }
-  &.danger { background: rgba(239, 68, 68, .08); color: #EF4444;
-    border: 1px solid rgba(239, 68, 68, .15); box-shadow: none;
-    ion-icon { font-size: 17px; } }
-  &.danger-outline { background: none; border: 1.5px solid rgba(239, 68, 68, .2); color: #EF4444;
-    margin-top: 10px; box-shadow: none; font-size: 13px;
-    ion-icon { font-size: 16px; } }
-}
+// Eliminar cuenta: el ícono en rojo.
+.pf-peligro .pf-sec-icono { background: var(--adm-rd-bg) !important; color: var(--adm-rd-fg) !important; }
 
-/* Cambio de correo a la espera de confirmación: borde de acento para que se note
-   que hay algo sin terminar, sin llegar a leerse como un error. */
-.correo-pendiente {
-  border-color: rgba(var(--ion-color-primary-rgb), .35);
-  .cp-texto { font-size: 13px; line-height: 1.55; color: var(--n-500); margin: -6px 0 14px;
-    strong { color: var(--ion-text-color); word-break: break-word; } }
-  .cp-codigo { font-family: var(--font-mono, monospace); font-size: 22px; font-weight: 700;
-    letter-spacing: .35em; text-align: center; }
-  .cp-acciones { display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: center; margin-top: 14px; }
-  .cp-link { background: none; border: none; padding: 4px 2px; font: inherit; font-size: 13px;
-    font-weight: 600; color: var(--ion-color-primary); cursor: pointer;
-    &:disabled { color: var(--n-500); cursor: default; }
-    &.cp-cancelar { color: var(--n-500); } }
-  .cp-ayuda { font-size: 12px; color: var(--n-500); text-align: center; margin: 10px 0 0; }
+// Los interruptores de Avisos, con el rojo de la marca.
+ion-toggle {
+  --track-background-checked: var(--ion-color-primary);
+  --handle-background-checked: #fff;
 }

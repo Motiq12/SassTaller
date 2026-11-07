@@ -48,7 +48,7 @@
   padding: 12px 14px;
   background: var(--sur2);
   border: 1px solid var(--bd);
-  border-radius: 16px;
+  border-radius: 2px;
   margin-bottom: 10px;
 
   &.inactivo { opacity: .55; }
@@ -77,3 +77,6 @@
 .empty-accion {
   margin-top: 10px;
 }
+
+// Vino desde «Servicios en el sitio»: el enlace para volver se tiene que ver.
+.srv-desde-sitio a { color: var(--cr-tx); font-weight: 600; white-space: nowrap; }

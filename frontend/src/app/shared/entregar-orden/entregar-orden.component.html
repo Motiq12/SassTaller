@@ -1,0 +1,68 @@
+<div class="admin-dark adm-modal-box ent" role="dialog" aria-modal="true" aria-labelledby="ent-titulo">
+  <div class="amb-head">
+    <div class="ent-cab">
+      <h2 id="ent-titulo" class="ent-titulo">Entregar la moto</h2>
+      <p class="ent-sub">
+        <span class="mono">{{ numeroOrden }}</span><span *ngIf="moto"> · {{ moto }}</span><span *ngIf="cliente"> · {{ cliente }}</span>
+      </p>
+    </div>
+    <button type="button" class="amb-x" (click)="cerrar()" aria-label="Cerrar"><ion-icon name="close"></ion-icon></button>
+  </div>
+
+  <div class="amb-body">
+    <p class="adm-aviso adm-aviso--interno am" *ngIf="noLista" role="status">
+      <ion-icon name="alert-circle-outline" aria-hidden="true"></ion-icon>
+      <span>
+        <ng-container *ngIf="cambioDeEstado">Alguien le cambió el estado mientras tanto. </ng-container>
+        Todavía no está marcada como lista para entrega. Si el cliente se la lleva, se entrega igual.
+      </span>
+    </p>
+
+    <div class="ent-total" *ngIf="total !== null">
+      <span>Total a cobrar</span>
+      <strong>₡{{ total | number:'1.0-0' }}</strong>
+    </div>
+    <p class="adm-aviso adm-aviso--interno rd" *ngIf="sinAprobar > 0">
+      <ion-icon name="alert-circle-outline" aria-hidden="true"></ion-icon>
+      <span>₡{{ sinAprobar | number:'1.0-0' }} de este total no los aprobó el cliente.</span>
+    </p>
+
+    <fieldset class="ent-pago">
+      <legend>Forma de pago</legend>
+      <div class="ent-pagos">
+        <button type="button" *ngFor="let m of metodos" class="filter-btn ent-pago-btn" [class.on]="metodo === m.valor"
+                [attr.aria-pressed]="metodo === m.valor" (click)="metodo = m.valor">{{ m.etiqueta }}</button>
+      </div>
+    </fieldset>
+
+    <div class="fg-row">
+      <div class="fg">
+        <label for="ent-garantia">Garantía (días)</label>
+        <input id="ent-garantia" type="number" min="0" inputmode="numeric" [(ngModel)]="garantiaDias" name="garantia_dias" />
+      </div>
+      <div class="fg">
+        <label for="ent-obs">Observaciones</label>
+        <input id="ent-obs" type="text" maxlength="500" placeholder="Opcional" [(ngModel)]="observaciones" name="observaciones_finales" />
+      </div>
+    </div>
+
+    <p class="adm-aviso adm-aviso--interno am" *ngIf="faltantes.length">
+      <ion-icon name="list-outline" aria-hidden="true"></ion-icon>
+      <span>Del checklist de entrega falta: {{ faltantes.join(', ').toLowerCase() }}.</span>
+    </p>
+
+    <ion-checkbox class="ent-factura" labelPlacement="end" justify="start" [(ngModel)]="abrirFactura" name="abrir_factura">
+      Abrir la factura al terminar
+    </ion-checkbox>
+  </div>
+
+  <div class="amb-foot">
+    <div class="amb-btns">
+      <button type="button" class="btn btn-ou" (click)="cerrar()" [disabled]="enviando">Cancelar</button>
+      <button type="button" class="btn btn-cr" (click)="entregar()" [disabled]="enviando || !metodo">
+        <ion-icon name="checkmark-done-outline" aria-hidden="true"></ion-icon>
+        {{ enviando ? 'Entregando…' : 'Entregar' }}
+      </button>
+    </div>
+  </div>
+</div>

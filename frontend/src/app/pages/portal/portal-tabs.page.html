@@ -1,24 +1,33 @@
+<!-- La barra de abajo es una cápsula flotante: solo íconos y la pestaña elegida con
+     una píldora clara y el ícono relleno. Mi perfil sigue arriba, al lado de la
+     campana. Los nombres quedan para lectores de pantalla (.tab-nombre).
+     Estilos en global.scss ("Barra del portal"). En escritorio no sale: está el menú. -->
 <ion-tabs>
-  <ion-tab-bar slot="bottom">
-    <ion-tab-button tab="inicio">
-      <ion-icon name="home-outline"></ion-icon>
-      <ion-label>Inicio</ion-label>
+  <ion-tab-bar slot="bottom" class="barra-flotante">
+    <ion-tab-button tab="inicio" aria-label="Inicio">
+      <ion-icon name="home-outline" class="ic-off" aria-hidden="true"></ion-icon>
+      <ion-icon name="home" class="ic-on" aria-hidden="true"></ion-icon>
+      <ion-label class="tab-nombre">Inicio</ion-label>
     </ion-tab-button>
-    <ion-tab-button tab="agendar">
-      <ion-icon name="add-circle-outline"></ion-icon>
-      <ion-label>Agendar</ion-label>
+    <ion-tab-button tab="agendar" aria-label="Agendar">
+      <ion-icon name="add-circle-outline" class="ic-off" aria-hidden="true"></ion-icon>
+      <ion-icon name="add-circle" class="ic-on" aria-hidden="true"></ion-icon>
+      <ion-label class="tab-nombre">Agendar</ion-label>
     </ion-tab-button>
-    <ion-tab-button tab="mis-citas">
-      <ion-icon name="clipboard-outline"></ion-icon>
-      <ion-label>Mis Citas</ion-label>
+    <ion-tab-button tab="mis-citas" aria-label="Mis citas">
+      <ion-icon name="clipboard-outline" class="ic-off" aria-hidden="true"></ion-icon>
+      <ion-icon name="clipboard" class="ic-on" aria-hidden="true"></ion-icon>
+      <ion-label class="tab-nombre">Mis citas</ion-label>
     </ion-tab-button>
-    <ion-tab-button tab="vehiculos">
-      <ion-icon name="bicycle-outline"></ion-icon>
-      <ion-label>Motos</ion-label>
+    <ion-tab-button tab="motos" aria-label="Mis motos">
+      <ion-icon name="bicycle-outline" class="ic-off" aria-hidden="true"></ion-icon>
+      <ion-icon name="bicycle" class="ic-on" aria-hidden="true"></ion-icon>
+      <ion-label class="tab-nombre">Motos</ion-label>
     </ion-tab-button>
-    <ion-tab-button tab="ofertas">
-      <ion-icon name="pricetags-outline"></ion-icon>
-      <ion-label>Ofertas</ion-label>
+    <ion-tab-button tab="ofertas" aria-label="Ofertas">
+      <ion-icon name="pricetags-outline" class="ic-off" aria-hidden="true"></ion-icon>
+      <ion-icon name="pricetags" class="ic-on" aria-hidden="true"></ion-icon>
+      <ion-label class="tab-nombre">Ofertas</ion-label>
     </ion-tab-button>
   </ion-tab-bar>
 </ion-tabs>

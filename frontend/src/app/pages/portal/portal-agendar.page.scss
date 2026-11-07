@@ -1,30 +1,31 @@
+// Estándar de diseño: colores del panel (.admin-dark en global.scss), que siguen el tema.
 .agendar { max-width: 640px; margin: 0 auto; padding: 12px 16px 0; }
 
 .intro {
   margin: 6px 2px 16px;
-  h2 { font-family: var(--font-display); font-size: 24px; font-weight: 800; letter-spacing: -0.03em; margin: 0 0 4px; }
-  p { font-size: 13px; color: var(--n-500); margin: 0; }
+  h2 { font-family: var(--font-display); font-size: 24px; font-weight: 800; letter-spacing: 0; margin: 0 0 4px; }
+  p { font-size: 13px; color: var(--tx3); margin: 0; }
 }
 
 .card {
-  background: var(--ion-card-background); border: 1px solid var(--hairline);
-  border-radius: var(--radius-card); box-shadow: var(--shadow-sm); padding: 18px 16px;
+  background: var(--sur); border: 1px solid var(--bd);
+  border-radius: var(--radius-card); padding: 18px 16px;
 }
 
-/* Estado vacío guiado: el cliente no tiene vehiculos */
-.sin-vehiculos {
+/* Estado vacío guiado: el cliente no tiene motos */
+.sin-motos {
   text-align: center; padding: 32px 22px;
-  > ion-icon { font-size: 50px; color: var(--ion-color-primary); opacity: .55; margin-bottom: 10px; }
+  > ion-icon { font-size: 50px; color: var(--cr-tx); opacity: .55; margin-bottom: 10px; }
   h3 { font-family: var(--font-display); font-size: 18px; font-weight: 800; margin: 0 0 6px; }
-  p { font-size: 13px; color: var(--n-500); margin: 0 0 18px; }
+  p { font-size: 13px; color: var(--tx3); margin: 0 0 18px; }
   .cta { width: auto; padding: 12px 22px; }
 }
 
 /* Dirección de la sucursal elegida, bajo el selector */
 .suc-dir {
   display: flex; align-items: center; gap: 6px; margin: 8px 2px 0;
-  font-size: 12px; color: var(--n-500);
-  ion-icon { font-size: 14px; color: var(--ion-color-primary); flex-shrink: 0; }
+  font-size: 12px; color: var(--tx3);
+  ion-icon { font-size: 14px; color: var(--cr-tx); flex-shrink: 0; }
 }
 
 /* Botón "Sugerir próximo horario libre" */
@@ -32,59 +33,59 @@
   width: 100%; margin: 0 0 14px; padding: 11px; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   border: 1.5px dashed var(--ion-color-primary); border-radius: var(--radius-pill);
-  background: var(--rose-50); color: var(--rose-700);  // AA sobre pastilla clara
+  background: var(--adm-cr-bg); color: var(--adm-cr-fg);  // AA sobre pastilla clara
   font-family: inherit; font-size: 13px; font-weight: 800;
   ion-icon { font-size: 17px; }
   &:active { transform: scale(.98); }
   &:disabled { opacity: .6; }
 }
 
-/* Preview de la vehiculo seleccionada (con su foto) */
-.vehiculo-sel {
+/* Preview de la moto seleccionada (con su foto) */
+.moto-sel {
   display: flex; align-items: center; gap: 12px; margin-top: 10px;
-  padding: 10px; border-radius: 14px; background: var(--n-50); border: 1px solid var(--hairline);
-  .ms-thumb { width: 48px; height: 48px; border-radius: 12px; overflow: hidden; flex-shrink: 0;
+  padding: 10px; border-radius: 2px; background: var(--sur2); border: 1px solid var(--bd);
+  .ms-thumb { width: 48px; height: 48px; border-radius: 2px; overflow: hidden; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    background: var(--rose-50); color: var(--ion-color-primary);
+    background: var(--adm-cr-bg); color: var(--cr-tx);
     img { width: 100%; height: 100%; object-fit: cover; display: block; }
     ion-icon { font-size: 24px; }
-    &.empty { background: var(--n-100); color: var(--n-400); } }
+    &.empty { background: var(--sur2); color: var(--tx3); } }
   .ms-info { display: flex; flex-direction: column; min-width: 0;
     strong { font-size: 14px; font-weight: 700; }
-    span { font-size: 12px; color: var(--text-accent); font-weight: 600; margin-top: 2px; } }  // AA
+    span { font-size: 12px; color: var(--cr-tx); font-weight: 600; margin-top: 2px; } }  // AA
 }
 
 /* Grupos de formulario (look del mockup) */
 .fg {
   margin-bottom: 14px;
   label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
-    color: var(--n-400); margin-bottom: 6px; }
+    color: var(--tx3); margin-bottom: 6px; }
   select, input, textarea {
-    width: 100%; padding: 11px 12px; border: 1px solid var(--hairline); border-radius: 12px;
-    font-family: inherit; font-size: 14px; background: var(--ion-card-background); color: var(--ion-text-color);
+    width: 100%; padding: 11px 12px; border: 1px solid var(--bd); border-radius: 2px;
+    font-family: inherit; font-size: 14px; background: var(--sur); color: var(--tx);
     outline: none; transition: border-color .15s;
     &:focus { border-color: var(--ion-color-primary); }
   }
   textarea { resize: none; min-height: 64px; }
-  .hint { font-size: 11px; color: var(--n-400); margin-top: 6px; }
+  .hint { font-size: 11px; color: var(--tx3); margin-top: 6px; }
 }
 
 /* Grilla de horas */
 .tg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .ts {
-  padding: 11px 4px; text-align: center; border-radius: 10px; cursor: pointer;
+  padding: 11px 4px; text-align: center; border-radius: 2px; cursor: pointer;
   font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;
-  border: 1px solid var(--hairline); background: var(--ion-card-background); color: var(--ion-text-color);
-  transition: all .15s;
+  border: 1px solid var(--bd); background: var(--sur); color: var(--tx);
+  transition: background-color .15s, border-color .15s, color .15s, box-shadow .15s, transform .15s, opacity .15s;
   &:active { transform: scale(.97); }
   &.sel { background: var(--ion-color-primary); color: #fff; border-color: var(--ion-color-primary);
-    box-shadow: 0 4px 12px rgba(var(--ion-color-primary-rgb), 0.25); }
-  &.full { background: var(--n-100); color: var(--n-400); border-color: transparent;
+    box-shadow: 0 4px 12px rgba(226, 35, 26, 0.25); }
+  &.full { background: var(--sur2); color: var(--tx3); border-color: transparent;
     text-decoration: line-through; cursor: not-allowed; }
 }
 
 .full-msg {
-  margin-top: 8px; padding: 10px 14px; border-radius: 12px; text-align: center;
+  margin-top: 8px; padding: 10px 14px; border-radius: 2px; text-align: center;
   background: #fef2f2; color: #dc2626; font-size: 12px; font-weight: 600;
 }
 
@@ -104,11 +105,26 @@
 .btn-limpiar {
   width: 100%; margin-top: 10px; padding: 11px; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  border: 1.5px solid var(--hairline); border-radius: var(--radius-pill);
-  background: none; color: var(--n-600);
+  border: 1.5px solid var(--bd); border-radius: var(--radius-pill);
+  background: none; color: var(--tx2);
   font-family: inherit; font-size: 13px; font-weight: 700;
   transition: transform .15s;
   ion-icon { font-size: 16px; }
   &:active { transform: scale(.98); }
   &:disabled { opacity: .5; }
+}
+
+/* Escritorio: los campos cortos de a dos por fila. Los horarios, la
+   descripción y los botones ocupan la fila entera. */
+@media (min-width: 1200px) {
+  .agendar { max-width: 900px; padding: 20px 32px 0; }
+  .agendar > .card:not(.sin-motos) {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 20px; align-items: start;
+    > .sugerir-btn, > .cta, > .btn-limpiar,
+    > .fg:has(.tg), > .fg:has(.hint), > .fg:has(textarea) { grid-column: 1 / -1; order: 2; }
+    /* "Sugerir horario" baja después de la fecha, para que la fecha quede al
+       lado del servicio y no sola en su fila. */
+    > .sugerir-btn { order: 1; }
+  }
 }

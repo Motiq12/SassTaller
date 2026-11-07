@@ -1,143 +1,146 @@
 <ion-header>
-  <ion-toolbar color="primary">
-    <ion-buttons slot="start">
-      <ion-back-button defaultHref="/tabs/dashboard"></ion-back-button>
+  <ion-toolbar class="admin-topbar">
+    <ion-buttons slot="start" *ngIf="dentroDelPanel"><ion-menu-button></ion-menu-button></ion-buttons>
+    <ion-buttons slot="start" *ngIf="!dentroDelPanel">
+      <ion-back-button defaultHref="/admin" text=""></ion-back-button>
     </ion-buttons>
     <ion-title>Garantías</ion-title>
   </ion-toolbar>
-  <ion-toolbar>
-    <ion-segment [(ngModel)]="filtroEstado" (ngModelChange)="filtrar()" scrollable="true">
-      <ion-segment-button *ngFor="let e of estados" [value]="e.valor">
-        <ion-label>{{ e.label }}</ion-label>
-      </ion-segment-button>
-    </ion-segment>
-  </ion-toolbar>
 </ion-header>
 
-<ion-content>
+<ion-content class="admin-dark">
   <ion-refresher slot="fixed" (ionRefresh)="cargar(); $event.target.complete()">
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
-  <div class="skeleton-wrap" *ngIf="cargando" style="max-width:900px">
-    <div class="skeleton" style="height:150px;margin-bottom:14px"></div>
-    <div class="skeleton" style="height:150px;margin-bottom:14px"></div>
-    <div class="skeleton" style="height:150px"></div>
-  </div>
+  <div class="pg">
+    <header class="pg-cab">
+      <div>
+        <h1>Garantías</h1>
+        <p>Reclamos de clientes por trabajos ya entregados. Se registran desde la orden.</p>
+      </div>
+    </header>
 
-  <div *ngIf="!cargando">
-    <ion-list style="padding:0 8px">
-      <ion-card *ngFor="let g of garantias" button (click)="abrir(g)" class="garantia-card">
-        <ion-card-content>
-          <div class="garantia-top">
-            <span class="garantia-orden">{{ g.numero_orden }}</span>
-            <ion-badge [color]="estadoColor(g.estado!)">{{ estadoLabel(g.estado!) }}</ion-badge>
-          </div>
-          <p class="garantia-vehiculo">
-            <ion-icon name="bicycle-outline"></ion-icon>
-            {{ g.marca }} {{ g.modelo }}
-            <span *ngIf="g.placa"> · {{ g.placa }}</span>
-          </p>
-          <p class="garantia-cliente">{{ g.cliente_nombre }} {{ g.cliente_apellido }}</p>
-          <p class="garantia-problema">{{ g.descripcion_problema }}</p>
-          <div class="garantia-meta">
-            <span *ngIf="g.cubre_repuestos" class="cobertura"><ion-icon name="cube-outline"></ion-icon> Repuestos</span>
-            <span *ngIf="g.cubre_mano_obra" class="cobertura"><ion-icon name="construct-outline"></ion-icon> Mano de obra</span>
-            <span class="garantia-fecha">{{ g.created_at | date:'dd/MM/yyyy' }}</span>
-          </div>
-        </ion-card-content>
-      </ion-card>
-    </ion-list>
-
-    <div class="empty-state" *ngIf="garantias.length === 0">
-      <ion-icon name="shield-checkmark-outline"></ion-icon>
-      <p>No hay reclamos de garantía{{ filtroEstado ? ' con ese estado' : '' }}</p>
+    <!-- Estado del trámite: filtra en el servidor -->
+    <div class="pg-filtros" role="tablist">
+      <button type="button" *ngFor="let e of estados" class="chip-filtro" role="tab"
+              [class.on]="filtroEstado === e.valor" [attr.aria-selected]="filtroEstado === e.valor"
+              (click)="filtroEstado = e.valor; filtrar()">
+        {{ e.label }}
+      </button>
     </div>
 
-    <div style="height:40px"></div>
+    <section class="cd pg-card">
+      <div class="pg-card-cab">
+        <span class="cd-title"><ion-icon name="shield-checkmark-outline"></ion-icon> Reclamos</span>
+        <span class="pg-cuenta" *ngIf="!cargando">{{ garantias.length }} {{ garantias.length === 1 ? 'reclamo' : 'reclamos' }}</span>
+      </div>
+
+      <div class="ga-sk" *ngIf="cargando">
+        <div class="sk-dark" style="height:64px" *ngFor="let i of [1,2,3]"></div>
+      </div>
+
+      <div class="pg-lista" *ngIf="!cargando && garantias.length">
+        <div class="pg-item ga-item" *ngFor="let g of garantias" (click)="abrir(g)" (keydown.enter)="abrir(g)"
+             tabindex="0" role="button" [attr.aria-label]="'Abrir reclamo de ' + g.numero_orden">
+          <div class="pg-item-txt">
+            <div class="ga-linea">
+              <span class="mono ga-orden">{{ g.numero_orden }}</span>
+              <span class="pill" [ngClass]="estadoPill(g.estado!)">{{ estadoLabel(g.estado!) }}</span>
+            </div>
+            <strong>{{ g.marca }} {{ g.modelo }}<ng-container *ngIf="g.placa"> · <span class="mono">{{ g.placa }}</span></ng-container></strong>
+            <span>{{ g.cliente_nombre }} {{ g.cliente_apellido }} · {{ g.created_at | date:'dd/MM/yyyy' }}</span>
+            <span class="ga-problema">{{ g.descripcion_problema }}</span>
+            <div class="ga-cubre" *ngIf="g.cubre_repuestos || g.cubre_mano_obra">
+              <span *ngIf="g.cubre_repuestos"><ion-icon name="cube-outline"></ion-icon> Repuestos</span>
+              <span *ngIf="g.cubre_mano_obra"><ion-icon name="construct-outline"></ion-icon> Mano de obra</span>
+            </div>
+          </div>
+          <ion-icon name="chevron-forward" class="ga-chev" aria-hidden="true"></ion-icon>
+        </div>
+      </div>
+
+      <div class="pg-vacio" *ngIf="!cargando && !garantias.length">
+        <ion-icon name="shield-checkmark-outline"></ion-icon>
+        {{ filtroEstado ? 'No hay reclamos con ese estado.' : 'No hay reclamos de garantía. Se registran desde el detalle de una orden entregada.' }}
+      </div>
+    </section>
   </div>
 </ion-content>
 
-<!-- Modal de gestión del trámite -->
-<ion-modal [isOpen]="modalAbierto" (didDismiss)="cerrarModal()">
+<!-- Gestión del trámite. Ionic monta el modal fuera de .admin-dark: el contenedor
+     de adentro la vuelve a poner para que tome los colores del panel. -->
+<ion-modal class="adm-modal" [isOpen]="modalAbierto" (didDismiss)="cerrarModal()">
   <ng-template>
-    <ion-header>
-      <ion-toolbar color="primary">
-        <ion-title>{{ seleccionada?.numero_orden }}</ion-title>
-        <ion-buttons slot="end">
-          <ion-button (click)="cerrarModal()"><ion-icon name="close"></ion-icon></ion-button>
-        </ion-buttons>
-      </ion-toolbar>
-    </ion-header>
-    <ion-content class="ion-padding" *ngIf="seleccionada">
-      <!-- Contexto -->
-      <ion-card>
-        <ion-card-content>
-          <p class="modal-vehiculo"><strong>{{ seleccionada.marca }} {{ seleccionada.modelo }}</strong>
-            <span *ngIf="seleccionada.placa"> · {{ seleccionada.placa }}</span></p>
-          <p class="modal-cliente">{{ seleccionada.cliente_nombre }} {{ seleccionada.cliente_apellido }}
-            <span *ngIf="seleccionada.cliente_telefono"> · {{ seleccionada.cliente_telefono }}</span></p>
-          <p class="modal-problema"><strong>Problema:</strong> {{ seleccionada.descripcion_problema }}</p>
-          <p class="modal-creado" *ngIf="seleccionada.creado_por_nombre">
+    <div class="admin-dark adm-modal-box" *ngIf="seleccionada">
+      <div class="amb-head">
+        <span class="cd-title">Garantía · <span class="mono">{{ seleccionada.numero_orden }}</span></span>
+        <button type="button" class="amb-x" (click)="cerrarModal()" aria-label="Cerrar"><ion-icon name="close"></ion-icon></button>
+      </div>
+
+      <div class="amb-body">
+        <!-- Contexto -->
+        <div class="ga-ctx">
+          <strong>{{ seleccionada.marca }} {{ seleccionada.modelo }}<ng-container *ngIf="seleccionada.placa"> · <span class="mono">{{ seleccionada.placa }}</span></ng-container></strong>
+          <span>{{ seleccionada.cliente_nombre }} {{ seleccionada.cliente_apellido }}<ng-container *ngIf="seleccionada.cliente_telefono"> · {{ seleccionada.cliente_telefono }}</ng-container></span>
+          <p><b>Problema:</b> {{ seleccionada.descripcion_problema }}</p>
+          <span class="ga-registro" *ngIf="seleccionada.creado_por_nombre">
             Registrado por {{ seleccionada.creado_por_nombre }} · {{ seleccionada.created_at | date:'dd/MM/yyyy HH:mm' }}
-          </p>
-        </ion-card-content>
-      </ion-card>
+          </span>
+        </div>
 
-      <!-- Trámite -->
-      <ion-card>
-        <ion-card-header><ion-card-title>Trámite</ion-card-title></ion-card-header>
-        <ion-card-content>
-          <ion-item>
-            <ion-select label="Estado" labelPlacement="floating" [(ngModel)]="edicion.estado"
-              [disabled]="!puedeGestionar" interface="action-sheet">
-              <ion-select-option *ngFor="let e of estadosTramite" [value]="e">{{ estadoLabel(e) }}</ion-select-option>
-            </ion-select>
-          </ion-item>
-          <ion-item>
-            <ion-checkbox slot="start" [(ngModel)]="edicion.cubre_repuestos" [disabled]="!puedeGestionar"></ion-checkbox>
-            <ion-label>Cubre repuestos</ion-label>
-          </ion-item>
-          <ion-item>
-            <ion-checkbox slot="start" [(ngModel)]="edicion.cubre_mano_obra" [disabled]="!puedeGestionar"></ion-checkbox>
-            <ion-label>Cubre mano de obra</ion-label>
-          </ion-item>
-          <ion-item lines="none">
-            <ion-textarea label="Resolución / notas" labelPlacement="floating"
-              [(ngModel)]="edicion.resolucion" rows="3" [disabled]="!puedeGestionar"></ion-textarea>
-          </ion-item>
-          <ion-button expand="block" class="ion-margin-top" (click)="guardarTramite()" *ngIf="puedeGestionar">
-            <ion-icon name="save-outline" slot="start"></ion-icon>
-            Guardar trámite
-          </ion-button>
-          <p *ngIf="!puedeGestionar" class="solo-lectura">Solo administración puede gestionar el trámite.</p>
-        </ion-card-content>
-      </ion-card>
+        <!-- Trámite -->
+        <span class="cd-title ga-sub">Trámite</span>
+        <div class="fg">
+          <label for="ga-estado">Estado</label>
+          <select id="ga-estado" [(ngModel)]="edicion.estado" [disabled]="!puedeGestionar">
+            <option *ngFor="let e of estadosTramite" [ngValue]="e">{{ estadoLabel(e) }}</option>
+          </select>
+        </div>
+        <div class="ga-checks">
+          <label class="ga-check">
+            <input type="checkbox" [(ngModel)]="edicion.cubre_repuestos" [disabled]="!puedeGestionar" /> Cubre repuestos
+          </label>
+          <label class="ga-check">
+            <input type="checkbox" [(ngModel)]="edicion.cubre_mano_obra" [disabled]="!puedeGestionar" /> Cubre mano de obra
+          </label>
+        </div>
+        <div class="fg">
+          <label for="ga-resol">Resolución o notas</label>
+          <textarea id="ga-resol" [(ngModel)]="edicion.resolucion" rows="3" [disabled]="!puedeGestionar"
+                    placeholder="Qué se decidió y por qué"></textarea>
+        </div>
+        <p *ngIf="!puedeGestionar" class="ga-solo">Solo administración puede gestionar el trámite.</p>
 
-      <!-- Evidencia -->
-      <ion-card>
-        <ion-card-header><ion-card-title>Evidencia</ion-card-title></ion-card-header>
-        <ion-card-content>
-          <input #fileInput type="file" accept="image/*" capture="environment"
-                 hidden (change)="onArchivoSeleccionado($event)" />
-          <ion-button expand="block" fill="outline" (click)="fileInput.click()" [disabled]="subiendoFoto">
-            <ion-spinner *ngIf="subiendoFoto" name="crescent" slot="start"></ion-spinner>
-            <ion-icon *ngIf="!subiendoFoto" name="camera-outline" slot="start"></ion-icon>
-            {{ subiendoFoto ? 'Subiendo...' : 'Agregar evidencia' }}
-          </ion-button>
-
-          <p *ngIf="!seleccionada.fotos?.length" class="sin-fotos">Sin evidencia</p>
-
-          <div class="foto-grid" *ngIf="seleccionada.fotos?.length">
-            <div class="foto-thumb" *ngFor="let f of seleccionada.fotos">
-              <img [src]="f.url" (click)="verFoto(f.url)" alt="evidencia" />
-              <ion-button class="foto-del" fill="clear" size="small" (click)="eliminarFoto(f.id!)">
-                <ion-icon name="close-circle" color="danger"></ion-icon>
-              </ion-button>
-            </div>
+        <!-- Evidencia -->
+        <span class="cd-title ga-sub">Evidencia</span>
+        <input #fileInput type="file" accept="image/*" capture="environment" hidden (change)="onArchivoSeleccionado($event)" />
+        <div class="ga-fotos">
+          <div class="ga-foto" *ngFor="let f of seleccionada.fotos">
+            <button type="button" class="ga-foto-ver" (click)="verFoto(f.url)" aria-label="Ver foto">
+              <img [src]="f.url" alt="Evidencia de la garantía" />
+            </button>
+            <button type="button" class="ga-foto-x" (click)="eliminarFoto(f.id!)" aria-label="Eliminar foto">
+              <ion-icon name="close"></ion-icon>
+            </button>
           </div>
-        </ion-card-content>
-      </ion-card>
-    </ion-content>
+          <button type="button" class="ga-foto-add" (click)="fileInput.click()" [disabled]="subiendoFoto">
+            <ion-spinner *ngIf="subiendoFoto" name="crescent"></ion-spinner>
+            <ion-icon *ngIf="!subiendoFoto" name="camera-outline"></ion-icon>
+            <span>{{ subiendoFoto ? 'Subiendo…' : 'Agregar foto' }}</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="amb-foot">
+        <span class="amb-tip">Las fotos se guardan al subirlas.</span>
+        <div class="amb-btns">
+          <button type="button" class="btn btn-ou" (click)="cerrarModal()">Cerrar</button>
+          <button type="button" class="btn btn-cr" (click)="guardarTramite()" *ngIf="puedeGestionar">
+            <ion-icon name="save-outline"></ion-icon> Guardar trámite
+          </button>
+        </div>
+      </div>
+    </div>
   </ng-template>
 </ion-modal>

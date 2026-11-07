@@ -1,15 +1,14 @@
 require('dotenv').config();
 const express = require('express');
+const { fail } = require('./utils/responder');
 const cors = require('cors');
 const compression = require('compression');
 const path = require('path');
 const fs = require('fs');
 const { testConnection } = require('./db/pool');
 const { ensureSchema } = require('./db/auto-migrate');
-const { verificarListaContraEsquema } = require('./db/tenant-db');
+const { sincronizarSitioWeb } = require('./utils/sitio-estado');
 const { iniciarJobs } = require('./jobs/scheduler');
-const { iniciarRefrescoEstados } = require('./utils/estado-tenant');
-const { iniciarRefrescoLimites } = require('./utils/limites');
 const { apiLimiter, authLimiter, adminLimiter } = require('./middleware/rate-limit');
 
 const app = express();
@@ -33,7 +32,8 @@ if (esProduccion) {
   if (!process.env.CORS_ORIGIN && !hasFrontend) {
     console.warn('⚠️  CORS_ORIGIN no definido en producción. Usando default restrictivo.');
   }
-  if (!process.env.DB_HOST || !process.env.DB_NAME) {
+  // Con MYSQL_URL (Railway) DB_HOST y DB_NAME no hacen falta: antes avisaba igual.
+  if (!process.env.MYSQL_URL && (!process.env.DB_HOST || !process.env.DB_NAME)) {
     console.warn('⚠️  Variables de DB incompletas (DB_HOST, DB_NAME). Verificá la configuración.');
   }
 }
@@ -63,14 +63,16 @@ app.use(compression());
 // las tipografías desde fonts.gstatic.com — se permiten explícitamente en style/font.
 // Cloudflare Turnstile (captcha anti-bot): carga un script y un iframe desde
 // challenges.cloudflare.com, y verifica por fetch. Se permite en script/frame/connect.
+// Entrar con Google (botón de Google Identity Services): script, estilos, iframe y
+// fetch a accounts.google.com.
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://accounts.google.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data: https://fonts.gstatic.com",
-  "connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://challenges.cloudflare.com",
-  "frame-src https://challenges.cloudflare.com",
+  "connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://challenges.cloudflare.com https://accounts.google.com",
+  "frame-src https://challenges.cloudflare.com https://accounts.google.com",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -106,9 +108,14 @@ const ORIGENES_PERMITIDOS = new Set([
   'http://localhost:8100',  // ionic serve en desarrollo
   ...(process.env.CORS_ORIGIN || '').split(',').map((s) => s.trim()).filter(Boolean),
 ]);
-app.use(cors({
+// /api/sitio es lo que usa el sitio web público, que vive en otro dominio (y
+// mientras no tenga uno propio, en cualquiera): contenido publicado, fotos y el
+// formulario de consultas. Son públicos y no usan sesión, así que se abren a
+// cualquier origen; el resto de la API sigue con la lista de arriba.
+app.use(cors((req, cb) => {
+  if (req.path.startsWith('/api/sitio/')) return cb(null, { origin: '*' });
   // Sin header Origin (same-origin, curl, healthcheck) se permite sin emitir CORS.
-  origin: (origin, cb) => cb(null, !origin || ORIGENES_PERMITIDOS.has(origin)),
+  cb(null, { origin: (origin, cb2) => cb2(null, !origin || ORIGENES_PERMITIDOS.has(origin)) });
 }));
 
 app.use(express.json({ limit: '10mb' }));
@@ -128,14 +135,13 @@ app.use([
 app.use('/api', apiLimiter);
 app.use('/api/admin', adminLimiter);
 
+// El mecánico no recibe montos ni el teléfono del cliente en ninguna respuesta.
+app.use('/api', require('./middleware/ocultar-al-mecanico'));
+
 app.use('/api/auth',      require('./routes/auth.routes'));
-app.use('/api/onboarding', require('./routes/onboarding.routes'));
-app.use('/api/motiq',     require('./routes/motiq.routes'));
-app.use('/api/avisos',    require('./routes/avisos.routes'));
-app.use('/api/reportes',  require('./routes/reportes.routes'));
 app.use('/api/marca',     require('./routes/marca.routes'));
 app.use('/api/clientes',  require('./routes/clientes.routes'));
-app.use('/api/vehiculos', require('./routes/vehiculos.routes'));
+app.use('/api/motos',     require('./routes/motos.routes'));
 app.use('/api/ordenes',   require('./routes/ordenes.routes'));
 app.use('/api/citas',     require('./routes/citas.routes'));
 app.use('/api/usuarios',  require('./routes/usuarios.routes'));
@@ -148,10 +154,20 @@ app.use('/api/recepcion', require('./routes/recepcion.routes'));
 app.use('/api/mensajeria', require('./routes/mensajeria.routes'));
 app.use('/api/admin',     require('./routes/admin.routes'));
 app.use('/api/metricas',  require('./routes/metricas.routes'));
+app.use('/api/web',       require('./routes/web.routes'));    // administración del sitio web
+app.use('/api/sitio',     require('./routes/sitio.routes'));  // lo publicado, para el build del sitio
+app.use('/api/monitor',   require('./routes/monitor.routes')); // el vigilante de n8n (clave propia)
 
+// Una dirección de la API que no existe responde 404 en JSON. Sin esto caía en la
+// app (index.html con 200) y quien llamaba no se enteraba de que no existía.
+app.use('/api', (req, res) => res.status(404).json({ error: 'No encontrado' }));
+
+// Lo que se escapa de las rutas. Una foto demasiado pesada o un cuerpo que no es JSON
+// no son fallas del servidor: se dicen como tales, para que se entienda qué pasó.
 app.use('/api', (err, req, res, next) => {
-  console.error('Error:', err.message);
-  res.status(500).json({ error: 'Error interno del servidor' });
+  if (err.type === 'entity.too.large') return res.status(413).json({ error: 'El archivo es demasiado pesado' });
+  if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Los datos llegaron mal formados' });
+  fail(res, err);
 });
 
 if (hasFrontend) {
@@ -195,22 +211,11 @@ const correrJobs = bajoCluster ? process.env.JOBS === '1' : true;
 (async () => {
   await testConnection();
   if (!bajoCluster) await ensureSchema();
-  // Después de migrar: avisa si alguna tabla con tenant_id quedó fuera de la lista
-  // del guard (o al revés). Sin esto, una tabla nueva pasaría sin filtro por tenant
-  // y el guard la dejaría entrar sin quejarse.
-  await verificarListaContraEsquema();
-  // Qué talleres están suspendidos, en memoria y antes de escuchar: los middlewares
-  // lo consultan en cada request y no puede haber una ventana donde uno suspendido
-  // trabaje porque la foto todavía no cargó.
-  await iniciarRefrescoEstados();
-  // Los límites y el precio de cada plan, editables desde el panel de Motiq (ver
-  // utils/limites.js). Misma razón que el refresco de arriba: se consulta en cada
-  // alta de usuario o sucursal, y no puede haber una ventana donde un plan recién
-  // editado siga usando el valor viejo porque la foto todavía no cargó.
-  await iniciarRefrescoLimites();
   // Tareas de fondo (recordatorios de cita, no-show). Después de migrar, para que
   // las columnas que usan (recordatorio_enviado, no_show) ya existan.
   // Solo un proceso las programa: si no, cada cliente recibiría un correo por worker.
   if (correrJobs) iniciarJobs();
+  // ¿Cambió SITIO_WEB_ACTIVO desde el último arranque? Un solo proceso lo revisa.
+  if (correrJobs) sincronizarSitioWeb().catch((err) => console.error('Sitio web:', err.message));
   app.listen(PORT, () => console.log(`🚀 Servidor en http://localhost:${PORT}${bajoCluster ? ` (worker ${process.pid}${correrJobs ? ', con jobs' : ''})` : ''}`));
 })();

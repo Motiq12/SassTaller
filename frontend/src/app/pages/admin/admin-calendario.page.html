@@ -55,7 +55,7 @@
           <span class="cd-title">Leyenda</span>
           <div class="legend-list">
             <div class="legend-item" *ngFor="let m of leyenda">
-              <div class="legend-dot" [style.background]="m.color.fg"></div>{{ m.nombre }}
+              <div class="legend-dot" [style.background]="m.color.solido"></div>{{ m.nombre }}
             </div>
             <div class="legend-item" *ngIf="!leyenda.length">Sin mecánicos activos.</div>
           </div>
@@ -70,7 +70,7 @@
           <h4>{{ detalleTitulo() }}</h4>
           <div class="mec-row" *ngFor="let m of diaSel.mecanicos">
             <div class="mec-name">
-              <div class="mec-av-sm" [style.background]="m.color.fg">{{ m.iniciales }}</div>
+              <div class="mec-av-sm" [style.background]="m.color.solido">{{ m.iniciales }}</div>
               {{ m.nombre }}
             </div>
             <span class="mec-cnt">{{ m.n }} {{ m.n === 1 ? 'cita' : 'citas' }}</span>

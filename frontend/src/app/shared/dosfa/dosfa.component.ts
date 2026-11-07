@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -13,9 +13,6 @@ import { AuthService } from '../../services/auth.service';
   styleUrls: ['./dosfa.component.scss'],
 })
 export class DosFaComponent implements OnInit, OnDestroy {
-  private auth = inject(AuthService);
-  private toast = inject(ToastController);
-
   private destroy$ = new Subject<void>();
 
   estado = { activado: false, backup_restantes: 0 };
@@ -23,7 +20,9 @@ export class DosFaComponent implements OnInit, OnDestroy {
   codigo = '';
   passBaja = '';
   procesando = false;
-  codigosRespaldo: string[] = [];
+  codigosRespaldo: string[] = [];   // solo en memoria: se muestran una única vez
+
+  constructor(private auth: AuthService, private toast: ToastController) {}
 
   ngOnInit() { this.cargar(); }
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }

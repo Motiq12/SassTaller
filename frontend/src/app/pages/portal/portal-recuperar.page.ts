@@ -1,11 +1,11 @@
-import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild, inject } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PortalService } from '../../services/portal.service';
-import { emailValido } from '../../shared/utils/validar.util';
-import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../shared/utils/turnstile.util';
+import { emailValido } from '../../utils/validar';
+import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../shared/turnstile.util';
 
 @Component({
   standalone: false,
@@ -14,11 +14,6 @@ import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../sha
   styleUrls: ['./portal-login.page.scss'],
 })
 export class PortalRecuperarPage implements AfterViewInit, OnDestroy {
-  private portal = inject(PortalService);
-  private router = inject(Router);
-  private loading = inject(LoadingController);
-  private toast = inject(ToastController);
-
   private destroy$ = new Subject<void>();
   paso: 1 | 2 = 1;
   email = '';
@@ -38,6 +33,13 @@ export class PortalRecuperarPage implements AfterViewInit, OnDestroy {
   @ViewChild('tsBox') tsBox?: ElementRef<HTMLElement>;
   private ts?: TurnstileWidget;
 
+  constructor(
+    private portal: PortalService,
+    private router: Router,
+    private loading: LoadingController,
+    private toast: ToastController
+  ) {}
+
   async ngAfterViewInit() {
     if (this.tsBox) this.ts = await montarTurnstile(this.tsBox.nativeElement);
   }
@@ -55,11 +57,11 @@ export class PortalRecuperarPage implements AfterViewInit, OnDestroy {
 
   get validoPaso2(): boolean {
     return !!(this.codigo.trim().length === 6 &&
-      this.password.length >= 6 && this.password === this.confirmar);
+      this.password.length >= 8 && this.password === this.confirmar);
   }
 
   async solicitar() {
-    if (!this.emailOk) return this.mostrar('Ingresá un correo válido', 'warning');
+    if (!this.emailOk) return this.mostrar('Ingresa un correo válido', 'warning');
     const l = await this.loading.create({ message: 'Enviando código...', cssClass: 'portal-loading', spinner: 'crescent' });
     await l.present();
     this.portal.solicitarCodigo(this.email.trim(), { website: this.website, turnstileToken: this.ts?.token() || '' })
@@ -87,7 +89,7 @@ export class PortalRecuperarPage implements AfterViewInit, OnDestroy {
   async confirmar_() {
     if (!this.validoPaso2) {
       if (this.codigo.trim().length !== 6) return this.mostrar('El código tiene 6 dígitos', 'warning');
-      if (this.password.length < 6) return this.mostrar('La contraseña debe tener al menos 6 caracteres', 'warning');
+      if (this.password.length < 8) return this.mostrar('La contraseña debe tener al menos 8 caracteres', 'warning');
       if (this.password !== this.confirmar) return this.mostrar('Las contraseñas no coinciden', 'warning');
       return;
     }
@@ -104,10 +106,6 @@ export class PortalRecuperarPage implements AfterViewInit, OnDestroy {
         this.mostrar(err.error?.error || 'No se pudo restablecer la contraseña', 'danger');
       },
     });
-  }
-
-  irLogin() {
-    this.router.navigate(['/portal/login']);
   }
 
   private iniciarCooldown() {

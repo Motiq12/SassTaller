@@ -1,22 +1,25 @@
-// Configuración del taller (una fila por taller en la tabla `configuracion`).
+// Configuración del taller (fila única en la tabla `configuracion`).
 // Centraliza datos del negocio, horarios de atención, capacidad de la agenda y
 // preferencias de notificación. El portal lee de aquí los cupos/horas agendables.
-//
-// Multi-tenant: recibe el `db` scopeado (req.db) y NO cae a un pool global. Si la
-// llamada llega sin él, revienta en vez de leer la configuración de otro taller.
+const { pool } = require('../db/pool');
+const { normalizarPlantillas } = require('./plantillas');
+const { normalizarTextosPortal } = require('./textos-portal');
 
 // Valores por defecto: idénticos a los antes hardcodeados (utils/servicios.js),
 // así el comportamiento inicial no cambia aunque la fila aún no exista.
 const DEFAULTS = {
-  // Neutro a proposito: este es el valor que ve un taller que todavia no cargo su
-  // nombre. Poner acá el de otro taller es el problema que estamos corrigiendo.
-  nombre_taller: 'Mi taller',
+  nombre_taller: 'MS Motos',
   telefono: '',
   email: '',
   direccion: '',
   logo: null,
-  // Color de marca del taller. null = el sistema usa el suyo por defecto.
-  color_primario: null,
+  // Datos de facturación (comprobante de la orden). Vacíos hasta que el taller los cargue.
+  razon_social: '',
+  cedula_juridica: '',
+  nota_factura: '',
+  // Contraseñas del personal (utils/contrasena.js).
+  pass_min_largo: 8,
+  pass_variedad: 0,
   max_citas_hora: 2,
   dias_anticipacion: 30,
   duracion_cita_min: 90,
@@ -54,20 +57,15 @@ const DEFAULTS = {
 
 // Caché en memoria: /disponibilidad del portal pega seguido; evita leer la BD
 // en cada request. Se invalida al guardar (clearCache) y por TTL como respaldo.
-//
-// La caché es POR TALLER. Con una sola variable global, la config del primer taller
-// que consultara quedaría servida al siguiente durante el TTL: una fuga que no pasa
-// por SQL, así que ni el guard de tenant-db ni los índices la detectarían.
-const cache = new Map(); // tenantId -> { config, at }
+let cache = null;
+let cacheAt = 0;
 const TTL_MS = 30 * 1000;
 
-async function getConfig(db) {
-  if (!db || !db.tenantId) throw new Error('getConfig: falta el db scopeado (req.db)');
-  const guardado = cache.get(db.tenantId);
-  if (guardado && Date.now() - guardado.at < TTL_MS) return guardado.config;
+async function getConfig() {
+  if (cache && Date.now() - cacheAt < TTL_MS) return cache;
   let row = {};
   try {
-    const [[r]] = await db.query('SELECT * FROM configuracion WHERE tenant_id = @tenant AND id = 1');
+    const [[r]] = await pool.query('SELECT * FROM configuracion WHERE id = 1');
     if (r) row = r;
   } catch (_) {
     // Tabla aún no migrada / sin fila: se usan los DEFAULTS.
@@ -86,16 +84,17 @@ async function getConfig(db) {
     ...row,
     horarios: listaJson(row.horarios, DEFAULTS.horarios),
     metodos_pago: listaJson(row.metodos_pago, DEFAULTS.metodos_pago),
+    plantillas: normalizarPlantillas(row.plantillas),
+    portal_textos: normalizarTextosPortal(row.portal_textos),
   };
-  cache.set(db.tenantId, { config, at: Date.now() });
+  cache = config;
+  cacheAt = Date.now();
   return config;
 }
 
-// Invalida la caché de UN taller (al guardar su configuración). Sin argumento limpia
-// todo, que es lo que quieren los tests.
-function clearCache(tenantId) {
-  if (tenantId == null) cache.clear();
-  else cache.delete(tenantId);
+function clearCache() {
+  cache = null;
+  cacheAt = 0;
 }
 
 // Día de semana (0=Dom … 6=Sáb) de una fecha 'YYYY-MM-DD', estable ante la zona

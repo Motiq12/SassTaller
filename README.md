@@ -37,7 +37,7 @@ seguimiento de su moto, aprobación de presupuestos y calificación.
 
 ## Requisitos
 
-- Node.js 18+
+- Node.js 22+
 - MySQL Server 8.x
 - Ionic CLI y Angular CLI
 
@@ -45,20 +45,7 @@ seguimiento de su moto, aprobación de presupuestos y calificación.
 
 ## 1. Base de datos
 
-Con MySQL corriendo (en Laragon: **Start All**), importá la base del repo:
-
-```bash
-cd backend
-npm install
-npm run db:importar
-```
-
-Eso recrea la base `sasstaller` con el volcado `backend/db/sasstaller.sql`, que ya trae
-el esquema al día y dos talleres de prueba. **Si ya la tenías, la reemplaza**: la idea es
-que todos arranquen desde lo mismo. El detalle de qué trae está en
-[`backend/db/README.md`](backend/db/README.md).
-
-Después copiá `backend/.env.example` a `backend/.env` y completá los valores:
+Creá la base y configurá `backend/.env` (copia de `backend/.env.example`):
 
 ```
 PORT=3000
@@ -66,27 +53,32 @@ DB_HOST=localhost
 DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=
-DB_NAME=sasstaller
+DB_NAME=taller_motos
 CORS_ORIGIN=http://localhost:8100
-JWT_SECRET=                # obligatorio; en producción el server aborta si falta
-RESEND_API_KEY=            # opcional; sin key, los códigos se imprimen en consola
+RESEND_API_KEY=          # opcional; sin key, los códigos se imprimen en consola
 ```
 
-Las cuentas vienen en el volcado (ver `backend/db/README.md`); el `.env` no está en el
-repo porque lleva el `JWT_SECRET`, así que pedíselo a quien te pasó el proyecto.
-
-Para entrar al panel de la plataforma necesitás crear tu propia cuenta, porque esas no
-vienen en el volcado a propósito:
+Cargá el esquema:
 
 ```bash
-npm run motiq:admin -- "Tu nombre" vos@motiq.cr
+cd backend
+node src/db/migrate.js
 ```
 
-> **Sobre las migraciones.** La API corre migraciones idempotentes (`ensureSchema`) en
-> cada arranque, así que el esquema se mantiene al día solo en cada deploy. Los archivos
-> de `backend/migrations/` son el registro de cómo se llegó hasta acá: **no los ejecuta
-> ningún script** y el volcado ya los tiene aplicados. Solo hacen falta para entender un
-> cambio o para migrar a mano una base vieja.
+Crea las tablas (`backend/schema.sql`). Las cuentas iniciales se crean **solo** si
+definís sus contraseñas en variables de entorno antes de migrar, para que nunca quede
+una contraseña escrita en el repositorio:
+
+```
+SEED_ADMIN_PASSWORD=...   # cuenta de administración (SEED_ADMIN_EMAIL, por defecto admin@taller.com)
+SEED_RECEP_PASSWORD=...   # cuenta de recepción (SEED_RECEP_EMAIL, por defecto recepcion@taller.com)
+```
+
+> Versiones anteriores de este README traían contraseñas de ejemplo. Si alguna cuenta
+> todavía usa una de ellas, cambiala desde **Mi perfil → Cambiar contraseña**.
+
+> La API además corre **migraciones idempotentes** (`ensureSchema`) en cada arranque,
+> así que el esquema se mantiene al día solo en cada deploy.
 
 ---
 
@@ -94,14 +86,15 @@ npm run motiq:admin -- "Tu nombre" vos@motiq.cr
 
 ```bash
 cd backend
-npm run dev        # recarga automática (nodemon), un solo proceso
+npm install
+npm run dev        # recarga automática (nodemon)
 # o
-npm start          # multiproceso (cluster), como en producción
+npm start
 npm test           # tests unitarios
 ```
 
-API en **http://localhost:3000**, montada bajo `/api` (auth, clientes, vehiculos, citas,
-ordenes, recepcion, mecanico, admin, garantias, promos, portal, motiq…).
+API en **http://localhost:3000**, montada bajo `/api` (auth, clientes, motos, citas,
+ordenes, recepcion, mecanico, admin, garantias, promos, portal…).
 
 ---
 
@@ -124,3 +117,13 @@ La URL de la API se configura en `frontend/src/environments/`.
 
 Railway despliega automáticamente al hacer **push a `main`**. La API sirve el build
 del frontend y ejecuta las migraciones al arrancar; no hay pasos manuales de base de datos.
+
+### Variables de producción (servicio Proyecto-taller)
+
+- `MYSQL_URL` y `JWT_SECRET`: la conexión a la base y la firma de las sesiones.
+- `RESEND_API_KEY` y `MAIL_FROM`: los correos. `MAIL_FROM` tiene que ser una dirección
+  de un **dominio verificado en Resend** (por ejemplo `MS Motos <no-reply@dominio-del-taller>`).
+  Con el remitente de prueba (`onboarding@resend.dev`) Resend solo entrega a la dueña de
+  la cuenta: los clientes no reciben el código para registrarse ni los avisos.
+- `RESPALDO_*`: el respaldo diario de la base (`backend/scripts/respaldos.js`).
+- `SITIO_WEB_ACTIVO=1`: enciende lo del sitio web en el panel; sin la variable queda apagado.
