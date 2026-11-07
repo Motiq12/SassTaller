@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { pool } = require('../db/pool');
+// Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
 const { fail } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
@@ -18,6 +18,12 @@ router.param('id', exigirSucursal(SUCURSAL_DE_GARANTIA));
 const ESTADOS = ['abierto', 'en_revision', 'aprobado', 'rechazado', 'resuelto'];
 
 // SELECT base con datos de la orden/cliente/moto para mostrar el reclamo en contexto
+// El filtro por taller va en CADA tabla, no solo en la principal. Con el JOIN
+// scopeado pero `garantias` suelta —o al revés— la consulta devolvería igual filas
+// de otros talleres, y una comprobación global la dejaría pasar (ver db/tenant-db).
+//
+// La base termina en WHERE para que quien la use siga con AND. Antes cada llamador
+// ponía su propio WHERE, y con el filtro acá adentro habría quedado duplicado.
 const SELECT_GARANTIA = `
   SELECT g.*,
          o.numero_orden, o.fecha_entrega_real, o.garantia_dias,
@@ -25,10 +31,11 @@ const SELECT_GARANTIA = `
          c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.telefono AS cliente_telefono,
          u.nombre AS creado_por_nombre
   FROM garantias g
-  JOIN ordenes_trabajo o ON o.id = g.orden_id
-  JOIN motos m           ON m.id = o.moto_id
-  JOIN clientes c        ON c.id = o.cliente_id
-  LEFT JOIN usuarios u   ON u.id = g.creado_por
+  JOIN ordenes_trabajo o ON o.id = g.orden_id     AND o.tenant_id = @tenant
+  JOIN vehiculos m       ON m.id = o.vehiculo_id  AND m.tenant_id = @tenant
+  JOIN clientes c        ON c.id = o.cliente_id   AND c.tenant_id = @tenant
+  LEFT JOIN usuarios u   ON u.id = g.creado_por   AND u.tenant_id = @tenant
+  WHERE g.tenant_id = @tenant
 `;
 
 // GET /api/garantias — lista de reclamos (filtros: ?estado= y ?orden_id=)
@@ -44,8 +51,8 @@ router.get('/', async (req, res) => {
       where.push('g.orden_id = ?');
       params.push(req.query.orden_id);
     }
-    const sql = SELECT_GARANTIA + ` WHERE 1=1${where.map((w) => ' AND ' + w).join('')}${soloSucursal(req, 'o.sucursal_id')}` + ' ORDER BY g.created_at DESC';
-    const [rows] = await pool.query(sql, params);
+    const sql = SELECT_GARANTIA + `${where.map((w) => ' AND ' + w).join('')}${soloSucursal(req, 'o.sucursal_id')}` + ' ORDER BY g.created_at DESC';
+    const [rows] = await req.db.query(sql, params);
     res.json({ data: rows });
   } catch (err) {
     fail(res, err);
@@ -55,9 +62,9 @@ router.get('/', async (req, res) => {
 // GET /api/garantias/:id — un reclamo con sus fotos
 router.get('/:id', async (req, res) => {
   try {
-    const [[garantia]] = await pool.query(SELECT_GARANTIA + ' WHERE g.id = ?', [req.params.id]);
+    const [[garantia]] = await req.db.query(SELECT_GARANTIA + ' AND g.id = ?', [req.params.id]);
     if (!garantia) return res.status(404).json({ error: 'Reclamo no encontrado' });
-    const [fotos] = await pool.query('SELECT * FROM garantia_fotos WHERE garantia_id = ? ORDER BY created_at ASC', [req.params.id]);
+    const [fotos] = await req.db.query('SELECT * FROM garantia_fotos WHERE garantia_id = ? AND tenant_id = @tenant ORDER BY created_at ASC', [req.params.id]);
     res.json({ data: { ...garantia, fotos } });
   } catch (err) {
     fail(res, err);
@@ -71,17 +78,17 @@ router.post('/', soloRoles('recepcion', 'admin'), async (req, res) => {
     if (!orden_id || !descripcion_problema) {
       return res.status(400).json({ error: 'Orden y descripción del problema son requeridos' });
     }
-    const [[orden]] = await pool.query(`SELECT id, estado FROM ordenes_trabajo WHERE id = ?${soloSucursal(req, 'sucursal_id')}`, [orden_id]);
+    const [[orden]] = await req.db.query(`SELECT id, estado FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant${soloSucursal(req, 'sucursal_id')}`, [orden_id]);
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
     if (orden.estado !== 'entregada') {
       return res.status(400).json({ error: 'Solo se puede reclamar garantía sobre órdenes entregadas' });
     }
-    const [result] = await pool.query(
-      `INSERT INTO garantias (orden_id, descripcion_problema, cubre_repuestos, cubre_mano_obra, creado_por)
-       VALUES (?, ?, ?, ?, ?)`,
+    const [result] = await req.db.query(
+      `INSERT INTO garantias (tenant_id, orden_id, descripcion_problema, cubre_repuestos, cubre_mano_obra, creado_por)
+       VALUES (@tenant, ?, ?, ?, ?, ?)`,
       [orden_id, descripcion_problema, cubre_repuestos ? 1 : 0, cubre_mano_obra ? 1 : 0, req.usuario.id]
     );
-    const [[nueva]] = await pool.query(SELECT_GARANTIA + ' WHERE g.id = ?', [result.insertId]);
+    const [[nueva]] = await req.db.query(SELECT_GARANTIA + ' AND g.id = ?', [result.insertId]);
     res.status(201).json({ data: nueva, message: 'Reclamo de garantía registrado' });
   } catch (err) {
     fail(res, err);
@@ -93,11 +100,11 @@ router.patch('/:id/estado', requireRol('admin'), async (req, res) => {
   try {
     const { estado, resolucion, cubre_repuestos, cubre_mano_obra } = req.body;
     if (!ESTADOS.includes(estado)) return res.status(400).json({ error: 'Estado inválido' });
-    await pool.query(
+    await req.db.query(
       `UPDATE garantias SET estado = ?, resolucion = ?,
          cubre_repuestos = COALESCE(?, cubre_repuestos),
          cubre_mano_obra = COALESCE(?, cubre_mano_obra)
-       WHERE id = ?`,
+       WHERE id = ? AND tenant_id = @tenant`,
       [
         estado,
         resolucion || null,
@@ -106,7 +113,7 @@ router.patch('/:id/estado', requireRol('admin'), async (req, res) => {
         req.params.id,
       ]
     );
-    const [[actualizada]] = await pool.query(SELECT_GARANTIA + ' WHERE g.id = ?', [req.params.id]);
+    const [[actualizada]] = await req.db.query(SELECT_GARANTIA + ' AND g.id = ?', [req.params.id]);
     res.json({ data: actualizada, message: 'Trámite actualizado' });
   } catch (err) {
     fail(res, err);
@@ -119,11 +126,11 @@ router.post('/:id/fotos', soloRoles('recepcion', 'admin'), exigirPermiso('taller
     const { url, descripcion } = req.body;
     if (!url) return res.status(400).json({ error: 'Imagen requerida' });
     if (!fotoValida(url)) return res.status(400).json({ error: 'Imagen inválida' });
-    const [result] = await pool.query(
-      'INSERT INTO garantia_fotos (garantia_id, url, descripcion) VALUES (?, ?, ?)',
+    const [result] = await req.db.query(
+      'INSERT INTO garantia_fotos (tenant_id, garantia_id, url, descripcion) VALUES (@tenant, ?, ?, ?)',
       [req.params.id, url, descripcion || null]
     );
-    const [[nueva]] = await pool.query('SELECT * FROM garantia_fotos WHERE id = ?', [result.insertId]);
+    const [[nueva]] = await req.db.query('SELECT * FROM garantia_fotos WHERE id = ? AND tenant_id = @tenant', [result.insertId]);
     res.status(201).json({ data: nueva, message: 'Evidencia agregada' });
   } catch (err) {
     fail(res, err);
@@ -133,7 +140,7 @@ router.post('/:id/fotos', soloRoles('recepcion', 'admin'), exigirPermiso('taller
 // DELETE /api/garantias/:id/fotos/:fid
 router.delete('/:id/fotos/:fid', soloRoles('recepcion', 'admin'), async (req, res) => {
   try {
-    await pool.query('DELETE FROM garantia_fotos WHERE id = ? AND garantia_id = ?', [req.params.fid, req.params.id]);
+    await req.db.query('DELETE FROM garantia_fotos WHERE id = ? AND garantia_id = ? AND tenant_id = @tenant', [req.params.fid, req.params.id]);
     res.json({ message: 'Evidencia eliminada' });
   } catch (err) {
     fail(res, err);
