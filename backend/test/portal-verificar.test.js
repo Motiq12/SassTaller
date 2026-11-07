@@ -10,13 +10,16 @@ const bcrypt = require('bcrypt');
 
 process.env.JWT_SECRET = 'test-secret';
 
-// Base falsa: la ruta solo usa `pool.query`, y acá se contesta según la consulta.
+// Base falsa. La ruta usa req.db (acotado al taller por middleware/tenant), así que
+// se le pasa esto como req.db además de dejarlo en la caché de módulos.
 // Se pone en la caché de módulos antes de cargar las rutas, para que ninguna
 // abra una conexión de verdad.
 const db = { clientes: [], codigos: [] };
 const pool = {
   async query(sql, params = []) {
-    if (/FROM clientes WHERE email = \?/.test(sql)) {
+    // Los patrones no dependen del orden de las condiciones: el filtro por taller
+    // que agrega req.db puede caer antes o después del resto del WHERE.
+    if (/FROM clientes WHERE .*email = \?/.test(sql)) {
       return [db.clientes.filter((c) => c.email === params[0] && c.activo)];
     }
     if (/FROM email_verify_codes/.test(sql)) {
@@ -54,7 +57,7 @@ function fakeRes() {
 }
 async function pedir(email, codigo) {
   const res = fakeRes();
-  await verificar({ body: { email, codigo } }, res);
+  await verificar({ body: { email, codigo }, db: pool, tenantId: 1 }, res);
   return res;
 }
 

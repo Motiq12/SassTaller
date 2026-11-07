@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { pool } = require('../db/pool');
+// Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
 const { fail, invalido, faltante } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
@@ -56,10 +56,10 @@ router.get('/', async (req, res) => {
              m.marca, m.modelo, m.placa, m.color,
              u.nombre AS tecnico_nombre
       FROM ordenes_trabajo ot
-      JOIN clientes c ON ot.cliente_id = c.id
-      JOIN motos m ON ot.moto_id = m.id
-      LEFT JOIN usuarios u ON ot.tecnico_id = u.id
-      WHERE 1=1`;
+      JOIN clientes c ON ot.cliente_id = c.id AND c.tenant_id = @tenant
+      JOIN vehiculos m ON ot.vehiculo_id = m.id AND m.tenant_id = @tenant
+      LEFT JOIN usuarios u ON ot.tecnico_id = u.id AND u.tenant_id = @tenant
+      WHERE ot.tenant_id = @tenant`;
     const params = [];
     if (estado) { sql += ' AND ot.estado = ?'; params.push(estado); }
     // El mecánico solo ve sus órdenes: la jerarquía lo deja pasar a esta ruta, y sin esto
@@ -93,7 +93,7 @@ router.get('/', async (req, res) => {
     }
     sql += soloSucursal(req, 'ot.sucursal_id');
     sql += ` ORDER BY ot.fecha_ingreso DESC LIMIT ${MAX_LISTADO}`;
-    const [rows] = await pool.query(sql, params);
+    const [rows] = await req.db.query(sql, params);
     res.json({ data: rows });
   } catch (err) {
     fail(res, err);
@@ -104,7 +104,7 @@ router.get('/', async (req, res) => {
 router.post('/', soloRoles('recepcion', 'admin'), exigirPermiso('ordenes.crear'), async (req, res) => {
   try {
     const {
-      moto_id, cliente_id, problema_reportado, kilometraje_ingreso,
+      vehiculo_id, cliente_id, problema_reportado, kilometraje_ingreso,
       nivel_combustible, accesorios_entregados, estado_fisico,
       prioridad, categoria, fecha_estimada_entrega,
     } = req.body;
@@ -128,21 +128,21 @@ router.post('/', soloRoles('recepcion', 'admin'), exigirPermiso('ordenes.crear')
 
     const sucursal_id = sucursalParaGuardar(req, (await sucursalValida(req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null);
 
-    const numero_orden = await generarNumeroOrden();
+    const numero_orden = await generarNumeroOrden(req.db);
 
     // Orden + su tiempo inicial en una sola transacción: si algo falla, no queda
     // una orden sin etapa de recepción registrada.
-    const conn = await pool.getConnection();
+    const conn = await req.db.conexion();
     try {
       await conn.beginTransaction();
       const [result] = await conn.query(
         `INSERT INTO ordenes_trabajo
-          (numero_orden, moto_id, cliente_id, sucursal_id, recepcionista_id, problema_reportado,
+          (tenant_id,numero_orden, vehiculo_id, cliente_id, sucursal_id, recepcionista_id, problema_reportado,
            kilometraje_ingreso, nivel_combustible, accesorios_entregados, estado_fisico,
            prioridad, categoria, fecha_estimada_entrega)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          numero_orden, moto_id, cliente_id, sucursal_id, req.usuario.id, problemaReportado,
+          numero_orden, vehiculo_id, cliente_id, sucursal_id, req.usuario.id, problemaReportado,
           kilometraje_ingreso || null, nivel_combustible || 'cuarto',
           accesorios_entregados || null, estado_fisico || null,
           prioridad || 'normal', categoria || 'diagnostico',
@@ -176,7 +176,7 @@ router.post('/', soloRoles('recepcion', 'admin'), exigirPermiso('ordenes.crear')
 // Va antes de /:id para que "eliminadas" no se lea como un id.
 router.get('/eliminadas', requireRol('admin'), async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await req.db.query(
       `SELECT id, orden_id, numero_orden, estado, cliente_nombre, moto, problema_reportado, total,
               fecha_ingreso, motivo, eliminada_por_nombre, created_at
        FROM ordenes_eliminadas ORDER BY created_at DESC LIMIT ${MAX_LISTADO}`
@@ -190,7 +190,7 @@ router.get('/eliminadas', requireRol('admin'), async (req, res) => {
 // GET /api/ordenes/:id
 router.get('/:id', async (req, res) => {
   try {
-    const [[orden]] = await pool.query(
+    const [[orden]] = await req.db.query(
       `SELECT ot.*,
               c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.telefono AS cliente_telefono, c.email AS cliente_email,
               m.marca, m.modelo, m.placa, m.color, m.anio, m.kilometraje_actual,
@@ -199,12 +199,12 @@ router.get('/:id', async (req, res) => {
               s.nombre AS sucursal_nombre, s.direccion AS sucursal_direccion, s.telefono AS sucursal_telefono,
               (ot.costo_mano_obra + ot.costo_repuestos - ot.descuento) AS total
        FROM ordenes_trabajo ot
-       JOIN clientes c ON ot.cliente_id = c.id
-       JOIN motos m ON ot.moto_id = m.id
-       LEFT JOIN usuarios u ON ot.tecnico_id = u.id
-       LEFT JOIN usuarios r ON ot.recepcionista_id = r.id
-       LEFT JOIN sucursales s ON s.id = ot.sucursal_id
-       WHERE ot.id = ?`,
+       JOIN clientes c ON ot.cliente_id = c.id AND c.tenant_id = @tenant
+       JOIN vehiculos m ON ot.vehiculo_id = m.id AND m.tenant_id = @tenant
+       LEFT JOIN usuarios u ON ot.tecnico_id = u.id AND u.tenant_id = @tenant
+       LEFT JOIN usuarios r ON ot.recepcionista_id = r.id AND r.tenant_id = @tenant
+       LEFT JOIN sucursales s ON s.id = ot.sucursal_id AND s.tenant_id = @tenant
+       WHERE ot.tenant_id = @tenant AND ot.id = ?`,
       [req.params.id]
     );
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
@@ -231,15 +231,15 @@ router.put('/:id', requireRol('tecnico'), async (req, res) => {
     // en esos campos se ignora y quedan los de la orden, para no borrarlos en cero.
     let montos = { costo_mano_obra, costo_repuestos, descuento };
     if (req.usuario.rol === 'tecnico') {
-      const [[actual]] = await pool.query('SELECT costo_mano_obra, costo_repuestos, descuento FROM ordenes_trabajo WHERE id = ?', [req.params.id]);
+      const [[actual]] = await req.db.query('SELECT costo_mano_obra, costo_repuestos, descuento FROM ordenes_trabajo WHERE id = ?', [req.params.id]);
       if (actual) montos = actual;
     }
-    await pool.query(
+    await req.db.query(
       `UPDATE ordenes_trabajo SET
         diagnostico=?, tiempo_estimado_horas=?, costo_mano_obra=?, costo_repuestos=?,
         descuento=?, fecha_estimada_entrega=?, prioridad=?, categoria=?,
         accesorios_entregados=?, estado_fisico=?
-       WHERE id=?`,
+       WHERE id=? AND tenant_id = @tenant`,
       [
         diagnostico || null, tiempo_estimado_horas || null,
         montos.costo_mano_obra || 0, montos.costo_repuestos || 0, montos.descuento || 0,
@@ -249,7 +249,7 @@ router.put('/:id', requireRol('tecnico'), async (req, res) => {
       ]
     );
     const reaprobacion = await revisarAdicional(req.params.id, totalAntes);
-    const [[actualizada]] = await pool.query('SELECT * FROM ordenes_trabajo WHERE id = ?', [req.params.id]);
+    const [[actualizada]] = await req.db.query('SELECT * FROM ordenes_trabajo WHERE id = ?', [req.params.id]);
     res.json({ data: actualizada, reaprobacion, message: reaprobacion ? MSG_REAPROBACION : 'Orden actualizada' });
   } catch (err) {
     fail(res, err);
@@ -262,7 +262,7 @@ router.put('/:id', requireRol('tecnico'), async (req, res) => {
 // entregada o cancelada no se edita.
 router.patch('/:id/datos', soloRoles('recepcion', 'admin'), exigirPermiso('ordenes.editar'), async (req, res) => {
   try {
-    const [[orden]] = await pool.query('SELECT id, cliente_id, estado FROM ordenes_trabajo WHERE id = ?', [req.params.id]);
+    const [[orden]] = await req.db.query('SELECT id, cliente_id, estado FROM ordenes_trabajo WHERE id = ?', [req.params.id]);
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
     if (['entregada', 'cancelada'].includes(orden.estado)) {
       return res.status(409).json({ error: 'Esta orden ya está cerrada: no se puede editar' });
@@ -284,12 +284,12 @@ router.patch('/:id/datos', soloRoles('recepcion', 'admin'), exigirPermiso('orden
     const fechaEst = b.fecha_estimada_entrega ? String(b.fecha_estimada_entrega).slice(0, 10) : null;
     if (fechaEst && !/^\d{4}-\d{2}-\d{2}$/.test(fechaEst)) return invalido(res, 'fecha_estimada_entrega', 'Fecha estimada no válida');
     // La moto tiene que ser del mismo cliente (para cambiar de cliente, se elimina y se abre otra).
-    const [[moto]] = await pool.query('SELECT id FROM motos WHERE id = ? AND cliente_id = ?', [b.moto_id, orden.cliente_id]);
+    const [[moto]] = await req.db.query('SELECT id FROM motos WHERE id = ? AND cliente_id = ?', [b.moto_id, orden.cliente_id]);
     if (!moto) return invalido(res, 'moto_id', 'Esa moto no es de este cliente');
     const sucursal_id = sucursalParaGuardar(req, (await sucursalValida(b.sucursal_id)) ? Number(b.sucursal_id) : null);
     const categoria = b.categoria || 'diagnostico';
 
-    await pool.query(
+    await req.db.query(
       `UPDATE ordenes_trabajo SET moto_id = ?, sucursal_id = ?, problema_reportado = ?, prioridad = ?, categoria = ?,
          kilometraje_ingreso = ?, nivel_combustible = ?, accesorios_entregados = ?, estado_fisico = ?,
          fecha_estimada_entrega = ?
@@ -303,8 +303,8 @@ router.patch('/:id/datos', soloRoles('recepcion', 'admin'), exigirPermiso('orden
     // La cita de la orden muestra la misma moto y sede; si la cita se creó sola
     // para la orden, también el problema (de una cita agendada por el cliente se
     // respeta lo que él escribió).
-    await pool.query('UPDATE citas SET moto_id = ?, sucursal_id = ? WHERE orden_id = ?', [moto.id, sucursal_id, orden.id]);
-    await pool.query('UPDATE citas SET motivo = ? WHERE orden_id = ? AND creada_por_orden = 1', [problema, orden.id]);
+    await req.db.query('UPDATE citas SET moto_id = ?, sucursal_id = ? WHERE orden_id = ?', [moto.id, sucursal_id, orden.id]);
+    await req.db.query('UPDATE citas SET motivo = ? WHERE orden_id = ? AND creada_por_orden = 1', [problema, orden.id]);
     res.json({ message: 'Orden actualizada' });
   } catch (err) {
     fail(res, err);
@@ -327,7 +327,7 @@ router.delete('/:id', requireRol('admin'), async (req, res) => {
   if (motivo.length > MAX_MOTIVO_ELIMINAR) {
     return res.status(400).json({ error: `El motivo no puede pasar de ${MAX_MOTIVO_ELIMINAR} caracteres` });
   }
-  const conn = await pool.getConnection();
+  const conn = await req.db.conexion();
   try {
     await conn.beginTransaction();
     const [[o]] = await conn.query(
@@ -422,7 +422,7 @@ router.patch('/:id/estado', exigirPermiso('ordenes.estado'), async (req, res) =>
       return invalido(res, 'motivo', `El motivo no puede pasar de ${MAX_MOTIVO_CANCELACION} caracteres`);
     }
 
-    const [[orden]] = await pool.query('SELECT estado, aprobacion_cliente FROM ordenes_trabajo WHERE id = ?', [req.params.id]);
+    const [[orden]] = await req.db.query('SELECT estado, aprobacion_cliente FROM ordenes_trabajo WHERE id = ?', [req.params.id]);
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
 
     // Solo transiciones válidas (evita saltos ilógicos, p. ej. entregada→diagnostico).
@@ -435,8 +435,8 @@ router.patch('/:id/estado', exigirPermiso('ordenes.estado'), async (req, res) =>
     // con los avisos y la pantalla pregunta; si la persona confirma, reenvía con
     // confirmar: true.
     if (!confirmar) {
-      const [repuestos] = await pool.query('SELECT nombre, cantidad, estado FROM orden_repuestos WHERE orden_id = ?', [req.params.id]);
-      const [[{ n: fotosIngreso }]] = await pool.query("SELECT COUNT(*) AS n FROM orden_fotos WHERE orden_id = ? AND tipo = 'ingreso'", [req.params.id]);
+      const [repuestos] = await req.db.query('SELECT nombre, cantidad, estado FROM orden_repuestos WHERE orden_id = ?', [req.params.id]);
+      const [[{ n: fotosIngreso }]] = await req.db.query("SELECT COUNT(*) AS n FROM orden_fotos WHERE orden_id = ? AND tipo = 'ingreso'", [req.params.id]);
       const avisos = avisosDeCambio({ desde: orden.estado, hacia: estado, repuestos, fotosIngreso, aprobacion: orden.aprobacion_cliente });
       if (avisos.length) {
         return res.status(409).json({ error: 'Hay avisos antes de cambiar el estado', codigo: 'requiere_confirmacion', avisos });
@@ -445,20 +445,20 @@ router.patch('/:id/estado', exigirPermiso('ordenes.estado'), async (req, res) =>
 
     // Cerrar tiempo de etapa anterior
     if (ETAPAS_TIEMPO.includes(orden.estado)) {
-      await pool.query(
-        'UPDATE orden_tiempos SET fin = NOW() WHERE orden_id = ? AND etapa = ? AND fin IS NULL',
+      await req.db.query(
+        'UPDATE orden_tiempos SET fin = NOW() WHERE tenant_id = @tenant AND orden_id = ? AND etapa = ? AND fin IS NULL',
         [req.params.id, orden.estado]
       );
     }
 
-    await pool.query('UPDATE ordenes_trabajo SET estado = ? WHERE id = ?', [estado, req.params.id]);
+    await req.db.query('UPDATE ordenes_trabajo SET estado = ? WHERE id = ?', [estado, req.params.id]);
     if (estado === 'cancelada') {
-      await pool.query('UPDATE ordenes_trabajo SET motivo_cancelacion = ? WHERE id = ?', [motivo || null, req.params.id]);
+      await req.db.query('UPDATE ordenes_trabajo SET motivo_cancelacion = ? WHERE id = ?', [motivo || null, req.params.id]);
     }
     // Un presupuesto que se vuelve a mandar (p. ej. después de un rechazo) arranca sin
     // decisión: si quedaba "rechazado", el portal no se lo mostraba al cliente.
     if (estado === 'esperando_aprobacion') {
-      await pool.query(
+      await req.db.query(
         "UPDATE ordenes_trabajo SET aprobacion_cliente = 'pendiente', motivo_rechazo = NULL WHERE id = ?",
         [req.params.id]
       );
@@ -466,15 +466,15 @@ router.patch('/:id/estado', exigirPermiso('ordenes.estado'), async (req, res) =>
 
     // Abrir nuevo tiempo
     if (ETAPAS_TIEMPO.includes(estado)) {
-      await pool.query('INSERT INTO orden_tiempos (orden_id, etapa) VALUES (?, ?)', [req.params.id, estado]);
+      await req.db.query('INSERT INTO orden_tiempos (tenant_id,orden_id, etapa) VALUES (@tenant, ?, ?)', [req.params.id, estado]);
     }
 
     // Refleja el avance en la cita vinculada (si la hay) → portal del cliente + mecánico.
-    await sincronizarCitaDesdeOrden(req.params.id, estado);
+    await sincronizarCitaDesdeOrden(req.db, req.params.id, estado);
 
     // Cotización lista: avisar al cliente cuando la orden entra a esperando aprobación,
     // por cualquier vía (no solo desde el flujo de "Enviar cotización" de recepción).
-    if (estado === 'esperando_aprobacion') await notificarPresupuestoListo(req.params.id);
+    if (estado === 'esperando_aprobacion') await notificarPresupuestoListo(req.db, req.params.id);
 
     res.json({ data: { estado }, message: 'Estado actualizado' });
   } catch (err) {
@@ -486,13 +486,13 @@ router.patch('/:id/estado', exigirPermiso('ordenes.estado'), async (req, res) =>
 router.patch('/:id/tecnico', requireRol('admin'), async (req, res) => {
   try {
     const { tecnico_id } = req.body;
-    const [[orden]] = await pool.query('SELECT id FROM ordenes_trabajo WHERE id = ?', [req.params.id]);
+    const [[orden]] = await req.db.query('SELECT id FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
     if (tecnico_id) {
-      const [[tec]] = await pool.query("SELECT id FROM usuarios WHERE id = ? AND rol = 'tecnico' AND activo = 1", [tecnico_id]);
+      const [[tec]] = await req.db.query("SELECT id FROM usuarios WHERE tenant_id = @tenant AND id = ? AND rol = 'tecnico' AND activo = 1", [tecnico_id]);
       if (!tec) return res.status(400).json({ error: 'El técnico no existe o está inactivo' });
     }
-    await pool.query('UPDATE ordenes_trabajo SET tecnico_id = ? WHERE id = ?', [tecnico_id || null, req.params.id]);
+    await req.db.query('UPDATE ordenes_trabajo SET tecnico_id = ? WHERE tenant_id = @tenant AND id = ?', [tecnico_id || null, req.params.id]);
     res.json({ message: 'Técnico asignado' });
   } catch (err) {
     fail(res, err);
@@ -504,11 +504,11 @@ router.post('/:id/avances', async (req, res) => {
   try {
     const { descripcion } = req.body;
     if (!descripcion) return res.status(400).json({ error: 'Descripción requerida' });
-    const [result] = await pool.query(
-      'INSERT INTO orden_avances (orden_id, usuario_id, descripcion) VALUES (?, ?, ?)',
+    const [result] = await req.db.query(
+      'INSERT INTO orden_avances (tenant_id,orden_id, usuario_id, descripcion) VALUES (@tenant, ?, ?, ?)',
       [req.params.id, req.usuario.id, descripcion]
     );
-    const [[nuevo]] = await pool.query('SELECT * FROM orden_avances WHERE id = ?', [result.insertId]);
+    const [[nuevo]] = await req.db.query('SELECT * FROM orden_avances WHERE tenant_id = @tenant AND id = ?', [result.insertId]);
     res.status(201).json({ data: nuevo, message: 'Avance registrado' });
   } catch (err) {
     fail(res, err);
@@ -518,10 +518,10 @@ router.post('/:id/avances', async (req, res) => {
 // GET /api/ordenes/:id/avances
 router.get('/:id/avances', async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await req.db.query(
       `SELECT oa.*, u.nombre AS usuario_nombre, u.rol AS usuario_rol
-       FROM orden_avances oa JOIN usuarios u ON oa.usuario_id = u.id
-       WHERE oa.orden_id = ? ORDER BY oa.created_at ASC`,
+       FROM orden_avances oa JOIN usuarios u ON oa.usuario_id = u.id AND u.tenant_id = @tenant
+       WHERE oa.tenant_id = @tenant AND oa.orden_id = ? ORDER BY oa.created_at ASC`,
       [req.params.id]
     );
     res.json({ data: rows });
@@ -538,17 +538,17 @@ router.post('/:id/repuestos', soloRoles('recepcion', 'admin'), exigirPermiso('or
     if (!nombre) return res.status(400).json({ error: 'Nombre del repuesto requerido' });
     if (estado && !ESTADOS_REPUESTO[estado]) return res.status(400).json({ error: 'Estado de repuesto inválido' });
     const totalAntes = await totalOrden(req.params.id);
-    const [result] = await pool.query(
+    const [result] = await req.db.query(
       'INSERT INTO orden_repuestos (orden_id, nombre, cantidad, costo_unitario, estado, adicional) VALUES (?, ?, ?, ?, ?, ?)',
       [req.params.id, nombre, cantidad || 1, costo_unitario || 0, estado || 'pendiente', await esAdicional(req.params.id)]
     );
     // Actualizar costo_repuestos en la orden
-    await pool.query(
-      'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ?) WHERE id = ?',
+    await req.db.query(
+      'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ?) WHERE tenant_id = @tenant AND id = ?',
       [req.params.id, req.params.id]
     );
     const reaprobacion = await revisarAdicional(req.params.id, totalAntes);
-    const [[nuevo]] = await pool.query('SELECT * FROM orden_repuestos WHERE id = ?', [result.insertId]);
+    const [[nuevo]] = await req.db.query('SELECT * FROM orden_repuestos WHERE id = ?', [result.insertId]);
     res.status(201).json({ data: nuevo, reaprobacion, message: reaprobacion ? MSG_REAPROBACION : 'Repuesto agregado' });
   } catch (err) {
     fail(res, err);
@@ -558,8 +558,8 @@ router.post('/:id/repuestos', soloRoles('recepcion', 'admin'), exigirPermiso('or
 // GET /api/ordenes/:id/tiempos — línea de tiempo de la orden (fecha/hora de cada fase)
 router.get('/:id/tiempos', async (req, res) => {
   try {
-    const [rows] = await pool.query(
-      'SELECT etapa, inicio, fin FROM orden_tiempos WHERE orden_id = ? ORDER BY inicio ASC',
+    const [rows] = await req.db.query(
+      'SELECT etapa, inicio, fin FROM orden_tiempos WHERE tenant_id = @tenant AND orden_id = ? ORDER BY inicio ASC',
       [req.params.id]
     );
     res.json({ data: rows });
@@ -571,8 +571,8 @@ router.get('/:id/tiempos', async (req, res) => {
 // GET /api/ordenes/:id/repuestos
 router.get('/:id/repuestos', async (req, res) => {
   try {
-    const [rows] = await pool.query(
-      'SELECT * FROM orden_repuestos WHERE orden_id = ? ORDER BY created_at ASC',
+    const [rows] = await req.db.query(
+      'SELECT * FROM orden_repuestos WHERE tenant_id = @tenant AND orden_id = ? ORDER BY created_at ASC',
       [req.params.id]
     );
     res.json({ data: rows });
@@ -585,20 +585,20 @@ router.get('/:id/repuestos', async (req, res) => {
 router.put('/:id/repuestos/:rid', soloRoles('recepcion', 'admin'), exigirPermiso('ordenes.costos'), async (req, res) => {
   try {
     const { nombre, cantidad, costo_unitario, estado } = req.body;
-    const [[existe]] = await pool.query('SELECT id, estado FROM orden_repuestos WHERE id = ? AND orden_id = ?', [req.params.rid, req.params.id]);
+    const [[existe]] = await req.db.query('SELECT id, estado FROM orden_repuestos WHERE id = ? AND orden_id = ?', [req.params.rid, req.params.id]);
     if (!existe) return res.status(404).json({ error: 'Repuesto no encontrado' });
     if (estado && !ESTADOS_REPUESTO[estado]) return res.status(400).json({ error: 'Estado de repuesto inválido' });
     const totalAntes = await totalOrden(req.params.id);
-    await pool.query(
+    await req.db.query(
       'UPDATE orden_repuestos SET nombre=?, cantidad=?, costo_unitario=?, estado=? WHERE id=? AND orden_id=?',
       [nombre, cantidad || 1, costo_unitario || 0, estadoAlEditarRepuesto(existe.estado, estado, costo_unitario), req.params.rid, req.params.id]
     );
-    await pool.query(
-      'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ?) WHERE id = ?',
+    await req.db.query(
+      'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ?) WHERE tenant_id = @tenant AND id = ?',
       [req.params.id, req.params.id]
     );
     const reaprobacion = await revisarAdicional(req.params.id, totalAntes);
-    const [[actualizado]] = await pool.query('SELECT * FROM orden_repuestos WHERE id = ?', [req.params.rid]);
+    const [[actualizado]] = await req.db.query('SELECT * FROM orden_repuestos WHERE id = ?', [req.params.rid]);
     res.json({ data: actualizado, reaprobacion, message: reaprobacion ? MSG_REAPROBACION : 'Repuesto actualizado' });
   } catch (err) {
     fail(res, err);
@@ -608,10 +608,10 @@ router.put('/:id/repuestos/:rid', soloRoles('recepcion', 'admin'), exigirPermiso
 // DELETE /api/ordenes/:id/repuestos/:rid
 router.delete('/:id/repuestos/:rid', requireRol('admin'), async (req, res) => {
   try {
-    const [result] = await pool.query('DELETE FROM orden_repuestos WHERE id=? AND orden_id=?', [req.params.rid, req.params.id]);
+    const [result] = await req.db.query('DELETE FROM orden_repuestos WHERE tenant_id = @tenant AND id=? AND orden_id=?', [req.params.rid, req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ error: 'Repuesto no encontrado' });
-    await pool.query(
-      'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ?) WHERE id = ?',
+    await req.db.query(
+      'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ?) WHERE tenant_id = @tenant AND id = ?',
       [req.params.id, req.params.id]
     );
     res.json({ message: 'Repuesto eliminado' });
@@ -628,9 +628,9 @@ router.delete('/:id/repuestos/:rid', requireRol('admin'), async (req, res) => {
 router.post('/:id/checklist', exigirPermiso('ordenes.entregar'), async (req, res) => {
   try {
     const { prueba_realizada, lavado, calidad_revisada, facturacion_lista, cliente_notificado, observaciones } = req.body;
-    await pool.query(
-      `INSERT INTO orden_checklist (orden_id, prueba_realizada, lavado, calidad_revisada, facturacion_lista, cliente_notificado, observaciones)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+    await req.db.query(
+      `INSERT INTO orden_checklist (tenant_id,orden_id, prueba_realizada, lavado, calidad_revisada, facturacion_lista, cliente_notificado, observaciones)
+       VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE prueba_realizada=VALUES(prueba_realizada), lavado=VALUES(lavado),
          calidad_revisada=VALUES(calidad_revisada), facturacion_lista=VALUES(facturacion_lista),
          cliente_notificado=VALUES(cliente_notificado), observaciones=VALUES(observaciones)`,
@@ -644,7 +644,7 @@ router.post('/:id/checklist', exigirPermiso('ordenes.entregar'), async (req, res
 
 router.get('/:id/checklist', async (req, res) => {
   try {
-    const [[checklist]] = await pool.query('SELECT * FROM orden_checklist WHERE orden_id = ?', [req.params.id]);
+    const [[checklist]] = await req.db.query('SELECT * FROM orden_checklist WHERE tenant_id = @tenant AND orden_id = ? AND tenant_id = @tenant', [req.params.id]);
     res.json({ data: checklist || null });
   } catch (err) {
     fail(res, err);
@@ -657,7 +657,7 @@ router.patch('/:id/cerrar', requireRol('admin'), async (req, res) => {
     const { metodo_pago, garantia_dias, observaciones_finales } = req.body;
     // Una orden cancelada o ya entregada no se vuelve a cerrar (contaría otra visita
     // del cliente y le cambiaría la fecha de entrega).
-    const [[actual]] = await pool.query('SELECT estado FROM ordenes_trabajo WHERE id = ?', [req.params.id]);
+    const [[actual]] = await req.db.query('SELECT estado FROM ordenes_trabajo WHERE id = ?', [req.params.id]);
     if (!actual) return res.status(404).json({ error: 'Orden no encontrada' });
     if (['entregada', 'cancelada'].includes(actual.estado)) {
       return res.status(400).json({ error: actual.estado === 'entregada' ? 'La orden ya estaba entregada' : 'La orden está cancelada' });
@@ -678,11 +678,11 @@ router.post('/:id/fotos', exigirPermiso('taller.fotos'), async (req, res) => {
     if (!fotoValida(url)) return res.status(400).json({ error: 'Imagen inválida' });
     const tiposValidos = ['ingreso', 'diagnostico', 'avance', 'entrega'];
     const tipoFinal = tiposValidos.includes(tipo) ? tipo : 'ingreso';
-    const [result] = await pool.query(
-      'INSERT INTO orden_fotos (orden_id, url, tipo, descripcion) VALUES (?, ?, ?, ?)',
+    const [result] = await req.db.query(
+      'INSERT INTO orden_fotos (tenant_id,orden_id, url, tipo, descripcion) VALUES (@tenant, ?, ?, ?, ?)',
       [req.params.id, url, tipoFinal, descripcion || null]
     );
-    const [[nueva]] = await pool.query('SELECT * FROM orden_fotos WHERE id = ?', [result.insertId]);
+    const [[nueva]] = await req.db.query('SELECT * FROM orden_fotos WHERE tenant_id = @tenant AND id = ?', [result.insertId]);
     res.status(201).json({ data: nueva, message: 'Foto agregada' });
   } catch (err) {
     fail(res, err);
@@ -692,8 +692,8 @@ router.post('/:id/fotos', exigirPermiso('taller.fotos'), async (req, res) => {
 // GET /api/ordenes/:id/fotos
 router.get('/:id/fotos', async (req, res) => {
   try {
-    const [rows] = await pool.query(
-      'SELECT * FROM orden_fotos WHERE orden_id = ? ORDER BY created_at ASC',
+    const [rows] = await req.db.query(
+      'SELECT * FROM orden_fotos WHERE tenant_id = @tenant AND orden_id = ? ORDER BY created_at ASC',
       [req.params.id]
     );
     res.json({ data: rows });
@@ -705,7 +705,7 @@ router.get('/:id/fotos', async (req, res) => {
 // DELETE /api/ordenes/:id/fotos/:fid
 router.delete('/:id/fotos/:fid', requireRol('admin'), async (req, res) => {
   try {
-    const [result] = await pool.query('DELETE FROM orden_fotos WHERE id = ? AND orden_id = ?', [req.params.fid, req.params.id]);
+    const [result] = await req.db.query('DELETE FROM orden_fotos WHERE tenant_id = @tenant AND id = ? AND orden_id = ?', [req.params.fid, req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ error: 'Foto no encontrada' });
     res.json({ message: 'Foto eliminada' });
   } catch (err) {
@@ -724,18 +724,18 @@ const SELECT_MSG_ORDEN = `
          du.nombre AS destino_nombre,
          ${LEIDO_POR_MI}, ${VISTO_POR_OTRO}
   FROM mensajes_internos m
-  JOIN usuarios ru ON ru.id = m.remitente_id
+  JOIN usuarios ru ON ru.id = m.remitente_id AND ru.tenant_id = @tenant
   LEFT JOIN usuarios du ON du.id = m.destino_id`;
 
 // GET /api/ordenes/:id/mensajes — hilo de la orden (marca leídos los míos).
 router.get('/:id/mensajes', async (req, res) => {
   try {
     const yo = req.usuario.id;
-    const [rows] = await pool.query(
+    const [rows] = await req.db.query(
       `${SELECT_MSG_ORDEN} WHERE m.orden_id = ? ORDER BY m.created_at ASC LIMIT 100`,
       [yo, req.params.id]
     );
-    await marcarLeidos(yo, rows);
+    await marcarLeidos(req.db, yo, rows);
     res.json({ data: rows });
   } catch (err) {
     fail(res, err);
@@ -748,7 +748,7 @@ router.post('/:id/mensajes', async (req, res) => {
   try {
     const { mensaje, foto } = req.body;
     if ((!mensaje || !mensaje.trim()) && !foto) return res.status(400).json({ error: 'El mensaje o una foto es requerido' });
-    const [[orden]] = await pool.query('SELECT id, tecnico_id, sucursal_id FROM ordenes_trabajo WHERE id = ?', [req.params.id]);
+    const [[orden]] = await req.db.query('SELECT id, tecnico_id, sucursal_id FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
 
     let destino_rol = null, destino_id = null;
@@ -759,12 +759,12 @@ router.post('/:id/mensajes', async (req, res) => {
     } else {
       return res.status(400).json({ error: 'Asigná un mecánico a la orden para enviarle un mensaje' });
     }
-    const [r] = await pool.query(
-      `INSERT INTO mensajes_internos (remitente_id, destino_rol, destino_id, mensaje, foto, orden_id, sucursal_id, tipo)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'directo')`,
+    const [r] = await req.db.query(
+      `INSERT INTO mensajes_internos (tenant_id,remitente_id, destino_rol, destino_id, mensaje, foto, orden_id, sucursal_id, tipo)
+       VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, 'directo')`,
       [req.usuario.id, destino_rol, destino_id, (mensaje || '').trim(), foto || null, orden.id, orden.sucursal_id || null]
     );
-    const [[nuevo]] = await pool.query(`${SELECT_MSG_ORDEN} WHERE m.id = ?`, [req.usuario.id, r.insertId]);
+    const [[nuevo]] = await req.db.query(`${SELECT_MSG_ORDEN} WHERE m.id = ?`, [req.usuario.id, r.insertId]);
     res.status(201).json({ data: nuevo, message: 'Mensaje enviado' });
   } catch (err) {
     fail(res, err);

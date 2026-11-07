@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const bcrypt = require('bcrypt');
-const { pool } = require('../db/pool');
+// Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
 const { anotar } = require('../utils/actividad');
 const { filtrarAvisos } = require('../utils/preferencias');
 const { fail } = require('../utils/responder');
@@ -17,6 +17,8 @@ const { enPeriodo, hoySQL } = require('../utils/sql-fechas');
 
 // Panel del mecánico: opera sobre SUS citas asignadas. Accesible a técnico o superior.
 router.use(auth, requireRol('tecnico'));
+// Foto y contraseña propias: el mismo tramo que monta el panel de recepción.
+router.use(require('./perfil-propio.routes'));
 
 const ESTADOS = ['agendado', 'en_revision', 'en_mantenimiento', 'listo', 'entregado', 'cancelado'];
 const EN_PROCESO = ['en_revision', 'en_mantenimiento'];
@@ -33,7 +35,7 @@ const SELECT_CITA = `
          m.marca, m.modelo, m.placa,
          c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.telefono AS cliente_telefono
   FROM citas ci
-  LEFT JOIN motos m    ON m.id = ci.moto_id
+  LEFT JOIN vehiculos m    ON m.id = ci.vehiculo_id
   JOIN clientes c      ON c.id = ci.cliente_id
   LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id`;
 
@@ -43,33 +45,33 @@ router.get('/resumen', async (req, res) => {
     const yo = req.usuario.id;
     // Hoy y el mes del taller, no los de la base (utils/sql-fechas.js).
     const off = (await getConfig()).zona_horaria_offset;
-    const [[{ citas_hoy }]] = await pool.query(
+    const [[{ citas_hoy }]] = await req.db.query(
       `SELECT COUNT(*) AS citas_hoy FROM citas WHERE tecnico_id = ? AND fecha = ${hoySQL(off)}`,
       [yo]
     );
-    const [[{ completadas_hoy }]] = await pool.query(
+    const [[{ completadas_hoy }]] = await req.db.query(
       `SELECT COUNT(*) AS completadas_hoy FROM citas WHERE tecnico_id = ? AND estado = 'entregado' AND ${enPeriodo('fecha_fin', 'hoy', { momento: true, offset: off })}`,
       [yo]
     );
-    const [[{ en_proceso }]] = await pool.query(
-      "SELECT COUNT(*) AS en_proceso FROM citas WHERE tecnico_id = ? AND estado IN ('en_revision','en_mantenimiento')",
+    const [[{ en_proceso }]] = await req.db.query(
+      "SELECT COUNT(*) AS en_proceso FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND estado IN ('en_revision','en_mantenimiento')",
       [yo]
     );
-    const [[{ monto_promedio }]] = await pool.query(
-      "SELECT COALESCE(AVG(monto), 0) AS monto_promedio FROM citas WHERE tecnico_id = ? AND estado = 'entregado' AND monto > 0",
+    const [[{ monto_promedio }]] = await req.db.query(
+      "SELECT COALESCE(AVG(monto), 0) AS monto_promedio FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND estado = 'entregado' AND monto > 0",
       [yo]
     );
-    const [[{ generado_hoy }]] = await pool.query(
+    const [[{ generado_hoy }]] = await req.db.query(
       `SELECT COALESCE(SUM(monto), 0) AS generado_hoy FROM citas WHERE tecnico_id = ? AND estado = 'entregado' AND ${enPeriodo('fecha_fin', 'hoy', { momento: true, offset: off })}`,
       [yo]
     );
-    const [[{ tiempo_promedio_min }]] = await pool.query(
+    const [[{ tiempo_promedio_min }]] = await req.db.query(
       `SELECT ROUND(AVG(TIMESTAMPDIFF(MINUTE, fecha_inicio, COALESCE(fecha_listo, fecha_fin)))) AS tiempo_promedio_min
-       FROM citas WHERE tecnico_id = ? AND estado = 'entregado' AND fecha_inicio IS NOT NULL AND (fecha_listo IS NOT NULL OR fecha_fin IS NOT NULL)`,
+       FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND estado = 'entregado' AND fecha_inicio IS NOT NULL AND (fecha_listo IS NOT NULL OR fecha_fin IS NOT NULL)`,
       [yo]
     );
-    const [[calif]] = await pool.query(
-      'SELECT ROUND(AVG(calificacion), 1) AS promedio, COUNT(calificacion) AS total FROM citas WHERE tecnico_id = ? AND calificacion IS NOT NULL',
+    const [[calif]] = await req.db.query(
+      'SELECT ROUND(AVG(calificacion), 1) AS promedio, COUNT(calificacion) AS total FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND calificacion IS NOT NULL',
       [yo]
     );
     res.json({
@@ -93,12 +95,12 @@ router.get('/resumen', async (req, res) => {
 router.get('/citas', async (req, res) => {
   try {
     const { fecha, estado } = req.query;
-    let sql = `${SELECT_CITA} WHERE ci.tecnico_id = ?`;
+    let sql = `${SELECT_CITA} WHERE ci.tenant_id = @tenant AND ci.tecnico_id = ?`;
     const params = [req.usuario.id];
     if (fecha) { sql += ' AND ci.fecha = ?'; params.push(fecha); }
     if (estado) { sql += ' AND ci.estado = ?'; params.push(estado); }
     sql += ' ORDER BY ci.fecha ASC, ci.hora ASC';
-    const [rows] = await pool.query(sql, params);
+    const [rows] = await req.db.query(sql, params);
     res.json({ data: rows });
   } catch (err) {
     fail(res, err);
@@ -110,8 +112,8 @@ router.get('/agenda', async (req, res) => {
   try {
     const { desde, hasta } = req.query;
     if (!desde || !hasta) return res.status(400).json({ error: 'desde y hasta son requeridos' });
-    const [rows] = await pool.query(
-      `${SELECT_CITA} WHERE ci.tecnico_id = ? AND ci.fecha BETWEEN ? AND ?
+    const [rows] = await req.db.query(
+      `${SELECT_CITA} WHERE ci.tenant_id = @tenant AND ci.tecnico_id = ? AND ci.fecha BETWEEN ? AND ?
        ORDER BY ci.fecha ASC, ci.hora ASC`,
       [req.usuario.id, desde, hasta]
     );
@@ -128,8 +130,8 @@ router.patch('/citas/:id/estado', async (req, res) => {
     const { estado, monto } = req.body;
     if (!ESTADOS.includes(estado)) return res.status(400).json({ error: 'Estado inválido' });
 
-    const [[cita]] = await pool.query(
-      'SELECT id, estado, orden_id FROM citas WHERE id = ? AND tecnico_id = ?',
+    const [[cita]] = await req.db.query(
+      'SELECT id, estado, orden_id FROM citas WHERE tenant_id = @tenant AND id = ? AND tecnico_id = ?',
       [req.params.id, req.usuario.id]
     );
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada o no asignada a vos' });
@@ -155,8 +157,8 @@ router.patch('/citas/:id/estado', async (req, res) => {
     }
     params.push(req.params.id);
 
-    await pool.query(`UPDATE citas SET ${sets.join(', ')} WHERE id = ?`, params);
-    await notificarCambioEstado(req.params.id, estado);
+    await req.db.query(`UPDATE citas SET ${sets.join(', ')} WHERE id = ?`, params);
+    await notificarCambioEstado(req.db, req.params.id, estado);
     res.json({ message: 'Estado actualizado' });
   } catch (err) {
     fail(res, err);
@@ -180,7 +182,7 @@ router.post('/ordenes/:id/repuestos', exigirPermiso('taller.repuestos'), async (
     if (piezas.length > MAX_PIEZAS_SOLICITUD) {
       return res.status(400).json({ error: `Máximo ${MAX_PIEZAS_SOLICITUD} repuestos por solicitud` });
     }
-    const [[orden]] = await pool.query(
+    const [[orden]] = await req.db.query(
       'SELECT id, numero_orden, total_aprobado FROM ordenes_trabajo WHERE id = ? AND tecnico_id = ?',
       [req.params.id, req.usuario.id]
     );
@@ -188,17 +190,17 @@ router.post('/ordenes/:id/repuestos', exigirPermiso('taller.repuestos'), async (
     // Sin precio todavía: recepción lo cotiza. Si el cliente ya había aprobado, queda
     // marcado como adicional y al ponerle precio se le pide aprobación otra vez.
     const adicional = orden.total_aprobado !== null ? 1 : 0;
-    const [result] = await pool.query(
+    const [result] = await req.db.query(
       "INSERT INTO orden_repuestos (orden_id, nombre, cantidad, costo_unitario, estado, adicional) VALUES ?",
       [piezas.map((p) => [req.params.id, p.nombre, p.cantidad, 0, 'solicitado', adicional])]
     );
-    const [nuevos] = await pool.query(
+    const [nuevos] = await req.db.query(
       'SELECT * FROM orden_repuestos WHERE orden_id = ? AND id >= ? ORDER BY id ASC LIMIT ?',
       [req.params.id, result.insertId, piezas.length]
     );
     // Notificar a recepción vía mensaje interno (uno por solicitud, no uno por pieza)
     const detalle = piezas.map((p) => `${p.nombre} ×${p.cantidad}`).join(', ');
-    await pool.query(
+    await req.db.query(
       `INSERT INTO mensajes_internos (remitente_id, destino_rol, mensaje, orden_id, tipo, sucursal_id)
        VALUES (?, 'recepcion', ?, ?, 'directo', (SELECT sucursal_id FROM usuarios WHERE id = ?))`,
       [req.usuario.id, `Solicitud de repuesto (${orden.numero_orden}): ${detalle}`.slice(0, 500), req.params.id, req.usuario.id]
@@ -218,11 +220,11 @@ router.post('/ordenes/:id/repuestos', exigirPermiso('taller.repuestos'), async (
 // ───────────────────────────────────────────────────────────
 router.get('/tareas', async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await req.db.query(
       `SELECT t.*, a.nombre AS asignado_por_nombre
        FROM tareas_mecanico t
-       LEFT JOIN usuarios a ON a.id = t.asignado_por
-       WHERE t.tecnico_id = ?
+       LEFT JOIN usuarios a ON a.id = t.asignado_por AND a.tenant_id = @tenant
+       WHERE t.tenant_id = @tenant AND t.tecnico_id = ?
        ORDER BY t.hecha ASC, FIELD(t.prioridad, 'urgente', 'alta', 'normal', 'baja'),
                 (t.vence IS NULL), t.vence ASC, t.created_at DESC`,
       [req.usuario.id]
@@ -238,11 +240,11 @@ router.post('/tareas', async (req, res) => {
     const { titulo, detalle, prioridad } = req.body;
     if (!titulo || !titulo.trim()) return res.status(400).json({ error: 'El título es requerido' });
     const prio = ['baja', 'normal', 'alta', 'urgente'].includes(prioridad) ? prioridad : 'normal';
-    const [r] = await pool.query(
-      'INSERT INTO tareas_mecanico (tecnico_id, titulo, detalle, prioridad) VALUES (?, ?, ?, ?)',
+    const [r] = await req.db.query(
+      'INSERT INTO tareas_mecanico (tenant_id,tecnico_id, titulo, detalle, prioridad) VALUES (@tenant, ?, ?, ?, ?)',
       [req.usuario.id, titulo.trim(), (detalle || '').trim() || null, prio]
     );
-    const [[nueva]] = await pool.query('SELECT * FROM tareas_mecanico WHERE id = ?', [r.insertId]);
+    const [[nueva]] = await req.db.query('SELECT * FROM tareas_mecanico WHERE tenant_id = @tenant AND id = ?', [r.insertId]);
     res.status(201).json({ data: nueva, message: 'Tarea creada' });
   } catch (err) {
     fail(res, err);
@@ -252,10 +254,10 @@ router.post('/tareas', async (req, res) => {
 // Alterna (o fija) el estado "hecha" de una tarea propia.
 router.patch('/tareas/:id', async (req, res) => {
   try {
-    const [[t]] = await pool.query('SELECT id, hecha FROM tareas_mecanico WHERE id = ? AND tecnico_id = ?', [req.params.id, req.usuario.id]);
+    const [[t]] = await req.db.query('SELECT id, hecha FROM tareas_mecanico WHERE tenant_id = @tenant AND id = ? AND tecnico_id = ?', [req.params.id, req.usuario.id]);
     if (!t) return res.status(404).json({ error: 'Tarea no encontrada' });
     const hecha = req.body.hecha !== undefined ? (req.body.hecha ? 1 : 0) : (t.hecha ? 0 : 1);
-    await pool.query('UPDATE tareas_mecanico SET hecha = ? WHERE id = ?', [hecha, req.params.id]);
+    await req.db.query('UPDATE tareas_mecanico SET hecha = ? WHERE tenant_id = @tenant AND id = ?', [hecha, req.params.id]);
     res.json({ data: { id: Number(req.params.id), hecha }, message: 'Tarea actualizada' });
   } catch (err) {
     fail(res, err);
@@ -265,8 +267,8 @@ router.patch('/tareas/:id', async (req, res) => {
 router.delete('/tareas/:id', async (req, res) => {
   try {
     // El técnico solo borra sus propias tareas; las asignadas por el admin las completa, no las borra.
-    await pool.query(
-      'DELETE FROM tareas_mecanico WHERE id = ? AND tecnico_id = ? AND asignado_por IS NULL',
+    await req.db.query(
+      'DELETE FROM tareas_mecanico WHERE tenant_id = @tenant AND id = ? AND tecnico_id = ? AND asignado_por IS NULL',
       [req.params.id, req.usuario.id]
     );
     res.json({ message: 'Tarea eliminada' });
@@ -289,19 +291,19 @@ const SELECT_MENSAJE = `
          o.numero_orden,
          ${LEIDO_POR_MI}, ${VISTO_POR_OTRO}
   FROM mensajes_internos m
-  JOIN usuarios u ON u.id = m.remitente_id
+  JOIN usuarios u ON u.id = m.remitente_id AND u.tenant_id = @tenant
   LEFT JOIN ordenes_trabajo o ON o.id = m.orden_id`;
 
 router.get('/mensajes', async (req, res) => {
   try {
     const yo = req.usuario.id;
-    const [rows] = await pool.query(
+    const [rows] = await req.db.query(
       `${SELECT_MENSAJE}
        WHERE m.remitente_id = ? OR m.destino_id = ? OR (m.tipo = 'broadcast' AND m.destino_rol = 'tecnico')
        ORDER BY m.created_at ASC LIMIT 100`,
       [yo, yo, yo]
     );
-    await marcarLeidos(yo, rows);
+    await marcarLeidos(req.db, yo, rows);
     res.json({ data: rows });
   } catch (err) {
     fail(res, err);
@@ -311,11 +313,11 @@ router.get('/mensajes', async (req, res) => {
 router.get('/mensajes/no-leidos', async (req, res) => {
   try {
     const yo = req.usuario.id;
-    const [[{ count }]] = await pool.query(
+    const [[{ count }]] = await req.db.query(
       `SELECT COUNT(*) AS count FROM mensajes_internos m
-       WHERE (m.destino_id = ? OR (m.tipo = 'broadcast' AND m.destino_rol = 'tecnico'))
+       WHERE m.tenant_id = @tenant AND (m.destino_id = ? OR (m.tipo = 'broadcast' AND m.destino_rol = 'tecnico'))
          AND m.remitente_id <> ?
-         AND NOT EXISTS(SELECT 1 FROM mensaje_lecturas ml WHERE ml.mensaje_id = m.id AND ml.usuario_id = ?)`,
+         AND NOT EXISTS(SELECT 1 FROM mensaje_lecturas ml WHERE ml.mensaje_id = m.id AND ml.usuario_id = ? AND ml.tenant_id = @tenant)`,
       [yo, yo, yo]
     );
     res.json({ data: { count } });
@@ -330,12 +332,12 @@ router.post('/mensajes', exigirPermiso('equipo.mensajes'), async (req, res) => {
     if ((!mensaje || !mensaje.trim()) && !foto) return res.status(400).json({ error: 'El mensaje o una foto es requerido' });
     // El mecánico elige a quién escribe: recepción (default) o admin.
     const destino_rol = destino === 'admin' ? 'admin' : 'recepcion';
-    const [[me]] = await pool.query('SELECT sucursal_id FROM usuarios WHERE id = ?', [req.usuario.id]);
-    const [r] = await pool.query(
-      "INSERT INTO mensajes_internos (remitente_id, destino_rol, mensaje, foto, orden_id, sucursal_id, tipo) VALUES (?, ?, ?, ?, ?, ?, 'directo')",
+    const [[me]] = await req.db.query('SELECT sucursal_id FROM usuarios WHERE tenant_id = @tenant AND id = ?', [req.usuario.id]);
+    const [r] = await req.db.query(
+      "INSERT INTO mensajes_internos (tenant_id,remitente_id, destino_rol, mensaje, foto, orden_id, sucursal_id, tipo) VALUES (@tenant, ?, ?, ?, ?, ?, ?, 'directo')",
       [req.usuario.id, destino_rol, (mensaje || '').trim(), foto || null, orden_id || null, me?.sucursal_id || null]
     );
-    const [[nuevo]] = await pool.query(`${SELECT_MENSAJE} WHERE m.id = ?`, [req.usuario.id, r.insertId]);
+    const [[nuevo]] = await req.db.query(`${SELECT_MENSAJE} WHERE m.id = ?`, [req.usuario.id, r.insertId]);
     res.status(201).json({ data: nuevo, message: 'Mensaje enviado' });
   } catch (err) {
     fail(res, err);
@@ -344,8 +346,8 @@ router.post('/mensajes', exigirPermiso('equipo.mensajes'), async (req, res) => {
 
 router.get('/recepcion-contacto', async (req, res) => {
   try {
-    const [rows] = await pool.query(
-      "SELECT id, nombre, telefono, foto FROM usuarios WHERE rol = 'recepcion' AND activo = 1 ORDER BY nombre"
+    const [rows] = await req.db.query(
+      "SELECT id, nombre, telefono, foto FROM usuarios WHERE tenant_id = @tenant AND rol = 'recepcion' AND activo = 1 ORDER BY nombre"
     );
     res.json({ data: rows.length ? rows[0] : null, equipo: rows });
   } catch (err) {
@@ -359,36 +361,36 @@ router.get('/recepcion-contacto', async (req, res) => {
 router.get('/perfil', async (req, res) => {
   try {
     const yo = req.usuario.id;
-    const [[u]] = await pool.query(
+    const [[u]] = await req.db.query(
       `SELECT u.id, u.nombre, u.email, u.rol, u.telefono, u.especialidades, u.horario, u.created_at,
               s.nombre AS sucursal_nombre, s.direccion AS sucursal_direccion
        FROM usuarios u LEFT JOIN sucursales s ON s.id = u.sucursal_id WHERE u.id = ?`, [yo]);
-    const [[g]] = await pool.query(
+    const [[g]] = await req.db.query(
       `SELECT COUNT(*) AS completadas,
               ROUND(AVG(TIMESTAMPDIFF(MINUTE, fecha_inicio, COALESCE(fecha_listo, fecha_fin)))) AS tiempo_promedio_min
-       FROM citas WHERE tecnico_id = ? AND estado = 'entregado'`,
+       FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND estado = 'entregado'`,
       [yo]
     );
-    const [[calif]] = await pool.query(
-      'SELECT ROUND(AVG(calificacion), 1) AS promedio, COUNT(calificacion) AS total FROM citas WHERE tecnico_id = ? AND calificacion IS NOT NULL',
+    const [[calif]] = await req.db.query(
+      'SELECT ROUND(AVG(calificacion), 1) AS promedio, COUNT(calificacion) AS total FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND calificacion IS NOT NULL',
       [yo]
     );
-    const [[sat]] = await pool.query(
-      'SELECT COUNT(*) AS total, COALESCE(SUM(calificacion >= 4), 0) AS buenas FROM citas WHERE tecnico_id = ? AND calificacion IS NOT NULL',
+    const [[sat]] = await req.db.query(
+      'SELECT COUNT(*) AS total, COALESCE(SUM(calificacion >= 4), 0) AS buenas FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND calificacion IS NOT NULL',
       [yo]
     );
     const satisfechos_pct = sat.total ? Math.round((sat.buenas / sat.total) * 100) : null;
-    const [[mes]] = await pool.query(
+    const [[mes]] = await req.db.query(
       `SELECT COUNT(*) AS citas_mes
        FROM citas WHERE tecnico_id = ? AND estado = 'entregado'
          AND ${enPeriodo('fecha_fin', 'mes', { momento: true, offset: (await getConfig()).zona_horaria_offset })}`,
       [yo]
     );
-    const [calificaciones] = await pool.query(
+    const [calificaciones] = await req.db.query(
       `SELECT ci.calificacion, ci.comentario_satisfaccion, ci.tipo_servicio, ci.servicios, ci.fecha_fin,
               c.nombre AS cliente_nombre, c.apellido AS cliente_apellido
-       FROM citas ci JOIN clientes c ON c.id = ci.cliente_id
-       WHERE ci.tecnico_id = ? AND ci.calificacion IS NOT NULL
+       FROM citas ci JOIN clientes c ON c.id = ci.cliente_id AND c.tenant_id = @tenant
+       WHERE ci.tenant_id = @tenant AND ci.tecnico_id = ? AND ci.calificacion IS NOT NULL
        ORDER BY ci.fecha_fin DESC LIMIT 8`,
       [yo]
     );
@@ -414,8 +416,8 @@ router.get('/perfil', async (req, res) => {
 router.patch('/perfil', async (req, res) => {
   try {
     const { telefono, especialidades, horario } = req.body;
-    await pool.query(
-      'UPDATE usuarios SET telefono = ?, especialidades = ?, horario = ? WHERE id = ?',
+    await req.db.query(
+      'UPDATE usuarios SET telefono = ?, especialidades = ?, horario = ? WHERE tenant_id = @tenant AND id = ?',
       [telefono || null, especialidades || null, horario || null, req.usuario.id]
     );
     res.json({ message: 'Perfil actualizado' });
@@ -428,34 +430,34 @@ router.patch('/perfil', async (req, res) => {
 router.get('/alertas', async (req, res) => {
   try {
     const yo = req.usuario.id;
-    const [mensajes] = await pool.query(
+    const [mensajes] = await req.db.query(
       `SELECT 'mensaje' AS tipo, m.created_at, m.mensaje AS texto,
               u.nombre AS remitente_nombre
        FROM mensajes_internos m
-       JOIN usuarios u ON u.id = m.remitente_id
-       WHERE (m.destino_id = ? OR (m.tipo = 'broadcast' AND m.destino_rol = 'tecnico'))
+       JOIN usuarios u ON u.id = m.remitente_id AND u.tenant_id = @tenant
+       WHERE m.tenant_id = @tenant AND (m.destino_id = ? OR (m.tipo = 'broadcast' AND m.destino_rol = 'tecnico'))
          AND m.remitente_id != ?
          AND m.created_at >= NOW() - INTERVAL 24 HOUR
        ORDER BY m.created_at DESC LIMIT 10`,
       [yo, yo]
     );
-    const [citas] = await pool.query(
+    const [citas] = await req.db.query(
       `SELECT 'cita_asignada' AS tipo, ci.created_at,
               DATE_FORMAT(ci.fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(ci.hora, '%H:%i') AS hora,
               ci.tipo_servicio, ci.servicios, m.marca, m.modelo
        FROM citas ci
-       LEFT JOIN motos m ON m.id = ci.moto_id
-       WHERE ci.tecnico_id = ? AND ci.created_at >= NOW() - INTERVAL 24 HOUR
+       LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant
+       WHERE ci.tenant_id = @tenant AND ci.tecnico_id = ? AND ci.created_at >= NOW() - INTERVAL 24 HOUR
        ORDER BY ci.created_at DESC LIMIT 10`,
       [yo]
     );
-    const [ordenes] = await pool.query(
+    const [ordenes] = await req.db.query(
       `SELECT 'orden_estado' AS tipo, o.updated_at AS created_at,
               o.numero_orden, o.id AS orden_id, o.estado,
               o.aprobacion_cliente, m.marca, m.modelo
        FROM ordenes_trabajo o
-       JOIN motos m ON m.id = o.moto_id
-       WHERE o.tecnico_id = ? AND o.updated_at >= NOW() - INTERVAL 24 HOUR
+       JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
+       WHERE o.tenant_id = @tenant AND o.tecnico_id = ? AND o.updated_at >= NOW() - INTERVAL 24 HOUR
          AND o.estado NOT IN ('recepcion')
        ORDER BY o.updated_at DESC LIMIT 10`,
       [yo]
@@ -473,7 +475,7 @@ router.put('/perfil/foto', async (req, res) => {
   try {
     const { foto } = req.body;
     if (!fotoValida(foto)) return res.status(400).json({ error: 'Imagen inválida' });
-    await pool.query('UPDATE usuarios SET foto = ? WHERE id = ?', [foto || null, req.usuario.id]);
+    await req.db.query('UPDATE usuarios SET foto = ? WHERE id = ?', [foto || null, req.usuario.id]);
     if (foto) anotar(req.usuario.id, 'foto');
     res.json({ data: { foto: foto || null }, message: foto ? 'Foto actualizada' : 'Foto eliminada' });
   } catch (err) {
@@ -485,7 +487,7 @@ router.put('/perfil/password', async (req, res) => {
   try {
     const { actual, nueva } = req.body;
     if (!actual || !nueva) return res.status(400).json({ error: 'Contraseña actual y nueva son requeridas' });
-    const [[u]] = await pool.query('SELECT password_hash, email, nombre FROM usuarios WHERE id = ?', [req.usuario.id]);
+    const [[u]] = await req.db.query('SELECT password_hash, email, nombre FROM usuarios WHERE id = ?', [req.usuario.id]);
     if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
     // La política de Configuración → Seguridad (utils/contrasena.js).
     const malaClave = problemaDeContrasena(nueva, politica(await getConfig()), u);
@@ -493,7 +495,7 @@ router.put('/perfil/password', async (req, res) => {
     const ok = await bcrypt.compare(String(actual), u.password_hash);
     if (!ok) return res.status(400).json({ error: 'La contraseña actual no es correcta' });
     const hash = await bcrypt.hash(String(nueva), 10);
-    await pool.query('UPDATE usuarios SET password_hash = ? WHERE id = ?', [hash, req.usuario.id]);
+    await req.db.query('UPDATE usuarios SET password_hash = ? WHERE id = ?', [hash, req.usuario.id]);
     anotar(req.usuario.id, 'contrasena');
     res.json({ message: 'Contraseña actualizada' });
   } catch (err) {

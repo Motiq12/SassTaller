@@ -1,11 +1,17 @@
 const router = require('express').Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+// `pool` (sin scope) se usa a propósito y SOLO en /login: ahí todavía no se sabe a
+// qué taller pertenece quien entra — justamente es lo que hay que averiguar. Las
+// rutas autenticadas de este archivo usan req.db como todas las demás.
 const { pool } = require('../db/pool');
 const { fail, invalido, faltante } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const { emailValido } = require('../utils/validar');
 const { consumir } = require('../utils/rate-limit');
+const { resumenCuenta } = require('../utils/cuenta');
+const { nuevoCodigo, canjear, VIGENCIA_MIN } = require('../utils/verificacion-usuario');
+const { enviarCodigoCorreoStaff } = require('../services/mailer');
 const totp = require('../utils/totp');
 const { normalizarPermisos } = require('../utils/permisos-web');
 const { permisosDeUsuario } = require('../middleware/permisos');
@@ -31,8 +37,7 @@ function anotarIngreso(usuarioId) {
 // Abre la sesión del personal: la anota con su dispositivo (Mi perfil → Sesiones) y
 // firma el token con ese `sid`. Si no se pudo anotar, firma sin sid y entra igual.
 async function sesionStaff(usuario, req) {
-  // tenant_id va en el token: es de donde lo saca middleware/tenant para acotar req.db.
-  const payload = { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol, tenant_id: usuario.tenant_id };
+  const payload = { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol };
   const sid = nuevoSid();
   const token = firmar({ ...payload, sid });
   const ok = await abrirSesion(usuario.id, req, jwt.decode(token).exp, sid);
@@ -45,8 +50,11 @@ async function sesionStaff(usuario, req) {
 // segundo factor. NO lleva `rol`, así que `middleware/auth` (que exige rol y rechaza
 // `pend2fa`) lo bloquea en todas las rutas del sistema: solo sirve para canjearlo en
 // /auth/2fa/verificar, y vive 5 minutos.
-function firmarParcial(usuarioId) {
-  return jwt.sign({ id: usuarioId, pend2fa: true }, process.env.JWT_SECRET, { expiresIn: '5m' });
+// Lleva el taller: la contraseña ya se validó, así que en este punto se sabe de qué
+// taller es el usuario. Sin esto, al canjear el código habría que volver a buscarlo
+// sin scope, que es justo lo que queremos evitar.
+function firmarParcial(usuarioId, tenantId) {
+  return jwt.sign({ id: usuarioId, tenant_id: tenantId, pend2fa: true }, process.env.JWT_SECRET, { expiresIn: '5m' });
 }
 
 // Hash señuelo (bcrypt válido) para igualar el tiempo de respuesta cuando el correo
@@ -59,12 +67,26 @@ const DUMMY_HASH = bcrypt.hashSync('timing-equalizer', 10);
 // La respuesta incluye `tipo` ('staff' | 'cliente') para que el front sepa a dónde mandar.
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, taller } = req.body;
     if (!email || !password) {
       return faltante(res, req.body, [['email', 'el correo'], ['password', 'la contraseña']]);
     }
     if (!emailValido(email)) {
       return invalido(res, 'email', 'El correo no tiene un formato válido');
+    }
+
+    // Multi-tenant: el email ya no es único global, solo dentro de un taller. Si el
+    // front manda el taller (subdominio/slug), la búsqueda se acota a ese. Si no lo
+    // manda, se resuelve por el correo y solo se acepta si aparece en UNO solo;
+    // ante ambigüedad se le pide al usuario que elija, en vez de adivinar.
+    let tenantId = null;
+    if (taller) {
+      const [[t]] = await pool.query(
+        "SELECT id FROM tenants WHERE slug = ? AND estado = 'activo'",
+        [String(taller).trim().toLowerCase()]
+      );
+      if (!t) return res.status(404).json({ error: 'Taller no encontrado o inactivo' });
+      tenantId = t.id;
     }
 
     // Anti fuerza-bruta: limita intentos por correo (10/min, 60/hora).
@@ -76,16 +98,34 @@ router.post('/login', async (req, res) => {
       return res.status(429).json({ error: `Demasiados intentos. Se puede volver a probar en ${limite.retryAfter} segundos.` });
     }
 
-    // 1) Personal del taller (usuarios)
-    const [[usuario]] = await pool.query(
-      'SELECT * FROM usuarios WHERE email = ? AND activo = 1',
-      [email]
+    // 1) Personal del taller (usuarios). Sin `taller` puede haber varios candidatos
+    // (mismo correo en talleres distintos), así que se resuelve por contraseña: se
+    // compara contra todos y se acepta si coincide en UNO. Desambiguar recién
+    // después de validar evita revelar en qué talleres existe un correo.
+    const [candidatos] = await pool.query(
+      tenantId
+        ? 'SELECT * FROM usuarios WHERE email = ? AND activo = 1 AND tenant_id = ?'
+        : 'SELECT * FROM usuarios WHERE email = ? AND activo = 1',
+      tenantId ? [email, tenantId] : [email]
     );
-    if (usuario && (await bcrypt.compare(password, usuario.password_hash))) {
+    const validos = [];
+    for (const c of candidatos) {
+      if (await bcrypt.compare(password, c.password_hash)) validos.push(c);
+    }
+    if (validos.length > 1) {
+      // La contraseña ya se validó, así que listar los talleres no filtra nada nuevo.
+      const [talleres] = await pool.query(
+        `SELECT id, nombre, slug FROM tenants WHERE id IN (${validos.map(() => '?').join(',')})`,
+        validos.map(v => v.tenant_id)
+      );
+      return res.status(409).json({ error: 'Ese correo está en varios talleres. Elegí uno.', talleres });
+    }
+    const usuario = validos[0];
+    if (usuario) {
       // Con verificación en dos pasos activa, la contraseña sola no abre sesión:
       // se devuelve un token parcial que solo sirve para canjear el código.
       if (usuario.totp_activado) {
-        return res.json({ data: { requiere_2fa: true, tipo: 'staff', token_parcial: firmarParcial(usuario.id) } });
+        return res.json({ data: { requiere_2fa: true, tipo: 'staff', token_parcial: firmarParcial(usuario.id, usuario.tenant_id) } });
       }
       // Los permisos del sitio web van en la respuesta (el panel arma su menú con
       // ellos) pero NO en el token: la API los relee en cada petición.
@@ -95,18 +135,25 @@ router.post('/login', async (req, res) => {
 
     // 2) Cliente del portal (clientes con contraseña definida)
     const [[cliente]] = await pool.query(
-      'SELECT * FROM clientes WHERE email = ? AND activo = 1 AND password_hash IS NOT NULL',
-      [email]
+      tenantId
+        ? 'SELECT * FROM clientes WHERE email = ? AND activo = 1 AND password_hash IS NOT NULL AND tenant_id = ?'
+        : 'SELECT * FROM clientes WHERE email = ? AND activo = 1 AND password_hash IS NOT NULL',
+      tenantId ? [email, tenantId] : [email]
     );
     if (cliente && (await bcrypt.compare(password, cliente.password_hash))) {
-      const payload = { id: cliente.id, tipo: 'cliente', nombre: cliente.nombre, apellido: cliente.apellido, tenant_id: cliente.tenant_id };
+      const payload = {
+        id: cliente.id, tipo: 'cliente', nombre: cliente.nombre,
+        apellido: cliente.apellido, tenant_id: cliente.tenant_id,
+      };
       // La foto va en la respuesta (para el header), NO en el token (lo mantiene liviano).
       return res.json({ data: { token: firmar(payload), tipo: 'cliente', cliente: { ...payload, foto: cliente.foto || null } } });
     }
 
     // Anti-enumeración: si el correo no existía en ninguna tabla, no se ejecutó
     // ningún bcrypt.compare; corré uno señuelo para no delatar la cuenta por timing.
-    if (!usuario && !cliente) {
+    // Se mira `candidatos` (existencia del correo) y no `usuario` (contraseña válida):
+    // con la contraseña equivocada ya se corrió un bcrypt real y no hace falta otro.
+    if (!candidatos.length && !cliente) {
       await bcrypt.compare(password, DUMMY_HASH);
     }
     registrarEvento('login_fallido', { email, ip: req.ip, detalle: usuario ? 'personal' : cliente ? 'cliente' : 'cuenta inexistente' });
@@ -167,7 +214,12 @@ router.post('/2fa/verificar', async (req, res) => {
     } catch {
       return res.status(401).json({ error: 'La sesión de ingreso venció. Iniciá sesión de nuevo.' });
     }
-    if (!datos.pend2fa || !datos.id) return res.status(401).json({ error: 'Token no válido' });
+    if (!datos.pend2fa || !datos.id || !datos.tenant_id) {
+      return res.status(401).json({ error: 'Token no válido' });
+    }
+    // Esta ruta no pasa por middleware/auth (todavía no hay sesión abierta), así que
+    // el acceso scopeado se arma acá, con el taller que viaja en el token parcial.
+    req.db = paraTenant(Number(datos.tenant_id));
 
     // Fuerza bruta: 6 dígitos son un millón de combinaciones, pero sin tope se
     // agotan rápido. Se limita por cuenta, no por IP (que el atacante puede rotar).
@@ -187,7 +239,7 @@ router.post('/2fa/verificar', async (req, res) => {
 
     if (contador) {
       // Guarda el período consumido: ese mismo código ya no se puede reusar.
-      await pool.query('UPDATE usuarios SET totp_ultimo_contador = ? WHERE id = ?', [contador, usuario.id]);
+      await req.db.query('UPDATE usuarios SET totp_ultimo_contador = ? WHERE id = ? AND tenant_id = @tenant', [contador, usuario.id]);
     } else {
       // ¿Será un código de respaldo? (un solo uso: si acierta, se elimina)
       const usado = await consumirCodigoRespaldo(usuario, codigo);
@@ -219,7 +271,7 @@ async function consumirCodigoRespaldo(usuario, codigo) {
   for (let i = 0; i < hashes.length; i++) {
     if (await bcrypt.compare(limpio, hashes[i])) {
       hashes.splice(i, 1);
-      await pool.query('UPDATE usuarios SET totp_backup = ? WHERE id = ?', [JSON.stringify(hashes), usuario.id]);
+      await req.db.query('UPDATE usuarios SET totp_backup = ? WHERE id = ? AND tenant_id = @tenant', [JSON.stringify(hashes), usuario.id]);
       return true;
     }
   }
@@ -229,7 +281,7 @@ async function consumirCodigoRespaldo(usuario, codigo) {
 // Estado del 2FA de mi cuenta (para pintar el panel del perfil).
 router.get('/2fa/estado', auth, async (req, res) => {
   try {
-    const [[u]] = await pool.query('SELECT totp_activado, totp_backup FROM usuarios WHERE id = ?', [req.usuario.id]);
+    const [[u]] = await req.db.query('SELECT totp_activado, totp_backup FROM usuarios WHERE id = ? AND tenant_id = @tenant', [req.usuario.id]);
     let restantes = 0;
     try { restantes = (JSON.parse(u?.totp_backup || '[]') || []).length; } catch { restantes = 0; }
     res.json({ data: { activado: !!u?.totp_activado, backup_restantes: restantes } });
@@ -242,19 +294,19 @@ router.get('/2fa/estado', auth, async (req, res) => {
 // Queda guardada pero INACTIVA hasta que se confirme con un código válido.
 router.post('/2fa/setup', auth, async (req, res) => {
   try {
-    const [[u]] = await pool.query('SELECT email, totp_activado FROM usuarios WHERE id = ?', [req.usuario.id]);
+    const [[u]] = await req.db.query('SELECT email, totp_activado FROM usuarios WHERE id = ? AND tenant_id = @tenant', [req.usuario.id]);
     if (u?.totp_activado) return res.status(400).json({ error: 'La verificación en dos pasos ya está activa' });
 
     const secreto = totp.generarSecreto();
-    await pool.query(
-      'UPDATE usuarios SET totp_secret = ?, totp_activado = 0, totp_ultimo_contador = NULL WHERE id = ?',
+    await req.db.query(
+      'UPDATE usuarios SET totp_secret = ?, totp_activado = 0, totp_ultimo_contador = NULL WHERE id = ? AND tenant_id = @tenant',
       [secreto, req.usuario.id]
     );
     res.json({
       data: {
         secreto,
         secreto_legible: totp.secretoLegible(secreto),
-        uri: totp.uriOtpauth(secreto, u.email || `usuario-${req.usuario.id}`),
+        uri: totp.uriOtpauth(secreto, u.email || `usuario-${req.usuario.id}`, (await getConfig(req.db)).nombre_taller),
       },
     });
   } catch (err) {
@@ -274,8 +326,8 @@ router.post('/2fa/activar', auth, async (req, res) => {
       return res.status(429).json({ error: `Demasiados intentos. Esperá ${limite.retryAfter}s e intentá de nuevo.` });
     }
 
-    const [[u]] = await pool.query(
-      'SELECT totp_secret, totp_activado FROM usuarios WHERE id = ?', [req.usuario.id]
+    const [[u]] = await req.db.query(
+      'SELECT totp_secret, totp_activado FROM usuarios WHERE id = ? AND tenant_id = @tenant', [req.usuario.id]
     );
     if (u?.totp_activado) return res.status(400).json({ error: 'La verificación en dos pasos ya está activa' });
     if (!u?.totp_secret) return res.status(400).json({ error: 'Primero generá la clave' });
@@ -285,8 +337,8 @@ router.post('/2fa/activar', auth, async (req, res) => {
 
     const codigos = totp.generarCodigosRespaldo();
     const hashes = await Promise.all(codigos.map(c => bcrypt.hash(totp.normalizarRespaldo(c), 10)));
-    await pool.query(
-      'UPDATE usuarios SET totp_activado = 1, totp_backup = ?, totp_ultimo_contador = ? WHERE id = ?',
+    await req.db.query(
+      'UPDATE usuarios SET totp_activado = 1, totp_backup = ?, totp_ultimo_contador = ? WHERE id = ? AND tenant_id = @tenant',
       [JSON.stringify(hashes), contador, req.usuario.id]
     );
 
@@ -309,14 +361,14 @@ router.post('/2fa/desactivar', auth, async (req, res) => {
       return res.status(429).json({ error: `Demasiados intentos. Esperá ${limite.retryAfter}s e intentá de nuevo.` });
     }
 
-    const [[u]] = await pool.query('SELECT password_hash FROM usuarios WHERE id = ?', [req.usuario.id]);
+    const [[u]] = await req.db.query('SELECT password_hash FROM usuarios WHERE id = ? AND tenant_id = @tenant', [req.usuario.id]);
     if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
     if (!(await bcrypt.compare(String(password), u.password_hash))) {
       return invalido(res, 'password', 'La contraseña no es correcta');
     }
 
-    await pool.query(
-      'UPDATE usuarios SET totp_activado = 0, totp_secret = NULL, totp_backup = NULL, totp_ultimo_contador = NULL WHERE id = ?',
+    await req.db.query(
+      'UPDATE usuarios SET totp_activado = 0, totp_secret = NULL, totp_backup = NULL, totp_ultimo_contador = NULL WHERE id = ? AND tenant_id = @tenant',
       [req.usuario.id]
     );
     anotar(req.usuario.id, 'dosfa_off');
