@@ -414,9 +414,15 @@ router.post('/otp/verificar', async (req, res) => {
     }
 
     await req.db.query('UPDATE login_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
-    // Entrar con el código por correo prueba lo mismo que la verificación de registro:
-    // se controla la bandeja. Se promueve sin fricción extra.
-    await req.db.query('UPDATE clientes SET email_verificado = 1 WHERE tenant_id = @tenant AND id = ? AND email_verificado = 0', [cliente.id]);
+    // Entrar con el código prueba que se controla la bandeja, pero NO que la contraseña
+    // pendiente sea de quien entra: pudo ponerla otro "reclamando" la cuenta en
+    // /registro. Promover ahí la volvería válida y le daría la cuenta a ese otro. Por
+    // eso solo se promueven las cuentas sin contraseña; la que tiene una pendiente
+    // sigue entrando por código y se confirma con el código de /registro/verificar.
+    await req.db.query(
+      'UPDATE clientes SET email_verificado = 1 WHERE tenant_id = @tenant AND id = ? AND email_verificado = 0 AND password_hash IS NULL',
+      [cliente.id]
+    );
     const { payload, token } = tokenCliente(cliente);
     res.json({ data: { token, cliente: { ...payload, foto: cliente.foto || null } } });
   } catch (err) {

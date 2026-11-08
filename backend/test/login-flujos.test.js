@@ -50,6 +50,13 @@ function baseFalsa(tenantId) {
 
 // Los routers toman `paraTenant` al cargarse: se reemplaza ANTES de requerirlos.
 tenantDb.paraTenant = (id) => baseFalsa(id);
+// /auth/login usa el pool crudo a propósito (todavía no sabe de qué taller es quien
+// entra), así que el guard no aplica: se simula sin él. Nunca toca la base real.
+const { pool } = require('../src/db/pool');
+pool.query = async (sql) => {
+  const hit = tablas.find(t => t.re.test(sql));
+  return [(hit ? [].concat(hit.filas) : []).map(f => recorte(sql, f))];
+};
 // El tramo público del portal resuelve el taller por slug contra la base real; acá
 // el taller ya está decidido.
 const rutaPublico = require.resolve('../src/middleware/tenant-publico');
@@ -150,6 +157,42 @@ test('portal: un cliente ya verificado NO recibe sesión por /registro/verificar
   const { status, body } = await pedir('POST', '/api/portal/registro/verificar', { email: 'lu@x.com', codigo: '000000' });
   assert.equal(status, 409);
   assert.equal(body.data, undefined);
+});
+
+// ── Toma de cuenta por el login unificado ────────────────────────────────
+// El ataque: /portal/registro "reclama" un cliente que el taller cargó sin contraseña
+// y le pone la del atacante, con email_verificado = 0. Antes /auth/login no miraba
+// ese campo y le daba la sesión.
+const HASH_CLAVE = bcrypt.hashSync('clave-del-atacante', 4);
+
+test('login unificado: un cliente con el correo sin confirmar no entra con contraseña', async () => {
+  tablas = [{ re: /from clientes/i, filas: cliente({ password_hash: HASH_CLAVE, email_verificado: 0 }) }];
+  const { status, body } = await pedir('POST', '/api/auth/login', { email: 'lu@x.com', password: 'clave-del-atacante' });
+  assert.equal(status, 403);
+  assert.equal(body.requiere_verificacion, true);
+  assert.equal(body.data, undefined);
+});
+
+test('login unificado: un cliente con el correo confirmado entra normalmente', async () => {
+  tablas = [{ re: /from clientes/i, filas: cliente({ password_hash: HASH_CLAVE, email_verificado: 1 }) }];
+  const { status, body } = await pedir('POST', '/api/auth/login', { email: 'lu@x.com', password: 'clave-del-atacante' });
+  assert.equal(status, 200, JSON.stringify(body));
+  assert.equal(body.data.tipo, 'cliente');
+  assert.equal(jwt.decode(body.data.token).tenant_id, 1);
+});
+
+test('portal: entrar por código no confirma una cuenta con contraseña pendiente', async () => {
+  // Si lo hiciera, el dueño real del correo, al entrar por código, dejaría activa la
+  // contraseña que puso el atacante al reclamar la cuenta.
+  tablas = [
+    { re: /from login_codes/i, filas: { id: 1, code_hash: HASH_123456, attempts: 0 } },
+    { re: /from clientes/i, filas: cliente({ password_hash: HASH_CLAVE, email_verificado: 0 }) },
+  ];
+  const { status } = await pedir('POST', '/api/portal/otp/verificar', { email: 'lu@x.com', codigo: '123456' });
+  assert.equal(status, 200);
+  const promocion = escrituras.find(e => /email_verificado = 1/.test(e.sql));
+  assert.ok(promocion, 'no se intentó confirmar el correo');
+  assert.match(promocion.sql, /password_hash IS NULL/, 'confirma el correo aunque haya una contraseña pendiente');
 });
 
 // ── Mecánico ──────────────────────────────────────────────────────────────

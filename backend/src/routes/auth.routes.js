@@ -113,6 +113,17 @@ router.post('/login', async (req, res) => {
       tenantId ? [email, tenantId] : [email]
     );
     if (cliente && (await bcrypt.compare(password, cliente.password_hash))) {
+      // Mismo criterio que /portal/login: la contraseña sola no alcanza mientras el
+      // correo no esté confirmado. Sin esto, cualquiera podía "reclamar" en
+      // /portal/registro un cliente que el taller cargó sin contraseña, ponerle la
+      // suya y entrar por acá sin haber visto nunca el código del correo.
+      // La contraseña ya se comprobó, así que avisarlo no enumera cuentas.
+      if (!cliente.email_verificado) {
+        return res.status(403).json({
+          error: 'Confirmá tu correo para entrar. Te enviamos un código al registrarte.',
+          requiere_verificacion: true,
+        });
+      }
       const payload = {
         id: cliente.id, tipo: 'cliente', nombre: cliente.nombre,
         apellido: cliente.apellido, tenant_id: cliente.tenant_id,
