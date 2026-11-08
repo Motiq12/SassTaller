@@ -366,12 +366,19 @@ router.delete('/:id/repuestos/:rid', requireRol('admin'), async (req, res) => {
 router.post('/:id/checklist', async (req, res) => {
   try {
     const { prueba_realizada, lavado, calidad_revisada, facturacion_lista, cliente_notificado, observaciones } = req.body;
+    // La orden tiene que ser de este taller. `orden_id` es único en TODA la tabla, no por
+    // taller: sin este chequeo, mandar el id de una orden ajena hacía que el upsert de
+    // abajo pisara el checklist de otro taller (o, si no tenía, le dejaba una fila a
+    // nombre de quien la mandó y el dueño ya no podía crear la suya).
+    const [[orden]] = await req.db.query('SELECT id FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
+    if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
     await req.db.query(
       `INSERT INTO orden_checklist (tenant_id,orden_id, prueba_realizada, lavado, calidad_revisada, facturacion_lista, cliente_notificado, observaciones)
        VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE prueba_realizada=VALUES(prueba_realizada), lavado=VALUES(lavado),
-         calidad_revisada=VALUES(calidad_revisada), facturacion_lista=VALUES(facturacion_lista),
-         cliente_notificado=VALUES(cliente_notificado), observaciones=VALUES(observaciones)`,
+       ON CONFLICT (orden_id) DO UPDATE SET prueba_realizada = EXCLUDED.prueba_realizada, lavado = EXCLUDED.lavado,
+         calidad_revisada = EXCLUDED.calidad_revisada, facturacion_lista = EXCLUDED.facturacion_lista,
+         cliente_notificado = EXCLUDED.cliente_notificado, observaciones = EXCLUDED.observaciones
+       WHERE orden_checklist.tenant_id = EXCLUDED.tenant_id`,
       [req.params.id, prueba_realizada ? 1 : 0, lavado ? 1 : 0, calidad_revisada ? 1 : 0, facturacion_lista ? 1 : 0, cliente_notificado ? 1 : 0, observaciones || null]
     );
     res.json({ message: 'Checklist guardado' });
@@ -456,14 +463,14 @@ const SELECT_MSG_ORDEN = `
          ${LEIDO_POR_MI}, ${VISTO_POR_OTRO}
   FROM mensajes_internos m
   JOIN usuarios ru ON ru.id = m.remitente_id AND ru.tenant_id = @tenant
-  LEFT JOIN usuarios du ON du.id = m.destino_id`;
+  LEFT JOIN usuarios du ON du.id = m.destino_id AND du.tenant_id = @tenant`;
 
 // GET /api/ordenes/:id/mensajes — hilo de la orden (marca leídos los míos).
 router.get('/:id/mensajes', async (req, res) => {
   try {
     const yo = req.usuario.id;
     const [rows] = await req.db.query(
-      `${SELECT_MSG_ORDEN} WHERE m.orden_id = ? ORDER BY m.created_at ASC LIMIT 100`,
+      `${SELECT_MSG_ORDEN} WHERE m.tenant_id = @tenant AND m.orden_id = ? ORDER BY m.created_at ASC LIMIT 100`,
       [yo, req.params.id]
     );
     await marcarLeidos(req.db, yo, rows);
@@ -495,7 +502,7 @@ router.post('/:id/mensajes', async (req, res) => {
        VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, 'directo')`,
       [req.usuario.id, destino_rol, destino_id, (mensaje || '').trim(), foto || null, orden.id, orden.sucursal_id || null]
     );
-    const [[nuevo]] = await req.db.query(`${SELECT_MSG_ORDEN} WHERE m.id = ?`, [req.usuario.id, r.insertId]);
+    const [[nuevo]] = await req.db.query(`${SELECT_MSG_ORDEN} WHERE m.tenant_id = @tenant AND m.id = ?`, [req.usuario.id, r.insertId]);
     res.status(201).json({ data: nuevo, message: 'Mensaje enviado' });
   } catch (err) {
     fail(res, err);

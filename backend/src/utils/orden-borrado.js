@@ -8,7 +8,7 @@
 // filas huérfanas quedaban sin que nadie se enterara.
 //
 // El orden se deduce del esquema real en cada corrida, así que una tabla nueva entra
-// sola. Y con las comprobaciones ENCENDIDAS: si el orden estuviera mal, MySQL lo dice
+// sola. Y con las comprobaciones ENCENDIDAS: si el orden estuviera mal, la base lo dice
 // en vez de dejar basura.
 
 // Orden topológico. `grafo` es tabla -> conjunto de tablas a las que apunta con una FK.
@@ -42,12 +42,16 @@ function ordenarPorDependencias(grafo) {
 // aparte y al final.
 async function grafoDeFks(pool, tablas) {
   const lista = [...tablas];
+  // pg_constraint (contype 'f' = clave foránea): conrelid es la tabla hija y confrelid
+  // la tabla a la que apunta. Acotado al esquema en uso, como antes con DATABASE().
   const [filas] = await pool.query(
-    `SELECT TABLE_NAME AS hija, REFERENCED_TABLE_NAME AS padre
-       FROM information_schema.KEY_COLUMN_USAGE
-      WHERE TABLE_SCHEMA = DATABASE()
-        AND REFERENCED_TABLE_NAME IS NOT NULL
-        AND TABLE_NAME IN (${lista.map(() => '?').join(',')})`,
+    `SELECT h.relname AS hija, p.relname AS padre
+       FROM pg_constraint c
+       JOIN pg_class h ON h.oid = c.conrelid
+       JOIN pg_class p ON p.oid = c.confrelid
+      WHERE c.contype = 'f'
+        AND h.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = current_schema())
+        AND h.relname IN (${lista.map(() => '?').join(',')})`,
     lista
   );
   const grafo = Object.fromEntries(lista.map(t => [t, new Set()]));

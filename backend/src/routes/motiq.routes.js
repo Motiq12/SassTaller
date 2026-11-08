@@ -202,7 +202,7 @@ router.post('/contactos/:id/taller', async (req, res) => {
     // el lead atendido seguiría figurando como pendiente en la bandeja.
     await conn.query(
       `UPDATE contactos_demo SET estado = 'cerrado',
-              nota_interna = CONCAT(COALESCE(nota_interna, ''), ?)
+              nota_interna = COALESCE(nota_interna, '') || ?
         WHERE id = ?`,
       [`\nTaller creado: ${slug} (plan ${plan}).`, contacto.id]
     );
@@ -276,12 +276,12 @@ router.get('/resumen', async (req, res) => {
   try {
     const [[t]] = await pool.query(
       `SELECT COUNT(*) AS total,
-              COALESCE(SUM(estado = 'activo'), 0)      AS activos,
-              COALESCE(SUM(estado = 'suspendido'), 0)  AS suspendidos,
-              COALESCE(SUM(plan = 'trial'), 0)         AS en_prueba,
-              COALESCE(SUM(plan = 'gratis'), 0)        AS en_gratis,
-              COALESCE(SUM(plan = 'pro'), 0)           AS en_pro,
-              COALESCE(SUM(created_at >= NOW() - INTERVAL 30 DAY), 0) AS nuevos_30d
+              COUNT(*) FILTER (WHERE estado = 'activo')      AS activos,
+              COUNT(*) FILTER (WHERE estado = 'suspendido')  AS suspendidos,
+              COUNT(*) FILTER (WHERE plan = 'trial')         AS en_prueba,
+              COUNT(*) FILTER (WHERE plan = 'gratis')        AS en_gratis,
+              COUNT(*) FILTER (WHERE plan = 'pro')           AS en_pro,
+              COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days') AS nuevos_30d
        FROM tenants`
     );
     // Uso agregado de la plataforma: sirve para dimensionar la infraestructura y
@@ -300,9 +300,9 @@ router.get('/resumen', async (req, res) => {
     // Altas por mes. Un total acumulado no dice si el negocio crece o está plano:
     // "47 talleres" se ve igual con 20 altas este mes que con ninguna.
     const [altas] = await pool.query(
-      `SELECT DATE_FORMAT(created_at, '%Y-%m') AS mes, COUNT(*) AS talleres
+      `SELECT to_char(created_at, 'YYYY-MM') AS mes, COUNT(*) AS talleres
          FROM tenants
-        WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+        WHERE created_at >= (CURRENT_DATE - INTERVAL '6 months')
         GROUP BY mes ORDER BY mes`
     );
 
@@ -312,12 +312,12 @@ router.get('/resumen', async (req, res) => {
       `SELECT
          (SELECT COUNT(*) FROM tenants
            WHERE plan = 'trial' AND estado = 'activo' AND trial_hasta IS NOT NULL
-             AND trial_hasta BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)) AS vencen_semana,
+             AND trial_hasta BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '7 days')) AS vencen_semana,
          (SELECT COUNT(*) FROM tenants t
            WHERE t.estado = 'activo'
              AND NOT EXISTS (SELECT 1 FROM ordenes_trabajo o
                               WHERE o.tenant_id = t.id
-                                AND o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY))) AS inactivos,
+                                AND o.created_at >= (NOW() - INTERVAL '30 days'))) AS inactivos,
          (SELECT COUNT(*) FROM reportes_falla WHERE estado = 'nuevo') AS reportes_nuevos`
     );
 
@@ -337,14 +337,14 @@ router.get('/vencimientos', async (req, res) => {
     const dias = Math.min(Math.max(Number(req.query.dias) || 7, 1), 90);
     const [filas] = await pool.query(
       `SELECT t.id, t.nombre, t.slug, t.plan, t.estado, t.trial_hasta,
-              DATEDIFF(t.trial_hasta, CURDATE()) AS dias_restantes,
+              (t.trial_hasta::date - CURRENT_DATE::date) AS dias_restantes,
               (SELECT u.nombre   FROM usuarios u WHERE u.tenant_id = t.id AND u.rol = 'admin' AND u.activo = 1 ORDER BY u.id LIMIT 1) AS admin_nombre,
               (SELECT u.email    FROM usuarios u WHERE u.tenant_id = t.id AND u.rol = 'admin' AND u.activo = 1 ORDER BY u.id LIMIT 1) AS admin_email,
               (SELECT u.telefono FROM usuarios u WHERE u.tenant_id = t.id AND u.rol = 'admin' AND u.activo = 1 ORDER BY u.id LIMIT 1) AS admin_telefono,
               (SELECT COUNT(*) FROM ordenes_trabajo o WHERE o.tenant_id = t.id) AS ordenes
          FROM tenants t
         WHERE t.plan = 'trial' AND t.estado = 'activo' AND t.trial_hasta IS NOT NULL
-          AND t.trial_hasta <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
+          AND t.trial_hasta <= (CURRENT_DATE + ?::int * INTERVAL '1 day')
         ORDER BY t.trial_hasta`,
       [dias]
     );
@@ -370,7 +370,7 @@ router.get('/inactivos', async (req, res) => {
          FROM tenants t
         WHERE t.estado = 'activo'
           AND NOT EXISTS (SELECT 1 FROM ordenes_trabajo o
-                           WHERE o.tenant_id = t.id AND o.created_at >= DATE_SUB(NOW(), INTERVAL ? DAY))
+                           WHERE o.tenant_id = t.id AND o.created_at >= (NOW() - ?::int * INTERVAL '1 day'))
         ORDER BY t.created_at DESC`,
       [dias]
     );
@@ -391,9 +391,9 @@ router.get('/talleres/:id', async (req, res) => {
     const id = Number(req.params.id);
     const [[taller]] = await pool.query(
       `SELECT t.id, t.nombre, t.slug, t.plan, t.estado, t.motivo_estado, t.trial_hasta,
-              t.created_at, DATEDIFF(t.trial_hasta, CURDATE()) AS dias_restantes,
+              t.created_at, (t.trial_hasta::date - CURRENT_DATE::date) AS dias_restantes,
               c.nombre_taller, c.telefono, c.email, c.direccion, c.tipos_vehiculo,
-              c.logo IS NOT NULL AS tiene_logo, c.color_primario
+              (c.logo IS NOT NULL)::int AS tiene_logo, c.color_primario
          FROM tenants t
          LEFT JOIN configuracion c ON c.tenant_id = t.id
         WHERE t.id = ?`,
@@ -417,7 +417,7 @@ router.get('/talleres/:id', async (req, res) => {
               (SELECT COUNT(*) FROM citas           WHERE tenant_id = ?) AS citas,
               (SELECT MAX(created_at) FROM ordenes_trabajo WHERE tenant_id = ?) AS ultima_orden,
               (SELECT COUNT(*) FROM ordenes_trabajo
-                WHERE tenant_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)) AS ordenes_30d`,
+                WHERE tenant_id = ? AND created_at >= (NOW() - INTERVAL '30 days')) AS ordenes_30d`,
       [id, id, id, id, id, id]
     );
 
@@ -435,7 +435,7 @@ router.get('/talleres', async (req, res) => {
     if (ESTADOS.includes(req.query.estado)) { cond.push('t.estado = ?'); params.push(req.query.estado); }
     if (PLANES.includes(req.query.plan)) { cond.push('t.plan = ?'); params.push(req.query.plan); }
     if (req.query.q) {
-      cond.push('(t.nombre LIKE ? OR t.slug LIKE ?)');
+      cond.push('(t.nombre ILIKE ? OR t.slug ILIKE ?)');
       params.push(`%${req.query.q}%`, `%${req.query.q}%`);
     }
     const where = cond.length ? `WHERE ${cond.join(' AND ')}` : '';
@@ -555,13 +555,13 @@ router.delete('/talleres/:id', async (req, res) => {
     const conn = await pool.getConnection();
     try {
       // El orden se deduce del esquema en cada corrida (utils/orden-borrado), con las
-      // claves foráneas ENCENDIDAS: si el orden estuviera mal, MySQL lo dice en vez de
+      // claves foráneas ENCENDIDAS: si el orden estuviera mal, la base lo dice en vez de
       // dejar filas huérfanas que nadie va a encontrar después.
       const orden = await ordenDeBorrado(conn, TABLAS_CON_TENANT);
       await conn.beginTransaction();
       let filas = 0;
       for (const tabla of orden) {
-        const [r] = await conn.query(`DELETE FROM \`${tabla}\` WHERE tenant_id = ?`, [id]);
+        const [r] = await conn.query(`DELETE FROM "${tabla}" WHERE tenant_id = ?`, [id]);
         filas += r.affectedRows;
       }
       const [r] = await conn.query('DELETE FROM tenants WHERE id = ?', [id]);
@@ -598,7 +598,7 @@ router.get('/planes', async (req, res) => {
   try {
     const [filas] = await pool.query(
       `SELECT plan, precio_mensual, limite_usuarios, limite_sucursales, marca_propia, reportes_dias, updated_at
-         FROM planes_config ORDER BY FIELD(plan, 'trial', 'gratis', 'pro')`
+         FROM planes_config ORDER BY array_position(ARRAY['trial', 'gratis', 'pro']::text[], plan::text)`
     );
     res.json({ data: filas });
   } catch (err) {
@@ -633,8 +633,8 @@ router.patch('/planes/:plan', async (req, res) => {
     await pool.query(
       `INSERT INTO planes_config (plan, precio_mensual, limite_usuarios, limite_sucursales, marca_propia, reportes_dias)
        VALUES (?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE precio_mensual = VALUES(precio_mensual), limite_usuarios = VALUES(limite_usuarios),
-         limite_sucursales = VALUES(limite_sucursales), marca_propia = VALUES(marca_propia), reportes_dias = VALUES(reportes_dias)`,
+       ON CONFLICT (plan) DO UPDATE SET precio_mensual = EXCLUDED.precio_mensual, limite_usuarios = EXCLUDED.limite_usuarios,
+         limite_sucursales = EXCLUDED.limite_sucursales, marca_propia = EXCLUDED.marca_propia, reportes_dias = EXCLUDED.reportes_dias`,
       [plan, precio_mensual, limite_usuarios, limite_sucursales, marca_propia, reportes_dias]
     );
 
@@ -792,7 +792,7 @@ router.get('/avisos', async (req, res) => {
   try {
     const [filas] = await pool.query(
       `SELECT id, mensaje, tipo, activo,
-              DATE_FORMAT(vence_el, '%Y-%m-%dT%H:%i:%s.000Z') AS vence_el,
+              to_char(vence_el, 'YYYY-MM-DD"T"HH24:MI:SS".000Z"') AS vence_el,
               admin_email, created_at, updated_at
          FROM avisos_plataforma ORDER BY created_at DESC LIMIT 100`
     );
@@ -876,13 +876,13 @@ router.get('/espacio', async (req, res) => {
     const [tareas] = await pool.query(
       `SELECT t.id, t.texto, t.tenant_id, t.vence_el, t.hecha, t.created_at,
               te.nombre AS taller_nombre, te.slug AS taller_slug,
-              DATEDIFF(t.vence_el, CURDATE()) AS dias
+              (t.vence_el::date - CURRENT_DATE::date) AS dias
          FROM motiq_tareas t
          LEFT JOIN tenants te ON te.id = t.tenant_id
         WHERE t.admin_id = ?
           -- Las hechas de hace más de una semana se dejan de mostrar solas. Una lista
           -- que solo crece deja de mirarse, y tachar algo tiene que sacarlo de encima.
-          AND (t.hecha = 0 OR t.hecha_en >= DATE_SUB(NOW(), INTERVAL 7 DAY))
+          AND (t.hecha = 0 OR t.hecha_en >= (NOW() - INTERVAL '7 days'))
         ORDER BY t.hecha, t.vence_el IS NULL, t.vence_el, t.id DESC`,
       [yo]
     );
@@ -891,7 +891,7 @@ router.get('/espacio', async (req, res) => {
     // están suspendidos y si se movieron.
     const [seguidos] = await pool.query(
       `SELECT s.tenant_id AS id, s.nota, t.nombre, t.slug, t.plan, t.estado, t.trial_hasta,
-              DATEDIFF(t.trial_hasta, CURDATE()) AS dias_restantes,
+              (t.trial_hasta::date - CURRENT_DATE::date) AS dias_restantes,
               (SELECT COUNT(*) FROM ordenes_trabajo o WHERE o.tenant_id = t.id) AS ordenes,
               (SELECT MAX(o.created_at) FROM ordenes_trabajo o WHERE o.tenant_id = t.id) AS ultima_orden
          FROM motiq_seguidos s
@@ -977,7 +977,7 @@ router.put('/seguidos/:tenantId', async (req, res) => {
     if (!existe) return res.status(404).json({ error: 'Taller no encontrado' });
     await pool.query(
       `INSERT INTO motiq_seguidos (admin_id, tenant_id, nota) VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE nota = VALUES(nota)`,
+       ON CONFLICT (admin_id, tenant_id) DO UPDATE SET nota = EXCLUDED.nota`,
       [req.plataforma.id, tenantId, String(req.body?.nota || '').trim().slice(0, 300) || null]
     );
     res.json({ message: 'Lo seguís de cerca' });

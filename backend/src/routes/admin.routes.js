@@ -96,7 +96,7 @@ router.delete('/ejemplo', async (req, res) => {
 router.get('/resumen', async (req, res) => {
   try {
     const [[{ total_citas }]] = await req.db.query(
-      'SELECT COUNT(*) AS total_citas FROM citas WHERE tenant_id = @tenant AND MONTH(fecha) = MONTH(CURDATE()) AND YEAR(fecha) = YEAR(CURDATE())'
+      "SELECT COUNT(*) AS total_citas FROM citas WHERE tenant_id = @tenant AND date_trunc('month', fecha) = date_trunc('month', CURRENT_DATE)"
     );
     const [[{ citas_pendientes }]] = await req.db.query(
       "SELECT COUNT(*) AS citas_pendientes FROM citas WHERE tenant_id = @tenant AND estado NOT IN ('entregado','cancelado')"
@@ -105,40 +105,40 @@ router.get('/resumen', async (req, res) => {
     const [[{ ingresos_mes }]] = await req.db.query(
       `SELECT
          (SELECT COALESCE(SUM(monto),0) FROM citas
-            WHERE tenant_id = @tenant AND estado='entregado' AND MONTH(fecha_fin)=MONTH(CURDATE()) AND YEAR(fecha_fin)=YEAR(CURDATE()))
+            WHERE tenant_id = @tenant AND estado='entregado' AND date_trunc('month', fecha_fin) = date_trunc('month', CURRENT_DATE))
        + (SELECT COALESCE(SUM(costo_mano_obra+costo_repuestos-descuento),0) FROM ordenes_trabajo
-            WHERE tenant_id = @tenant AND estado='entregada' AND MONTH(fecha_entrega_real)=MONTH(CURDATE()) AND YEAR(fecha_entrega_real)=YEAR(CURDATE())
+            WHERE tenant_id = @tenant AND estado='entregada' AND date_trunc('month', fecha_entrega_real) = date_trunc('month', CURRENT_DATE)
               AND id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL AND tenant_id = @tenant)) AS ingresos_mes`
     );
     // Tasa de éxito del mes: entregadas / (entregadas + canceladas).
     const [[exito]] = await req.db.query(
-      `SELECT COALESCE(SUM(estado='entregado'),0) AS entregadas, COALESCE(SUM(estado='cancelado'),0) AS canceladas
-       FROM citas WHERE tenant_id = @tenant AND MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE())`
+      `SELECT COUNT(*) FILTER (WHERE estado='entregado') AS entregadas, COUNT(*) FILTER (WHERE estado='cancelado') AS canceladas
+       FROM citas WHERE tenant_id = @tenant AND date_trunc('month', fecha) = date_trunc('month', CURRENT_DATE)`
     );
     const cerradas = Number(exito.entregadas) + Number(exito.canceladas);
     const tasa_exito = cerradas ? Math.round((Number(exito.entregadas) / cerradas) * 100) : 0;
 
     const [top_servicios] = await req.db.query(
       `SELECT COALESCE(tipo_servicio,'Sin especificar') AS servicio, COUNT(*) AS total
-       FROM citas WHERE tenant_id = @tenant AND MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE())
+       FROM citas WHERE tenant_id = @tenant AND date_trunc('month', fecha) = date_trunc('month', CURRENT_DATE)
        GROUP BY servicio ORDER BY total DESC LIMIT 5`
     );
 
     const [[estado_citas]] = await req.db.query(
       `SELECT
-         COALESCE(SUM(estado='agendado'),0) AS agendadas,
-         COALESCE(SUM(estado IN ('en_revision','en_mantenimiento','listo')),0) AS en_proceso,
-         COALESCE(SUM(estado='entregado'),0) AS completadas,
-         COALESCE(SUM(estado='cancelado'),0) AS canceladas,
+         COUNT(*) FILTER (WHERE estado='agendado') AS agendadas,
+         COUNT(*) FILTER (WHERE estado IN ('en_revision','en_mantenimiento','listo')) AS en_proceso,
+         COUNT(*) FILTER (WHERE estado='entregado') AS completadas,
+         COUNT(*) FILTER (WHERE estado='cancelado') AS canceladas,
          COUNT(*) AS total
-       FROM citas WHERE tenant_id = @tenant AND MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE())`
+       FROM citas WHERE tenant_id = @tenant AND date_trunc('month', fecha) = date_trunc('month', CURRENT_DATE)`
     );
 
     const [ingresos_por_servicio] = await req.db.query(
       `SELECT COALESCE(tipo_servicio,'Sin especificar') AS servicio,
               COUNT(*) AS citas, COALESCE(SUM(monto),0) AS ingreso, COALESCE(AVG(monto),0) AS promedio
        FROM citas
-       WHERE tenant_id = @tenant AND estado='entregado' AND MONTH(fecha_fin)=MONTH(CURDATE()) AND YEAR(fecha_fin)=YEAR(CURDATE())
+       WHERE tenant_id = @tenant AND estado='entregado' AND date_trunc('month', fecha_fin) = date_trunc('month', CURRENT_DATE)
        GROUP BY servicio ORDER BY ingreso DESC`
     );
 
@@ -204,7 +204,7 @@ router.get('/opiniones', async (req, res) => {
     // Resumen con los mismos filtros aplicados.
     const [[agg]] = await req.db.query(
       `SELECT COUNT(*) AS total, COALESCE(AVG(t.calificacion),0) AS promedio,
-              COALESCE(SUM(t.calificacion <= 2),0) AS bajas
+              COUNT(*) FILTER (WHERE t.calificacion <= 2) AS bajas
        FROM (${UNION}) t WHERE 1=1${filtro}`,
       params
     );
@@ -241,10 +241,13 @@ router.get('/reportes', async (req, res) => {
     const COLUMNAS_RANGO = ['c.fecha', 'c.fecha_fin', 'o.fecha_entrega_real', 'o.fecha_ingreso'];
     const rango = (col) => {
       if (!COLUMNAS_RANGO.includes(col)) throw new Error(`Columna no permitida en rango: ${col}`);
+      // Rangos semiabiertos [desde, hasta): sirven igual para columnas DATE y timestamptz,
+      // y dejan usar el índice de la columna (una función sobre ella no lo deja).
       if (periodo === 'mes_pasado')
-        return `${col} >= DATE_FORMAT(CURDATE() - INTERVAL 1 MONTH, '%Y-%m-01') AND ${col} < DATE_FORMAT(CURDATE(), '%Y-%m-01')`;
-      if (periodo === 'anio') return `YEAR(${col}) = YEAR(CURDATE())`;
-      return `MONTH(${col}) = MONTH(CURDATE()) AND YEAR(${col}) = YEAR(CURDATE())`;
+        return `${col} >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month' AND ${col} < date_trunc('month', CURRENT_DATE)`;
+      if (periodo === 'anio')
+        return `${col} >= date_trunc('year', CURRENT_DATE) AND ${col} < date_trunc('year', CURRENT_DATE) + INTERVAL '1 year'`;
+      return `${col} >= date_trunc('month', CURRENT_DATE) AND ${col} < date_trunc('month', CURRENT_DATE) + INTERVAL '1 month'`;
     };
     // Filtro opcional por mecánico (aplica a métricas basadas en citas).
     const empCita = empleado ? ' AND c.tecnico_id = ?' : '';
@@ -253,8 +256,8 @@ router.get('/reportes', async (req, res) => {
     // KPIs del período.
     const [[k]] = await req.db.query(
       `SELECT COUNT(*) AS total_citas,
-              COALESCE(SUM(estado='entregado'),0) AS entregadas,
-              COALESCE(SUM(estado='cancelado'),0) AS canceladas,
+              COUNT(*) FILTER (WHERE estado='entregado') AS entregadas,
+              COUNT(*) FILTER (WHERE estado='cancelado') AS canceladas,
               COALESCE(AVG(NULLIF(calificacion,0)),0) AS calificacion_promedio
        FROM citas c WHERE c.tenant_id = @tenant AND ${rango('c.fecha')}${empCita}`, pEmp
     );
@@ -280,7 +283,7 @@ router.get('/reportes', async (req, res) => {
     );
 
     // Serie temporal: citas e ingreso por día (mes) o por mes (año), con huecos en cero.
-    const bucket = periodo === 'anio' ? 'MONTH(c.fecha)' : 'DAY(c.fecha)';
+    const bucket = periodo === 'anio' ? 'EXTRACT(MONTH FROM c.fecha)::int' : 'EXTRACT(DAY FROM c.fecha)::int';
     const [serieRows] = await req.db.query(
       `SELECT ${bucket} AS b, COUNT(*) AS citas,
               COALESCE(SUM(CASE WHEN estado='entregado' THEN monto ELSE 0 END),0) AS ingreso
@@ -299,8 +302,10 @@ router.get('/reportes', async (req, res) => {
     } else {
       const [[{ dias }]] = await req.db.query(
         periodo === 'mes_pasado'
-          ? 'SELECT DAYOFMONTH(LAST_DAY(CURDATE() - INTERVAL 1 MONTH)) AS dias'
-          : 'SELECT DAYOFMONTH(LAST_DAY(CURDATE())) AS dias'
+          // Días del mes = último día del mes. Postgres no tiene LAST_DAY: el último día
+          // es el primero del mes siguiente menos un día.
+          ? "SELECT EXTRACT(DAY FROM date_trunc('month', CURRENT_DATE) - INTERVAL '1 day')::int AS dias"
+          : "SELECT EXTRACT(DAY FROM date_trunc('month', CURRENT_DATE) + INTERVAL '1 month' - INTERVAL '1 day')::int AS dias"
       );
       serie = Array.from({ length: Number(dias) }, (_, i) => {
         const r = mapSerie[i + 1];
@@ -320,13 +325,13 @@ router.get('/reportes', async (req, res) => {
     const [rendimiento] = await req.db.query(
       `SELECT u.id AS tecnico_id, u.nombre,
               COUNT(*) AS citas,
-              COALESCE(SUM(c.estado='entregado'),0) AS entregadas,
-              COALESCE(SUM(c.estado='cancelado'),0) AS canceladas,
+              COUNT(*) FILTER (WHERE c.estado='entregado') AS entregadas,
+              COUNT(*) FILTER (WHERE c.estado='cancelado') AS canceladas,
               COALESCE(SUM(CASE WHEN c.estado='entregado' THEN c.monto ELSE 0 END),0) AS ingresos,
               AVG(CASE WHEN c.estado='entregado' AND c.fecha_inicio IS NOT NULL AND (c.fecha_listo IS NOT NULL OR c.fecha_fin IS NOT NULL)
-                       THEN TIMESTAMPDIFF(MINUTE, c.fecha_inicio, COALESCE(c.fecha_listo, c.fecha_fin)) END) AS tiempo_prom_min,
+                       THEN TRUNC(EXTRACT(EPOCH FROM (COALESCE(c.fecha_listo, c.fecha_fin)) - (c.fecha_inicio)) / 60) END) AS tiempo_prom_min,
               AVG(CASE WHEN c.estado='entregado' AND c.fecha_listo IS NOT NULL AND c.fecha_fin IS NOT NULL
-                       THEN TIMESTAMPDIFF(MINUTE, c.fecha_listo, c.fecha_fin) END) AS tiempo_entrega_min,
+                       THEN TRUNC(EXTRACT(EPOCH FROM (c.fecha_fin) - (c.fecha_listo)) / 60) END) AS tiempo_entrega_min,
               AVG(NULLIF(c.calificacion,0)) AS calificacion
        FROM citas c JOIN usuarios u ON u.id = c.tecnico_id AND u.tenant_id = @tenant
        WHERE c.tenant_id = @tenant AND ${rango('c.fecha')}${empCita}
@@ -338,8 +343,8 @@ router.get('/reportes', async (req, res) => {
     const [recepcion] = await req.db.query(
       `SELECT u.id, u.nombre,
               COUNT(*) AS ordenes,
-              COALESCE(SUM(o.aprobacion_cliente='aprobado'),0) AS aprobadas,
-              COALESCE(SUM(o.aprobacion_cliente='rechazado'),0) AS rechazadas
+              COUNT(*) FILTER (WHERE o.aprobacion_cliente='aprobado') AS aprobadas,
+              COUNT(*) FILTER (WHERE o.aprobacion_cliente='rechazado') AS rechazadas
        FROM ordenes_trabajo o JOIN usuarios u ON u.id = o.recepcionista_id AND u.tenant_id = @tenant
        WHERE o.tenant_id = @tenant AND ${rango('o.fecha_ingreso')}
        GROUP BY u.id, u.nombre ORDER BY ordenes DESC`
@@ -373,8 +378,8 @@ router.get('/reportes', async (req, res) => {
 // ───────────────────────────────────────────────────────────
 const PRIORIDADES = ['baja', 'normal', 'alta', 'urgente'];
 // Topes de la tabla (titulo VARCHAR(150), detalle VARCHAR(300)). Sin comprobarlos,
-// un texto más largo no se recorta: MySQL en modo estricto corta la petición con un
-// 500 en vez de decir qué pasó.
+// un texto más largo no se recorta: la base rechaza el INSERT y la respuesta es un
+// error genérico en vez de decir qué campo se pasó.
 const MAX_TITULO = 150;
 const MAX_DETALLE = 300;
 
@@ -398,10 +403,10 @@ router.get('/tareas', async (req, res) => {
        FROM tareas_mecanico t
        JOIN usuarios u ON u.id = t.tecnico_id AND u.tenant_id = @tenant
        LEFT JOIN usuarios a ON a.id = t.asignado_por AND a.tenant_id = @tenant
-       WHERE t.asignado_por IS NOT NULL`;
+       WHERE t.tenant_id = @tenant AND t.asignado_por IS NOT NULL`;
     const params = [];
     if (empleado) { sql += ' AND t.tecnico_id = ?'; params.push(empleado); }
-    sql += ` ORDER BY t.hecha ASC, FIELD(t.prioridad,'urgente','alta','normal','baja'),
+    sql += ` ORDER BY t.hecha ASC, array_position(ARRAY['urgente', 'alta', 'normal', 'baja']::text[], t.prioridad::text),
              (t.vence IS NULL), t.vence ASC, t.created_at DESC`;
     const [rows] = await req.db.query(sql, params);
     res.json({ data: rows });
@@ -584,10 +589,10 @@ router.get('/calendario', async (req, res) => {
     const anio = parseInt(req.query.anio, 10) || new Date().getFullYear();
     const mes = Math.min(12, Math.max(1, parseInt(req.query.mes, 10) || (new Date().getMonth() + 1)));
     const [celdas] = await req.db.query(
-      `SELECT DAY(ci.fecha) AS dia, ci.tecnico_id, t.nombre AS tecnico_nombre, COUNT(*) AS n
+      `SELECT EXTRACT(DAY FROM ci.fecha)::int AS dia, ci.tecnico_id, t.nombre AS tecnico_nombre, COUNT(*) AS n
        FROM citas ci
        LEFT JOIN usuarios t ON t.id = ci.tecnico_id AND t.tenant_id = @tenant
-       WHERE ci.tenant_id = @tenant AND YEAR(ci.fecha) = ? AND MONTH(ci.fecha) = ? AND ci.estado != 'cancelado'
+       WHERE ci.tenant_id = @tenant AND EXTRACT(YEAR FROM ci.fecha) = ? AND EXTRACT(MONTH FROM ci.fecha) = ? AND ci.estado != 'cancelado'
        GROUP BY dia, ci.tecnico_id, t.nombre
        ORDER BY dia`,
       [anio, mes]
@@ -664,9 +669,9 @@ router.put('/configuracion', async (req, res) => {
     // borra — si mañana pasa a Pro, su logo sigue ahí.
     const marcaPropia = puedeMarcaPropia(req.db.tenantId);
 
-    // INSERT ... ON DUPLICATE KEY UPDATE y no un UPDATE liso: un taller sin fila
+    // INSERT ... ON CONFLICT DO UPDATE y no un UPDATE liso: un taller sin fila
     // (creado a mano, o de una instalación vieja) hacía que el UPDATE no tocara
-    // NINGUNA fila —sin avisar, MySQL no lo trata como error— y esta pantalla se
+    // NINGUNA fila —sin avisar, la base no lo trata como error— y esta pantalla se
     // quedaba guardando en el vacío para siempre, cliqueo tras cliqueo. Así, si la
     // fila falta, esta misma llamada la crea; si ya existe, la actualiza como antes.
     await req.db.query(
@@ -686,17 +691,17 @@ router.put('/configuracion', async (req, res) => {
           ${horarios ? '?,' : ''}
           ${metodosJson ? '?,' : ''}
           ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         nombre_taller = VALUES(nombre_taller), telefono = VALUES(telefono),
-         email = VALUES(email), direccion = VALUES(direccion),
-         ${marcaPropia ? 'logo = VALUES(logo), color_primario = VALUES(color_primario),' : ''}
-         max_citas_hora = VALUES(max_citas_hora), dias_anticipacion = VALUES(dias_anticipacion),
-         duracion_cita_min = VALUES(duracion_cita_min), cancelacion_horas_min = VALUES(cancelacion_horas_min),
-         garantia_dias = VALUES(garantia_dias),
-         ${horarios ? 'horarios = VALUES(horarios),' : ''}
-         ${metodosJson ? 'metodos_pago = VALUES(metodos_pago),' : ''}
-         notif_estado = VALUES(notif_estado), notif_recordatorio = VALUES(notif_recordatorio),
-         notif_cotizacion = VALUES(notif_cotizacion), notif_email_entrega = VALUES(notif_email_entrega)`,
+       ON CONFLICT (tenant_id, id) DO UPDATE SET
+         nombre_taller = EXCLUDED.nombre_taller, telefono = EXCLUDED.telefono,
+         email = EXCLUDED.email, direccion = EXCLUDED.direccion,
+         ${marcaPropia ? 'logo = EXCLUDED.logo, color_primario = EXCLUDED.color_primario,' : ''}
+         max_citas_hora = EXCLUDED.max_citas_hora, dias_anticipacion = EXCLUDED.dias_anticipacion,
+         duracion_cita_min = EXCLUDED.duracion_cita_min, cancelacion_horas_min = EXCLUDED.cancelacion_horas_min,
+         garantia_dias = EXCLUDED.garantia_dias,
+         ${horarios ? 'horarios = EXCLUDED.horarios,' : ''}
+         ${metodosJson ? 'metodos_pago = EXCLUDED.metodos_pago,' : ''}
+         notif_estado = EXCLUDED.notif_estado, notif_recordatorio = EXCLUDED.notif_recordatorio,
+         notif_cotizacion = EXCLUDED.notif_cotizacion, notif_email_entrega = EXCLUDED.notif_email_entrega`,
       [
         // Sin nombre se deja el del propio taller, no uno inventado: poner acá el
         // nombre de otro taller fue justamente el problema que estamos corrigiendo.

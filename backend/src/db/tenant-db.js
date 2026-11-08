@@ -1,4 +1,4 @@
-// Acceso a MySQL scopeado por tenant (taller suscriptor del SaaS).
+// Acceso a Postgres scopeado por tenant (taller suscriptor del SaaS).
 //
 // El problema que resuelve: con base compartida, una consulta a la que se le olvida
 // el filtro por tenant NO falla — devuelve datos de otros talleres. Es una fuga
