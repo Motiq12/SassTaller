@@ -37,7 +37,9 @@ function anotarIngreso(usuarioId) {
 // Abre la sesión del personal: la anota con su dispositivo (Mi perfil → Sesiones) y
 // firma el token con ese `sid`. Si no se pudo anotar, firma sin sid y entra igual.
 async function sesionStaff(usuario, req) {
-  const payload = { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol };
+  // tenant_id va en el token: es de donde lo saca middleware/tenant para acotar
+  // req.db. Sin él, auth encadena a tenant y tenant rechaza TODO con 401.
+  const payload = { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol, tenant_id: usuario.tenant_id };
   const sid = nuevoSid();
   const token = firmar({ ...payload, sid });
   const ok = await abrirSesion(usuario.id, req, jwt.decode(token).exp, sid);

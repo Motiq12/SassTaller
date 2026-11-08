@@ -64,7 +64,7 @@ router.get('/', async (req, res) => {
                LEFT JOIN usuarios u ON ci.usuario_id = u.id AND u.tenant_id = @tenant
                LEFT JOIN usuarios t ON ci.tecnico_id = t.id AND t.tenant_id = @tenant
                LEFT JOIN sucursales s ON s.id = ci.sucursal_id AND s.tenant_id = @tenant
-               WHERE 1=1`;
+               WHERE ci.tenant_id = @tenant`;
     const params = [];
     if (fecha) { sql += ' AND ci.fecha = ?'; params.push(fecha); }
     if (estado) { sql += ' AND ci.estado = ?'; params.push(estado); }
