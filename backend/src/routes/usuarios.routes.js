@@ -103,6 +103,18 @@ router.patch('/:id/activo', async (req, res) => {
     if (Number(req.params.id) === req.usuario.id && !activo) {
       return res.status(400).json({ error: 'No podés desactivar tu propia cuenta' });
     }
+    // Reactivar suma un usuario igual que darlo de alta, así que choca con el mismo
+    // tope. Sin esto el tope del plan gratis se esquivaba en dos clics: desactivar a
+    // uno, crear otro, y volver a activar al primero. Solo se mira cuando de verdad
+    // pasa de inactivo a activo: re-activar a alguien ya activo no suma nada.
+    if (activo) {
+      const [[u]] = await req.db.query('SELECT activo FROM usuarios WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
+      if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
+      if (!u.activo) {
+        const tope = await topeAlcanzado(req.db, 'usuarios');
+        if (tope) return res.status(402).json({ error: tope, tope: 'usuarios' });
+      }
+    }
     await req.db.query('UPDATE usuarios SET activo = ? WHERE tenant_id = @tenant AND id = ?', [activo ? 1 : 0, req.params.id]);
     res.json({ message: activo ? 'Usuario activado' : 'Usuario desactivado' });
   } catch (err) {

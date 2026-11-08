@@ -841,6 +841,15 @@ router.patch('/sucursales/:id/activa', async (req, res) => {
     if (!activa) {
       const [[{ activas }]] = await req.db.query('SELECT COUNT(*) AS activas FROM sucursales WHERE tenant_id = @tenant AND activa = 1 AND id <> ?', [req.params.id]);
       if (!activas) return res.status(400).json({ error: 'Debe quedar al menos una sucursal activa' });
+    } else {
+      // Reactivar suma una sucursal igual que el alta: mismo tope (ver usuarios.routes,
+      // que tenía el mismo hueco). Solo cuenta si de verdad pasa de inactiva a activa.
+      const [[s]] = await req.db.query('SELECT activa FROM sucursales WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
+      if (!s) return res.status(404).json({ error: 'Sucursal no encontrada' });
+      if (!s.activa) {
+        const tope = await topeAlcanzado(req.db, 'sucursales');
+        if (tope) return res.status(402).json({ error: tope, tope: 'sucursales' });
+      }
     }
     const [result] = await req.db.query('UPDATE sucursales SET activa = ? WHERE tenant_id = @tenant AND id = ?', [activa, req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ error: 'Sucursal no encontrada' });
