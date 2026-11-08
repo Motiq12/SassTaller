@@ -14,6 +14,23 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    # Postgres real para test/pg-adaptador.test.js: los errores de dialecto y de tipos
+    # de la migración desde MySQL no se ven contra una base falsa. Misma versión mayor
+    # que en Railway. La base termina en _test porque el test borra el esquema entero
+    # y se niega a correr contra cualquier otra.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: motiq
+          POSTGRES_PASSWORD: motiq_ci
+          POSTGRES_DB: motiq_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U motiq -d motiq_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PG_TEST_URL: postgres://motiq:motiq_ci@localhost:5432/motiq_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
