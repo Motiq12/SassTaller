@@ -134,7 +134,7 @@ router.get('/resumen', async (req, res) => {
     const [top_servicios] = await req.db.query(
       `SELECT COALESCE(cs.servicio,'Sin especificar') AS servicio, COUNT(*) AS total
        FROM citas ci LEFT JOIN cita_servicios cs ON cs.cita_id = ci.id AND cs.tenant_id = @tenant
-       WHERE ${enPeriodo('ci.fecha', 'mes', { offset: off })}
+       WHERE ci.tenant_id = @tenant AND ${enPeriodo('ci.fecha', 'mes', { offset: off })}
        GROUP BY servicio ORDER BY total DESC LIMIT 5`
     );
 
@@ -572,7 +572,8 @@ router.delete('/servicios/:id', async (req, res) => {
 
     const [[uso]] = await req.db.query(
       `SELECT COUNT(*) AS n FROM citas ci
-       WHERE ci.tipo_servicio = ? OR EXISTS (SELECT 1 FROM cita_servicios cs WHERE cs.tenant_id = @tenant AND cs.cita_id = ci.id AND cs.servicio = ?)`,
+       WHERE ci.tenant_id = @tenant
+         AND (ci.tipo_servicio = ? OR EXISTS (SELECT 1 FROM cita_servicios cs WHERE cs.tenant_id = @tenant AND cs.cita_id = ci.id AND cs.servicio = ?))`,
       [s.nombre, s.nombre]
     );
     if (uso.n > 0) {
@@ -696,7 +697,7 @@ router.put('/configuracion', async (req, res) => {
          ${plantillasJson ? 'plantillas = ?,' : ''}
          ${portalJson ? 'portal_textos = ?,' : ''}
          notif_estado = ?, notif_recordatorio = ?, notif_cotizacion = ?, notif_email_entrega = ?
-       WHERE id = 1`,
+       WHERE id = 1 AND tenant_id = @tenant`,
       [
         // Sin nombre se deja el del propio taller, no uno inventado: poner acá el
         // nombre de otro taller fue justamente el problema que estamos corrigiendo.
@@ -838,7 +839,7 @@ router.get('/seguridad', async (req, res) => {
   try {
     const [personal] = await req.db.query(
       `SELECT id, nombre, email, rol, activo, totp_activado, ultimo_ingreso, sesiones_desde_ms
-       FROM usuarios ORDER BY activo DESC, nombre`
+       FROM usuarios WHERE tenant_id = @tenant ORDER BY activo DESC, nombre`
     );
     for (const p of personal) {
       p.es_yo = p.id === req.usuario.id;
@@ -857,7 +858,7 @@ router.post('/seguridad/cerrar', async (req, res) => {
   try {
     let ids;
     if (req.body?.todos) {
-      const [filas] = await req.db.query('SELECT id FROM usuarios WHERE id <> ?', [req.usuario.id]);
+      const [filas] = await req.db.query('SELECT id FROM usuarios WHERE id <> ? AND tenant_id = @tenant', [req.usuario.id]);
       ids = filas.map((f) => f.id);
     } else {
       const id = Number(req.body?.usuario_id);
@@ -946,9 +947,9 @@ router.post('/sucursales', async (req, res) => {
   try {
     const nombre = (req.body.nombre || '').trim();
     if (!nombre) return invalido(res, 'nombre', 'Falta el nombre de la sucursal');
-    const [[{ orden }]] = await req.db.query('SELECT COALESCE(MAX(orden), 0) + 1 AS orden FROM sucursales');
+    const [[{ orden }]] = await req.db.query('SELECT COALESCE(MAX(orden), 0) + 1 AS orden FROM sucursales WHERE tenant_id = @tenant');
     const [result] = await req.db.query(
-      'INSERT INTO sucursales (nombre, direccion, telefono, orden) VALUES (?, ?, ?, ?)',
+      'INSERT INTO sucursales (tenant_id, nombre, direccion, telefono, orden) VALUES (@tenant, ?, ?, ?, ?)',
       [nombre, (req.body.direccion || '').trim() || null, (req.body.telefono || '').trim() || null, orden]
     );
     clearSucursalesCache();
@@ -1026,7 +1027,7 @@ router.get('/roles', async (req, res) => {
     );
     // Se cuenta en JavaScript y no con un JOIN: así no se compara usuarios.rol con
     // roles.clave en SQL (ver la collation de roles en auto-migrate.js).
-    const [usuarios] = await req.db.query('SELECT rol, rol_id FROM usuarios WHERE activo = 1');
+    const [usuarios] = await req.db.query('SELECT rol, rol_id FROM usuarios WHERE tenant_id = @tenant AND activo = 1');
     const porId = new Map(roles.map((r) => [r.id, r]));
     const conteo = new Map();
     for (const u of usuarios) {
@@ -1284,7 +1285,7 @@ router.post('/feriados', async (req, res) => {
       if (nombre.length > 80) return invalido(res, 'nombre', 'El nombre no puede pasar de 80 caracteres');
       let sucursalId = null;
       if (f.sucursal_id) {
-        const [[s]] = await req.db.query('SELECT id FROM sucursales WHERE id = ?', [f.sucursal_id]);
+        const [[s]] = await req.db.query('SELECT id FROM sucursales WHERE id = ? AND tenant_id = @tenant', [f.sucursal_id]);
         if (!s) return invalido(res, 'sucursal_id', 'Sucursal no válida');
         sucursalId = s.id;
       }

@@ -59,7 +59,7 @@ router.get('/', async (req, res) => {
                       o.numero_orden
                FROM citas ci
                JOIN clientes c ON ci.cliente_id = c.id AND c.tenant_id = @tenant
-               LEFT JOIN motos m ON ci.vehiculo_id = m.id
+               LEFT JOIN vehiculos m ON ci.vehiculo_id = m.id AND m.tenant_id = @tenant
                LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id AND o.tenant_id = @tenant
                LEFT JOIN usuarios u ON ci.usuario_id = u.id AND u.tenant_id = @tenant
                LEFT JOIN usuarios t ON ci.tecnico_id = t.id AND t.tenant_id = @tenant
@@ -110,7 +110,7 @@ router.post('/', soloRoles(...GESTIONA_AGENDA), exigirPermiso('citas.agendar'), 
     // La duración solo la decide administración; las demás nacen de 1 hora.
     const duracion = esAdmin && duracionValida(req.body.duracion_horas) ? Number(req.body.duracion_horas) : 1;
     const [result] = await req.db.query(
-      'INSERT INTO citas (tenant_id, cliente_id, vehiculo_id, usuario_id, tecnico_id, sucursal_id, fecha, hora, motivo, tipo_servicio, duracion_horas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO citas (tenant_id, cliente_id, vehiculo_id, usuario_id, tecnico_id, sucursal_id, fecha, hora, motivo, tipo_servicio, duracion_horas) VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [cliente_id, vehiculo_id || null, req.usuario.id, tecnico_id || null, sucursal_id, fecha, hora, motivo, servicios[0] || null, duracion]
     );
     await guardarServiciosCita(result.insertId, servicios);

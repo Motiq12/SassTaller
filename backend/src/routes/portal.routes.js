@@ -241,7 +241,7 @@ router.post('/google/completar', async (req, res) => {
     if (cliente) return entrarConGoogle(res, cliente, g);
 
     const [r] = await req.db.query(
-      'INSERT INTO clientes (nombre, apellido, telefono, email, cedula, password_hash, email_verificado, google_sub) VALUES (?, ?, ?, ?, ?, NULL, 1, ?)',
+      'INSERT INTO clientes (tenant_id, nombre, apellido, telefono, email, cedula, password_hash, email_verificado, google_sub) VALUES (@tenant, ?, ?, ?, ?, ?, NULL, 1, ?)',
       [nombre, apellido, String(telefono).trim(), pase.email, String(cedula).trim(), pase.sub]
     );
     const [[nuevo]] = await req.db.query('SELECT * FROM clientes WHERE tenant_id = @tenant AND id = ?', [r.insertId]);
@@ -519,7 +519,7 @@ router.post('/otp/verificar', async (req, res) => {
 
     const ok = await bcrypt.compare(String(codigo).trim(), reg.code_hash);
     if (!ok) {
-      await req.db.query('UPDATE login_codes SET attempts = attempts + 1 WHERE id = ?', [reg.id]);
+      await req.db.query('UPDATE login_codes SET attempts = attempts + 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
       return invalido(res, 'codigo', ERR_CODIGO);
     }
 
@@ -1469,7 +1469,7 @@ router.put('/citas/:id', async (req, res) => {
       await guardarServiciosCita(req.params.id, servicios, conn);
       const [[actualizada]] = await conn.query(
         `SELECT ci.id, ci.fecha, ci.hora, ci.motivo, ci.tipo_servicio, ci.servicios, ci.estado, m.marca, m.modelo, m.placa
-         FROM citas ci LEFT JOIN motos m ON m.id = ci.vehiculo_id WHERE ci.id = ?`,
+         FROM citas ci LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant WHERE ci.tenant_id = @tenant AND ci.id = ?`,
         [req.params.id]
       );
       await conn.commit();
@@ -1547,13 +1547,13 @@ router.post('/citas', async (req, res) => {
         return invalido(res, 'hora', 'Esa hora ya no está disponible, elige otra.');
       }
       const [result] = await conn.query(
-        "INSERT INTO citas (cliente_id, vehiculo_id, sucursal_id, fecha, hora, motivo, tipo_servicio, estado) VALUES (?, ?, ?, ?, ?, ?, ?, 'agendado')",
+        "INSERT INTO citas (tenant_id, cliente_id, vehiculo_id, sucursal_id, fecha, hora, motivo, tipo_servicio, estado) VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, 'agendado')",
         [req.cliente.id, vehiculo_id, sucursalId, fecha, hora, motivo, servicios[0]]
       );
       await guardarServiciosCita(result.insertId, servicios, conn);
       const [[nueva]] = await conn.query(
         `SELECT ci.id, ci.fecha, ci.hora, ci.motivo, ci.tipo_servicio, ci.servicios, ci.estado, m.marca, m.modelo, m.placa
-         FROM citas ci LEFT JOIN motos m ON m.id = ci.vehiculo_id WHERE ci.id = ?`,
+         FROM citas ci LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant WHERE ci.tenant_id = @tenant AND ci.id = ?`,
         [result.insertId]
       );
       await conn.commit();
