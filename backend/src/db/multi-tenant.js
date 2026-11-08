@@ -203,6 +203,64 @@ async function columnaTenant(tabla) {
   return hizo;
 }
 
+// 4) Índices COMPUESTOS, que es de lo que depende el rendimiento con muchos talleres.
+//
+// Un índice de una sola columna sobre tenant_id casi no sirve acá: toda consulta ya
+// filtra por taller, así que ese índice no distingue nada dentro del taller — el motor
+// acota por tenant y después recorre. Peor todavía cuando un taller grande concentra
+// la mayoría de las filas: su propio tenant_id deja de ser selectivo.
+//
+// Lo que sirve es (tenant_id, <la columna por la que se filtra u ordena>). La lista de
+// abajo no se inventó: salió de medir qué columnas acompañan a tenant_id en las
+// consultas reales de src/routes. Cada par está puesto porque aparece, no por si acaso
+// — un índice de más también cuesta, en cada INSERT y en disco.
+const INDICES = [
+  // La orden de trabajo es el centro del sistema y la que más se lista y filtra.
+  ['ordenes_trabajo', 'estado'], ['ordenes_trabajo', 'fecha_ingreso'],
+  ['ordenes_trabajo', 'tecnico_id'], ['ordenes_trabajo', 'cliente_id'],
+  ['ordenes_trabajo', 'vehiculo_id'],
+  // La agenda: por mecánico, por cliente, por estado y por la orden que la originó.
+  ['citas', 'tecnico_id'], ['citas', 'cliente_id'], ['citas', 'estado'], ['citas', 'orden_id'],
+  // Las hijas de la orden se piden siempre por su orden.
+  ['orden_repuestos', 'orden_id'], ['orden_avances', 'orden_id'], ['orden_fotos', 'orden_id'],
+  ['orden_checklist', 'orden_id'], ['orden_tiempos', 'orden_id'], ['garantias', 'orden_id'],
+  // El resto del uso diario.
+  ['clientes', 'email'], ['vehiculos', 'cliente_id'],
+  ['usuarios', 'rol'], ['usuarios', 'activo'],
+  ['notificaciones', 'cliente_id'], ['tareas_mecanico', 'tecnico_id'],
+  ['promos', 'activa'], ['servicios', 'activo'],
+];
+
+async function indicesPorTaller() {
+  let puestos = 0;
+  for (const [tabla, col] of INDICES) {
+    if (!(await existeTabla(tabla))) continue;
+    if (!(await existeColumna(tabla, col))) continue;       // la trajo otra versión
+    const nombre = `idx_${tabla}_t_${col}`;
+    if (await existeIndice(tabla, nombre)) continue;
+    try {
+      await pool.query(`ALTER TABLE \`${tabla}\` ADD INDEX \`${nombre}\` (tenant_id, \`${col}\`)`);
+      puestos++;
+    } catch (err) {
+      console.warn(`⚠️  Multi-taller: índice ${nombre} omitido (${err.code || err.message})`);
+    }
+  }
+
+  // El login del personal busca por correo ANTES de saber el taller (el mismo correo
+  // puede existir en varios), así que esa consulta no lleva tenant_id y necesita su
+  // propio índice. Sin él, cada intento de ingreso recorre la tabla entera de usuarios
+  // de TODO el SaaS — y es la consulta que más se repite.
+  if ((await existeTabla('usuarios')) && !(await existeIndice('usuarios', 'idx_usuarios_email'))) {
+    try {
+      await pool.query('ALTER TABLE usuarios ADD INDEX idx_usuarios_email (email)');
+      puestos++;
+    } catch (err) {
+      console.warn(`⚠️  Multi-taller: índice de correo omitido (${err.code || err.message})`);
+    }
+  }
+  return puestos > 0;
+}
+
 async function aplicarMultiTenant() {
   console.log('🏢 Aplicando la capa multi-taller…');
   await paso('tabla tenants', crearTenants);
@@ -219,6 +277,7 @@ async function aplicarMultiTenant() {
     });
     if (tocadas === antes) continue;
   }
+  await paso('índices por taller', indicesPorTaller);
   console.log(`🏢 Capa multi-taller lista (${tocadas} tabla(s) modificada(s) en esta corrida).`);
 }
 
