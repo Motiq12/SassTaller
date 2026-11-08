@@ -38,7 +38,7 @@ seguimiento de su moto, aprobación de presupuestos y calificación.
 ## Requisitos
 
 - Node.js 18+
-- PostgreSQL 16 (lo más simple: Docker Desktop, ver abajo)
+- PostgreSQL 18, la misma versión que producción (lo más simple: Docker Desktop, ver abajo)
 - Ionic CLI y Angular CLI
 
 ---
@@ -49,7 +49,7 @@ La base es **PostgreSQL**. En desarrollo alcanza con un contenedor (se crea una 
 
 ```bash
 docker run -d --name motiq-pg -e POSTGRES_USER=motiq -e POSTGRES_PASSWORD=motiq_dev \
-  -e POSTGRES_DB=sasstaller -p 5432:5432 -v motiq-pg-data:/var/lib/postgresql/data postgres:16-alpine
+  -e POSTGRES_DB=sasstaller -p 5432:5432 -v motiq-pg18-data:/var/lib/postgresql postgres:18-alpine
 ```
 
 Copiá `backend/.env.example` a `backend/.env`: ya trae los valores de ese contenedor.

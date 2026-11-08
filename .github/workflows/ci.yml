@@ -20,7 +20,7 @@ jobs:
     # y se niega a correr contra cualquier otra.
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: motiq
           POSTGRES_PASSWORD: motiq_ci

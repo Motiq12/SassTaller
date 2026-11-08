@@ -15,7 +15,7 @@
 //
 // Postgres local de desarrollo (Docker):
 //   docker run -d --name motiq-pg -e POSTGRES_USER=motiq -e POSTGRES_PASSWORD=motiq_dev \
-//     -e POSTGRES_DB=sasstaller -p 5432:5432 -v motiq-pg-data:/var/lib/postgresql/data postgres:16-alpine
+//     -e POSTGRES_DB=sasstaller -p 5432:5432 -v motiq-pg18-data:/var/lib/postgresql postgres:18-alpine
 const fs = require('fs');
 const path = require('path');
 
