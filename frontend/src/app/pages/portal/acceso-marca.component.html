@@ -1,7 +1,11 @@
 <section class="marca">
   <!-- El logo del taller, no un archivo de la app: app-marca-logo pinta el que
        cargó el taller y, si no cargó ninguno, sus iniciales. -->
-  <app-marca-logo class="marca-logo" [tamano]="132"></app-marca-logo>
+  <app-marca-logo class="marca-logo" [tamano]="72"></app-marca-logo>
+
+  <!-- La figura va en su propia zona y entera. Como fondo a pantalla completa quedaba
+       recortada y con el titular encima, sin importar lo bien que estuviera dibujada. -->
+  <img class="marca-figura" src="assets/portal/taller-iso.svg" alt="" />
 
   <div class="marca-cuerpo">
     <span class="marca-rotulo">Portal de {{ marca.rotuloPublico }}</span>

@@ -39,8 +39,6 @@ $ease: var(--ease-out, cubic-bezier(0.32, 0.72, 0, 1));
   display: flex;
   flex-direction: column;
   min-height: 100%;
-  // En celular y tablet la foto va solo detrás de la marca (ver acceso-marca); en
-  // escritorio, de fondo de toda la pantalla (más abajo).
   background: $tinta;
 }
 
@@ -418,22 +416,13 @@ ion-item + .ayuda { margin: 0 0 12px; }
   .acceso-caja { max-width: 440px; }
 }
 
-// ── Escritorio: la marca a la izquierda, sobre la foto; el panel a la derecha ──
+// ── Escritorio: la marca a la izquierda, con su figura; el panel a la derecha ──
 @media (min-width: 1024px) {
   .acceso {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(480px, 520px);
-    // El dibujo de la bahía en vez de la fotografía que vino de MS Motos: ese
-    // taller era uno solo, y acá entra el cliente de cualquiera.
-    //
-    // Los degradados son mucho más suaves que los que pedía la foto. El dibujo
-    // ya nace oscuro y en el azul del producto, así que taparlo solo lo borra;
-    // se oscurece donde cae el texto y nada más.
-    background:
-      linear-gradient(90deg, rgba(10, 16, 24, 0) 0%, rgba(10, 16, 24, .08) 55%, rgba(10, 16, 24, .75) 100%),
-      linear-gradient(180deg, rgba(10, 16, 24, 0) 30%, rgba(10, 16, 24, .72) 100%),
-      url('/assets/portal/taller-iso.svg') 46% 56% / cover no-repeat,
-      $tinta;
+    // La figura vive dentro de la columna de la marca (acceso-marca): acá no va nada.
+    background: $tinta;
   }
 
   .acceso-panel {
