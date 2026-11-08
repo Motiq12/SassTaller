@@ -2,6 +2,7 @@ const router = require('express').Router();
 // Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
 const { fail } = require('../utils/responder');
 const auth = require('../middleware/auth');
+const tenantPublico = require('../middleware/tenant-publico');
 const requireRol = require('../middleware/roles');
 
 // Core Web Vitals medidos en los navegadores de la gente que usa la app.
@@ -19,8 +20,17 @@ const METRICAS = ['LCP', 'CLS', 'INP', 'FCP', 'TTFB'];
 // que ocurren antes de que exista un token. A cambio se valida con dureza y solo se
 // guardan los cinco nombres conocidos: es un endpoint de escritura abierto, así que
 // no puede aceptar nada que venga en el cuerpo.
-router.post('/web-vitals', async (req, res) => {
+// Lleva `tenantPublico` porque la fila necesita un taller y acá no hay sesión de
+// donde sacarlo. Sin ese middleware `req.db` no existe y CADA llamada termina en un
+// 500 silencioso: la medición de INP —el motivo por el que existe este endpoint—
+// no guardaría un solo dato.
+router.post('/web-vitals', tenantPublico, async (req, res) => {
   try {
+    // Una métrica que no se puede atribuir a ningún taller no se guarda, y tampoco se
+    // reporta como error: quien llama es un sendBeacon al cerrar la pestaña, que no
+    // mira la respuesta y no puede hacer nada con ella.
+    if (!req.db) return res.status(204).end();
+
     const { metrica, valor, calificacion, ruta, movil } = req.body || {};
     if (!METRICAS.includes(metrica)) return res.status(400).json({ error: 'Métrica no válida' });
 

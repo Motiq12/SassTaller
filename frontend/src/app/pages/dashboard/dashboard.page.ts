@@ -4,6 +4,7 @@ import { ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
+import { MarcaService } from '../../services/marca.service';
 import { DashboardService } from '../../services/dashboard.service';
 import { OrdenesService } from '../../services/ordenes.service';
 import { ESTADO_CONFIG, EstadoOrden } from '../../models/orden.model';
@@ -46,6 +47,8 @@ export class DashboardPage implements OnInit, OnDestroy {
 
   constructor(
     public auth: AuthService,
+    // El encabezado muestra el nombre del taller, que antes estaba escrito fijo.
+    public marca: MarcaService,
     private dashSvc: DashboardService,
     private ordenSvc: OrdenesService,
     private toast: ToastController,

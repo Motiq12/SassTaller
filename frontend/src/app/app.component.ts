@@ -3,6 +3,7 @@ import { NavigationEnd, Router } from '@angular/router';
 import { filter, take } from 'rxjs/operators';
 import { AccesibilidadService } from './services/accesibilidad.service';
 import { PortalService } from './services/portal.service';
+import { MarcaService } from './services/marca.service';
 import { AuthService } from './services/auth.service';
 import { iniciarWebVitals } from './shared/web-vitals.util';
 
@@ -26,7 +27,7 @@ export class AppComponent implements OnInit {
   navPortal = false;
 
   // Inyectar AccesibilidadService aplica la preferencia de tamaño de texto al arrancar.
-  constructor(private zone: NgZone, private _a11y: AccesibilidadService, private router: Router, private portal: PortalService, private auth: AuthService) {
+  constructor(private zone: NgZone, private _a11y: AccesibilidadService, private router: Router, private portal: PortalService, private auth: AuthService, private marca: MarcaService) {
     window.addEventListener('online', () => this.zone.run(() => (this.enLinea = true)));
     window.addEventListener('offline', () => this.zone.run(() => (this.enLinea = false)));
   }
@@ -37,6 +38,19 @@ export class AppComponent implements OnInit {
     if (this.auth.isLoggedIn() && !this.auth.isTokenExpired()) {
       this.auth.refrescarUsuario().subscribe({ error: () => {} });
     }
+
+    // Marca del taller. Con sesión se pide la completa; sin ella, la pública por
+    // slug — el login se pinta antes de que exista un token. Va acá y no en cada
+    // pantalla porque el color se aplica a toda la app: hacerlo por pantalla haría
+    // que el color parpadeara al navegar.
+    //
+    // Sin esto, el portal mostraba el nombre y el logo de respaldo en vez de los del
+    // taller: el código de MS Motos no la cargaba porque su marca estaba escrita fija
+    // en las plantillas.
+    this.auth.usuario$.subscribe(u => {
+      if (u) this.marca.get().subscribe({ error: () => {} });
+      else this.marca.cargarPublica().subscribe({ error: () => {} });
+    });
 
     this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))

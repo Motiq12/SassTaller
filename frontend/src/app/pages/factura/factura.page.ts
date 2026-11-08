@@ -63,6 +63,7 @@ export class FacturaPage implements OnInit, OnDestroy {
   // null cuando el taller no cargó logo: la factura sale sin imagen, no con la de
   // otro taller. La plantilla oculta el <img> en ese caso.
   get logo(): string | null { return this.marcaSvc.logoParaDocumento(this.marca); }
-  get nombreTaller(): string { return this.marca?.nombre_taller || 'MS Motos'; }
+  // Sin respaldo a un nombre propio: si el taller no cargó el suyo, va el genérico.
+  get nombreTaller(): string { return this.marca?.nombre_taller || 'Taller'; }
   get emisor(): string { return this.auth.getUsuario()?.nombre || ''; }
 }

@@ -1,6 +1,4 @@
 import { HttpClient } from '@angular/common/http';
-import { firstValueFrom, timeout } from 'rxjs';
-import { environment } from '../environments/environment';
 
 // El interruptor del sitio web, como lo ve el panel.
 //
@@ -16,11 +14,18 @@ import { environment } from '../environments/environment';
 // del sistema en Railway (ver backend/src/utils/sitio-estado.js): no hay
 // interruptor en el panel. El estado lo da el servidor (/api/sitio/estado) y se
 // lee al arrancar la app; si no responde, el sitio cuenta como apagado.
+// En ESTE proyecto el sitio web público no existe: no se trajo desde MS Motos, así
+// que la bandera queda apagada de forma definitiva y nadie le pregunta al servidor.
+//
+// Antes consultaba /api/sitio/estado. Esa ruta se fue con el sitio, así que la
+// llamada terminaba en 404 y el interceptor de errores le mostraba un aviso rojo a
+// quien abría el login, sin que nada estuviera mal de verdad.
+//
+// La bandera se conserva (en vez de borrarla y tocar los seis archivos que la leen)
+// porque es la forma de que los menús y las guardias del panel sigan escondiendo lo
+// del sitio sin cambiarles una línea.
 export const sitioWeb = { activo: false };
 
-export function cargarEstadoSitioWeb(http: HttpClient): () => Promise<void> {
-  return () =>
-    firstValueFrom(http.get<{ data: { activo: boolean } }>(`${environment.apiUrl}/sitio/estado`).pipe(timeout(5000)))
-      .then(r => { sitioWeb.activo = r?.data?.activo === true; })
-      .catch(() => { sitioWeb.activo = false; });
+export function cargarEstadoSitioWeb(_http: HttpClient): () => Promise<void> {
+  return () => Promise.resolve();
 }

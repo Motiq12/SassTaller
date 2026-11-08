@@ -47,7 +47,11 @@ export class PortalLegalPage implements OnInit {
         if (!canales.length) return;
         const contacto = this.doc?.secciones.find(s => s.titulo === 'Contacto');
         if (contacto) {
-          contacto.parrafos = [`Si tienes dudas sobre el manejo de tus datos o quieres ejercer tus derechos, comunícate con ${c.nombre_taller || 'MS Motos'} ${canales.join(' o ')}, o acércate al mostrador de nuestras sucursales de Liberia o Cañas.`];
+          // Sin nombres de taller escritos acá. Esto es el aviso de privacidad de
+          // CADA taller: decía "MS Motos" de respaldo y nombraba sus sucursales de
+          // Liberia y Cañas, así que el documento legal de cualquier otro taller
+          // remitía a las sedes de una empresa ajena.
+          contacto.parrafos = [`Si tienes dudas sobre el manejo de tus datos o quieres ejercer tus derechos, comunícate con ${c.nombre_taller || 'el taller'} ${canales.join(' o ')}, o acércate al mostrador.`];
         }
       },
       error: () => {},

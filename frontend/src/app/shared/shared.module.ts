@@ -16,16 +16,19 @@ import { MisPreferenciasComponent } from './perfil/mis-preferencias.component';
 import { RecortarFotoComponent } from './perfil/recortar-foto.component';
 import { PerfilListaComponent } from './perfil/perfil-lista.component';
 import { ElegirServiciosComponent } from './elegir-servicios.component';
+// Pinta el logo del taller (o sus iniciales si no cargó ninguno). Lo usan el panel
+// y el portal, que son de CADA taller, así que no puede ser un <img> a un archivo.
+import { MarcaLogoComponent } from './marca-logo.component';
 
 @NgModule({
   declarations: [EstadoLabelPipe, EstadoColorPipe, ChatContactosComponent, ChatHiloComponent, DosFaComponent, VolverWebComponent, EntregarOrdenComponent,
     MisSesionesComponent, MiActividadComponent, MiFirmaComponent, MisPreferenciasComponent, RecortarFotoComponent, PerfilListaComponent,
-    ElegirServiciosComponent],
+    ElegirServiciosComponent, MarcaLogoComponent],
   imports: [CommonModule, FormsModule, IonicModule, RouterModule],
   exports: [
     CommonModule, FormsModule, IonicModule, EstadoLabelPipe, EstadoColorPipe,
     ChatContactosComponent, ChatHiloComponent, DosFaComponent, VolverWebComponent,
-    MisSesionesComponent, MiActividadComponent, MiFirmaComponent, MisPreferenciasComponent, PerfilListaComponent,
+    MisSesionesComponent, MiActividadComponent, MiFirmaComponent, MisPreferenciasComponent, PerfilListaComponent, MarcaLogoComponent,
     ElegirServiciosComponent,
   ],
 })

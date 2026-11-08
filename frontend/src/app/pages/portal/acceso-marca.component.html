@@ -1,9 +1,11 @@
 <section class="marca">
-  <img class="marca-logo" src="assets/logo/ms-logo-white.png" alt="MS Motos · Repuestos y taller" width="132" height="132" />
+  <!-- El logo del taller, no un archivo de la app: app-marca-logo pinta el que
+       cargó el taller y, si no cargó ninguno, sus iniciales. -->
+  <app-marca-logo class="marca-logo" [tamano]="132"></app-marca-logo>
 
   <div class="marca-cuerpo">
-    <span class="marca-rotulo">Portal MS Motos</span>
-    <h2 class="marca-titulo">Tu moto, <span>en buenas manos.</span></h2>
+    <span class="marca-rotulo">Portal de {{ marca.rotuloPublico }}</span>
+    <h2 class="marca-titulo">Tu vehículo, <span>en buenas manos.</span></h2>
 
     <ol class="marca-lista">
       <li *ngFor="let p of puntos; let i = index">

@@ -16,6 +16,20 @@ import { environment } from '../../environments/environment';
 const nativo = !!(window as any).Capacitor?.isNativePlatform?.();
 const URL_METRICAS = `${nativo ? environment.nativeApiUrl : ''}${environment.apiUrl}/metricas/web-vitals`;
 
+// El taller al que atribuir la medición. El endpoint es público —las métricas que más
+// importan son las del login y el registro, donde todavía no hay sesión— así que el
+// taller no puede salir de un token: viaja en la dirección, igual que en el resto de
+// las rutas públicas del portal. Sin esto la fila no tiene a qué taller pertenecer, el
+// servidor responde 400 y no se guarda una sola medición.
+function urlConTaller(): string {
+  try {
+    const enUrl = new URLSearchParams(window.location.search).get('taller');
+    const slug = enUrl || localStorage.getItem('tallerms_taller');
+    if (slug) return `${URL_METRICAS}?taller=${encodeURIComponent(slug)}`;
+  } catch { /* modo privado o sin window: se manda sin taller y el servidor decide */ }
+  return URL_METRICAS;
+}
+
 function enviar(m: Metric) {
   const cuerpo = JSON.stringify({
     metrica: m.name,
@@ -30,11 +44,11 @@ function enviar(m: Metric) {
     // sendBeacon es el único que sobrevive al cierre de la pestaña, que es
     // justamente cuando se conocen los valores definitivos de CLS e INP.
     if (navigator.sendBeacon) {
-      navigator.sendBeacon(URL_METRICAS, new Blob([cuerpo], { type: 'application/json' }));
+      navigator.sendBeacon(urlConTaller(), new Blob([cuerpo], { type: 'application/json' }));
       return;
     }
     // keepalive cumple el mismo papel donde no hay sendBeacon (Safari viejo).
-    fetch(URL_METRICAS, {
+    fetch(urlConTaller(), {
       method: 'POST', body: cuerpo, keepalive: true,
       headers: { 'Content-Type': 'application/json' },
     }).catch(() => {});

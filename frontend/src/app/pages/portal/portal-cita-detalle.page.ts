@@ -1,9 +1,10 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ToastController, AlertController } from '@ionic/angular';
 import { Subject, interval } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PortalService } from '../../services/portal.service';
+import { MarcaService } from '../../services/marca.service';
 import { FLUJO_CITA, ESTADO_CITA_LABEL } from '../../utils/servicios';
 
 @Component({
@@ -13,6 +14,10 @@ import { FLUJO_CITA, ESTADO_CITA_LABEL } from '../../utils/servicios';
   styleUrls: ['./portal-cita-detalle.page.scss'],
 })
 export class PortalCitaDetallePage implements OnInit, OnDestroy {
+  // El comprobante lo imprime el cliente de CUALQUIER taller: el encabezado y el
+  // pie salen de su marca, no de un nombre escrito en el código.
+  private readonly marcaSvc = inject(MarcaService);
+
   private destroy$ = new Subject<void>();
   cita: any = null;
   orden: any = null;        // detalle de la orden vinculada (si hay)
@@ -196,6 +201,8 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
     const c = this.cita;
     const o = this.orden;
     const cli = this.portal.getCliente();
+    // El nombre del taller que atendió, no el del software ni el de otro taller.
+    const taller = this.marcaSvc.actual.nombre_taller;
     const money = (n: any) => '₡' + Number(n || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 });
     const esc = (s: any) => String(s ?? '').replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' } as any)[m]);
     const fecha = c.fecha ? new Date(`${String(c.fecha).slice(0, 10)}T00:00:00`).toLocaleDateString('es-CR') : '';
@@ -232,19 +239,19 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
         h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #999; margin: 0 0 6px; }
       </style></head><body><div class="doc">
       <div class="hd">
-        <div><h1>MS Motos</h1><div class="sub">Comprobante de servicio</div></div>
+        <div><h1>${esc(taller)}</h1><div class="sub">Comprobante de servicio</div></div>
         <div class="num"><strong>${esc(c.numero_orden || ('Cita #' + c.id))}</strong><br>${esc(fecha)}</div>
       </div>
       <div class="grid">
         <div><div class="k">Cliente</div><div class="v">${esc(cli ? cli.nombre + ' ' + cli.apellido : '—')}</div></div>
-        <div><div class="k">Moto</div><div class="v">${esc(c.marca)} ${esc(c.modelo)}${c.placa ? ' · ' + esc(c.placa) : ''}</div></div>
+        <div><div class="k">Vehículo</div><div class="v">${esc(c.marca)} ${esc(c.modelo)}${c.placa ? ' · ' + esc(c.placa) : ''}</div></div>
         <div><div class="k">Servicio</div><div class="v">${esc(c.tipo_servicio || c.motivo || '—')}</div></div>
         <div><div class="k">Mecánico</div><div class="v">${esc(c.tecnico_nombre || 'Por asignar')}</div></div>
       </div>
       ${o?.diagnostico ? `<div class="diag"><strong>Diagnóstico:</strong> ${esc(o.diagnostico)}</div>` : ''}
       ${filas.length ? `<h3>Detalle</h3><table>${filas.join('')}</table>` : ''}
       <div class="total"><span>Total</span><span>${money(total)}</span></div>
-      <div class="ft">Gracias por confiar en MS Motos · Documento generado el ${new Date().toLocaleDateString('es-CR')}</div>
+      <div class="ft">Gracias por confiar en ${esc(taller)} · Documento generado el ${new Date().toLocaleDateString('es-CR')}</div>
       </div>
       <script>window.onload = function(){ window.print(); }</script>
       </body></html>`;

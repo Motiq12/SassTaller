@@ -5,13 +5,21 @@
 // los datos (montos, placas, fechas), que el sitio no tiene. Ver DESIGN.md.
 
 :root {
-  // —— Acento de marca: el rojo del sitio (accent / accent2 / accentText) ——
-  --ion-color-primary: #e2231a;
-  --ion-color-primary-rgb: 226, 35, 26;
+  // —— Acento de marca: azul marino del isotipo de Motiq ——
+  // Es el color POR DEFECTO del producto, no el de ningún taller. Cada taller lo
+  // pisa con el suyo desde su configuración (MarcaService reescribe estas mismas
+  // variables en caliente), así que esto es lo que ve un taller que todavía no
+  // eligió color.
+  //
+  // Acá estaba el rojo de MS Motos, que vino con su código. Dejarlo significaba
+  // que un taller nuevo abría el sistema pintado con la marca de otra empresa —
+  // el mismo problema que el logo de respaldo en las facturas.
+  --ion-color-primary: #1e3a5f;
+  --ion-color-primary-rgb: 30, 58, 95;
   --ion-color-primary-contrast: #ffffff;
   --ion-color-primary-contrast-rgb: 255, 255, 255;
-  --ion-color-primary-shade: #c2201a;
-  --ion-color-primary-tint: #f24a3d;
+  --ion-color-primary-shade: #1a3252;
+  --ion-color-primary-tint: #354e6f;
 
   // —— Secondary: grafito neutro (estructura, no compite con el acento) ——
   --ion-color-secondary: #262b34;

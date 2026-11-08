@@ -74,6 +74,16 @@ async function marcaDelTaller(db, slug) {
   } catch { return {}; }
 }
 
+// GET /api/portal/google/config — el ID de cliente para el botón (no es secreto), o null.
+//
+// Va ANTES de tenantPublico a propósito: devuelve una variable de entorno del
+// servidor, igual para todos los talleres, y no toca la base. Puesto después, el
+// guard lo rechazaba con «Falta indicar el taller» y el login mostraba un aviso
+// rojo al abrirse, sin que hubiera nada mal.
+router.get('/google/config', (req, res) => {
+  res.json({ data: { clientId: process.env.GOOGLE_CLIENT_ID || null } });
+});
+
 // Tramo publico (login, registro, recuperar, OTP): el taller sale del subdominio
 // o de un campo `taller`, porque todavia no hay token del que leerlo.
 router.use(tenantPublico);
@@ -158,11 +168,6 @@ async function correoOcupado(db, email, exceptoId) {
 // Sin GOOGLE_CLIENT_ID no hay botón y estas rutas responden que no está activo.
 const GOOGLE_NO_ACTIVO = 'El ingreso con Google no está activado.';
 const ERR_GOOGLE = 'No se pudo comprobar tu cuenta de Google. Intenta de nuevo.';
-
-// GET /api/portal/google/config — el ID de cliente para el botón (no es secreto), o null.
-router.get('/google/config', (req, res) => {
-  res.json({ data: { clientId: process.env.GOOGLE_CLIENT_ID || null } });
-});
 
 // Entra con la cuenta que ya existe: la une a la cuenta de Google si todavía no lo
 // estaba y da el correo por verificado (Google ya lo verificó).

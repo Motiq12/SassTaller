@@ -2,8 +2,9 @@
   <ion-menu contentId="admin-content" type="overlay" class="admin-sidebar">
     <ion-content class="admin-dark sidebar-content">
       <div class="sb-logo">
-        <img class="sb-brand light-only" src="assets/logo/ms-logo.png" alt="MS Motos" />
-        <img class="sb-brand dark-only" src="assets/logo/ms-logo-white.png" alt="" />
+        <!-- El logo del taller. Eran dos <img> fijos al de MS Motos, así que todo
+             taller abría su panel con el logotipo de otra empresa. -->
+        <app-marca-logo class="sb-brand" [tamano]="34"></app-marca-logo>
         <span class="sb-rotulo">{{ esAdmin ? 'Panel administrativo' : 'Sitio web' }}</span>
       </div>
 
