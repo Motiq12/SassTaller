@@ -68,6 +68,6 @@ export class MotoHistorialPage implements OnInit, OnDestroy {
   abrirCliente() { if (this.moto) this.router.navigate([rutaPanel(this.router, '/cliente-detalle'), this.moto.cliente_id]); }
   editar() { if (this.moto) this.router.navigate([rutaPanel(this.router, '/moto-form'), this.moto.id]); }
   nuevaOrden() {
-    if (this.moto) this.router.navigate([rutaPanel(this.router, '/nueva-orden')], { queryParams: { cliente_id: this.moto.cliente_id, moto_id: this.moto.id } });
+    if (this.moto) this.router.navigate([rutaPanel(this.router, '/nueva-orden')], { queryParams: { cliente_id: this.moto.cliente_id, vehiculo_id: this.moto.id } });
   }
 }

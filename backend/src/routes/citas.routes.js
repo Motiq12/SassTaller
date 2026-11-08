@@ -59,7 +59,7 @@ router.get('/', async (req, res) => {
                       o.numero_orden
                FROM citas ci
                JOIN clientes c ON ci.cliente_id = c.id AND c.tenant_id = @tenant
-               LEFT JOIN motos m ON ci.moto_id = m.id
+               LEFT JOIN motos m ON ci.vehiculo_id = m.id
                LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id AND o.tenant_id = @tenant
                LEFT JOIN usuarios u ON ci.usuario_id = u.id AND u.tenant_id = @tenant
                LEFT JOIN usuarios t ON ci.tecnico_id = t.id AND t.tenant_id = @tenant
@@ -91,7 +91,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', soloRoles(...GESTIONA_AGENDA), exigirPermiso('citas.agendar'), async (req, res) => {
   try {
-    const { cliente_id, moto_id, fecha, hora, tecnico_id } = req.body;
+    const { cliente_id, vehiculo_id, fecha, hora, tecnico_id } = req.body;
     const motivo = String(req.body.motivo || '').trim();
     if (faltante(res, { ...req.body, motivo }, [['cliente_id', 'el cliente'], ['fecha', 'la fecha'], ['hora', 'la hora'], ['motivo', 'el motivo']])) return;
     if (!textoDentroDeLimite(motivo, MAX_MOTIVO)) {
@@ -110,8 +110,8 @@ router.post('/', soloRoles(...GESTIONA_AGENDA), exigirPermiso('citas.agendar'), 
     // La duración solo la decide administración; las demás nacen de 1 hora.
     const duracion = esAdmin && duracionValida(req.body.duracion_horas) ? Number(req.body.duracion_horas) : 1;
     const [result] = await req.db.query(
-      'INSERT INTO citas (cliente_id, moto_id, usuario_id, tecnico_id, sucursal_id, fecha, hora, motivo, tipo_servicio, duracion_horas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [cliente_id, moto_id || null, req.usuario.id, tecnico_id || null, sucursal_id, fecha, hora, motivo, servicios[0] || null, duracion]
+      'INSERT INTO citas (tenant_id, cliente_id, vehiculo_id, usuario_id, tecnico_id, sucursal_id, fecha, hora, motivo, tipo_servicio, duracion_horas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [cliente_id, vehiculo_id || null, req.usuario.id, tecnico_id || null, sucursal_id, fecha, hora, motivo, servicios[0] || null, duracion]
     );
     await guardarServiciosCita(result.insertId, servicios);
     const [[nueva]] = await req.db.query('SELECT * FROM citas WHERE tenant_id = @tenant AND id = ?', [result.insertId]);
@@ -140,7 +140,7 @@ router.delete('/:id', requireRol('admin'), async (req, res) => {
        FROM citas ci
        LEFT JOIN clientes c ON c.id = ci.cliente_id AND c.tenant_id = @tenant
        LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id AND o.tenant_id = @tenant
-       WHERE ci.id = ? FOR UPDATE`,
+       WHERE ci.tenant_id = @tenant AND ci.id = ? FOR UPDATE`,
       [req.params.id]
     );
     if (!cita) { await conn.rollback(); return res.status(404).json({ error: 'Cita no encontrada' }); }
@@ -186,7 +186,7 @@ router.get('/:id', async (req, res) => {
 
 router.put('/:id', soloRoles(...GESTIONA_AGENDA), exigirPermiso('citas.agendar'), async (req, res) => {
   try {
-    const { cliente_id, moto_id, fecha, hora, tecnico_id } = req.body;
+    const { cliente_id, vehiculo_id, fecha, hora, tecnico_id } = req.body;
     const motivo = String(req.body.motivo || '').trim();
     if (!textoDentroDeLimite(motivo, MAX_MOTIVO)) {
       return invalido(res, 'motivo', `El motivo no puede pasar de ${MAX_MOTIVO} caracteres`);
@@ -214,9 +214,9 @@ router.put('/:id', soloRoles(...GESTIONA_AGENDA), exigirPermiso('citas.agendar')
     // La duración solo la cambia administración; si no viene, se conserva.
     const duracion = minutos ? 1 : (esAdmin && duracionValida(req.body.duracion_horas) ? Number(req.body.duracion_horas) : (previa?.duracion_horas || 1));
     await req.db.query(
-      `UPDATE citas SET cliente_id=?, moto_id=?, tecnico_id=?, fecha=?, hora=?, motivo=?,
+      `UPDATE citas SET cliente_id=?, vehiculo_id=?, tecnico_id=?, fecha=?, hora=?, motivo=?,
          sucursal_id = COALESCE(?, sucursal_id), duracion_horas = ? WHERE tenant_id = @tenant AND id=?`,
-      [cliente_id, moto_id || null, tecnico_id || null, fecha, hora, motivo, sucursalNueva, duracion, req.params.id]
+      [cliente_id, vehiculo_id || null, tecnico_id || null, fecha, hora, motivo, sucursalNueva, duracion, req.params.id]
     );
     if (cambiaServicios) await guardarServiciosCita(req.params.id, servicios);
     const [[actualizada]] = await req.db.query('SELECT * FROM citas WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
@@ -332,7 +332,7 @@ router.post('/:id/entregar', soloRoles(...GESTIONA_AGENDA), exigirPermiso('orden
     if (montoNum !== null) { sets.push('monto = ?'); params.push(montoNum); }
     if (metodo) { sets.push('metodo_pago = ?'); params.push(metodo); }
     params.push(req.params.id);
-    await req.db.query(`UPDATE citas SET ${sets.join(', ')} WHERE id = ?`, params);
+    await req.db.query(`UPDATE citas SET ${sets.join(', ')} WHERE id = ? AND tenant_id = @tenant`, params);
     await notificarCambioEstado(req.params.id, 'entregado');
     res.json({ message: 'Cita entregada' });
   } catch (err) {

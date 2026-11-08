@@ -21,7 +21,7 @@ const esDinero = (k) => DINERO.has(k) || PREFIJOS_DINERO.some((p) => k.startsWit
 
 // "total" también es un conteo (calificaciones, citas): se quita solo cuando el
 // objeto es una orden o lleva costos, que es cuando "total" es plata.
-const PISTAS_DE_ORDEN = ['numero_orden', 'costo_mano_obra', 'costo_repuestos', 'moto_id'];
+const PISTAS_DE_ORDEN = ['numero_orden', 'costo_mano_obra', 'costo_repuestos', 'vehiculo_id'];
 
 // Teléfono del cliente con nombre propio: siempre fuera.
 const TELEFONO_CLIENTE = new Set(['cliente_telefono', 'telefono_cliente']);

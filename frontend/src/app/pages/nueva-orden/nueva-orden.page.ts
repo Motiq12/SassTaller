@@ -53,13 +53,13 @@ export class NuevaOrdenPage implements OnInit, OnDestroy {
     private auth: AuthService,
   ) {}
 
-  // Desde la ficha de una moto se llega con ?cliente_id=…&moto_id=…: el cliente y la
+  // Desde la ficha de una moto se llega con ?cliente_id=…&vehiculo_id=…: el cliente y la
   // moto quedan elegidos y se pasa directo a describir el problema.
   ngOnInit() {
     const q = this.route.snapshot.queryParamMap;
     const clienteId = Number(q.get('cliente_id'));
     if (!clienteId) return;
-    const motoId = Number(q.get('moto_id')) || null;
+    const motoId = Number(q.get('vehiculo_id')) || null;
     this.clienteSvc.getById(clienteId).pipe(takeUntil(this.destroy$)).subscribe({
       next: res => this.seleccionarCliente(res.data, motoId),
       error: () => {},
@@ -113,7 +113,7 @@ export class NuevaOrdenPage implements OnInit, OnDestroy {
     const l = await this.loading.create({ message: 'Creando orden...' });
     await l.present();
     this.ordenSvc.create({
-      moto_id: this.motoSeleccionada!.id!,
+      vehiculo_id: this.motoSeleccionada!.id!,
       cliente_id: this.clienteSeleccionado!.id!,
       ...this.form,
     }).pipe(takeUntil(this.destroy$)).subscribe({

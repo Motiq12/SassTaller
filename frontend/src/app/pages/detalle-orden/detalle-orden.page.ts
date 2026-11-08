@@ -844,7 +844,7 @@ export class DetalleOrdenPage implements OnInit, OnDestroy {
   abrirEdicion() {
     const o = this.orden!;
     this.edicion = {
-      moto_id: o.moto_id,
+      vehiculo_id: o.vehiculo_id,
       sucursal_id: o.sucursal_id ?? null,
       problema_reportado: o.problema_reportado || '',
       prioridad: o.prioridad || 'normal',
@@ -988,7 +988,7 @@ export class DetalleOrdenPage implements OnInit, OnDestroy {
 
   verFactura() { this.router.navigate([rutaPanel(this.router, '/factura'), this.orden!.id]); }
   verCliente() { this.router.navigate([rutaPanel(this.router, '/cliente-detalle'), this.orden!.cliente_id]); }
-  verHistorialMoto() { this.router.navigate([rutaPanel(this.router, '/moto-historial'), this.orden!.moto_id]); }
+  verHistorialMoto() { this.router.navigate([rutaPanel(this.router, '/moto-historial'), this.orden!.vehiculo_id]); }
 
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
 

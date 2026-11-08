@@ -36,7 +36,7 @@
 
       <div class="fg">
         <label>Seleccionar moto *</label>
-        <select [(ngModel)]="form.moto_id" name="moto_id">
+        <select [(ngModel)]="form.vehiculo_id" name="vehiculo_id">
           <option [ngValue]="null" disabled>Elige tu moto</option>
           <option *ngFor="let m of motos" [ngValue]="m.id">{{ m.marca }} {{ m.modelo }}<ng-container *ngIf="m.placa"> — {{ m.placa }}</ng-container></option>
         </select>

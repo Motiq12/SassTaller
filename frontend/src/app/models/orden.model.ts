@@ -22,7 +22,7 @@ export interface OrdenEliminada {
 export interface Orden {
   id?: number;
   numero_orden?: string;
-  moto_id: number;
+  vehiculo_id: number;
   cliente_id: number;
   recepcionista_id?: number;
   tecnico_id?: number | null;

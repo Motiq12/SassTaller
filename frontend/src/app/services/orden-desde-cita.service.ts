@@ -19,7 +19,7 @@ export interface CitaParaOrden {
   id: number;
   cliente_id: number;
   fecha?: string | null;
-  moto_id?: number | null;
+  vehiculo_id?: number | null;
   cliente_nombre?: string | null;
 }
 export interface OrdenCreada { orden_id: number; numero_orden: string; }
@@ -42,7 +42,7 @@ export class OrdenDesdeCitaService {
         `Esta cita es para el ${fecha.slice(8, 10)}/${fecha.slice(5, 7)}. ¿Abrir la orden ya?`, 'Abrir la orden');
       if (!ok) return null;
     }
-    let motoId = c.moto_id || null;
+    let motoId = c.vehiculo_id || null;
     if (!motoId) {
       motoId = await this.elegirMoto(c.cliente_id, c.cliente_nombre || '');
       if (!motoId) return null;

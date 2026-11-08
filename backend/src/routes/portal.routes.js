@@ -1372,7 +1372,7 @@ router.get('/citas/:id', async (req, res) => {
   try {
     const [[cita]] = await req.db.query(
       `SELECT ci.id, DATE_FORMAT(ci.fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(ci.hora, '%H:%i') AS hora,
-              ci.motivo, ci.tipo_servicio, ci.servicios, ci.estado, ci.moto_id,
+              ci.motivo, ci.tipo_servicio, ci.servicios, ci.estado, ci.vehiculo_id,
               ci.monto, ci.calificacion, ci.comentario_satisfaccion, ci.fecha_inicio, ci.fecha_fin,
               ci.confirmada_cliente,
               ci.orden_id, o.numero_orden, o.estado AS orden_estado, o.aprobacion_cliente,
@@ -1399,10 +1399,10 @@ router.get('/citas/:id', async (req, res) => {
 // Revalida la NUEVA fecha/hora con las mismas reglas que agendar (cupo atómico).
 router.put('/citas/:id', async (req, res) => {
   try {
-    const { moto_id, fecha, hora, descripcion } = req.body;
+    const { vehiculo_id, fecha, hora, descripcion } = req.body;
     // Uno o varios servicios del catálogo (`tipo_servicio` suelto: la app sin actualizar).
     const servicios = serviciosDelPedido(req.body);
-    if (!moto_id || !fecha || !hora || !servicios.length) {
+    if (!vehiculo_id || !fecha || !hora || !servicios.length) {
       return res.status(400).json({ error: 'Moto, servicio, fecha y hora son requeridos' });
     }
     const problemaServicios = await problemaConServicios(servicios, { obligatorio: true, delCatalogo: true });
@@ -1442,8 +1442,8 @@ router.put('/citas/:id', async (req, res) => {
       return invalido(res, 'fecha', `Solo se puede agendar hasta ${config.dias_anticipacion} días por adelantado`);
     }
 
-    const [[moto]] = await req.db.query('SELECT id FROM motos WHERE id = ? AND cliente_id = ?', [moto_id, req.cliente.id]);
-    if (!moto) return invalido(res, 'moto_id', 'Moto no válida');
+    const [[moto]] = await req.db.query('SELECT id FROM motos WHERE id = ? AND cliente_id = ?', [vehiculo_id, req.cliente.id]);
+    if (!moto) return invalido(res, 'vehiculo_id', 'Moto no válida');
 
     const motivo = (descripcion || '').trim() || textoServicios(servicios).slice(0, MAX_MOTIVO);
     if (!textoDentroDeLimite(motivo, MAX_MOTIVO)) {
@@ -1463,13 +1463,13 @@ router.put('/citas/:id', async (req, res) => {
         return invalido(res, 'hora', 'Esa hora ya no está disponible, elige otra.');
       }
       await conn.query(
-        'UPDATE citas SET moto_id = ?, fecha = ?, hora = ?, motivo = ?, sucursal_id = ? WHERE tenant_id = @tenant AND id = ?',
-        [moto_id, fecha, hora, motivo, sucursalId, req.params.id]
+        'UPDATE citas SET vehiculo_id = ?, fecha = ?, hora = ?, motivo = ?, sucursal_id = ? WHERE tenant_id = @tenant AND id = ?',
+        [vehiculo_id, fecha, hora, motivo, sucursalId, req.params.id]
       );
       await guardarServiciosCita(req.params.id, servicios, conn);
       const [[actualizada]] = await conn.query(
         `SELECT ci.id, ci.fecha, ci.hora, ci.motivo, ci.tipo_servicio, ci.servicios, ci.estado, m.marca, m.modelo, m.placa
-         FROM citas ci LEFT JOIN motos m ON m.id = ci.moto_id WHERE ci.id = ?`,
+         FROM citas ci LEFT JOIN motos m ON m.id = ci.vehiculo_id WHERE ci.id = ?`,
         [req.params.id]
       );
       await conn.commit();
@@ -1488,10 +1488,10 @@ router.put('/citas/:id', async (req, res) => {
 // POST /api/portal/citas — el cliente solicita una cita (queda pendiente de confirmar)
 router.post('/citas', async (req, res) => {
   try {
-    const { moto_id, fecha, hora, descripcion } = req.body;
+    const { vehiculo_id, fecha, hora, descripcion } = req.body;
     // Uno o varios servicios del catálogo (`tipo_servicio` suelto: la app sin actualizar).
     const servicios = serviciosDelPedido(req.body);
-    if (!moto_id || !fecha || !hora || !servicios.length) {
+    if (!vehiculo_id || !fecha || !hora || !servicios.length) {
       return res.status(400).json({ error: 'Moto, servicio, fecha y hora son requeridos' });
     }
     const problemaServicios = await problemaConServicios(servicios, { obligatorio: true, delCatalogo: true });
@@ -1526,8 +1526,8 @@ router.post('/citas', async (req, res) => {
     }
 
     // La moto debe ser del cliente
-    const [[moto]] = await req.db.query('SELECT id FROM motos WHERE id = ? AND cliente_id = ?', [moto_id, req.cliente.id]);
-    if (!moto) return invalido(res, 'moto_id', 'Moto no válida');
+    const [[moto]] = await req.db.query('SELECT id FROM motos WHERE id = ? AND cliente_id = ?', [vehiculo_id, req.cliente.id]);
+    if (!moto) return invalido(res, 'vehiculo_id', 'Moto no válida');
 
     const motivo = (descripcion || '').trim() || textoServicios(servicios).slice(0, MAX_MOTIVO);
     if (!textoDentroDeLimite(motivo, MAX_MOTIVO)) {
@@ -1547,13 +1547,13 @@ router.post('/citas', async (req, res) => {
         return invalido(res, 'hora', 'Esa hora ya no está disponible, elige otra.');
       }
       const [result] = await conn.query(
-        "INSERT INTO citas (cliente_id, moto_id, sucursal_id, fecha, hora, motivo, tipo_servicio, estado) VALUES (?, ?, ?, ?, ?, ?, ?, 'agendado')",
-        [req.cliente.id, moto_id, sucursalId, fecha, hora, motivo, servicios[0]]
+        "INSERT INTO citas (cliente_id, vehiculo_id, sucursal_id, fecha, hora, motivo, tipo_servicio, estado) VALUES (?, ?, ?, ?, ?, ?, ?, 'agendado')",
+        [req.cliente.id, vehiculo_id, sucursalId, fecha, hora, motivo, servicios[0]]
       );
       await guardarServiciosCita(result.insertId, servicios, conn);
       const [[nueva]] = await conn.query(
         `SELECT ci.id, ci.fecha, ci.hora, ci.motivo, ci.tipo_servicio, ci.servicios, ci.estado, m.marca, m.modelo, m.placa
-         FROM citas ci LEFT JOIN motos m ON m.id = ci.moto_id WHERE ci.id = ?`,
+         FROM citas ci LEFT JOIN motos m ON m.id = ci.vehiculo_id WHERE ci.id = ?`,
         [result.insertId]
       );
       await conn.commit();

@@ -111,7 +111,7 @@ router.post('/', soloRoles('recepcion', 'admin'), exigirPermiso('ordenes.crear')
 
     const problemaReportado = String(problema_reportado || '').trim();
 
-    if (faltante(res, { ...req.body, problema_reportado: problemaReportado }, [['cliente_id', 'el cliente'], ['moto_id', 'la moto'], ['problema_reportado', 'el problema que reporta el cliente']])) return;
+    if (faltante(res, { ...req.body, problema_reportado: problemaReportado }, [['cliente_id', 'el cliente'], ['vehiculo_id', 'la moto'], ['problema_reportado', 'el problema que reporta el cliente']])) return;
     if (!textoDentroDeLimite(problemaReportado, MAX_PROBLEMA_REPORTADO)) {
       return invalido(res, 'problema_reportado', `El problema no puede pasar de ${MAX_PROBLEMA_REPORTADO} caracteres`);
     }
@@ -149,10 +149,10 @@ router.post('/', soloRoles('recepcion', 'admin'), exigirPermiso('ordenes.crear')
           fecha_estimada_entrega || null,
         ]
       );
-      await conn.query('INSERT INTO orden_tiempos (orden_id, etapa) VALUES (?, ?)', [result.insertId, 'recepcion']);
+      await conn.query('INSERT INTO orden_tiempos (tenant_id, orden_id, etapa) VALUES (@tenant, ?, ?)', [result.insertId, 'recepcion']);
       // Su cita, para que el cliente la vea en el portal (ver crearCitaDeOrden).
       const citaId = await crearCitaDeOrden(conn, {
-        orden_id: result.insertId, cliente_id, moto_id, sucursal_id, usuario_id: req.usuario.id,
+        orden_id: result.insertId, cliente_id, vehiculo_id, sucursal_id, usuario_id: req.usuario.id,
         problema_reportado: problemaReportado,
         // Servicio rápido: el tiempo estimado que eligió recepción (20, 30 o 40 min).
         duracion_min: req.body.duracion_min,
@@ -284,13 +284,13 @@ router.patch('/:id/datos', soloRoles('recepcion', 'admin'), exigirPermiso('orden
     const fechaEst = b.fecha_estimada_entrega ? String(b.fecha_estimada_entrega).slice(0, 10) : null;
     if (fechaEst && !/^\d{4}-\d{2}-\d{2}$/.test(fechaEst)) return invalido(res, 'fecha_estimada_entrega', 'Fecha estimada no válida');
     // La moto tiene que ser del mismo cliente (para cambiar de cliente, se elimina y se abre otra).
-    const [[moto]] = await req.db.query('SELECT id FROM motos WHERE id = ? AND cliente_id = ?', [b.moto_id, orden.cliente_id]);
-    if (!moto) return invalido(res, 'moto_id', 'Esa moto no es de este cliente');
+    const [[moto]] = await req.db.query('SELECT id FROM motos WHERE id = ? AND cliente_id = ?', [b.vehiculo_id, orden.cliente_id]);
+    if (!moto) return invalido(res, 'vehiculo_id', 'Esa moto no es de este cliente');
     const sucursal_id = sucursalParaGuardar(req, (await sucursalValida(b.sucursal_id)) ? Number(b.sucursal_id) : null);
     const categoria = b.categoria || 'diagnostico';
 
     await req.db.query(
-      `UPDATE ordenes_trabajo SET moto_id = ?, sucursal_id = ?, problema_reportado = ?, prioridad = ?, categoria = ?,
+      `UPDATE ordenes_trabajo SET vehiculo_id = ?, sucursal_id = ?, problema_reportado = ?, prioridad = ?, categoria = ?,
          kilometraje_ingreso = ?, nivel_combustible = ?, accesorios_entregados = ?, estado_fisico = ?,
          fecha_estimada_entrega = ?
        WHERE tenant_id = @tenant AND id = ?`,
@@ -303,7 +303,7 @@ router.patch('/:id/datos', soloRoles('recepcion', 'admin'), exigirPermiso('orden
     // La cita de la orden muestra la misma moto y sede; si la cita se creó sola
     // para la orden, también el problema (de una cita agendada por el cliente se
     // respeta lo que él escribió).
-    await req.db.query('UPDATE citas SET moto_id = ?, sucursal_id = ? WHERE tenant_id = @tenant AND orden_id = ?', [moto.id, sucursal_id, orden.id]);
+    await req.db.query('UPDATE citas SET vehiculo_id = ?, sucursal_id = ? WHERE tenant_id = @tenant AND orden_id = ?', [moto.id, sucursal_id, orden.id]);
     await req.db.query('UPDATE citas SET motivo = ? WHERE tenant_id = @tenant AND orden_id = ? AND creada_por_orden = 1', [problema, orden.id]);
     res.json({ message: 'Orden actualizada' });
   } catch (err) {
@@ -337,8 +337,8 @@ router.delete('/:id', requireRol('admin'), async (req, res) => {
               CONCAT_WS(' ', m.marca, m.modelo, m.placa) AS moto
        FROM ordenes_trabajo ot
        LEFT JOIN clientes c ON c.id = ot.cliente_id AND c.tenant_id = @tenant
-       LEFT JOIN motos m ON m.id = ot.moto_id
-       WHERE ot.id = ? FOR UPDATE`,
+       LEFT JOIN vehiculos m ON m.id = ot.vehiculo_id AND m.tenant_id = @tenant
+       WHERE ot.tenant_id = @tenant AND ot.id = ? FOR UPDATE`,
       [req.params.id]
     );
     if (!o) { await conn.rollback(); return res.status(404).json({ error: 'Orden no encontrada' }); }
@@ -539,7 +539,7 @@ router.post('/:id/repuestos', soloRoles('recepcion', 'admin'), exigirPermiso('or
     if (estado && !ESTADOS_REPUESTO[estado]) return res.status(400).json({ error: 'Estado de repuesto inválido' });
     const totalAntes = await totalOrden(req.params.id);
     const [result] = await req.db.query(
-      'INSERT INTO orden_repuestos (orden_id, nombre, cantidad, costo_unitario, estado, adicional) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO orden_repuestos (tenant_id, orden_id, nombre, cantidad, costo_unitario, estado, adicional) VALUES (@tenant, ?, ?, ?, ?, ?, ?)',
       [req.params.id, nombre, cantidad || 1, costo_unitario || 0, estado || 'pendiente', await esAdicional(req.params.id)]
     );
     // Actualizar costo_repuestos en la orden

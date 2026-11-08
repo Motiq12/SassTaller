@@ -150,7 +150,7 @@
             <div class="fg-row">
               <div class="fg">
                 <label for="ed-moto">Moto</label>
-                <select id="ed-moto" name="moto_id" [(ngModel)]="edicion.moto_id">
+                <select id="ed-moto" name="vehiculo_id" [(ngModel)]="edicion.vehiculo_id">
                   <option *ngFor="let m of motosCliente" [ngValue]="m.id">{{ m.marca }} {{ m.modelo }}{{ m.placa ? ' · ' + m.placa : '' }}</option>
                 </select>
               </div>

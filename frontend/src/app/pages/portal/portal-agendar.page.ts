@@ -25,7 +25,7 @@ export class PortalAgendarPage implements OnInit, OnDestroy {
   sucursales: any[] = [];
   hoy = hoyCR();
 
-  form = { sucursal_id: null as number | null, moto_id: null as number | null, servicios: [] as string[], fecha: '', hora: '', descripcion: '' };
+  form = { sucursal_id: null as number | null, vehiculo_id: null as number | null, servicios: [] as string[], fecha: '', hora: '', descripcion: '' };
   ocupacion: Record<string, number> = {};
   maxPorHora = 2;
   enviando = false;
@@ -82,7 +82,7 @@ export class PortalAgendarPage implements OnInit, OnDestroy {
   private aplicarPrefill() {
     if (!this.prefill || this.editId) return;
     if (!this.motosListas || !this.serviciosListos) return;
-    if (this.prefill.moto && this.motos.some(m => m.id === this.prefill!.moto)) this.form.moto_id = this.prefill.moto;
+    if (this.prefill.moto && this.motos.some(m => m.id === this.prefill!.moto)) this.form.vehiculo_id = this.prefill.moto;
     if (this.prefill.servicio && this.servicios.includes(this.prefill.servicio)) this.form.servicios = [this.prefill.servicio];
     this.prefill = null;
   }
@@ -117,7 +117,7 @@ export class PortalAgendarPage implements OnInit, OnDestroy {
         this.editId = id;
         this.form = {
           sucursal_id: c.sucursal_id ?? null,
-          moto_id: c.moto_id ?? null,
+          vehiculo_id: c.vehiculo_id ?? null,
           servicios: serviciosDeCita(c),
           fecha: String(c.fecha).slice(0, 10),
           hora: String(c.hora || '').slice(0, 5),
@@ -203,7 +203,7 @@ export class PortalAgendarPage implements OnInit, OnDestroy {
   }
 
   // Moto seleccionada (para el preview con foto bajo el selector).
-  get motoSel(): any { return this.motos.find(m => m.id === this.form.moto_id) || null; }
+  get motoSel(): any { return this.motos.find(m => m.id === this.form.vehiculo_id) || null; }
 
   // Dirección de la sucursal elegida (para mostrarla bajo el selector).
   get sucursalSelDir(): string | null {
@@ -212,12 +212,12 @@ export class PortalAgendarPage implements OnInit, OnDestroy {
   irAMotos() { this.router.navigate(['/portal/motos']); }
 
   get valido(): boolean {
-    return !!(this.form.sucursal_id && this.form.moto_id && this.form.servicios.length && this.form.fecha && this.form.hora);
+    return !!(this.form.sucursal_id && this.form.vehiculo_id && this.form.servicios.length && this.form.fecha && this.form.hora);
   }
 
   // ¿Hay algo cargado en el formulario? (para mostrar "Limpiar" solo cuando aplica)
   get hayDatos(): boolean {
-    return !!(this.form.sucursal_id || this.form.moto_id || this.form.servicios.length || this.form.fecha || this.form.hora || this.form.descripcion.trim());
+    return !!(this.form.sucursal_id || this.form.vehiculo_id || this.form.servicios.length || this.form.fecha || this.form.hora || this.form.descripcion.trim());
   }
 
   // Limpia el formulario (solo al crear). Guarda el estado previo —incluida la
@@ -227,7 +227,7 @@ export class PortalAgendarPage implements OnInit, OnDestroy {
     const previo = { form: { ...this.form, servicios: [...this.form.servicios] }, ocupacion: { ...this.ocupacion }, maxPorHora: this.maxPorHora };
     // Si solo hay una sucursal, se conserva preseleccionada al limpiar.
     const sucursalDefault = this.sucursales.length === 1 ? this.sucursales[0].id : null;
-    this.form = { sucursal_id: sucursalDefault, moto_id: null, servicios: [] as string[], fecha: '', hora: '', descripcion: '' };
+    this.form = { sucursal_id: sucursalDefault, vehiculo_id: null, servicios: [] as string[], fecha: '', hora: '', descripcion: '' };
     this.ocupacion = {};
     this.maxPorHora = 2;
     this.msgHora = '';
@@ -257,7 +257,7 @@ export class PortalAgendarPage implements OnInit, OnDestroy {
     this.enviando = true;
     const datos = {
       sucursal_id: this.form.sucursal_id!,
-      moto_id: this.form.moto_id!,
+      vehiculo_id: this.form.vehiculo_id!,
       servicios: this.form.servicios,
       fecha: this.form.fecha,
       hora: this.form.hora,
@@ -268,7 +268,7 @@ export class PortalAgendarPage implements OnInit, OnDestroy {
       next: async () => {
         await l.dismiss(); this.enviando = false;
         this.toastMsg(editando ? 'Cita actualizada' : '¡Cita agendada!');
-        this.form = { sucursal_id: null, moto_id: null, servicios: [] as string[], fecha: '', hora: '', descripcion: '' };
+        this.form = { sucursal_id: null, vehiculo_id: null, servicios: [] as string[], fecha: '', hora: '', descripcion: '' };
         this.editId = null;
         this.router.navigate(editando ? ['/portal/cita', editando] : ['/portal/mis-citas']);
       },

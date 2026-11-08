@@ -92,7 +92,7 @@ export class AdminCitasPage implements OnInit, OnDestroy {
   async crearOrden(c: any) {
     if (this.creandoOrden) return;
     this.creandoOrden = c.id;
-    const o = await this.ordenCita.crear({ id: c.id, cliente_id: c.cliente_id, fecha: c.fecha, moto_id: c.moto_id, cliente_nombre: c.cliente_nombre });
+    const o = await this.ordenCita.crear({ id: c.id, cliente_id: c.cliente_id, fecha: c.fecha, vehiculo_id: c.vehiculo_id, cliente_nombre: c.cliente_nombre });
     this.creandoOrden = null;
     if (o) this.router.navigate(['/admin/detalle-orden', o.orden_id]);
   }

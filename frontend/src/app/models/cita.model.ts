@@ -3,7 +3,7 @@ export type EstadoCita = 'agendado' | 'en_revision' | 'en_mantenimiento' | 'list
 export interface Cita {
   id?: number;
   cliente_id: number;
-  moto_id?: number | null;
+  vehiculo_id?: number | null;
   usuario_id?: number | null;
   tecnico_id?: number | null;
   fecha: string;

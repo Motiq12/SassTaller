@@ -29,11 +29,11 @@ async function crearCitaDeOrden(conn, o) {
   const config = await getConfig();
   const offset = Number(config.zona_horaria_offset) || -6;
   const [r] = await conn.query(
-    `INSERT INTO citas (cliente_id, moto_id, usuario_id, tecnico_id, sucursal_id, fecha, hora, motivo,
+    `INSERT INTO citas (cliente_id, vehiculo_id, usuario_id, tecnico_id, sucursal_id, fecha, hora, motivo,
                         estado, fecha_inicio, hora_llegada, orden_id, creada_por_orden, duracion_min)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'en_revision', NOW(), NOW(), ?, 1, ?)`,
     [
-      o.cliente_id, o.moto_id, o.usuario_id || null, o.tecnico_id || null, o.sucursal_id || null,
+      o.cliente_id, o.vehiculo_id, o.usuario_id || null, o.tecnico_id || null, o.sucursal_id || null,
       fechaLocalISO(offset), horaLocal(offset), o.problema_reportado, o.orden_id,
       // Servicio rápido (20, 30 o 40 min): ocupa solo ese rato de la hora en que llegó.
       minutosRapidosValidos(o.duracion_min) ? Number(o.duracion_min) : null,

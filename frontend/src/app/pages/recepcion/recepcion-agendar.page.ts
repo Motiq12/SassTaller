@@ -64,7 +64,7 @@ export class RecepcionAgendarPage implements OnInit, OnDestroy {
   get titulo(): string { return this.enPanel ? 'Nueva cita u orden' : 'Recibir cliente'; }
 
   form = {
-    moto_id: null as number | null,
+    vehiculo_id: null as number | null,
     // Agendar cita
     servicios: [] as string[],
     tecnico_id: null as number | null,
@@ -141,20 +141,20 @@ export class RecepcionAgendarPage implements OnInit, OnDestroy {
     this.cliente = c;
     this.qCliente = `${c.nombre} ${c.apellido || ''}`.trim();
     this.clientes = [];
-    this.form.moto_id = null;
+    this.form.vehiculo_id = null;
     this.cargarMotos(c.id);
   }
 
   private cargarMotos(clienteId: number) {
     this.rec.getMotos(clienteId).pipe(takeUntil(this.destroy$)).subscribe({
-      next: r => { this.motos = r.data; if (r.data.length === 1) this.form.moto_id = r.data[0].id; },
+      next: r => { this.motos = r.data; if (r.data.length === 1) this.form.vehiculo_id = r.data[0].id; },
       error: () => { this.motos = []; },
     });
   }
 
   limpiarCliente() {
     this.cliente = null; this.qCliente = ''; this.clientes = [];
-    this.motos = []; this.form.moto_id = null;
+    this.motos = []; this.form.vehiculo_id = null;
   }
 
   // —— Registrar cliente / moto sin salir de la pantalla ——
@@ -230,7 +230,7 @@ export class RecepcionAgendarPage implements OnInit, OnDestroy {
         this.guardandoAlta = false;
         this.modalMoto = false;
         this.motos = [...this.motos, r.data];
-        this.form.moto_id = r.data.id!;
+        this.form.vehiculo_id = r.data.id!;
         this.aviso('Moto registrada');
       },
       error: () => { this.guardandoAlta = false; },
@@ -284,7 +284,7 @@ export class RecepcionAgendarPage implements OnInit, OnDestroy {
     if (this.modo === 'agendar') {
       return !!this.form.fecha && !!this.form.hora && this.form.servicios.length > 0 && sucursalOk;
     }
-    return !!this.form.moto_id && !!this.form.problema_reportado.trim() && sucursalOk;
+    return !!this.form.vehiculo_id && !!this.form.problema_reportado.trim() && sucursalOk;
   }
 
   confirmar() {
@@ -300,7 +300,7 @@ export class RecepcionAgendarPage implements OnInit, OnDestroy {
   private confirmarCita() {
     this.rec.crearCita({
       cliente_id: this.cliente.id,
-      moto_id: this.form.moto_id,
+      vehiculo_id: this.form.vehiculo_id,
       fecha: this.form.fecha,
       hora: this.form.hora,
       motivo: this.form.motivo.trim() || this.form.servicios.join(' + '),
@@ -317,7 +317,7 @@ export class RecepcionAgendarPage implements OnInit, OnDestroy {
   private confirmarOrden() {
     this.rec.crearOrden({
       cliente_id: this.cliente.id,
-      moto_id: this.form.moto_id!,
+      vehiculo_id: this.form.vehiculo_id!,
       problema_reportado: this.form.problema_reportado.trim(),
       sucursal_id: this.form.sucursal_id,
       kilometraje_ingreso: this.form.kilometraje_ingreso || null,
@@ -334,7 +334,7 @@ export class RecepcionAgendarPage implements OnInit, OnDestroy {
     const sucursal_id = this.sucursales.length === 1 ? this.sucursales[0].id : null;
     this.limpiarCliente();
     this.form = {
-      moto_id: null, servicios: [] as string[], tecnico_id: null, fecha, hora: '', motivo: '',
+      vehiculo_id: null, servicios: [] as string[], tecnico_id: null, fecha, hora: '', motivo: '',
       problema_reportado: '', sucursal_id, kilometraje_ingreso: null, prioridad: 'normal',
     };
     this.duracion = 1;

@@ -248,11 +248,11 @@ export class PortalService {
     return this.http.patch(`${this.url}/citas/${id}/confirmar`, {});
   }
 
-  crearCita(data: { moto_id: number; sucursal_id: number; fecha: string; hora: string; servicios: string[]; descripcion?: string }): Observable<{ data: any }> {
+  crearCita(data: { vehiculo_id: number; sucursal_id: number; fecha: string; hora: string; servicios: string[]; descripcion?: string }): Observable<{ data: any }> {
     return this.http.post<{ data: any }>(`${this.url}/citas`, data);
   }
 
-  editarCita(id: number, data: { moto_id: number; sucursal_id: number; fecha: string; hora: string; servicios: string[]; descripcion?: string }): Observable<{ data: any }> {
+  editarCita(id: number, data: { vehiculo_id: number; sucursal_id: number; fecha: string; hora: string; servicios: string[]; descripcion?: string }): Observable<{ data: any }> {
     return this.http.put<{ data: any }>(`${this.url}/citas/${id}`, data);
   }
 

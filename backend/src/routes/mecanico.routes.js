@@ -46,7 +46,7 @@ router.get('/resumen', async (req, res) => {
     // Hoy y el mes del taller, no los de la base (utils/sql-fechas.js).
     const off = (await getConfig()).zona_horaria_offset;
     const [[{ citas_hoy }]] = await req.db.query(
-      `SELECT COUNT(*) AS citas_hoy FROM citas WHERE tecnico_id = ? AND fecha = ${hoySQL(off)}`,
+      `SELECT COUNT(*) AS citas_hoy FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND fecha = ${hoySQL(off)}`,
       [yo]
     );
     const [[{ completadas_hoy }]] = await req.db.query(
@@ -157,7 +157,7 @@ router.patch('/citas/:id/estado', async (req, res) => {
     }
     params.push(req.params.id);
 
-    await req.db.query(`UPDATE citas SET ${sets.join(', ')} WHERE id = ?`, params);
+    await req.db.query(`UPDATE citas SET ${sets.join(', ')} WHERE id = ? AND tenant_id = @tenant`, params);
     await notificarCambioEstado(req.db, req.params.id, estado);
     res.json({ message: 'Estado actualizado' });
   } catch (err) {
@@ -191,8 +191,11 @@ router.post('/ordenes/:id/repuestos', exigirPermiso('taller.repuestos'), async (
     // marcado como adicional y al ponerle precio se le pide aprobación otra vez.
     const adicional = orden.total_aprobado !== null ? 1 : 0;
     const [result] = await req.db.query(
-      "INSERT INTO orden_repuestos (orden_id, nombre, cantidad, costo_unitario, estado, adicional) VALUES ?",
-      [piezas.map((p) => [req.params.id, p.nombre, p.cantidad, 0, 'solicitado', adicional])]
+      // Inserción masiva: el taller va DENTRO de cada fila, no como marcador @tenant.
+      // Ese marcador se expande a un `?` con un valor suelto, y acá el único `?` es el
+      // arreglo anidado de filas — mezclarlos desalinearía los parámetros.
+      "INSERT INTO orden_repuestos (tenant_id, orden_id, nombre, cantidad, costo_unitario, estado, adicional) VALUES ?",
+      [piezas.map((p) => [req.tenantId, req.params.id, p.nombre, p.cantidad, 0, 'solicitado', adicional])]
     );
     const [nuevos] = await req.db.query(
       'SELECT * FROM orden_repuestos WHERE tenant_id = @tenant AND orden_id = ? AND id >= ? ORDER BY id ASC LIMIT ?',
@@ -364,7 +367,7 @@ router.get('/perfil', async (req, res) => {
     const [[u]] = await req.db.query(
       `SELECT u.id, u.nombre, u.email, u.rol, u.telefono, u.especialidades, u.horario, u.created_at,
               s.nombre AS sucursal_nombre, s.direccion AS sucursal_direccion
-       FROM usuarios u LEFT JOIN sucursales s ON s.id = u.sucursal_id WHERE u.id = ?`, [yo]);
+       FROM usuarios u LEFT JOIN sucursales s ON s.id = u.sucursal_id AND s.tenant_id = @tenant WHERE u.tenant_id = @tenant AND u.id = ?`, [yo]);
     const [[g]] = await req.db.query(
       `SELECT COUNT(*) AS completadas,
               ROUND(AVG(TIMESTAMPDIFF(MINUTE, fecha_inicio, COALESCE(fecha_listo, fecha_fin)))) AS tiempo_promedio_min

@@ -41,7 +41,7 @@ async function notificarCambioEstado(citaId, estado) {
       `SELECT ci.cliente_id, cl.notif_avances, cl.nombre AS cliente_nombre, cl.email AS cliente_email,
               m.marca, m.modelo
        FROM citas ci
-       LEFT JOIN motos m ON m.id = ci.moto_id
+       LEFT JOIN motos m ON m.id = ci.vehiculo_id
        LEFT JOIN clientes cl ON cl.id = ci.cliente_id
        WHERE ci.id = ?`,
       [citaId]
@@ -116,7 +116,7 @@ async function notificarCitaAgendada(citaId, { reprogramada = false } = {}) {
               cl.notif_avances, m.marca, m.modelo
        FROM citas ci
        LEFT JOIN clientes cl ON cl.id = ci.cliente_id
-       LEFT JOIN motos m ON m.id = ci.moto_id
+       LEFT JOIN motos m ON m.id = ci.vehiculo_id
        WHERE ci.id = ?`,
       [citaId]
     );
@@ -167,7 +167,7 @@ async function notificarPresupuestoListo(ordenId, { adicional = false } = {}) {
       `SELECT ot.cliente_id, ot.numero_orden, m.marca, m.modelo,
               (SELECT id FROM citas WHERE orden_id = ot.id LIMIT 1) AS cita_id
        FROM ordenes_trabajo ot
-       LEFT JOIN motos m ON m.id = ot.moto_id
+       LEFT JOIN motos m ON m.id = ot.vehiculo_id
        WHERE ot.id = ?`,
       [ordenId]
     );

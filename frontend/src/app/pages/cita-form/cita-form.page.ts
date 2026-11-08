@@ -79,7 +79,7 @@ export class CitaFormPage implements OnInit, OnDestroy {
         // La base manda la fecha completa (2026-10-21T00:00:00Z) y la hora con segundos:
         // los campos de fecha y hora solo entienden 'AAAA-MM-DD' y 'HH:MM'. Sin esto la
         // fecha aparecía vacía y al guardar se mandaba sin fecha.
-        this.form = { ...res.data, fecha: String(res.data.fecha || '').slice(0, 10), hora: String(res.data.hora || '').slice(0, 5), moto_id: res.data.moto_id ?? null };
+        this.form = { ...res.data, fecha: String(res.data.fecha || '').slice(0, 10), hora: String(res.data.hora || '').slice(0, 5), vehiculo_id: res.data.vehiculo_id ?? null };
         this.listaServicios = serviciosDeCita(res.data);
         this.busquedaCliente = `${res.data.cliente_nombre} ${res.data.cliente_apellido}`;
         if (res.data.cliente_id) {

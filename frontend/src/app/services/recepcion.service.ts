@@ -111,7 +111,7 @@ export class RecepcionService {
   getMotos(clienteId: number): Observable<{ data: any[] }> {
     return this.http.get<{ data: any[] }>(`${environment.apiUrl}/motos`, { params: { cliente_id: clienteId } as any });
   }
-  crearCita(data: { cliente_id: number; moto_id: number | null; fecha: string; hora: string; motivo: string; servicios: string[]; tecnico_id: number | null; sucursal_id?: number | null; duracion_horas?: number }): Observable<{ data: any }> {
+  crearCita(data: { cliente_id: number; vehiculo_id: number | null; fecha: string; hora: string; motivo: string; servicios: string[]; tecnico_id: number | null; sucursal_id?: number | null; duracion_horas?: number }): Observable<{ data: any }> {
     return this.http.post<{ data: any }>(`${environment.apiUrl}/citas`, data);
   }
 
@@ -119,7 +119,7 @@ export class RecepcionService {
   getSucursales(): Observable<{ data: any[] }> {
     return this.http.get<{ data: any[] }>(`${this.url}/sucursales`);
   }
-  crearOrden(data: { cliente_id: number; moto_id: number; problema_reportado: string; sucursal_id?: number | null; kilometraje_ingreso?: number | null; prioridad?: string; duracion_min?: number | null }): Observable<{ data: any }> {
+  crearOrden(data: { cliente_id: number; vehiculo_id: number; problema_reportado: string; sucursal_id?: number | null; kilometraje_ingreso?: number | null; prioridad?: string; duracion_min?: number | null }): Observable<{ data: any }> {
     return this.http.post<{ data: any }>(`${environment.apiUrl}/ordenes`, data);
   }
 
@@ -141,7 +141,7 @@ export class RecepcionService {
   // Puente cita ↔ orden: crea (o recupera) la orden de trabajo de una cita.
   // motoId: para una cita agendada sin moto (se le asigna también a la cita).
   crearOrdenDesdeCita(citaId: number, motoId?: number | null): Observable<{ data: { orden_id: number; numero_orden: string } }> {
-    return this.http.post<{ data: any }>(`${this.url}/citas/${citaId}/crear-orden`, motoId ? { moto_id: motoId } : {});
+    return this.http.post<{ data: any }>(`${this.url}/citas/${citaId}/crear-orden`, motoId ? { vehiculo_id: motoId } : {});
   }
 
   // Check-in de mostrador: marca / deshace la llegada del cliente.
