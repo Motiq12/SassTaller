@@ -72,7 +72,7 @@ async function getConfig(db) {
   } catch (_) {
     // Tabla aún no migrada / sin fila: se usan los DEFAULTS.
   }
-  // Las columnas JSON pueden venir parseadas (mysql2 → array), como string, o null.
+  // Las columnas jsonb llegan parseadas (pg → array), pero puede venir un string o null.
   const listaJson = (valor, porDefecto) => {
     let v = valor;
     if (typeof v === 'string') {

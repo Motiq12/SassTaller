@@ -768,11 +768,10 @@ router.patch('/admins/:id', async (req, res) => {
 // front tendría que mandar un string con una zona horaria que el server tiene que
 // adivinar. `undefined` = no la mandó (dejar como está); `null`/'' = vaciarla.
 //
-// Se devuelve como STRING ya formateado en UTC ("YYYY-MM-DD HH:MM:SS") y no como
-// objeto Date: mysql2 serializa un Date según la zona horaria del PROCESO de Node
-// (no la de MySQL), así que en una máquina que no corre en UTC —como cualquier
-// entorno de desarrollo— el valor guardado queda corrido varias horas. Un string ya
-// formateado no sufre esa segunda conversión.
+// Se devuelve como STRING ya formateado en UTC ("YYYY-MM-DD HH:MM:SS"). vence_el es
+// timestamptz y la sesión de la base corre en UTC (db/pool.js), así que un texto sin
+// zona se guarda como esa hora UTC exacta, en cualquier máquina. (Con MySQL hacía
+// falta además porque mysql2 serializaba un Date en la zona del PROCESO de Node.)
 function fechaOVacio(v) {
   if (v === null || v === '') return { ok: true, valor: null };
   const d = new Date(v);
@@ -782,12 +781,9 @@ function fechaOVacio(v) {
 
 // GET /api/motiq/avisos — el historial completo, para administrarlos.
 //
-// vence_el se pide con DATE_FORMAT(...'Z') y no se deja como columna cruda: mysql2
-// devuelve un DATETIME como objeto Date interpretando el valor guardado en la zona
-// horaria LOCAL DEL PROCESO, y acá se guardó como UTC (ver fechaOVacio) — sin este
-// formateo explícito, el valor le llega al front corrido esa misma cantidad de horas
-// una SEGUNDA vez. Mismo motivo por el que estado-tenant.js pide trial_hasta con
-// DATE_FORMAT en vez de dejar que el driver lo convierta solo.
+// vence_el se pide ya formateado como ISO en UTC (to_char con "T" y "Z") en vez de
+// como columna cruda: así el front recibe siempre el mismo texto, sin depender de cómo
+// el driver convierta la fecha. Mismo criterio que estado-tenant.js con trial_hasta.
 router.get('/avisos', async (req, res) => {
   try {
     const [filas] = await pool.query(

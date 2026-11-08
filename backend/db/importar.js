@@ -1,103 +1,115 @@
 #!/usr/bin/env node
-// Importa la base del repo en la MySQL local. Un solo comando:
+// Deja la base de desarrollo igual que la del resto del equipo. Un solo comando:
 //
 //   npm run db:importar
 //
-// Existe para que levantar el proyecto no dependa de que alguien te pase un
-// archivo por chat ni de recordar una secuencia de pasos. Clonás, corrés esto, y
-// tenés la base igual que el resto del equipo.
-const { spawnSync } = require('child_process');
+// Recrea el esquema `public` desde cero, aplica las migraciones de db/migraciones/,
+// carga los dos talleres de prueba (db/datos-prueba.sql) y genera contraseñas nuevas
+// para el personal, que imprime una sola vez (el repo no lleva ninguna que funcione:
+// ver db/credenciales.js).
+//
+// BORRA TODO lo que haya en la base. Por eso se niega a correr contra un servidor que
+// no sea local: el script anterior a este (migrate.js) borraba la base entera si
+// alguien lo apuntaba a Railway siguiendo el README. Para una base remota de pruebas,
+// y solo sabiendo lo que se hace: `npm run db:importar -- --remota`.
+//
+// Postgres local de desarrollo (Docker):
+//   docker run -d --name motiq-pg -e POSTGRES_USER=motiq -e POSTGRES_PASSWORD=motiq_dev \
+//     -e POSTGRES_DB=sasstaller -p 5432:5432 -v motiq-pg-data:/var/lib/postgresql/data postgres:16-alpine
 const fs = require('fs');
 const path = require('path');
 
-const DUMP = path.join(__dirname, 'sasstaller.sql');
-const BASE = process.env.DB_NAME || 'sasstaller';
-const USUARIO = process.env.DB_USER || 'root';
-const CLAVE = process.env.DB_PASSWORD || '';
-const HOST = process.env.DB_HOST || '127.0.0.1';
-const PUERTO = process.env.DB_PORT || '3306';
+const DATOS = path.join(__dirname, 'datos-prueba.sql');
+const LOCALES = new Set(['localhost', '127.0.0.1', '::1', '']);
 
-// mysql.exe no suele estar en el PATH en Windows con Laragon o XAMPP, y pedirle a
-// cada quien que lo agregue es una fricción evitable. Se buscan las rutas típicas
-// antes de rendirse; MYSQL_BIN permite forzarla si está en otro lado.
-function buscarMysql() {
-  if (process.env.MYSQL_BIN) return process.env.MYSQL_BIN;
-
-  const candidatos = [];
-  if (process.platform === 'win32') {
-    for (const raiz of ['C:\\laragon\\bin\\mysql', 'C:\\xampp\\mysql']) {
-      if (!fs.existsSync(raiz)) continue;
-      // Laragon guarda una carpeta por versión (mysql-8.4.3-winx64, etc.).
-      const dentro = fs.statSync(raiz).isDirectory() ? fs.readdirSync(raiz) : [];
-      for (const sub of [...dentro, '.']) {
-        candidatos.push(path.join(raiz, sub, 'bin', 'mysql.exe'));
-      }
-    }
+function hostDestino() {
+  if (process.env.DATABASE_URL) {
+    try { return new URL(process.env.DATABASE_URL).hostname; } catch { return '(DATABASE_URL inválida)'; }
   }
-  candidatos.push('mysql');   // Linux/macOS, o Windows con el PATH configurado
+  return process.env.DB_HOST || 'localhost';
+}
 
-  for (const c of candidatos) {
-    if (c === 'mysql') {
-      const r = spawnSync(c, ['--version'], { shell: true });
-      if (r.status === 0) return c;
-    } else if (fs.existsSync(c)) {
-      return c;
-    }
+(async () => {
+  // El pool lee backend/.env al cargarse; se requiere recién acá para poder dar antes
+  // nuestro propio mensaje si algo falta.
+  require('dotenv').config({ path: path.join(__dirname, '../.env') });
+  const host = hostDestino();
+  if (!LOCALES.has(host) && !process.argv.includes('--remota')) {
+    console.error(`✖ La base apunta a "${host}", que no es local. Este script BORRA TODO lo que tiene.`);
+    console.error('  Si de verdad es una base de pruebas: npm run db:importar -- --remota');
+    process.exit(1);
   }
-  return null;
-}
+  if (!fs.existsSync(DATOS)) {
+    console.error(`✖ Falta ${path.basename(DATOS)}. ¿Hiciste git pull?`);
+    process.exit(1);
+  }
 
-function correr(mysql, args, entrada) {
-  const base = ['-u', USUARIO, '-h', HOST, '-P', String(PUERTO), '--protocol=TCP'];
-  if (CLAVE) base.push(`-p${CLAVE}`);
-  return spawnSync(mysql, [...base, ...args], {
-    input: entrada,
-    encoding: 'utf8',
-    maxBuffer: 128 * 1024 * 1024,   // el volcado entra entero por stdin
-  });
-}
+  const { pool } = require('../src/db/pool');
+  const { migrar } = require('../src/db/migrar');
+  let base;
+  try {
+    ({ rows: [{ base }] } = await pool.nativo.query('SELECT current_database() AS base'));
+  } catch (err) {
+    console.error('✖ No se pudo conectar a Postgres:', err.code || err.message);
+    console.error('  ¿Está corriendo? Revisá DB_HOST/DB_PORT/DB_USER/DB_PASSWORD en backend/.env');
+    console.error('  (el comando del contenedor de desarrollo está al principio de este archivo).');
+    process.exit(1);
+  }
 
-const mysql = buscarMysql();
-if (!mysql) {
-  console.error('✖ No se encontró mysql. Si lo tenés en otra ruta:');
-  console.error('    MYSQL_BIN="C:\\ruta\\a\\mysql.exe" npm run db:importar');
-  process.exit(1);
-}
-if (!fs.existsSync(DUMP)) {
-  console.error(`✖ Falta ${path.basename(DUMP)}. ¿Hiciste git pull?`);
-  process.exit(1);
-}
+  try {
+    console.log(`→ Recreando el esquema de "${base}" en ${host}…`);
+    // Se recrea el esquema entero, no tabla por tabla: el resultado tiene que ser
+    // idéntico para todos, no "lo del repo encima de lo que ya tenías".
+    await pool.nativo.query('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;');
 
-const ping = correr(mysql, ['-e', 'SELECT 1']);
-if (ping.status !== 0) {
-  console.error('✖ No se pudo conectar a MySQL. ¿Está corriendo? (en Laragon: Start All)');
-  console.error(String(ping.stderr || '').trim().split('\n')[0]);
-  process.exit(1);
+    console.log('→ Aplicando migraciones…');
+    await migrar({ log: (m) => console.log('  ' + m) });
+
+    console.log('→ Cargando los datos de prueba…');
+    await pool.nativo.query(fs.readFileSync(DATOS, 'utf8'));
+
+    const { rows: [n] } = await pool.nativo.query(
+      'SELECT (SELECT COUNT(*) FROM tenants) AS talleres, (SELECT COUNT(*) FROM usuarios) AS usuarios, (SELECT COUNT(*) FROM clientes) AS clientes'
+    );
+    console.log(`\n✔ Base "${base}" lista — ${n.talleres} talleres, ${n.usuarios} usuarios, ${n.clientes} clientes.`);
+
+    await repartirPasswords(pool);
+
+    console.log('\n  Para el backend/.env: copiá backend/.env.example y completá JWT_SECRET');
+    console.log('  (cualquier texto largo sirve en desarrollo).');
+  } catch (err) {
+    console.error('✖ Falló la importación:', err.message);
+    process.exitCode = 1;
+  } finally {
+    await pool.end();
+  }
+})();
+
+// El personal llega con la contraseña neutralizada (db/credenciales.js). Acá se le
+// genera una nueva a cada uno y se imprime UNA vez: es la única forma de que el repo no
+// cargue una credencial que funcione y que, aun así, después de importar se pueda
+// entrar sin pedirle nada a nadie.
+async function repartirPasswords(pool) {
+  const bcrypt = require('bcrypt');
+  const { SIN_PASSWORD } = require('./credenciales');
+  const { generarPassword } = require('../src/utils/password');
+
+  const [filas] = await pool.query(
+    `SELECT u.id, u.email, u.rol, t.slug FROM usuarios u JOIN tenants t ON t.id = u.tenant_id
+      WHERE u.password_hash = ? ORDER BY t.slug, u.id`,
+    [SIN_PASSWORD]
+  );
+  if (!filas.length) return;
+
+  console.log('\n  Cuentas de prueba (contraseñas generadas ahora, no vuelven a mostrarse):\n');
+  for (const u of filas) {
+    // 12 caracteres y no 20: estas se escriben a mano en un formulario de desarrollo
+    // muchas veces al día. Las de plataforma, que abren los datos de todos los
+    // talleres, siguen siendo de 20 (scripts/crear-admin-motiq).
+    const password = generarPassword(12);
+    await pool.query('UPDATE usuarios SET password_hash = ? WHERE id = ?', [await bcrypt.hash(password, 10), u.id]);
+    console.log(`    ${u.slug.padEnd(11)} ${String(u.email).padEnd(26)} ${password}   (${u.rol})`);
+  }
+  console.log('\n  Si las perdés, volvé a correr `npm run db:importar`.');
+  console.log('  Los clientes de prueba no tienen contraseña: entran con el código al correo.');
 }
-
-// El volcado trae DROP TABLE por tabla, así que reimportar sobre una base existente
-// la deja igual que la del repo. Lo que NO borra son las tablas que ya no existen en
-// el volcado, por eso se recrea la base entera: el resultado tiene que ser idéntico
-// para todos, no "lo del repo encima de lo que ya tenías".
-console.log(`→ Recreando la base "${BASE}"…`);
-const recrear = correr(mysql, ['-e',
-  `DROP DATABASE IF EXISTS \`${BASE}\`; CREATE DATABASE \`${BASE}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`]);
-if (recrear.status !== 0) {
-  console.error('✖ No se pudo recrear la base:', String(recrear.stderr).trim());
-  process.exit(1);
-}
-
-console.log('→ Importando…');
-const importar = correr(mysql, [BASE], fs.readFileSync(DUMP, 'utf8'));
-if (importar.status !== 0) {
-  console.error('✖ Falló la importación:', String(importar.stderr).trim());
-  process.exit(1);
-}
-
-const conteo = correr(mysql, ['-N', '-B', BASE, '-e',
-  'SELECT (SELECT COUNT(*) FROM tenants), (SELECT COUNT(*) FROM usuarios), (SELECT COUNT(*) FROM clientes)']);
-const [talleres, usuarios, clientes] = String(conteo.stdout).trim().split(/\s+/);
-
-console.log(`\n✔ Base "${BASE}" lista — ${talleres} talleres, ${usuarios} usuarios, ${clientes} clientes.`);
-console.log('\n  Falta el archivo backend/.env (no está en el repo: lleva secretos).');
-console.log('  Copiá backend/.env.example a backend/.env y pedile las claves a quien te pasó el proyecto.');

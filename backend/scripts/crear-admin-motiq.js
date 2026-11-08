@@ -37,13 +37,16 @@ if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
 
     // Si ya existe se le cambia la contraseña, que es lo que se quiere cuando uno
     // vuelve a correr esto: recuperar el acceso, no que falle por duplicado.
-    const [r] = await pool.query(
+    // `xmax = 0` distingue en Postgres una fila recién insertada de una que el
+    // ON CONFLICT actualizó (en MySQL lo decía insertId).
+    const [[r]] = await pool.query(
       `INSERT INTO plataforma_admins (nombre, email, password_hash, activo) VALUES (?, ?, ?, 1)
-       ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), password_hash = VALUES(password_hash), activo = 1`,
+       ON CONFLICT (email) DO UPDATE SET nombre = EXCLUDED.nombre, password_hash = EXCLUDED.password_hash, activo = 1
+       RETURNING (xmax = 0)::int AS creado`,
       [nombre, email, hash]
     );
 
-    console.log(`\n✔ Admin de Motiq ${r.insertId ? 'creado' : 'actualizado'}: ${email}`);
+    console.log(`\n✔ Admin de Motiq ${r.creado ? 'creado' : 'actualizado'}: ${email}`);
     if (!propia) {
       console.log(`\n  Contraseña: ${password}`);
       console.log('  Guardala ahora: no se vuelve a mostrar y en la base solo queda el hash.\n');

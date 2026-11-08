@@ -72,7 +72,7 @@ if (!slug && !patron) {
         // sin tener que apagar la única red que avisa si algo quedó colgando.
         let filas = 0;
         for (const tabla of orden) {
-          const [r] = await conn.query(`DELETE FROM \`${tabla}\` WHERE tenant_id = ?`, [t.id]);
+          const [r] = await conn.query(`DELETE FROM "${tabla}" WHERE tenant_id = ?`, [t.id]);
           filas += r.affectedRows;
         }
         const [r] = await conn.query('DELETE FROM tenants WHERE id = ?', [t.id]);

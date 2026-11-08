@@ -28,6 +28,7 @@
 // Uso: node scripts/convertir-volcado-a-postgres.js [ruta-del-volcado]
 const fs = require('fs');
 const path = require('path');
+const { SIN_PASSWORD } = require('../db/credenciales');
 
 const RAIZ = path.join(__dirname, '..');
 const ORIGEN = process.argv[2] || path.join(RAIZ, 'db/sasstaller.sql');
@@ -229,12 +230,23 @@ BEGIN;
 SET CONSTRAINTS ALL DEFERRED;
 `];
 const generadas = Object.fromEntries(tablas.map(t => [t.nombre, new Set(t.columnas.filter(c => c.generada).map(c => c.nombre))]));
+// Códigos de un solo uso (verificación, login, recuperación): en el volcado son restos
+// vencidos de pruebas viejas. No sirven para nada y son hashes de 6 dígitos, que se
+// revierten por fuerza bruta en segundos: no viajan.
+const SIN_DATOS = new Set(['email_verify_codes', 'login_codes', 'password_reset_codes', 'usuario_verify_codes']);
 for (const m of volcado.matchAll(/^INSERT INTO `(\w+)` \(([^)]*)\) VALUES (.*);$/gm)) {
   const tabla = m[1];
+  if (SIN_DATOS.has(tabla)) continue;
   const columnas = cols(m[2]);
   const quitar = columnas.map((c, k) => (generadas[tabla].has(c) ? k : -1)).filter(k => k >= 0);
-  const filas = valores(m[3]).map(f => f.filter((_, k) => !quitar.includes(k)));
   const usar = columnas.filter((_, k) => !quitar.includes(k));
+  // Ninguna contraseña que funcione sale de acá (ver db/credenciales.js): el volcado
+  // MySQL traía los hashes de cuentas semilla cuyas claves están escritas en el README.
+  // Las del personal las genera `npm run db:importar`; las de clientes quedan sin
+  // contraseña (entran por código al correo).
+  const iHash = ['usuarios', 'clientes'].includes(tabla) ? usar.indexOf('password_hash') : -1;
+  const filas = valores(m[3]).map(f => f.filter((_, k) => !quitar.includes(k)))
+    .map(f => (iHash >= 0 && typeof f[iHash] === 'object' ? f.map((v, k) => (k === iHash ? { texto: SIN_PASSWORD } : v)) : f));
   filas.forEach(f => { if (f.length !== usar.length) throw new Error(`Fila con ${f.length} valores en ${tabla} (esperaba ${usar.length})`); });
   datos.push(`INSERT INTO ${q(tabla)} (${usar.map(q).join(', ')}) VALUES\n` +
     filas.map(f => `  (${f.map(literal).join(', ')})`).join(',\n') + ';');

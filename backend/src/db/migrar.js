@@ -31,8 +31,24 @@ function pendientesEn(aplicadas) {
     .filter(f => !aplicadas.has(f));
 }
 
+// Con quién se migra. En producción la app NO es dueña del esquema: se conecta como un
+// rol que solo lee y escribe filas (scripts/crear-usuario-app.js), así una inyección
+// SQL no puede borrar ni alterar tablas. Las migraciones, que sí cambian el esquema,
+// usan entonces otra conexión: MIGRACION_DATABASE_URL, la del dueño. Sin esa variable
+// (desarrollo, tests) se migra con la misma conexión de la app.
+async function conexionDeMigracion() {
+  if (!process.env.MIGRACION_DATABASE_URL) {
+    const c = await pool.nativo.connect();
+    return { cliente: c, soltar: () => c.release() };
+  }
+  const { Client } = require('pg');
+  const c = new Client({ connectionString: process.env.MIGRACION_DATABASE_URL, options: '-c TimeZone=UTC' });
+  await c.connect();
+  return { cliente: c, soltar: () => c.end() };
+}
+
 async function migrar({ log = console.log } = {}) {
-  const cliente = await pool.nativo.connect();
+  const { cliente, soltar } = await conexionDeMigracion();
   try {
     await cliente.query('SELECT pg_advisory_lock($1)', [CANDADO]);
     await cliente.query(`CREATE TABLE IF NOT EXISTS schema_migraciones (
@@ -74,7 +90,7 @@ async function migrar({ log = console.log } = {}) {
     return pendientes;
   } finally {
     await cliente.query('SELECT pg_advisory_unlock($1)', [CANDADO]).catch(() => {});
-    cliente.release();
+    await soltar();
   }
 }
 
