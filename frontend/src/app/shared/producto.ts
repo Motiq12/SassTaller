@@ -21,6 +21,10 @@ export const PRODUCTO = {
   // app instalada: un solo asset para toda la identidad de Motiq. Si falta, la
   // interfaz cae a las iniciales y no queda una imagen rota.
   logo: 'assets/logo/motiq-iso.png',
+  // La misma marca en blanco sobre transparente, para fondos oscuros. El PNG de
+  // arriba es azul marino sobre BLANCO: puesto en el menú o en la pantalla de
+  // acceso se veía como un cuadro blanco recortado, no como un logo.
+  logoClaro: 'assets/logo/motiq-iso-white.svg',
   // Azul marino del isotipo. Es el color por defecto de la app; cada taller lo
   // pisa con el suyo desde su configuración.
   color: '#1e3a5f',

@@ -23,8 +23,13 @@ import { PRODUCTO } from './producto';
   imports: [CommonModule],
   template: `
     <!-- Orden: el logo del taller manda; si no hay taller resuelto se muestra el de
-         Motiq (estamos en su puerta); y si tampoco carga, las iniciales. -->
-    <img *ngIf="src as url" [src]="url" [alt]="rotulo" class="marca-img"
+         Motiq (estamos en su puerta); y si tampoco carga, las iniciales.
+         El del taller va sobre una pastilla blanca, porque puede ser un logo
+         oscuro y estos fondos son oscuros. El de Motiq NO: es la versión en
+         blanco sobre transparente, y encima de la pastilla quedaba un cuadro
+         blanco recortado en medio de la pantalla de acceso. -->
+    <img *ngIf="src as url" [src]="url" [alt]="rotulo"
+         [class.marca-img]="!esDelProducto" [class.marca-producto]="esDelProducto"
          [style.height.px]="tamano" [style.width.px]="tamano" (error)="falloImagen = true" />
     <span *ngIf="!src" class="marca-iniciales"
           [style.height.px]="tamano" [style.width.px]="tamano"
@@ -40,6 +45,7 @@ import { PRODUCTO } from './producto';
       padding: 6%;
       box-sizing: border-box;
     }
+    .marca-producto { object-fit: contain; display: block; }
     .marca-iniciales {
       display: inline-flex;
       align-items: center;
@@ -77,6 +83,11 @@ export class MarcaLogoComponent {
     const delTaller = this.marca.actual.logo;
     if (delTaller) return delTaller;
     // Sin taller resuelto estamos en una pantalla de Motiq: va su isotipo.
-    return this.taller.actual() ? null : PRODUCTO.logo;
+    return this.taller.actual() ? null : PRODUCTO.logoClaro;
+  }
+
+  /** Si lo que se está mostrando es el isotipo de Motiq y no el del taller. */
+  get esDelProducto(): boolean {
+    return !this.falloImagen && !this.marca.actual.logo && !this.taller.actual();
   }
 }
