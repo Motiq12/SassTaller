@@ -74,7 +74,9 @@ test('la URI otpauth lleva la clave y el emisor', () => {
   const uri = totp.uriOtpauth(s, 'admin@taller.com');
   assert.ok(uri.startsWith('otpauth://totp/'));
   assert.ok(uri.includes(`secret=${s}`));
-  assert.ok(uri.includes('issuer=MS+Motos'));
+  // El emisor es el PRODUCTO, no un taller: es lo que el empleado ve listado en su
+  // app de autenticacion. Era 'MS Motos' para todos los talleres del SaaS.
+  assert.ok(uri.includes('issuer=Motiq'));
 });
 
 test('los códigos de respaldo son únicos y se normalizan al comparar', () => {

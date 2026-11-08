@@ -4,6 +4,7 @@ import { Subject, interval } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { MensajeriaService } from '../../services/mensajeria.service';
+import { MarcaService } from '../../services/marca.service';
 
 @Component({
   standalone: false,
@@ -14,7 +15,9 @@ export class RecepcionTabsPage implements OnInit, OnDestroy {
   noLeidos = 0;
   private destroy$ = new Subject<void>();
 
-  constructor(private auth: AuthService, private router: Router, private msj: MensajeriaService) {}
+  // Público: el menú lo usa para el nombre del taller (ver sb-marca en la plantilla).
+  constructor(private auth: AuthService, private router: Router, private msj: MensajeriaService,
+              public marca: MarcaService) {}
 
   ngOnInit() {
     // Las casillas de su rol, al día (si administración se las cambió, sin volver a entrar).

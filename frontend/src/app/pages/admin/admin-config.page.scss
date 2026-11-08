@@ -139,7 +139,7 @@
   border: 1px solid transparent;
   transition: border-color .2s, opacity .2s;
 
-  &:hover { border-color: rgba(226, 35, 26, .15); }
+  &:hover { border-color: rgba(var(--ion-color-primary-rgb), .15); }
   &.cerrado { opacity: .5; }
 }
 

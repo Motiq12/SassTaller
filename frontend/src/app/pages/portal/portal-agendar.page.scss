@@ -79,7 +79,7 @@
   transition: background-color .15s, border-color .15s, color .15s, box-shadow .15s, transform .15s, opacity .15s;
   &:active { transform: scale(.97); }
   &.sel { background: var(--ion-color-primary); color: #fff; border-color: var(--ion-color-primary);
-    box-shadow: 0 4px 12px rgba(226, 35, 26, 0.25); }
+    box-shadow: 0 4px 12px rgba(var(--ion-color-primary-rgb), 0.25); }
   &.full { background: var(--sur2); color: var(--tx3); border-color: transparent;
     text-decoration: line-through; cursor: not-allowed; }
 }

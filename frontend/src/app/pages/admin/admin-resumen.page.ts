@@ -39,7 +39,7 @@ export class AdminResumenPage implements OnInit, OnDestroy {
 
   // Estado del taller (órdenes) → etiqueta + color del punto + clase de badge.
   readonly estadoMap: Record<string, { label: string; dot: string; bg: string }> = {
-    recepcion:            { label: 'Recepción',            dot: '#F24A3D', bg: 'bg-cr' },
+    recepcion:            { label: 'Recepción',            dot: 'var(--ion-color-primary)', bg: 'bg-cr' },
     diagnostico:          { label: 'Diagnóstico',          dot: '#FBB834', bg: 'bg-am' },
     esperando_aprobacion: { label: 'Esperando aprobación', dot: '#818CF8', bg: 'bg-in' },
     esperando_repuestos:  { label: 'Esperando repuestos',  dot: '#A3A3A3', bg: 'bg-n' },

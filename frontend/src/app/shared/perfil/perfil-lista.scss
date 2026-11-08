@@ -83,7 +83,7 @@
   }
   .pf-sec-icono {
     display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex-shrink: 0;
-    border-radius: 8px; background: rgba(226, 35, 26, .12); color: var(--cr-tx);
+    border-radius: 8px; background: rgba(var(--ion-color-primary-rgb), .12); color: var(--cr-tx);
     ion-icon { font-size: 18px; }
   }
   .pf-pie { display: flex; justify-content: flex-end; margin-top: 4px; }

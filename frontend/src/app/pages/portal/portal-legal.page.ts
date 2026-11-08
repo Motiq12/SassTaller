@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { Documento, copiaDocumento, seccionDeTexto, mesYAnio } from '../../shared/textos-legales';
+import { MarcaService } from '../../services/marca.service';
 
 
 @Component({
@@ -14,13 +15,24 @@ import { Documento, copiaDocumento, seccionDeTexto, mesYAnio } from '../../share
 export class PortalLegalPage implements OnInit {
   doc: Documento | null = null;
 
-  constructor(private route: ActivatedRoute, private http: HttpClient) {}
+  constructor(private route: ActivatedRoute, private http: HttpClient, private marca: MarcaService) {}
 
   ngOnInit() {
     const key = this.route.snapshot.paramMap.get('doc') || 'terminos';
     this.doc = copiaDocumento(key === 'privacidad' ? 'privacidad' : 'terminos');
+    this.ponerNombreTaller();
     if (key === 'privacidad') this.ponerContacto();
     else this.ponerCondiciones();
+  }
+
+  // Los textos de fábrica traen `{taller}` donde va el nombre. Sale de MarcaService
+  // y no de una petición nueva: ya lo tiene resuelto para el taller de esta sesión.
+  private ponerNombreTaller() {
+    if (!this.doc) return;
+    const nombre = this.marca.rotuloPublico || 'el taller';
+    for (const s of this.doc.secciones) {
+      s.parrafos = s.parrafos.map(p => p.split('{taller}').join(nombre));
+    }
   }
 
   // Las condiciones que escribió el taller (Configuración → Textos del portal). Sin

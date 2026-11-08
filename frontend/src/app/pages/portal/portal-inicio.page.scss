@@ -35,7 +35,9 @@ $tinta: #0b0d10;
   margin-bottom: 14px;
   border-radius: 8px;
   color: #fff;
-  background: var(--foto, url('/assets/portal/taller-bg.jpg')) center 55% / cover no-repeat, $tinta;
+  // --foto la pone el taller con su propia imagen; el respaldo es el dibujo de
+  // la bahía, no la fotografía de un taller en particular.
+  background: var(--foto, url('/assets/portal/taller-iso.svg')) center 55% / cover no-repeat, $tinta;
   box-shadow: 0 14px 34px rgba(0, 0, 0, .28);
   animation: sube .45s $ease both;
 
@@ -46,7 +48,7 @@ $tinta: #0b0d10;
     inset: auto 0 0 0;
     height: 8px;
     background: repeating-conic-gradient(#e9edf2 0 25%, $tinta 0 50%) 0 0 / 8px 8px;
-    box-shadow: 0 -2px 0 0 #e2231a;
+    box-shadow: 0 -2px 0 0 var(--ion-color-primary);
   }
 }
 
@@ -86,7 +88,7 @@ $tinta: #0b0d10;
   border: none; border-radius: 2px; cursor: pointer;
   font-family: var(--fd); font-size: 14px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
   background: var(--ion-color-primary); color: #fff;
-  box-shadow: 0 10px 24px rgba(226, 35, 26, .35);
+  box-shadow: 0 10px 24px rgba(var(--ion-color-primary-rgb), .35);
   transition: transform .15s $ease, background-color .15s;
   ion-icon { font-size: 16px; transition: transform .2s $ease; }
   &:hover { background: var(--ion-color-primary-shade); ion-icon { transform: translateX(3px); } }
@@ -106,7 +108,7 @@ $tinta: #0b0d10;
     content: ''; position: absolute; top: 11px; right: 50%; width: 100%; height: 2px;
     background: rgba(255, 255, 255, .22);
   }
-  li.hecha + li::before, li.hecha + li.actual::before { background: #e2231a; }
+  li.hecha + li::before, li.hecha + li.actual::before { background: var(--ion-color-primary); }
 }
 
 .etapa-punto {
@@ -116,7 +118,7 @@ $tinta: #0b0d10;
   background: #2a2f38; border: 2px solid rgba(255, 255, 255, .25);
   ion-icon { font-size: 14px; color: #fff; }
 
-  .hecha & { background: #e2231a; border-color: #e2231a; }
+  .hecha & { background: var(--ion-color-primary); border-color: var(--ion-color-primary); }
   .actual & { background: #fff; border-color: #fff; box-shadow: 0 0 0 5px rgba(255, 255, 255, .18); }
 }
 
@@ -142,7 +144,7 @@ $tinta: #0b0d10;
 }
 .dia-mes {
   align-self: stretch; padding: 5px 0; text-align: center;
-  background: #e2231a; color: #fff;
+  background: var(--ion-color-primary); color: #fff;
   font-family: var(--fd); font-size: 13px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
 }
 .dia-n { margin-top: 4px; font-family: var(--fd); font-size: 44px; font-weight: 700; line-height: 1; }
@@ -152,7 +154,7 @@ $tinta: #0b0d10;
 .hero .prox-badge {
   padding: 3px 8px; border-radius: 2px; font-family: inherit; font-size: 11px; letter-spacing: .04em;
   background: rgba(255, 255, 255, .16); color: #fff;
-  &.pb-hoy { background: #e2231a; }
+  &.pb-hoy { background: var(--ion-color-primary); }
   &.pb-pronto { background: #f59e0b; color: $tinta; }
 }
 
@@ -249,8 +251,8 @@ $tinta: #0b0d10;
 .sellos {
   position: relative; overflow: hidden;
   padding: 20px 20px 18px; border-radius: 8px; color: #fff;
-  background: linear-gradient(135deg, #e2231a 0%, #a3140d 100%);
-  box-shadow: 0 14px 30px rgba(226, 35, 26, .28);
+  background: linear-gradient(135deg, var(--ion-color-primary) 0%, var(--ion-color-primary-shade) 100%);
+  box-shadow: 0 14px 30px rgba(var(--ion-color-primary-rgb), .28);
 
   // Cuadros de la bandera, muy tenues, en la esquina.
   &::before {
@@ -281,7 +283,7 @@ $tinta: #0b0d10;
   font-family: var(--fd); font-size: 13px; font-weight: 700; color: rgba(255, 255, 255, .7);
   ion-icon { font-size: 18px; }
 
-  &.on { border: 2px solid #fff; background: #fff; color: #c41c14; animation: sella .35s $ease both; }
+  &.on { border: 2px solid #fff; background: #fff; color: var(--text-accent); animation: sella .35s $ease both; }
   &.premio { border: 2px solid #fde68a; background: rgba(253, 230, 138, .16); color: #fde68a; }
   &.premio.on { background: #fde68a; color: #78350f; }
 }

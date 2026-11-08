@@ -89,7 +89,7 @@ router.get('/contacto', async (req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.json({
       data: {
-        nombre_taller: c.nombre_taller || 'MS Motos',
+        nombre_taller: c.nombre_taller || 'El taller',
         telefono: c.telefono || '',
         email: c.email || '',
         direccion: c.direccion || '',

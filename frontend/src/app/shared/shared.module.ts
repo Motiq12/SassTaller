@@ -23,8 +23,8 @@ import { MarcaLogoComponent } from './marca-logo.component';
 @NgModule({
   declarations: [EstadoLabelPipe, EstadoColorPipe, ChatContactosComponent, ChatHiloComponent, DosFaComponent, VolverWebComponent, EntregarOrdenComponent,
     MisSesionesComponent, MiActividadComponent, MiFirmaComponent, MisPreferenciasComponent, RecortarFotoComponent, PerfilListaComponent,
-    ElegirServiciosComponent, MarcaLogoComponent],
-  imports: [CommonModule, FormsModule, IonicModule, RouterModule],
+    ElegirServiciosComponent],
+  imports: [CommonModule, FormsModule, IonicModule, RouterModule, MarcaLogoComponent],
   exports: [
     CommonModule, FormsModule, IonicModule, EstadoLabelPipe, EstadoColorPipe,
     ChatContactosComponent, ChatHiloComponent, DosFaComponent, VolverWebComponent,

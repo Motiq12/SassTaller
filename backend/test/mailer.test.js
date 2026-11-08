@@ -113,19 +113,30 @@ test('la cabecera usa el logo solo si hay dominio publico', async () => {
   try {
     const { enviarCodigoLogin } = require('../src/services/mailer');
 
+    const marca = { nombre: 'Taller Pérez', slug: 'perez', color: '#0a7d4b' };
+
     delete process.env.RAILWAY_PUBLIC_DOMAIN;
     delete process.env.APP_URL;
-    await enviarCodigoLogin('a@b.com', 'Ana', '111111');
+    await enviarCodigoLogin('a@b.com', 'Ana', '111111', marca);
     assert.ok(!ultimo.html.includes('<img'), 'sin dominio publico no debe haber <img>');
-    assert.ok(ultimo.html.includes('MS Motos') || ultimo.html.includes('Taller MS'));
+    // El rotulo es el del taller que manda el correo. Antes acá decía "MS Motos":
+    // el cliente de cualquier taller recibía el código firmado por otra empresa.
+    assert.ok(ultimo.html.includes('Taller Pérez'), 'la cabecera lleva el nombre del taller');
+    assert.ok(!ultimo.html.includes('MS Motos'), 'no debe aparecer la marca de otro taller');
+    assert.ok(ultimo.html.includes('#0a7d4b'), 'el acento es el color del taller');
 
     process.env.APP_URL = 'https://ejemplo.test/';
-    await enviarCodigoLogin('a@b.com', 'Ana', '111111');
+    await enviarCodigoLogin('a@b.com', 'Ana', '111111', marca);
     assert.ok(ultimo.html.includes('<img'), 'con dominio publico debe llevar el logo');
     // Apunta al endpoint, no al archivo del bundle: sirve el logo configurado por el
-    // taller (guardado como data URL, inservible dentro de un correo) y si no hay,
-    // redirige al que trae la app.
-    assert.ok(ultimo.html.includes('https://ejemplo.test/api/marca/logo'), 'usa el endpoint de marca, sin barra doble');
+    // taller (guardado como data URL, inservible dentro de un correo). Lleva el slug
+    // porque el endpoint es publico y multi-taller: sin el no sabe de quien es.
+    assert.ok(ultimo.html.includes('https://ejemplo.test/api/marca/logo?taller=perez'),
+      'usa el endpoint de marca con el slug del taller, sin barra doble');
+
+    // Sin slug no se pone logo: antes que mostrar el de otro taller, ninguno.
+    await enviarCodigoLogin('a@b.com', 'Ana', '111111', { nombre: 'Taller Pérez' });
+    assert.ok(!ultimo.html.includes('<img'), 'sin slug no se puede saber de que taller es el logo');
   } finally {
     global.fetch = fetchOriginal;
     console.warn = origWarn;

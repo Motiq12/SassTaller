@@ -222,7 +222,7 @@ ion-button[fill="solid"], ion-button:not([fill]) {
 }
 // CTA principal carmesí: sombra tintada
 ion-button[color="primary"][fill="solid"], ion-button[color="primary"]:not([fill]) {
-  --box-shadow: 0 8px 20px rgba(226, 35, 26, .22);
+  --box-shadow: 0 8px 20px rgba(var(--ion-color-primary-rgb), .22);
 }
 
 // Botones propios de cada pantalla (los que no son ion-button): mismo criterio,
@@ -313,7 +313,7 @@ ion-segment-button {
   --indicator-color: var(--ion-color-primary);
   --color: var(--n-500);
   --color-checked: #ffffff;
-  --indicator-box-shadow: 0 2px 6px rgba(226, 35, 26, .25);
+  --indicator-box-shadow: 0 2px 6px rgba(var(--ion-color-primary-rgb), .25);
   font-size: 12px;
   font-weight: 700;
   min-height: 36px;
@@ -329,7 +329,7 @@ ion-segment-button.md {
   --indicator-height: 0;
   --background-hover: var(--n-500);
 }
-ion-segment-button.md.segment-button-checked { box-shadow: 0 2px 6px rgba(226, 35, 26, .25); }
+ion-segment-button.md.segment-button-checked { box-shadow: 0 2px 6px rgba(var(--ion-color-primary-rgb), .25); }
 
 // ————————————————————————————————
 // Tab bar
@@ -557,7 +557,7 @@ ion-toast {
     border-bottom-left-radius: 50%;
     z-index: 0;
   }
-  &.accent::after { background: var(--rose-50); }
+  &.accent::after { background: var(--marca-50); }
   .stat-number, .stat-label { position: relative; z-index: 1; }
 }
 
@@ -573,7 +573,7 @@ ion-toast {
   background: var(--n-100);
   color: var(--n-600);
 }
-.pill.rose   { background: var(--rose-50);    color: var(--rose-700); }
+.pill.rose   { background: var(--marca-50);    color: var(--marca-700); }
 .pill.green  { background: var(--emerald-50); color: var(--emerald-700); }
 .pill.amber  { background: var(--amber-100);  color: var(--amber-700); }
 .pill.indigo { background: var(--indigo-50);  color: var(--indigo-600); }
@@ -585,7 +585,7 @@ ion-toast {
   display: inline-flex; align-items: center; white-space: nowrap;
   font-size: 11px; font-weight: 800; letter-spacing: 0.01em;
   padding: 3px 10px; border-radius: var(--radius-pill);
-  &.pb-hoy    { background: var(--rose-50);   color: var(--rose-700); }
+  &.pb-hoy    { background: var(--marca-50);   color: var(--marca-700); }
   &.pb-pronto { background: var(--amber-100);  color: var(--amber-700); }
   &.pb-futuro { background: var(--n-100);      color: var(--n-500); }
 }
@@ -615,7 +615,7 @@ ion-toast {
 .seg-btn.on {
   background: var(--ion-color-primary);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(226, 35, 26, 0.25);
+  box-shadow: 0 2px 8px rgba(var(--ion-color-primary-rgb), 0.25);
 }
 
 // Fila de filtros rápidos. Se distingue del .segment de arriba a propósito: aquel
@@ -655,7 +655,7 @@ ion-toast {
   border-color: transparent;
   background: var(--ion-color-primary);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(226, 35, 26, 0.2);
+  box-shadow: 0 2px 8px rgba(var(--ion-color-primary-rgb), 0.2);
 }
 
 // Timeline vertical con línea y nodos carmesí
@@ -787,6 +787,11 @@ ion-footer.admin-dark { background: var(--adm-sur); }
   .sb-logo { padding: 22px 20px 18px; border-bottom: 1px solid var(--bd);
     .sb-brand { width: 138px; max-width: 100%; height: auto; display: block; margin-bottom: 12px; }
     .sb-brand.dark-only { display: none; }
+    // Reemplaza al logotipo fijo: isotipo del taller (o sus iniciales) junto a su
+    // nombre. Antes era un .sb-brand con el logotipo de MS Motos, que traía el
+    // nombre dibujado adentro — por eso ahora el nombre va como texto aparte.
+    .sb-marca { display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+      h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
     h1 { font-family: var(--fd); font-size: 20px; font-weight: 900; letter-spacing: 0; margin: 0; .dot { color: var(--cr); } }
     span { font-size: 11px; color: var(--tx3); font-weight: 600; }
     .sb-rotulo { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border: 1px solid var(--bd2); border-radius: 2px;
@@ -864,7 +869,7 @@ ion-footer.admin-dark { background: var(--adm-sur); }
   .bar-head { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; gap: 10px;
     span { color: var(--tx2); } strong { color: var(--tx); font-family: var(--fm); white-space: nowrap; } }
   .bar-track { height: 8px; background: var(--sur3); border-radius: 2px; overflow: hidden; }
-  .bar-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--cr), #F24A3D); }
+  .bar-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--cr), var(--ion-color-primary-tint)); }
 
   .tbl { width: 100%; border-collapse: collapse;
     th { text-align: left; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--tx3); padding: 10px 12px; border-bottom: 1px solid var(--bd); white-space: nowrap; }
@@ -976,13 +981,13 @@ ion-footer.admin-dark { background: var(--adm-sur); }
     &.today .day-num { color: var(--cr-tx); font-weight: 800; }
     .day-citas { display: flex; flex-direction: column; gap: 3px; }
     .flujo { position: absolute; bottom: 6px; right: 6px; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 2px;
-      &.flujo-bajo { background: var(--adm-em-bg); color: var(--adm-em-fg); } &.flujo-medio { background: var(--adm-am-bg); color: var(--adm-am-fg); } &.flujo-alto { background: var(--adm-cr-bg); color: var(--adm-cr-fg); } } }
+      &.flujo-bajo { background: var(--adm-em-bg); color: var(--adm-em-fg); } &.flujo-medio { background: var(--adm-am-bg); color: var(--adm-am-fg); } &.flujo-alto { background: var(--adm-rd-bg); color: var(--adm-rd-fg); } } }
   .mec-dot { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cal-side { display: flex; flex-direction: column; gap: 14px; }
   .legend-list { display: flex; flex-direction: column; gap: 8px; }
   .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--tx2); }
   .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0;
-    &.lg-bajo { background: var(--adm-em-bg); border: 1px solid var(--adm-em-fg); } &.lg-medio { background: var(--adm-am-bg); border: 1px solid var(--adm-am-fg); } &.lg-alto { background: var(--adm-cr-bg); border: 1px solid var(--adm-cr-fg); } }
+    &.lg-bajo { background: var(--adm-em-bg); border: 1px solid var(--adm-em-fg); } &.lg-medio { background: var(--adm-am-bg); border: 1px solid var(--adm-am-fg); } &.lg-alto { background: var(--adm-rd-bg); border: 1px solid var(--adm-rd-fg); } }
   .legend-sep { height: 1px; background: var(--bd); margin: 10px 0; }
   .day-detail h4 { font-size: 13px; font-weight: 700; margin: 0 0 10px; }
   .mec-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--bd2); font-size: 12px;
@@ -1093,8 +1098,8 @@ ion-footer.admin-dark { background: var(--adm-sur); }
   @at-root ion-alert#{&} .alert-radio-group [aria-checked="true"] .alert-radio-label { color: var(--text-accent); }
   @at-root ion-alert#{&} .alert-radio-group { border-color: var(--adm-ov-linea); }
   .alert-radio-icon { border-color: var(--adm-ov-radio); }
-  [aria-checked="true"] .alert-radio-icon { border-color: var(--cr, #E2231A); }
-  [aria-checked="true"] .alert-radio-inner { background: var(--cr, #E2231A); }
+  [aria-checked="true"] .alert-radio-icon { border-color: var(--cr); }
+  [aria-checked="true"] .alert-radio-inner { background: var(--cr); }
   .alert-button { color: var(--text-accent); }
   .alert-button.alert-button-role-cancel { color: var(--adm-ov-tenue); }
   .alert-button-group { border-top: 1px solid var(--adm-ov-linea); }
@@ -1142,7 +1147,7 @@ ion-action-sheet {
   .action-sheet-button + .action-sheet-button { border-top: 1px solid var(--adm-ov-linea); }
   .action-sheet-button.ion-activated,
   .action-sheet-button:hover { background: var(--adm-ov-hover) !important; }
-  .action-sheet-icon { color: var(--cr, #E2231A) !important; font-size: 21px; }
+  .action-sheet-icon { color: var(--cr) !important; font-size: 21px; }
 
   .action-sheet-button.action-sheet-destructive { color: var(--ion-color-danger) !important; }
   .action-sheet-group-cancel .action-sheet-button { color: var(--adm-tx2) !important; font-weight: 800; }
@@ -1616,7 +1621,7 @@ ion-item.campo-error { --border-width: 0 0 2px 0; }
     &.vacio { background: transparent; border-color: transparent; cursor: default; }
     &.flujo-bajo, &.flujo-completo { background: color-mix(in srgb, var(--em) 10%, var(--sur)); .pg-cal-n { color: var(--em); } }
     &.flujo-medio, &.flujo-proceso { background: color-mix(in srgb, var(--am) 12%, var(--sur)); .pg-cal-n { color: var(--am); } }
-    &.flujo-alto { background: color-mix(in srgb, var(--cr) 12%, var(--sur)); .pg-cal-n { color: var(--cr-tx); } }
+    &.flujo-alto { background: color-mix(in srgb, var(--rd) 12%, var(--sur)); .pg-cal-n { color: var(--rd); } }
     &.flujo-agendado { background: color-mix(in srgb, var(--in) 10%, var(--sur)); .pg-cal-n { color: var(--in); } }
     &.hoy { border-color: var(--cr); .pg-cal-num { color: var(--cr-tx); font-weight: 800; } }
     &.sel { border-color: var(--cr); box-shadow: 0 0 0 2px color-mix(in srgb, var(--cr) 30%, transparent); }

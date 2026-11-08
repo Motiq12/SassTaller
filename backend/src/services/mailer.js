@@ -3,7 +3,7 @@
 
 const RESEND_API_URL = 'https://api.resend.com/emails';
 const RESEND_DOMINIOS_URL = 'https://api.resend.com/domains';
-const REMITENTE_DE_PRUEBA = 'MS Motos <onboarding@resend.dev>';
+const REMITENTE_DE_PRUEBA = 'Motiq <onboarding@resend.dev>';
 
 // Logo de la cabecera. En un correo no sirve incrustar la imagen (Gmail y compañía
 // descartan las data: URI), así que se enlaza desde el mismo dominio que sirve la app.
@@ -19,10 +19,29 @@ function baseUrlPublica() {
 // Se apunta a /api/marca/logo y no al archivo del bundle: ese endpoint devuelve el
 // logo cargado desde la configuración (guardado como data URL, que en un correo no
 // se puede usar) y, si no hay ninguno, redirige al que trae la app.
-function logoUrl() {
+// El logo es el del taller que manda el correo, así que la URL tiene que decir cuál
+// es: /api/marca/logo pasa por tenantPublico, que saca el taller del slug. Sin él
+// responde 400 y el correo sale sin logo (por eso tenant-publico.js guarda
+// req.tallerSlug — su comentario ya anticipaba este uso).
+function logoUrl(slug) {
   if (process.env.MAIL_LOGO_URL) return process.env.MAIL_LOGO_URL;
   const base = baseUrlPublica();
-  return base ? `${base}/api/marca/logo` : null;
+  if (!base || !slug) return null;
+  return `${base}/api/marca/logo?taller=${encodeURIComponent(slug)}`;
+}
+
+// Acento de los correos cuando el taller no eligió color: el navy de Motiq. Antes
+// cada plantilla llevaba el rojo de MS Motos escrito a mano, así que el cliente de
+// CUALQUIER taller recibía correos con los colores de otra empresa.
+const ACENTO = '#1e3a5f';
+
+// Normaliza lo que mandan las rutas (marcaDelTaller) a algo que las plantillas
+// puedan usar siempre, aunque la consulta de configuración haya fallado.
+function normalizarMarca(m) {
+  const marca = typeof m === 'string' ? { nombre: m } : (m || {});
+  const color = /^#[0-9a-fA-F]{6}$/.test(marca.color || '') ? marca.color : ACENTO;
+  // Sin nombre se dice "el taller" y no el de ninguna empresa concreta.
+  return { nombre: marca.nombre || 'El taller', slug: marca.slug || null, color };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -61,7 +80,7 @@ async function enviarCorreo({ to, subject, html, devLog }) {
       const detalle = await resp.text().catch(() => '');
       console.error(`⚠️  Resend rechazó el envío a ${to}:`, resp.status, detalle);
       if (resp.status === 403 || /testing|verify a domain|own email/i.test(detalle)) {
-        console.error('   → Causa típica: dominio sin verificar en Resend. Verificá un dominio y definí MAIL_FROM (p. ej. "MS Motos <no-reply@TU-DOMINIO>").');
+        console.error('   → Causa típica: dominio sin verificar en Resend. Verificá un dominio y definí MAIL_FROM (p. ej. "Motiq <no-reply@TU-DOMINIO>").');
       }
       return false;
     }
@@ -77,9 +96,10 @@ async function enviarCorreo({ to, subject, html, devLog }) {
 // ─────────────────────────────────────────────────────────────
 
 // Envoltorio común: tarjeta oscura con encabezado del taller.
-function envoltorio(taller, titulo, cuerpoHtml) {
-  const nombre = escapar(taller || 'MS Motos');
-  const logo = logoUrl();
+function envoltorio(marca, titulo, cuerpoHtml) {
+  const { nombre: rotulo, slug, color } = normalizarMarca(marca);
+  const nombre = escapar(rotulo);
+  const logo = logoUrl(slug);
 
   // El alt del logo lleva el nombre del taller con el mismo estilo que el rótulo de
   // texto: si el cliente de correo bloquea imágenes (Outlook lo hace por defecto),
@@ -87,8 +107,8 @@ function envoltorio(taller, titulo, cuerpoHtml) {
   const cabecera = logo
     ? `<img src="${logo}" width="72" height="72" alt="${nombre}"
            style="display:block;border:0;outline:none;text-decoration:none;width:72px;height:72px;
-                  color:#e2231a;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">`
-    : `<div style="color:#e2231a;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">${nombre}</div>`;
+                  color:${color};font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">`
+    : `<div style="color:${color};font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">${nombre}</div>`;
 
   return `
   <div style="background:#0a0a0a;padding:32px 0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
@@ -113,55 +133,59 @@ function escapar(s) {
     .replace(/"/g, '&quot;');
 }
 
-function plantillaCodigo(nombre, codigo) {
+function plantillaCodigo(nombre, codigo, marca) {
+  const { color } = normalizarMarca(marca);
   const cuerpo = `
     ${parrafo(`Hola${nombre ? ' ' + escapar(nombre) : ''}, usa este código para restablecer tu contraseña. Vence en 10 minutos.`)}
     <div style="text-align:center;padding:12px 0 8px;">
-      <div style="display:inline-block;background:#0a0a0a;border:1px solid #c2201a;border-radius:16px;padding:18px 28px;">
+      <div style="display:inline-block;background:#0a0a0a;border:1px solid ${color};border-radius:16px;padding:18px 28px;">
         <span style="color:#fafafa;font-size:38px;font-weight:700;letter-spacing:10px;font-family:'JetBrains Mono','Courier New',monospace;">${escapar(codigo)}</span>
       </div>
     </div>
     <p style="color:#737373;font-size:12px;line-height:1.5;margin:12px 0 0;">
       Si no pediste este cambio, puedes ignorar este correo. Nadie podrá cambiar tu contraseña sin este código.
     </p>`;
-  return envoltorio('MS Motos', 'Recupera tu contraseña', cuerpo);
+  return envoltorio(marca, 'Recupera tu contraseña', cuerpo);
 }
 
-function plantillaCodigoLogin(nombre, codigo) {
+function plantillaCodigoLogin(nombre, codigo, marca) {
+  const { color } = normalizarMarca(marca);
   const cuerpo = `
     ${parrafo(`Hola${nombre ? ' ' + escapar(nombre) : ''}, usa este código para ingresar a tu cuenta. Vence en 10 minutos.`)}
     <div style="text-align:center;padding:12px 0 8px;">
-      <div style="display:inline-block;background:#0a0a0a;border:1px solid #c2201a;border-radius:16px;padding:18px 28px;">
+      <div style="display:inline-block;background:#0a0a0a;border:1px solid ${color};border-radius:16px;padding:18px 28px;">
         <span style="color:#fafafa;font-size:38px;font-weight:700;letter-spacing:10px;font-family:'JetBrains Mono','Courier New',monospace;">${escapar(codigo)}</span>
       </div>
     </div>
     <p style="color:#737373;font-size:12px;line-height:1.5;margin:12px 0 0;">
       Si no intentaste ingresar, ignora este correo. Nadie puede entrar a tu cuenta sin este código.
     </p>`;
-  return envoltorio('MS Motos', 'Tu código de ingreso', cuerpo);
+  return envoltorio(marca, 'Tu código de ingreso', cuerpo);
 }
 
-function plantillaCodigoVerificacion(nombre, codigo) {
+function plantillaCodigoVerificacion(nombre, codigo, marca) {
+  const { color } = normalizarMarca(marca);
   const cuerpo = `
     ${parrafo(`Hola${nombre ? ' ' + escapar(nombre) : ''}, ¡bienvenido! Usa este código para confirmar tu correo y activar tu cuenta. Vence en 10 minutos.`)}
     <div style="text-align:center;padding:12px 0 8px;">
-      <div style="display:inline-block;background:#0a0a0a;border:1px solid #c2201a;border-radius:16px;padding:18px 28px;">
+      <div style="display:inline-block;background:#0a0a0a;border:1px solid ${color};border-radius:16px;padding:18px 28px;">
         <span style="color:#fafafa;font-size:38px;font-weight:700;letter-spacing:10px;font-family:'JetBrains Mono','Courier New',monospace;">${escapar(codigo)}</span>
       </div>
     </div>
     <p style="color:#737373;font-size:12px;line-height:1.5;margin:12px 0 0;">
       Si no creaste esta cuenta, puedes ignorar este correo.
     </p>`;
-  return envoltorio('MS Motos', 'Confirma tu correo', cuerpo);
+  return envoltorio(marca, 'Confirma tu correo', cuerpo);
 }
 
 // Confirmación de la dirección NUEVA al cambiar el correo desde el perfil.
 // Va dirigido a la dirección nueva: recibirlo es justamente la prueba de que existe.
-function plantillaCambioCorreo(nombre, codigo) {
+function plantillaCambioCorreo(nombre, codigo, marca) {
+  const { color } = normalizarMarca(marca);
   const cuerpo = `
     ${parrafo(`Hola${nombre ? ' ' + escapar(nombre) : ''}, pediste cambiar el correo de tu cuenta a esta dirección. Confirma con este código, que vence en 10 minutos.`)}
     <div style="text-align:center;padding:12px 0 8px;">
-      <div style="display:inline-block;background:#0a0a0a;border:1px solid #c2201a;border-radius:16px;padding:18px 28px;">
+      <div style="display:inline-block;background:#0a0a0a;border:1px solid ${color};border-radius:16px;padding:18px 28px;">
         <span style="color:#fafafa;font-size:38px;font-weight:700;letter-spacing:10px;font-family:'JetBrains Mono','Courier New',monospace;">${escapar(codigo)}</span>
       </div>
     </div>
@@ -169,22 +193,23 @@ function plantillaCambioCorreo(nombre, codigo) {
       Hasta que confirmes, tu cuenta sigue usando el correo anterior. Si no pediste este
       cambio, ignora este mensaje: sin el código no se cambia nada.
     </p>`;
-  return envoltorio('MS Motos', 'Confirma tu correo nuevo', cuerpo);
+  return envoltorio(marca, 'Confirma tu correo nuevo', cuerpo);
 }
 
 // Aviso a la dirección ANTERIOR de que alguien pidió mudar la cuenta. No lleva código:
 // su único fin es que el dueño real se entere a tiempo si le robaron la sesión.
-function plantillaAvisoCambioCorreo(nombre, emailNuevo) {
+function plantillaAvisoCambioCorreo(nombre, emailNuevo, marca) {
+  const { color } = normalizarMarca(marca);
   const cuerpo = `
     ${parrafo(`Hola${nombre ? ' ' + escapar(nombre) : ''}, se pidió cambiar el correo de tu cuenta a <strong style="color:#fafafa;">${escapar(emailNuevo)}</strong>.`)}
     ${parrafo('Si fuiste tú, no tienes que hacer nada: confirma con el código que enviamos a esa dirección.')}
-    <div style="background:#0a0a0a;border:1px solid #c2201a;border-radius:16px;padding:16px 20px;margin:8px 0 4px;">
+    <div style="background:#0a0a0a;border:1px solid ${color};border-radius:16px;padding:16px 20px;margin:8px 0 4px;">
       <p style="color:#fafafa;font-size:14px;line-height:1.6;margin:0;">
         <strong>Si no fuiste tú</strong>, entra ya mismo y cambia tu contraseña: alguien podría
         tener acceso a tu cuenta. Mientras no se confirme, este correo sigue siendo el válido.
       </p>
     </div>`;
-  return envoltorio('MS Motos', 'Pidieron cambiar tu correo', cuerpo);
+  return envoltorio(marca, 'Pidieron cambiar tu correo', cuerpo);
 }
 
 function plantillaRecordatorio({ nombre, hora, servicio, moto, sucursal, taller }) {
@@ -194,7 +219,7 @@ function plantillaRecordatorio({ nombre, hora, servicio, moto, sucursal, taller 
     <div style="background:#0a0a0a;border:1px solid #262626;border-radius:16px;padding:16px 20px;margin:8px 0 12px;">
       <p style="color:#737373;font-size:12px;margin:0 0 4px;text-transform:uppercase;letter-spacing:1px;">Servicio</p>
       <p style="color:#fafafa;font-size:15px;margin:0 0 10px;">${escapar(servicio)}</p>
-      <p style="color:#737373;font-size:12px;margin:0 0 4px;text-transform:uppercase;letter-spacing:1px;">Moto</p>
+      <p style="color:#737373;font-size:12px;margin:0 0 4px;text-transform:uppercase;letter-spacing:1px;">Vehículo</p>
       <p style="color:#fafafa;font-size:15px;margin:0;">${escapar(moto)}</p>
     </div>
     ${parrafo('Si no puedes asistir, avísanos para reprogramar. ¡Te esperamos!')}`;
@@ -214,51 +239,51 @@ function plantillaEstado({ nombre, titulo, mensaje, taller }) {
 // API pública (una función por tipo de correo).
 // ─────────────────────────────────────────────────────────────
 
-async function enviarCodigoReset(email, nombre, codigo) {
+async function enviarCodigoReset(email, nombre, codigo, marca) {
   return enviarCorreo({
     to: email,
     subject: 'Tu código para recuperar la contraseña',
-    html: plantillaCodigo(nombre, codigo),
+    html: plantillaCodigo(nombre, codigo, marca),
     devLog: `Código de recuperación para ${email}: ${codigo}`,
   });
 }
 
 // Código de ingreso sin contraseña (OTP) para el portal del cliente.
-async function enviarCodigoLogin(email, nombre, codigo) {
+async function enviarCodigoLogin(email, nombre, codigo, marca) {
   return enviarCorreo({
     to: email,
     subject: 'Tu código de ingreso',
-    html: plantillaCodigoLogin(nombre, codigo),
+    html: plantillaCodigoLogin(nombre, codigo, marca),
     devLog: `Código de ingreso para ${email}: ${codigo}`,
   });
 }
 
 // Código para confirmar el correo al auto-registrarse en el portal.
-async function enviarCodigoVerificacion(email, nombre, codigo) {
+async function enviarCodigoVerificacion(email, nombre, codigo, marca) {
   return enviarCorreo({
     to: email,
     subject: 'Confirma tu correo',
-    html: plantillaCodigoVerificacion(nombre, codigo),
+    html: plantillaCodigoVerificacion(nombre, codigo, marca),
     devLog: `Código de verificación para ${email}: ${codigo}`,
   });
 }
 
 // Código a la dirección nueva para confirmar un cambio de correo desde el perfil.
-async function enviarCodigoCambioCorreo(emailNuevo, nombre, codigo) {
+async function enviarCodigoCambioCorreo(emailNuevo, nombre, codigo, marca) {
   return enviarCorreo({
     to: emailNuevo,
     subject: 'Confirma tu correo nuevo',
-    html: plantillaCambioCorreo(nombre, codigo),
+    html: plantillaCambioCorreo(nombre, codigo, marca),
     devLog: `Código de cambio de correo para ${emailNuevo}: ${codigo}`,
   });
 }
 
 // Aviso a la dirección anterior. Que falle no debe frenar el cambio: es informativo.
-async function enviarAvisoCambioCorreo(emailAnterior, nombre, emailNuevo) {
+async function enviarAvisoCambioCorreo(emailAnterior, nombre, emailNuevo, marca) {
   return enviarCorreo({
     to: emailAnterior,
     subject: 'Pidieron cambiar el correo de tu cuenta',
-    html: plantillaAvisoCambioCorreo(nombre, emailNuevo),
+    html: plantillaAvisoCambioCorreo(nombre, emailNuevo, marca),
     devLog: `Aviso de cambio de correo a ${emailAnterior} (nuevo: ${emailNuevo})`,
   });
 }

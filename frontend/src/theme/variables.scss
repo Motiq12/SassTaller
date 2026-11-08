@@ -1,8 +1,13 @@
-// MS Motos — el mismo estilo del sitio web (msmotors-web), para que el sitio,
-// el portal de clientes y las pantallas del taller se vean como una sola cosa:
-// rojo de marca, superficies frías casi negras, esquinas rectas y tipografía
-// Rajdhani (títulos y etiquetas) + Inter (texto). JetBrains Mono se queda para
-// los datos (montos, placas, fechas), que el sitio no tiene. Ver DESIGN.md.
+// Motiq — el tema del SaaS: superficies frías casi negras, esquinas rectas y
+// tipografía Rajdhani (títulos y etiquetas) + Inter (texto). JetBrains Mono para
+// los datos (montos, placas, fechas). Ver DESIGN.md.
+//
+// El acento NO está fijo acá: es el color que elige cada taller, y MarcaService lo
+// escribe en caliente sobre --ion-color-primary. Todo lo que dependa del acento se
+// deriva de esa variable (ver el bloque de tintes de marca más abajo); un color
+// escrito a mano queda clavado al de un taller y se lo impone a todos los demás.
+// Este encabezado describía el estilo del sitio de MS Motos, que no es parte de
+// este proyecto (ver sitio-web-activo.ts).
 
 :root {
   // —— Acento de marca: azul marino del isotipo de Motiq ——
@@ -95,7 +100,7 @@
   --ion-overlay-background-color: #ffffff;
   --ion-tab-bar-background: #ffffff;
   --ion-tab-bar-color: #94a3b8;
-  --ion-tab-bar-color-selected: #e2231a;
+  --ion-tab-bar-color-selected: var(--ion-color-primary);
 
   // —— Escala neutral cruda (para SCSS de páginas) ——
   --n-50: #f8fafc;
@@ -114,15 +119,22 @@
   --n-900: #14171c;
   --n-950: #0b0d10;
 
-  // —— Tintes de acento reutilizables ——
-  --rose-50: #fef2f1;
-  --rose-100: #fde4e1;
-  --rose-200: #fbcdc8;
-  --rose-600: #e2231a;
-  --rose-700: #c2201a;
-  // Carmín para TEXTO pequeño sobre fondo de la app: oscuro en claro (AA ≈5.2:1),
-  // se aclara en modo oscuro (ver bloque dark) para no quedar ilegible sobre negro.
-  --text-accent: #c2201a;
+  // —— Tintes de la marca DEL TALLER ——
+  // Antes eran una rampa fija (--rose-*) con el rojo de MS Motos: cada taller veía
+  // chips, placas y sombras del color de otra empresa por más que eligiera el suyo.
+  // Ahora los fondos salen de --ion-color-primary con color-mix, y los dos valores
+  // de TEXTO salen de --marca-tx-*, que MarcaService calcula corrigiendo contraste
+  // (ver pintarColor): cuánto hay que oscurecer depende del color, así que un
+  // porcentaje fijo acá no sirve. El respaldo es el navy por defecto del tema.
+  --marca-50: color-mix(in srgb, var(--ion-color-primary) 4%, #fff);
+  --marca-100: color-mix(in srgb, var(--ion-color-primary) 9%, #fff);
+  --marca-200: color-mix(in srgb, var(--ion-color-primary) 18%, #fff);
+  --marca-600: var(--marca-tx-claro, #1e3a5f);
+  --marca-700: color-mix(in srgb, var(--marca-tx-claro, #1e3a5f) 88%, #000);
+  // La marca para TEXTO pequeño sobre el fondo de la app. Oscurecida hasta AA en
+  // claro; en el bloque de tema oscuro se aclara, porque el mismo color no puede
+  // leerse sobre blanco y sobre negro a la vez.
+  --text-accent: var(--marca-tx-claro, #1e3a5f);
   --emerald-50: #ecfdf5;
   --emerald-600: #059669;
   --emerald-700: #047857;
@@ -156,7 +168,7 @@
   --shadow-xs: 0 1px 2px rgba(11, 13, 16, 0.04);
   --shadow-sm: 0 1px 2px rgba(11, 13, 16, 0.04), 0 1px 3px rgba(11, 13, 16, 0.06);
   --shadow-md: 0 1px 3px rgba(11, 13, 16, 0.05), 0 6px 20px rgba(11, 13, 16, 0.07);
-  --shadow-accent: 0 10px 24px rgba(226, 35, 26, 0.28);
+  --shadow-accent: 0 10px 24px rgba(var(--ion-color-primary-rgb), 0.28);
   --hairline: rgba(11, 13, 16, 0.07);
   // Velo sobre un fondo de tinte (la etiqueta de estado en la cabecera de una orden).
   --velo: rgba(255, 255, 255, 0.8);
@@ -171,13 +183,13 @@
   // Acentos para texto: los colores base de Ionic quedan justos sobre blanco.
   --adm-em: #047857; --adm-am: #b45309; --adm-in: var(--ion-color-tertiary); --adm-rd: #c81e1e;
   // Etiquetas y botones de estado: fondo + texto (+ borde de los botones).
-  --adm-cr-bg: #fde8e7; --adm-cr-fg: #b91c1c;
+  --adm-cr-bg: color-mix(in srgb, var(--ion-color-primary) 9%, #fff); --adm-cr-fg: var(--marca-tx-claro, #1e3a5f);
   --adm-am-bg: #fef3c7; --adm-am-fg: #92400e; --adm-am-bd: #fcd34d;
   --adm-em-bg: #dcfce7; --adm-em-fg: #166534; --adm-em-bd: #86efac;
   --adm-in-bg: #e0e7ff; --adm-in-fg: #3730a3;
   --adm-rd-bg: #fee2e2; --adm-rd-fg: #991b1b; --adm-rd-bd: #fca5a5;
   // Calendario: hoy y los días de poco o mucho flujo.
-  --adm-hoy: #fdecec; --adm-flujo-bajo: #f0fdf4; --adm-flujo-alto: #fef2f2;
+  --adm-hoy: color-mix(in srgb, var(--ion-color-primary) 7%, #fff); --adm-flujo-bajo: #f0fdf4; --adm-flujo-alto: #fef2f2;
   // Alertas y hojas de acciones (se montan fuera del panel).
   --adm-ov: #ffffff; --adm-ov-tx: #1e293b; --adm-ov-msg: #475569; --adm-ov-tenue: #64748b;
   --adm-ov-linea: rgba(11, 13, 16, 0.1); --adm-ov-hover: rgba(11, 13, 16, 0.05);
@@ -199,7 +211,7 @@
     --ion-overlay-background-color: #14171c;
     --ion-tab-bar-background: #0e1115;
     --ion-tab-bar-color: #64748b;
-    --ion-tab-bar-color-selected: #f24a3d;
+    --ion-tab-bar-color-selected: var(--ion-color-primary-tint);
 
     --ion-color-light: #262b34;
     --ion-color-light-rgb: 38, 43, 52;
@@ -224,20 +236,21 @@
     --n-800: #e2e8f0;
     --n-900: #f1f5f9;
 
-    // Carmín para texto: se aclara sobre fondo oscuro (rose-400 ≈6.9:1 sobre la tarjeta).
-    --text-accent: #f24a3d;
+    // La marca para texto, aclarada para el fondo oscuro. MarcaService la sube de
+    // brillo sin desaturarla, para que un navy no termine gris (ver pintarColor).
+    --text-accent: var(--marca-tx-oscuro, #4382d5);
 
     // Tintes y sus textos. En claro son fondo pastel + texto oscuro; aquí se
     // invierten (fondo profundo + texto claro). Sin esto, una etiqueta o un
-    // adorno con --rose-50 era un cuadro casi blanco sobre la tarjeta oscura, y
+    // adorno con --marca-50 era un cuadro casi blanco sobre la tarjeta oscura, y
     // un texto --emerald-700 sobre la tarjeta quedaba en 3:1.
     // Por eso los -600/-700 NO se usan como fondo de nada: para un fondo sólido
     // están --ion-color-primary, -success, -warning y -tertiary.
-    --rose-50: #2a1614;
-    --rose-100: #3b1b18;
-    --rose-200: #5a2621;
-    --rose-600: #f24a3d;
-    --rose-700: #f8776c;
+    --marca-50: color-mix(in srgb, var(--ion-color-primary) 12%, #0b0d10);
+    --marca-100: color-mix(in srgb, var(--ion-color-primary) 18%, #0b0d10);
+    --marca-200: color-mix(in srgb, var(--ion-color-primary) 28%, #0b0d10);
+    --marca-600: var(--marca-tx-oscuro, #4382d5);
+    --marca-700: color-mix(in srgb, var(--marca-tx-oscuro, #4382d5) 78%, #fff);
     --emerald-50: #10271f;
     --emerald-600: #34d399;
     --emerald-700: #34d399;
@@ -275,12 +288,12 @@
     --adm-em: #34d399; --adm-am: var(--ion-color-warning-tint);
     // El índigo y el rojo "tint" daban 3,9:1 como texto sobre el panel; estos, 5,5:1 y más.
     --adm-in: #818cf8; --adm-rd: #f87171;
-    --adm-cr-bg: #2c0a12; --adm-cr-fg: #f24a3d;
+    --adm-cr-bg: color-mix(in srgb, var(--ion-color-primary) 16%, #0b0d10); --adm-cr-fg: var(--marca-tx-oscuro, #4382d5);
     --adm-am-bg: #2c1a00; --adm-am-fg: #fbb834; --adm-am-bd: #78350f;
     --adm-em-bg: #0a1f0a; --adm-em-fg: #4ade80; --adm-em-bd: #14532d;
     --adm-in-bg: #0a0f2e; --adm-in-fg: #818cf8;
     --adm-rd-bg: #2b0d0d; --adm-rd-fg: #f87171; --adm-rd-bd: #7f1d1d;
-    --adm-hoy: #1a0608; --adm-flujo-bajo: #0a1a0a; --adm-flujo-alto: #1a0a0a;
+    --adm-hoy: color-mix(in srgb, var(--ion-color-primary) 12%, #0b0d10); --adm-flujo-bajo: #0a1a0a; --adm-flujo-alto: #1a0a0a;
     --adm-ov: #1b1f26; --adm-ov-tx: #e2e8f0; --adm-ov-msg: #cccccc; --adm-ov-tenue: #999999;
     --adm-ov-linea: rgba(255, 255, 255, 0.1); --adm-ov-hover: rgba(255, 255, 255, 0.06);
     --adm-ov-radio: #555555; --adm-sombra: rgba(0, 0, 0, 0.5);

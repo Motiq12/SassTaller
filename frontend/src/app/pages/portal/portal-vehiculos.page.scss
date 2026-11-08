@@ -21,15 +21,15 @@
 
   .mc-i { width: 54px; height: 54px; border-radius: 14px; flex-shrink: 0; overflow: hidden;
     display: flex; align-items: center; justify-content: center;
-    background: var(--rose-50); color: var(--ion-color-primary);
+    background: var(--marca-50); color: var(--ion-color-primary);
     ion-icon { font-size: 26px; }
     img { width: 100%; height: 100%; object-fit: cover; display: block; } }
 
   .mc-m { flex: 1; min-width: 0;
     h4 { margin: 0 0 5px; font-family: var(--font-display); font-size: 15.5px; font-weight: 800; letter-spacing: -0.02em; }
     .mc-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-    .mc-plate { font-weight: 700; color: var(--rose-700);  // AA sobre pastilla clara
-      background: var(--rose-50); padding: 1px 7px; border-radius: 6px; letter-spacing: .06em; font-size: 11px; }
+    .mc-plate { font-weight: 700; color: var(--marca-700);  // AA sobre pastilla clara
+      background: var(--marca-50); padding: 1px 7px; border-radius: 6px; letter-spacing: .06em; font-size: 11px; }
     .mc-km { font-size: 11.5px; color: var(--n-500); }
     .mc-aviso { display: inline-flex; align-items: center; gap: 5px; margin-top: 7px;
       font-size: 11px; font-weight: 700;
@@ -71,7 +71,7 @@
   .mf-prev {
     width: 84px; height: 84px; border-radius: 16px; flex-shrink: 0; overflow: hidden; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    background: var(--rose-50); color: var(--ion-color-primary);
+    background: var(--marca-50); color: var(--ion-color-primary);
     img { width: 100%; height: 100%; object-fit: cover; display: block; }
     ion-icon { font-size: 28px; }
     &.empty { border: 1.5px dashed var(--hairline); background: var(--n-100); color: var(--n-400); }
@@ -115,7 +115,7 @@
     font-family: inherit; font-size: 14px;
     border-bottom: 1px solid var(--hairline);
     &:last-child { border-bottom: none; }
-    &:active, &:hover { background: var(--rose-50); color: var(--rose-700); }  // AA sobre fondo claro
+    &:active, &:hover { background: var(--marca-50); color: var(--marca-700); }  // AA sobre fondo claro
   }
 }
 

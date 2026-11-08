@@ -39,7 +39,7 @@ ion-item-sliding:not(:last-child) .nf-item { border-bottom: 1px solid var(--bd);
     &.t-azul   { background: rgba(99,102,241,.14);  color: #4f46e5; }
     &.t-verde  { background: var(--adm-em-bg);     color: var(--em); }
     &.t-ambar  { background: var(--adm-am-bg);      color: var(--am); }
-    &.t-rojo   { background: rgba(226,35,26,.13);    color: var(--ion-color-danger, #e2231a); }
+    &.t-rojo   { background: rgba(var(--ion-color-primary-rgb),.13);    color: var(--ion-color-danger); }
     &.t-rosa   { background: var(--adm-cr-bg);        color: var(--adm-cr-fg); }
   }
   .nf-b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
@@ -51,7 +51,7 @@ ion-item-sliding:not(:last-child) .nf-item { border-bottom: 1px solid var(--bd);
   &.nueva .nf-msg { font-weight: 700; }
 }
 
-ion-item-option { --background: var(--ion-color-danger, #e2231a); }
+ion-item-option { --background: var(--ion-color-danger); }
 
 .hint-swipe {
   text-align: center; font-size: 11px; color: var(--tx3); margin: 12px 0 0;

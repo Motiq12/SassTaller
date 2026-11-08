@@ -25,7 +25,7 @@
   position: relative; width: 44px; height: 44px; flex-shrink: 0; border-radius: 50%;
   display: flex; align-items: center; justify-content: center; overflow: hidden;
   font-size: 15px; font-weight: 800;
-  &.sin-foto { background: var(--rose-50); color: var(--rose-700); }
+  &.sin-foto { background: var(--marca-50); color: var(--marca-700); }
   img { width: 100%; height: 100%; object-fit: cover; }
   &.bc { background: var(--amber-100, #fef3c7); color: var(--amber-700, #b45309);
     ion-icon { font-size: 20px; } }
@@ -41,7 +41,7 @@
   letter-spacing: .04em; padding: 2px 8px; border-radius: 2px;
   // --n-600: el --n-500 de antes daba 4,34:1 sobre este fondo.
   background: var(--n-100, #f1f5f9); color: var(--n-600, #475569);
-  &[data-rol='admin'] { background: var(--rose-50); color: var(--rose-700); }
+  &[data-rol='admin'] { background: var(--marca-50); color: var(--marca-700); }
   &[data-rol='recepcion'] { background: var(--indigo-50, #eef2ff); color: var(--indigo-600, #4f46e5); }
 }
 

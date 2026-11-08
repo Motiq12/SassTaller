@@ -8,7 +8,9 @@ const { normalizarTextosPortal } = require('./textos-portal');
 // Valores por defecto: idénticos a los antes hardcodeados (utils/servicios.js),
 // así el comportamiento inicial no cambia aunque la fila aún no exista.
 const DEFAULTS = {
-  nombre_taller: 'MS Motos',
+  // Neutro a proposito: era 'MS Motos', y un taller que todavia no cargo su nombre
+  // salia identificado con el de otra empresa en pantallas, correos y documentos.
+  nombre_taller: 'Mi taller',
   telefono: '',
   email: '',
   direccion: '',

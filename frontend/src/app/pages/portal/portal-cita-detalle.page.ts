@@ -220,13 +220,21 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
     }
     const total = o ? Number(o.total || 0) : Number(c.monto || 0);
 
+    // El acento del comprobante sale del color del taller. Esta ventana es otro
+    // documento, así que las variables CSS de la app no llegan: hay que interpolar
+    // el valor. Antes iba el rojo de MS Motos a fuego y el cliente de cualquier
+    // taller recibía un comprobante con el color de otra empresa.
+    const acento = getComputedStyle(document.documentElement)
+      .getPropertyValue('--ion-color-primary').trim();
+    const cr = /^#[0-9a-fA-F]{3,8}$/.test(acento) ? acento : '#1e3a5f';
+
     const html = `<!doctype html><html lang="es"><head><meta charset="utf-8">
       <title>Comprobante ${esc(c.numero_orden || c.id)}</title>
       <style>
         * { box-sizing: border-box; } body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; margin: 0; padding: 28px; }
         .doc { max-width: 620px; margin: 0 auto; }
-        .hd { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #e2231a; padding-bottom: 14px; margin-bottom: 18px; }
-        .hd h1 { font-size: 22px; margin: 0; color: #e2231a; letter-spacing: 0; }
+        .hd { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid ${cr}; padding-bottom: 14px; margin-bottom: 18px; }
+        .hd h1 { font-size: 22px; margin: 0; color: ${cr}; letter-spacing: 0; }
         .hd .sub { font-size: 12px; color: #666; margin-top: 2px; }
         .hd .num { text-align: right; font-size: 12px; color: #444; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; font-size: 13px; margin-bottom: 18px; }

@@ -1,18 +1,18 @@
 {
-  "name": "MS Motos · Taller",
-  "short_name": "MS Motos",
+  "name": "Motiq · Gestión de talleres",
+  "short_name": "Motiq",
   "description": "Gestión del taller: órdenes, citas, clientes y cotizaciones.",
   "lang": "es",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
-  "background_color": "#E2231A",
-  "theme_color": "#E2231A",
+  "background_color": "#1e3a5f",
+  "theme_color": "#1e3a5f",
   "icons": [
     {
-      "src": "logo/ms-iso.png",
-      "sizes": "1773x1773",
+      "src": "logo/motiq-iso.png",
+      "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     }

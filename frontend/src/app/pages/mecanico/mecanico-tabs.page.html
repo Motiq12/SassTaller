@@ -2,8 +2,13 @@
   <ion-menu contentId="mecanico-content" type="overlay" class="admin-sidebar">
     <ion-content class="admin-dark sidebar-content">
       <div class="sb-logo">
-        <img class="sb-brand light-only" src="assets/logo/ms-logo.png" alt="MS Motos" />
-        <img class="sb-brand dark-only" src="assets/logo/ms-logo-white.png" alt="" />
+        <!-- Antes eran dos <img> con el logo de MS Motos: cada taller del SaaS veía
+             la marca de otra empresa en su propio menú. app-marca-logo muestra el
+             logo del taller, o sus iniciales sobre su color si todavía no cargó uno. -->
+        <div class="sb-marca">
+          <app-marca-logo [tamano]="38"></app-marca-logo>
+          <h1>{{ marca.rotuloPublico }}</h1>
+        </div>
         <span>Mecánico</span>
       </div>
 

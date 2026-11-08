@@ -121,8 +121,8 @@
 
   p { margin: 4px 0; }
   .fac-nota { margin-top: 14px; font-size: 12px; line-height: 1.5; color: #666; white-space: pre-line; }
-  // Fijo, no var(--rose-700): en tema oscuro esa variable se aclara y sobre la hoja blanca no se leía.
-  .gracias { margin-top: 18px; text-align: center; color: #c2201a; font-weight: 700; }  // AA (factura impresa, fondo blanco)
+  // Fijo, no var(--marca-700): en tema oscuro esa variable se aclara y sobre la hoja blanca no se leía.
+  .gracias { margin-top: 18px; text-align: center; color: var(--text-accent); font-weight: 700; }  // AA (factura impresa, fondo blanco)
 }
 
 // Impresión: sin barra y solo la hoja (plana, sin sombra ni márgenes de pantalla).

@@ -87,7 +87,10 @@ function verificar(secreto, codigo, { ventana = 1, ultimoContador = 0 } = {}) {
 
 // URI otpauth:// — al abrirla desde el teléfono, la app de autenticación se
 // configura sola; en escritorio sirve para generar un QR o copiar la clave.
-function uriOtpauth(secreto, cuenta, emisor = 'MS Motos') {
+// El emisor por defecto es el PRODUCTO: es lo que el usuario ve listado en su app
+// de autenticacion. Era 'MS Motos', o sea la marca de un taller en el telefono de
+// los empleados de todos los demas.
+function uriOtpauth(secreto, cuenta, emisor = 'Motiq') {
   const etiqueta = encodeURIComponent(`${emisor}:${cuenta}`);
   const params = new URLSearchParams({
     secret: secreto,

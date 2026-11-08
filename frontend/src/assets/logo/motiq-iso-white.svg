@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Motiq">
+  <!--
+    El isotipo de Motiq en blanco, para fondos oscuros (la pantalla de arranque).
+    El motiq-iso.png es la «M» azul marino sobre BLANCO, no sobre transparente:
+    puesto sobre el splash navy se veía como un cuadro blanco. Va en SVG y no en
+    PNG porque son dos trazos — pesa unos cientos de bytes en vez de decenas de
+    kilobytes, y queda nítido en cualquier densidad de pantalla.
+    La geometría sigue la del PNG para que las dos versiones sean el mismo logo.
+  -->
+  <circle cx="256" cy="256" r="211" fill="none" stroke="#ffffff" stroke-opacity=".45" stroke-width="22"/>
+  <path d="M139 351 V169 L256 289 L373 169 V351"
+        fill="none" stroke="#ffffff" stroke-width="58"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,4 +1,5 @@
 import { Component, Input, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { MarcaService } from '../services/marca.service';
 import { TallerService } from '../services/taller.service';
 import { PRODUCTO } from './producto';
@@ -15,7 +16,11 @@ import { PRODUCTO } from './producto';
  */
 @Component({
   selector: 'app-marca-logo',
-  standalone: false,
+  // Standalone, y no declarado en SharedModule: también lo necesita el menú del
+  // portal, que vive en AppModule. Importar SharedModule entero allá habría metido
+  // el chat, el 2FA y el recorte de fotos en el bundle de arranque por un logo.
+  standalone: true,
+  imports: [CommonModule],
   template: `
     <!-- Orden: el logo del taller manda; si no hay taller resuelto se muestra el de
          Motiq (estamos en su puerta); y si tampoco carga, las iniciales. -->

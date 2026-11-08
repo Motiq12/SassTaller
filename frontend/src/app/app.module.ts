@@ -7,6 +7,7 @@ import { AlertController, IonicModule, IonicRouteStrategy, ToastController } fro
 
 import { AppComponent } from './app.component';
 import { PortalNavComponent } from './shared/portal-nav.component';
+import { MarcaLogoComponent } from './shared/marca-logo.component';
 import { AppRoutingModule } from './app-routing.module';
 import { AuthInterceptor } from './interceptors/auth.interceptor';
 import { ApiUrlInterceptor } from './interceptors/api-url.interceptor';
@@ -26,7 +27,7 @@ function initSesiones(auth: AuthService, portal: PortalService) {
 
 @NgModule({
   declarations: [AppComponent, PortalNavComponent],
-  imports: [BrowserModule, IonicModule.forRoot(), AppRoutingModule],
+  imports: [BrowserModule, IonicModule.forRoot(), AppRoutingModule, MarcaLogoComponent],
   providers: [
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
     { provide: APP_INITIALIZER, useFactory: initSesiones, deps: [AuthService, PortalService], multi: true },

@@ -37,8 +37,8 @@
   <meta name="format-detection" content="telephone=no" />
   <meta name="msapplication-tap-highlight" content="no" />
 
-  <link rel="icon" type="image/png" href="assets/logo/ms-iso.png" />
-  <meta name="theme-color" content="#E2231A" />
+  <link rel="icon" type="image/png" href="assets/logo/motiq-iso.png" />
+  <meta name="theme-color" content="#1e3a5f" />
 
   <!-- Instalada en la pantalla de inicio, la app abre SIN la barra de direcciones.
        Hacen falta las dos cosas y por motivos distintos:
@@ -52,13 +52,15 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-  <meta name="apple-mobile-web-app-title" content="MS Motos" />
-  <link rel="apple-touch-icon" href="assets/logo/ms-iso.png" />
+  <meta name="apple-mobile-web-app-title" content="Motiq" />
+  <link rel="apple-touch-icon" href="assets/logo/motiq-iso.png" />
 
   <!-- Pantalla de arranque ("Pulso mínimo"): cubre el instante entre el HTML
        inicial y la primera pantalla real de Angular (tanto en web como justo
-       después del splash nativo en la app). Mismo carmesí que el splash nativo
-       (capacitor.config.ts) para que la transición sea continua, sin salto de color. -->
+       después del splash nativo en la app). Mismo azul marino que el splash nativo
+       (capacitor.config.ts) para que la transición sea continua, sin salto de color.
+       Es el color de MOTIQ, no el del taller: esta pantalla se pinta antes de saber
+       a qué taller entra el usuario. -->
   <style>
     #boot-splash {
       position: fixed;
@@ -67,7 +69,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #E2231A;
+      background: #1e3a5f;
       transition: opacity .35s ease;
     }
     #boot-splash.hide { opacity: 0; pointer-events: none; }
@@ -111,7 +113,7 @@
 <body>
   <div id="boot-splash" aria-hidden="true">
     <div class="boot-glow"></div>
-    <img class="boot-mark" src="assets/logo/ms-iso-white.png" alt="" />
+    <img class="boot-mark" src="assets/logo/motiq-iso-white.svg" alt="" />
   </div>
   <script>
     (function () {

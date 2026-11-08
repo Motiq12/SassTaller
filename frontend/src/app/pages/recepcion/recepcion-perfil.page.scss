@@ -2,7 +2,7 @@
 
 .profile-header {
   display: flex; align-items: center; gap: 16px;
-  background: linear-gradient(135deg, var(--rose-50), var(--emerald-50));
+  background: linear-gradient(135deg, var(--marca-50), var(--emerald-50));
   border: 1px solid var(--hairline); border-radius: 24px; padding: 20px; margin-bottom: 16px;
 
   .avatar-wrap { position: relative; flex-shrink: 0; }
@@ -60,7 +60,7 @@
   width: 38px; height: 38px; border-radius: 12px; cursor: pointer;
   border: 1.5px solid var(--hairline); background: var(--ion-card-background); color: var(--n-500);
   font-weight: 800; line-height: 1; display: flex; align-items: center; justify-content: center;
-  &.on { border-color: var(--ion-color-primary); color: var(--ion-color-primary); background: var(--rose-50); }
+  &.on { border-color: var(--ion-color-primary); color: var(--ion-color-primary); background: var(--marca-50); }
 }
 
 .card {

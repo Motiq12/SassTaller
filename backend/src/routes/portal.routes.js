@@ -70,7 +70,7 @@ function tokenCliente(cliente) {
 async function marcaDelTaller(db, slug) {
   try {
     const cfg = await getConfig(db);
-    return { nombre: cfg.nombre_taller, slug: slug || null };
+    return { nombre: cfg.nombre_taller, slug: slug || null, color: cfg.color_primario || null };
   } catch { return {}; }
 }
 
@@ -775,7 +775,7 @@ router.put('/perfil', async (req, res) => {
       await enviarCodigoCambio(req.db, req.tallerSlug, req.cliente.id, emailNuevo, actual.nombre);
       // Al correo viejo le avisamos aunque el cambio no esté hecho: si le robaron la
       // sesión, ese aviso es la única forma de que el dueño se entere a tiempo.
-      await enviarAvisoCambioCorreo(actual.email, actual.nombre, emailNuevo);
+      await enviarAvisoCambioCorreo(actual.email, actual.nombre, emailNuevo, await marcaDelTaller(req.db, req.tallerSlug));
     }
 
     // Recién acá se tocan los demás datos: si el cambio de correo se rechazó por

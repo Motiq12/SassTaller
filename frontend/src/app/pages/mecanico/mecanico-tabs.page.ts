@@ -3,6 +3,7 @@ import { Subject, interval } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { MensajeriaService } from '../../services/mensajeria.service';
+import { MarcaService } from '../../services/marca.service';
 
 @Component({
   standalone: false,
@@ -13,7 +14,8 @@ export class MecanicoTabsPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   noLeidos = 0;
 
-  constructor(private msj: MensajeriaService, private auth: AuthService) {}
+  // Público: el menú lo usa para el nombre del taller (ver sb-marca en la plantilla).
+  constructor(private msj: MensajeriaService, private auth: AuthService, public marca: MarcaService) {}
 
   get nombre(): string {
     return this.auth.getUsuario()?.nombre || 'Mecánico';

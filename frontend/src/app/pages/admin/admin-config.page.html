@@ -22,10 +22,10 @@
         <div class="cfg-lado">
           <div class="cd">
             <span class="cd-title"><ion-icon name="storefront-outline"></ion-icon> Datos del negocio</span>
-            <div class="fg"><label>Nombre del negocio</label><input [(ngModel)]="config.nombre_taller" name="nombre_taller" placeholder="MS Motos"></div>
+            <div class="fg"><label>Nombre del negocio</label><input [(ngModel)]="config.nombre_taller" name="nombre_taller" placeholder="Nombre de tu taller"></div>
             <div class="fg-row">
               <div class="fg"><label>Teléfono / WhatsApp</label><input [(ngModel)]="config.telefono" name="telefono" placeholder="+506 0000-0000"></div>
-              <div class="fg"><label>Correo de contacto</label><input type="email" [(ngModel)]="config.email" name="email" placeholder="info@msmotos.com"><div class="hint">Acá llegan las consultas nuevas del sitio web.</div></div>
+              <div class="fg"><label>Correo de contacto</label><input type="email" [(ngModel)]="config.email" name="email" placeholder="info@tutaller.com"><div class="hint">Acá llegan las consultas nuevas del sitio web.</div></div>
             </div>
             <div class="fg"><label>Dirección</label><input [(ngModel)]="config.direccion" name="direccion" placeholder="San José, Costa Rica"></div>
           </div>
@@ -59,7 +59,7 @@
               </label>
               <button *ngIf="config.logo" type="button" class="btn btn-rd btn-sm" (click)="quitarLogo()">Quitar</button>
             </div>
-            <div class="hint">PNG o JPG con fondo transparente o blanco. Sin logo, los documentos usan el de MS Motos.</div>
+            <div class="hint">PNG o JPG con fondo transparente o blanco. Sin logo, los documentos salen sin logo y en la app se muestran las iniciales del taller.</div>
           </div>
 
           <!-- Dónde aparece cada dato: logo y nombre en la factura y los PDF (MarcaService);
@@ -344,7 +344,7 @@
               <div class="hint">Entre 8 y 32. Una frase de varias palabras es más segura y fácil de recordar que una palabra rara.</div>
             </div>
             <label class="bloq-todo"><input type="checkbox" [(ngModel)]="config.pass_variedad" name="pass_variedad"> Pedir letras y números</label>
-            <div class="hint">Siempre se rechazan las más usadas (12345678, password, msmotos123…), un solo carácter repetido, el correo de la cuenta y el nombre con números.</div>
+            <div class="hint">Siempre se rechazan las más usadas (12345678, password, taller123…), un solo carácter repetido, el correo de la cuenta y el nombre con números.</div>
             <div class="hint">Vale para las contraseñas nuevas: las que ya están siguen sirviendo hasta que cada uno la cambie.</div>
           </div>
 
@@ -542,9 +542,9 @@
           <span class="cd-title"><ion-icon name="construct-outline"></ion-icon> Cómo dejarlo listo</span>
           <ol class="cfg-pasos">
             <li *ngIf="!correo.configurado">En Railway, servicio <strong>sistema</strong> → Variables, poné <code>RESEND_API_KEY</code> con la clave de la cuenta de Resend.</li>
-            <li>En <strong>resend.com → Domains</strong>, agregá el dominio del negocio (por ejemplo, msmotos.com).</li>
+            <li>En <strong>resend.com → Domains</strong>, agregá el dominio del negocio (por ejemplo, tutaller.com).</li>
             <li>Quien maneja ese dominio pone en el DNS los registros que da Resend (SPF y DKIM) y espera a que Resend lo marque como verificado.</li>
-            <li>En Railway, servicio <strong>sistema</strong> → Variables, poné <code>MAIL_FROM</code> con una dirección de ese dominio, por ejemplo <code>MS Motos &lt;avisos&#64;msmotos.com&gt;</code>.</li>
+            <li>En Railway, servicio <strong>sistema</strong> → Variables, poné <code>MAIL_FROM</code> con una dirección de ese dominio, por ejemplo <code>Tu Taller &lt;avisos&#64;tutaller.com&gt;</code>.</li>
             <li>Volvé acá y mandate un correo de prueba.</li>
           </ol>
         </div>

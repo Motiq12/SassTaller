@@ -1,6 +1,7 @@
 import { Component, Input } from '@angular/core';
 import { Router } from '@angular/router';
 import { PortalService } from '../services/portal.service';
+import { MarcaService } from '../services/marca.service';
 import { SITIO_WEB_URL } from './volver-web.component';
 import { sitioWeb } from '../sitio-web-activo';
 
@@ -19,9 +20,14 @@ import { sitioWeb } from '../sitio-web-activo';
   selector: 'app-portal-nav',
   template: `
     <nav class="admin-dark pn" aria-label="Menú del portal">
-      <a class="sb-logo pn-marca" routerLink="/portal/inicio" routerDirection="root" aria-label="MS Motos, inicio">
-        <img class="sb-brand light-only" src="assets/logo/ms-logo.png" alt="" />
-        <img class="sb-brand dark-only" src="assets/logo/ms-logo-white.png" alt="" />
+      <a class="sb-logo pn-marca" routerLink="/portal/inicio" routerDirection="root"
+         [attr.aria-label]="marca.rotuloPublico + ', inicio'">
+        <!-- Antes el logo de MS Motos a fuego, y el aria-label también lo nombraba:
+             el cliente de cualquier taller leía la marca de otra empresa. -->
+        <div class="sb-marca">
+          <app-marca-logo [tamano]="34"></app-marca-logo>
+          <h1>{{ marca.rotuloPublico }}</h1>
+        </div>
         <span class="sb-rotulo">Mi taller</span>
       </a>
 
@@ -82,7 +88,7 @@ export class PortalNavComponent {
     { id: 'ofertas', ruta: '/portal/ofertas', icono: 'pricetags-outline', texto: 'Ofertas' },
   ];
 
-  constructor(public portal: PortalService, private router: Router) {}
+  constructor(public portal: PortalService, private router: Router, public marca: MarcaService) {}
 
   salir() {
     this.portal.logout();

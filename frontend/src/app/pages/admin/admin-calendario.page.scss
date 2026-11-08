@@ -14,7 +14,7 @@
     color: var(--tx2); font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
     transition: background-color .2s, border-color .2s, color .2s, box-shadow .2s, transform .2s, opacity .2s;
     &:hover { background: var(--sur2); color: var(--tx); }
-    &.on { background: var(--cr); color: #fff; border-color: var(--cr); box-shadow: 0 2px 8px rgba(226, 35, 26, .25); }
+    &.on { background: var(--cr); color: #fff; border-color: var(--cr); box-shadow: 0 2px 8px rgba(var(--ion-color-primary-rgb), .25); }
   }
 }
 
@@ -30,9 +30,9 @@
 .cal-day {
   min-height: 64px; background: var(--sur2); border-radius: 2px; padding: 10px;
   cursor: pointer; border: 1.5px solid transparent; transition: background-color .2s, border-color .2s, color .2s, box-shadow .2s, transform .2s, opacity .2s; position: relative;
-  &:hover { border-color: rgba(226, 35, 26, .2); background: var(--sur3); }
+  &:hover { border-color: rgba(var(--ion-color-primary-rgb), .2); background: var(--sur3); }
   &.empty { background: transparent; cursor: default; &:hover { border-color: transparent; } }
-  &.today { border-color: var(--cr); background: rgba(226, 35, 26, .06);
+  &.today { border-color: var(--cr); background: rgba(var(--ion-color-primary-rgb), .06);
     .day-num { color: var(--cr-tx); font-weight: 900; font-size: 14px; } }
   &.low { background: rgba(74, 222, 128, .04); }
   &.high { background: rgba(242, 74, 61, .06); }
@@ -45,7 +45,7 @@
     padding: 2px 8px; border-radius: 2px; min-width: 20px; text-align: center;
     &.flujo-bajo { background: rgba(74, 222, 128, .12); color: var(--adm-em-fg); }
     &.flujo-medio { background: rgba(251, 184, 52, .12); color: var(--adm-am-fg); }
-    &.flujo-alto { background: rgba(242, 74, 61, .15); color: var(--adm-cr-fg); }
+    &.flujo-alto { background: rgba(242, 74, 61, .15); color: var(--adm-rd-fg); }
   }
 }
 
@@ -64,7 +64,7 @@
   width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0;
   &.lg-bajo { background: rgba(74, 222, 128, .15); border: 1.5px solid var(--adm-em-fg); }
   &.lg-medio { background: rgba(251, 184, 52, .15); border: 1.5px solid var(--adm-am-fg); }
-  &.lg-alto { background: rgba(242, 74, 61, .18); border: 1.5px solid var(--adm-cr-fg); }
+  &.lg-alto { background: rgba(242, 74, 61, .18); border: 1.5px solid var(--adm-rd-fg); }
 }
 .legend-sep { height: 1px; background: var(--bd); margin: 12px 0; }
 

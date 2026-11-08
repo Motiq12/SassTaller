@@ -26,7 +26,7 @@
 
   &.alert {
     border-color: var(--cr);
-    background: rgba(226, 35, 26, .08);
+    background: rgba(var(--ion-color-primary-rgb), .08);
   }
 }
 
@@ -142,7 +142,7 @@
 .op-clickable { cursor: pointer; }
 
 .op-baja {
-  background: rgba(226, 35, 26, .08);
+  background: rgba(var(--ion-color-primary-rgb), .08);
   border-left: 3px solid var(--cr);
   border-radius: 2px;
   padding-left: 10px;

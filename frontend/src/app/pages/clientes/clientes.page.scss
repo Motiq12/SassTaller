@@ -54,7 +54,7 @@
 .cli-av {
   width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(226, 35, 26, .12); color: var(--text-accent);
+  background: rgba(var(--ion-color-primary-rgb), .12); color: var(--text-accent);
   font-family: var(--fd); font-size: 16px; font-weight: 700; letter-spacing: .02em;
 }
 

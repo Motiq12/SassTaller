@@ -17,7 +17,7 @@
   > ion-icon {
     // ion-icon fuerza content-box: 18 px + 9 de relleno por lado = 36.
     width: 18px; height: 18px; padding: 9px; flex-shrink: 0;
-    border-radius: 8px; background: rgba(226, 35, 26, .12); color: var(--text-accent);
+    border-radius: 8px; background: rgba(var(--ion-color-primary-rgb), .12); color: var(--text-accent);
   }
   strong { display: block; font-family: var(--font-display, 'Rajdhani', sans-serif); font-size: 18px; font-weight: 700; line-height: 1.2; color: var(--ion-text-color); }
   span { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.5; color: var(--n-500); }

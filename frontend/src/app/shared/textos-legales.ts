@@ -1,6 +1,12 @@
 // Textos legales del portal de clientes, los de fábrica. Revisar con asesoría legal
 // antes de considerarlos definitivos.
 //
+// `{taller}` lo reemplaza portal-legal.page.ts por el nombre del taller (o por "el
+// taller" si no cargó ninguno). Acá decía "MS Motos" literal y hablaba de
+// "motocicletas": los términos y condiciones de CUALQUIER taller del SaaS nombraban
+// a otra empresa como prestadora del servicio, y un taller de autos o de camiones
+// le hacía aceptar a su cliente un documento sobre motos.
+//
 // Las secciones de "Términos y condiciones" las puede reescribir el taller en
 // Configuración → Textos del portal (backend/src/utils/textos-portal.js); la política
 // de privacidad no, porque la pide la Ley 8968 (su contacto sale de Configuración).
@@ -14,10 +20,10 @@ export const DOCS_LEGALES: Record<string, Documento> = {
     actualizado: 'junio 2026',
     secciones: [
       { titulo: 'Aceptación de los términos', parrafos: [
-        'Al crear una cuenta y usar el portal de MS Motos aceptas estos términos y condiciones. Si no estás de acuerdo, no utilices el servicio.',
+        'Al crear una cuenta y usar el portal de {taller} aceptas estos términos y condiciones. Si no estás de acuerdo, no utilices el servicio.',
       ] },
       { titulo: 'Servicios del taller', parrafos: [
-        'MS Motos ofrece servicios de mantenimiento y reparación de motocicletas. La descripción de un trabajo, su alcance y su costo se confirman en el presupuesto de cada orden.',
+        '{taller} ofrece servicios de mantenimiento y reparación de vehículos. La descripción de un trabajo, su alcance y su costo se confirman en el presupuesto de cada orden.',
       ] },
       { titulo: 'Citas y cancelaciones', parrafos: [
         'Puedes agendar, consultar y dar seguimiento a tus citas desde el portal, sujeto a la disponibilidad de horarios del taller.',
@@ -31,7 +37,7 @@ export const DOCS_LEGALES: Record<string, Documento> = {
         'Los trabajos entregados pueden incluir una garantía cuya duración se indica al cierre de la orden. La garantía no cubre daños por mal uso, accidentes o intervención de terceros.',
       ] },
       { titulo: 'Responsabilidades del cliente', parrafos: [
-        'Eres responsable de la veracidad de los datos de tu cuenta y de tus motocicletas. Mantén tu contraseña en un lugar seguro.',
+        'Eres responsable de la veracidad de los datos de tu cuenta y de tus vehículos. Mantén tu contraseña en un lugar seguro.',
       ] },
       { titulo: 'Cambios en los términos', parrafos: [
         'Podemos actualizar estos términos. Los cambios relevantes se reflejarán en esta misma sección con su fecha de actualización.',
@@ -43,7 +49,7 @@ export const DOCS_LEGALES: Record<string, Documento> = {
     actualizado: 'octubre 2026',
     secciones: [
       { titulo: 'Datos que recopilamos', parrafos: [
-        'Recopilamos los datos que nos brindas al registrarte y usar el portal: nombre, contacto (teléfono y correo), datos de tus motocicletas y el historial de citas y servicios.',
+        'Recopilamos los datos que nos brindas al registrarte y usar el portal: nombre, contacto (teléfono y correo), datos de tus vehículos y el historial de citas y servicios.',
       ] },
       { titulo: 'Cómo usamos tus datos', parrafos: [
         'Usamos tus datos para gestionar tus citas y órdenes, comunicarte el avance de tus servicios, emitir presupuestos y mejorar la atención del taller.',

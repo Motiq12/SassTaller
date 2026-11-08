@@ -143,7 +143,8 @@ export class MarcaService {
   private pintarColor(hex: string | null): void {
     const raiz = document.documentElement;
     const vars = ['--ion-color-primary', '--ion-color-primary-rgb', '--ion-color-primary-shade',
-                  '--ion-color-primary-tint', '--ion-color-primary-contrast', '--ion-color-primary-contrast-rgb'];
+                  '--ion-color-primary-tint', '--ion-color-primary-contrast', '--ion-color-primary-contrast-rgb',
+                  '--marca-tx-claro', '--marca-tx-oscuro'];
     if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) {
       vars.forEach(v => raiz.style.removeProperty(v));   // vuelve al color del tema
       return;
@@ -163,5 +164,83 @@ export class MarcaService {
     raiz.style.setProperty('--ion-color-primary-tint', mezclar(0.15));
     raiz.style.setProperty('--ion-color-primary-contrast', claro ? '#000000' : '#ffffff');
     raiz.style.setProperty('--ion-color-primary-contrast-rgb', claro ? '0, 0, 0' : '255, 255, 255');
+
+    // La marca usada como TEXTO (placas, montos, la fecha de hoy, los chips): casi
+    // ningún color de marca se lee directo sobre el fondo de la app, así que hay
+    // que corregirlo hasta pasar AA. Cuánto corregir depende del color — un
+    // amarillo necesita oscurecerse un 43% y un violeta nada —, y por eso esto no
+    // se puede hacer en el CSS con un `color-mix` a porcentaje fijo.
+    //
+    // Son dos variables, una por tema, porque esto se escribe como estilo EN LÍNEA
+    // sobre :root: un solo valor pisaría el bloque de tema oscuro de variables.scss
+    // y el CSS no podría elegir. Los respaldos de cada una están en variables.scss.
+    raiz.style.setProperty('--marca-tx-claro', this.legibleSobreClaro([r, g, b]));
+    raiz.style.setProperty('--marca-tx-oscuro', this.legibleSobreOscuro([r, g, b]));
+  }
+
+  // —— Contraste (WCAG 2.1) ——
+
+  private static readonly BLANCO: Canal = [255, 255, 255];
+  private static readonly NEGRO: Canal = [0, 0, 0];
+  /** El panel oscuro: --adm-sur del bloque de tema oscuro de variables.scss. */
+  private static readonly PANEL_OSCURO: Canal = [20, 23, 28];
+  /** AA pide 4.5:1; se apunta un poco más arriba para no quedar al filo del redondeo. */
+  private static readonly MINIMO = 4.6;
+
+  private luminancia([r, g, b]: Canal): number {
+    const lin = (c: number) => {
+      const s = c / 255;
+      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  }
+
+  private contraste(a: Canal, b: Canal): number {
+    const [la, lb] = [this.luminancia(a), this.luminancia(b)];
+    return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+  }
+
+  private interpolar(a: Canal, b: Canal, f: number): Canal {
+    return [0, 1, 2].map(i => a[i] + (b[i] - a[i]) * f) as Canal;
+  }
+
+  private aHex(c: Canal): string {
+    const n = (v: number) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0');
+    return `#${n(c[0])}${n(c[1])}${n(c[2])}`;
+  }
+
+  /** Oscurece la marca hasta que se lea sobre su propio tinte claro (fondo de chip). */
+  private legibleSobreClaro(marca: Canal): string {
+    const fondo = this.interpolar(MarcaService.BLANCO, marca, 0.09);   // el tinte de --adm-cr-bg
+    for (let f = 0; f <= 1.0001; f += 0.01) {
+      const c = this.interpolar(marca, MarcaService.NEGRO, f);
+      if (this.contraste(c, fondo) >= MarcaService.MINIMO) return this.aHex(c);
+    }
+    return '#000000';
+  }
+
+  /**
+   * Aclara la marca hasta que se lea sobre el panel oscuro, SIN perder el tono:
+   * primero sube los tres canales a la vez hasta que el mayor toca 255, que aclara
+   * manteniendo el color. Mezclar con blanco de entrada también aclara, pero desatura
+   * — un navy terminaba gris azulado y la marca se perdía. Solo si escalar no alcanza
+   * (una marca negra o casi gris, donde no hay tono que conservar) se va a blanco.
+   */
+  private legibleSobreOscuro(marca: Canal): string {
+    const panel = MarcaService.PANEL_OSCURO;
+    const mayor = Math.max(...marca) || 1;
+    const vivo = marca.map(c => c * 255 / mayor) as Canal;
+    for (let f = 0; f <= 1.0001; f += 0.01) {
+      const c = this.interpolar(marca, vivo, f);
+      if (this.contraste(c, panel) >= MarcaService.MINIMO) return this.aHex(c);
+    }
+    for (let f = 0; f <= 1.0001; f += 0.01) {
+      const c = this.interpolar(vivo, MarcaService.BLANCO, f);
+      if (this.contraste(c, panel) >= MarcaService.MINIMO) return this.aHex(c);
+    }
+    return '#ffffff';
   }
 }
+
+/** Un color como canales RGB de 0 a 255. */
+type Canal = [number, number, number];

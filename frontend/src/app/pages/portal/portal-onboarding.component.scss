@@ -32,9 +32,9 @@
 .ob-illu {
   width: 84px; height: 84px; margin: 6px auto 18px; border-radius: 8px;
   display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, var(--rose-50), var(--amber-100));
+  background: linear-gradient(135deg, var(--marca-50), var(--amber-100));
   ion-icon { font-size: 40px; color: var(--text-accent); }
-  &[data-paso="1"] { background: linear-gradient(135deg, var(--rose-50), var(--emerald-50)); }
+  &[data-paso="1"] { background: linear-gradient(135deg, var(--marca-50), var(--emerald-50)); }
   &[data-paso="2"] { background: linear-gradient(135deg, var(--amber-100), #fde68a);
     ion-icon { color: var(--amber-700); } }
 }

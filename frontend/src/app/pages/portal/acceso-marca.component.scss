@@ -8,12 +8,16 @@
   gap: 18px;
   padding: calc(26px + var(--ion-safe-area-top, 0px)) 22px 30px;
   color: #f1f5f9;
-  // En celular y tablet la foto cubre solo esta franja, encuadrada en el banco de
-  // herramientas (estirada a toda la página se veía solo la pared).
+  // El dibujo de la bahía, no una fotografía: la que había era la del taller de
+  // MS Motos, y este portal lo abre el cliente de cualquier taller.
+  //
+  // El degradado es mucho más suave que el que pedía la foto: el dibujo ya nace
+  // oscuro y en el azul del producto, así que taparlo lo único que hace es
+  // borrarlo. Solo se oscurece abajo, donde cae el texto.
   background:
-    linear-gradient(180deg, rgba(11, 13, 16, .35) 0%, rgba(11, 13, 16, .55) 55%, rgba(11, 13, 16, .85) 100%),
-    url('/assets/portal/taller-bg.jpg') 60% 62% / cover no-repeat,
-    #0b0d10;
+    linear-gradient(180deg, rgba(10, 16, 24, 0) 0%, rgba(10, 16, 24, .45) 62%, rgba(10, 16, 24, .9) 100%),
+    url('/assets/portal/taller-iso.svg') 50% 58% / cover no-repeat,
+    #0b1118;
 }
 
 .marca-logo {
