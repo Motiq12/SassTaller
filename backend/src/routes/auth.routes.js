@@ -143,6 +143,17 @@ router.post('/login', async (req, res) => {
       tenantId ? [email, tenantId] : [email]
     );
     if (cliente && (await bcrypt.compare(password, cliente.password_hash))) {
+      // Mismo criterio que /portal/login: la contraseña sola no alcanza mientras el
+      // correo no esté confirmado. Sin esto, cualquiera podía "reclamar" en
+      // /portal/registro un cliente que el taller cargó sin contraseña, ponerle la
+      // suya y entrar por acá sin haber visto nunca el código del correo.
+      // La contraseña ya se comprobó, así que avisarlo no enumera cuentas.
+      if (!cliente.email_verificado) {
+        return res.status(403).json({
+          error: 'Confirmá tu correo para entrar. Te enviamos un código al registrarte.',
+          requiere_verificacion: true,
+        });
+      }
       const payload = {
         id: cliente.id, tipo: 'cliente', nombre: cliente.nombre,
         apellido: cliente.apellido, tenant_id: cliente.tenant_id,
@@ -244,14 +255,17 @@ router.post('/2fa/verificar', async (req, res) => {
       await req.db.query('UPDATE usuarios SET totp_ultimo_contador = ? WHERE id = ? AND tenant_id = @tenant', [contador, usuario.id]);
     } else {
       // ¿Será un código de respaldo? (un solo uso: si acierta, se elimina)
-      const usado = await consumirCodigoRespaldo(usuario, codigo);
+      const usado = await consumirCodigoRespaldo(req.db, usuario, codigo);
       if (!usado) {
         registrarEvento('dosfa_fallido', { email: usuario.email, ip: req.ip, usuarioId: usuario.id });
         return res.status(401).json({ error: ERR });
       }
     }
 
-    const { payload, token } = await sesionStaff(usuario, req);
+    // El SELECT de arriba no trae tenant_id: el taller sale del token parcial ya
+    // verificado. Sin él la sesión recién abierta no serviría para nada (middleware/tenant
+    // la corta con 401 en el primer pedido).
+    const { payload, token } = await sesionStaff({ ...usuario, tenant_id: req.db.tenantId }, req);
     res.json({ data: { token, tipo: 'staff', usuario: { ...payload, permisos_web: normalizarPermisos(usuario.permisos_web), ...(await casillasDeSesion(usuario.id)), preferencias: await preferenciasDe(usuario.id, usuario.rol), foto: usuario.foto || null } } });
   } catch (err) {
     fail(res, err);
@@ -260,7 +274,7 @@ router.post('/2fa/verificar', async (req, res) => {
 
 // Busca el código entre los de respaldo del usuario. Si coincide, lo quema
 // (lo saca de la lista) para que no sirva una segunda vez.
-async function consumirCodigoRespaldo(usuario, codigo) {
+async function consumirCodigoRespaldo(db, usuario, codigo) {
   let hashes;
   try {
     hashes = JSON.parse(usuario.totp_backup || '[]');
@@ -273,7 +287,7 @@ async function consumirCodigoRespaldo(usuario, codigo) {
   for (let i = 0; i < hashes.length; i++) {
     if (await bcrypt.compare(limpio, hashes[i])) {
       hashes.splice(i, 1);
-      await req.db.query('UPDATE usuarios SET totp_backup = ? WHERE id = ? AND tenant_id = @tenant', [JSON.stringify(hashes), usuario.id]);
+      await db.query('UPDATE usuarios SET totp_backup = ? WHERE id = ? AND tenant_id = @tenant', [JSON.stringify(hashes), usuario.id]);
       return true;
     }
   }

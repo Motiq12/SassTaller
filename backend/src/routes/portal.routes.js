@@ -58,7 +58,10 @@ function horasHastaCita(fecha, hora) {
 const codigoDeSeisDigitos = () => String(crypto.randomInt(100000, 1000000));
 
 // Firma el JWT del cliente y arma el payload estándar.
+// El SELECT que trae a `cliente` TIENE que incluir tenant_id: sin él el token sale sin
+// taller y middleware/tenant corta con 401 el primer pedido (pasó en tres flujos).
 function tokenCliente(cliente) {
+  if (!cliente.tenant_id) throw new Error('tokenCliente: el cliente no trae tenant_id');
   const payload = { id: cliente.id, tipo: 'cliente', nombre: cliente.nombre, apellido: cliente.apellido, tenant_id: cliente.tenant_id };
   const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '8h' });
   return { payload, token };
@@ -310,18 +313,19 @@ router.post('/registro/verificar', async (req, res) => {
     if (!codigo) return invalido(res, 'codigo', 'Falta el código');
 
     const [[cliente]] = await req.db.query(
-      'SELECT id, nombre, apellido, email_verificado FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1', [email]
+      'SELECT id, tenant_id, nombre, apellido, email_verificado FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1', [email]
     );
     const ERR_CODIGO = 'Código inválido o expirado';
     if (!cliente) return invalido(res, 'codigo', ERR_CODIGO);
 
-    // Una cuenta ya verificada NO entra por acá sin código. Antes había un atajo
-    // ("si ya se verificó, simplemente entra") que devolvía la sesión sin mirar el
-    // código: alcanzaba con el correo de un cliente para abrir su cuenta. Ahora toda
-    // cuenta pasa por la misma comprobación de abajo; la que ya está verificada no
-    // tiene código pendiente y recibe el mismo error genérico. Quien ya verificó
-    // entra por el login normal. (El doble envío lo frena la pantalla, que
-    // deshabilita el botón mientras espera.)
+    // Ya verificado: NO se entrega sesión. Antes esto devolvía un token sin mirar el
+    // código ("idempotente" ante un doble clic), y como los clientes que carga el taller
+    // nacen con email_verificado = 1, alcanzaba con saber el correo de cualquiera de
+    // ellos para entrar a su cuenta. Si ya está confirmado, que inicie sesión.
+    if (cliente.email_verificado) {
+      return res.status(409).json({ error: 'Tu correo ya está confirmado. Iniciá sesión.', ya_verificado: true });
+    }
+
     const limite = consumir(`registro-verificar:${String(email).trim().toLowerCase()}`, { porMinuto: 5, porHora: 20 });
     if (!limite.ok) {
       return res.status(429).json({ error: `Demasiados intentos. Espera ${limite.retryAfter}s e intenta de nuevo.` });
@@ -423,7 +427,7 @@ router.post('/recuperar/confirmar', async (req, res) => {
     if (password.length < 8) return invalido(res, 'password', 'La contraseña debe tener al menos 8 caracteres');
 
     const [[cliente]] = await req.db.query(
-      'SELECT id, nombre, apellido FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND (password_hash IS NOT NULL OR google_sub IS NOT NULL)',
+      'SELECT id, tenant_id, nombre, apellido FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND (password_hash IS NOT NULL OR google_sub IS NOT NULL)',
       [email]
     );
     const ERR_CODIGO = 'Código inválido o expirado';
@@ -503,7 +507,7 @@ router.post('/otp/verificar', async (req, res) => {
     if (!codigo) return invalido(res, 'codigo', 'Falta el código');
 
     const [[cliente]] = await req.db.query(
-      'SELECT id, nombre, apellido, foto FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1',
+      'SELECT id, tenant_id, nombre, apellido, foto FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1',
       [email]
     );
     const ERR_CODIGO = 'Código inválido o expirado';
@@ -524,9 +528,15 @@ router.post('/otp/verificar', async (req, res) => {
     }
 
     await req.db.query('UPDATE login_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
-    // Entrar con el código por correo prueba lo mismo que la verificación de registro:
-    // se controla la bandeja. Se promueve sin fricción extra.
-    await req.db.query('UPDATE clientes SET email_verificado = 1 WHERE tenant_id = @tenant AND id = ? AND email_verificado = 0', [cliente.id]);
+    // Entrar con el código prueba que se controla la bandeja, pero NO que la contraseña
+    // pendiente sea de quien entra: pudo ponerla otro "reclamando" la cuenta en
+    // /registro. Promover ahí la volvería válida y le daría la cuenta a ese otro. Por
+    // eso solo se promueven las cuentas sin contraseña; la que tiene una pendiente
+    // sigue entrando por código y se confirma con el código de /registro/verificar.
+    await req.db.query(
+      'UPDATE clientes SET email_verificado = 1 WHERE tenant_id = @tenant AND id = ? AND email_verificado = 0 AND password_hash IS NULL',
+      [cliente.id]
+    );
     const { payload, token } = tokenCliente(cliente);
     res.json({ data: { token, cliente: { ...payload, foto: cliente.foto || null } } });
   } catch (err) {

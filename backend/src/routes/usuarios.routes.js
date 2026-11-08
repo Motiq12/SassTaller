@@ -12,6 +12,7 @@ const { ROL_DE_BASE, BASES_PROPIAS } = require('../utils/permisos');
 const { getConfig } = require('../utils/configuracion');
 const { politica, problemaDeContrasena } = require('../utils/contrasena');
 const { olvidar } = require('../utils/sesiones');
+const { topeAlcanzado } = require('../utils/cuenta');
 
 router.use(auth, requireRol('admin'));
 
@@ -82,6 +83,14 @@ router.post('/', async (req, res) => {
     if (!ROLES.includes(rol)) return invalido(res, 'rol', 'Rol no válido');
     const elegido = await rolDelBody(rol, req.body.rol_id);
     if (elegido.error) return invalido(res, 'rol', elegido.error);
+
+    // Tope del plan. Se comprueba antes del hash: bcrypt cuesta ~100ms y no tiene
+    // sentido pagarlos para después rechazar el alta. El 402 distingue "tu plan no
+    // llega" de un 403 de permisos — quien está acá es admin y tiene todo el derecho,
+    // lo que falta es plan, y el frontend lo trata distinto por eso.
+    const tope = await topeAlcanzado(req.db, 'usuarios');
+    if (tope) return res.status(402).json({ error: tope, tope: 'usuarios' });
+
     const hash = await bcrypt.hash(password, 10);
     const sucursal_id = await sucursalDelBody(req.body.sucursal_id);
     const [result] = await req.db.query(
@@ -152,6 +161,18 @@ router.patch('/:id/activo', async (req, res) => {
     // Anti-lockout: el admin logueado no puede desactivarse a sí mismo.
     if (Number(req.params.id) === req.usuario.id && !activo) {
       return res.status(400).json({ error: 'No podés desactivar tu propia cuenta' });
+    }
+    // Reactivar suma un usuario igual que darlo de alta, así que choca con el mismo
+    // tope. Sin esto el tope del plan gratis se esquivaba en dos clics: desactivar a
+    // uno, crear otro, y volver a activar al primero. Solo se mira cuando de verdad
+    // pasa de inactivo a activo: re-activar a alguien ya activo no suma nada.
+    if (activo) {
+      const [[u]] = await req.db.query('SELECT activo FROM usuarios WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
+      if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
+      if (!u.activo) {
+        const tope = await topeAlcanzado(req.db, 'usuarios');
+        if (tope) return res.status(402).json({ error: tope, tope: 'usuarios' });
+      }
     }
     await req.db.query('UPDATE usuarios SET activo = ? WHERE id = ? AND tenant_id = @tenant', [activo ? 1 : 0, req.params.id]);
     olvidar(req.params.id); // desactivado: deja de entrar en el próximo pedido
