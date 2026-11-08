@@ -242,11 +242,16 @@ router.post('/2fa/verificar', async (req, res) => {
       await req.db.query('UPDATE usuarios SET totp_ultimo_contador = ? WHERE id = ? AND tenant_id = @tenant', [contador, usuario.id]);
     } else {
       // ¿Será un código de respaldo? (un solo uso: si acierta, se elimina)
-      const usado = await consumirCodigoRespaldo(usuario, codigo);
+      const usado = await consumirCodigoRespaldo(req.db, usuario, codigo);
       if (!usado) return res.status(401).json({ error: ERR });
     }
 
-    const payload = { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol };
+    // Mismo payload que el login sin 2FA: sin `tenant_id`, middleware/tenant corta
+    // cada pedido con 401 y la sesión recién abierta no sirve para nada.
+    const payload = {
+      id: usuario.id, nombre: usuario.nombre, email: usuario.email,
+      rol: usuario.rol, tenant_id: req.db.tenantId,
+    };
     res.json({ data: { token: firmar(payload), tipo: 'staff', usuario: payload } });
   } catch (err) {
     fail(res, err);
@@ -255,7 +260,7 @@ router.post('/2fa/verificar', async (req, res) => {
 
 // Busca el código entre los de respaldo del usuario. Si coincide, lo quema
 // (lo saca de la lista) para que no sirva una segunda vez.
-async function consumirCodigoRespaldo(usuario, codigo) {
+async function consumirCodigoRespaldo(db, usuario, codigo) {
   let hashes;
   try {
     hashes = JSON.parse(usuario.totp_backup || '[]');
@@ -268,7 +273,7 @@ async function consumirCodigoRespaldo(usuario, codigo) {
   for (let i = 0; i < hashes.length; i++) {
     if (await bcrypt.compare(limpio, hashes[i])) {
       hashes.splice(i, 1);
-      await req.db.query('UPDATE usuarios SET totp_backup = ? WHERE id = ? AND tenant_id = @tenant', [JSON.stringify(hashes), usuario.id]);
+      await db.query('UPDATE usuarios SET totp_backup = ? WHERE id = ? AND tenant_id = @tenant', [JSON.stringify(hashes), usuario.id]);
       return true;
     }
   }

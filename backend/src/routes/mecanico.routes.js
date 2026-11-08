@@ -146,7 +146,7 @@ router.patch('/citas/:id/estado', async (req, res) => {
     }
     params.push(req.params.id);
 
-    await req.db.query(`UPDATE citas SET ${sets.join(', ')} WHERE id = ?`, params);
+    await req.db.query(`UPDATE citas SET ${sets.join(', ')} WHERE id = ? AND tenant_id = @tenant`, params);
     await notificarCambioEstado(req.db, req.params.id, estado);
     res.json({ message: 'Estado actualizado' });
   } catch (err) {

@@ -49,7 +49,10 @@ function horasHastaCita(fecha, hora) {
 }
 
 // Firma el JWT del cliente y arma el payload estándar.
+// El SELECT que trae a `cliente` TIENE que incluir tenant_id: sin él el token sale sin
+// taller y middleware/tenant corta con 401 el primer pedido (pasó en tres flujos).
 function tokenCliente(cliente) {
+  if (!cliente.tenant_id) throw new Error('tokenCliente: el cliente no trae tenant_id');
   const payload = { id: cliente.id, tipo: 'cliente', nombre: cliente.nombre, apellido: cliente.apellido, tenant_id: cliente.tenant_id };
   const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '8h' });
   return { payload, token };
@@ -198,15 +201,17 @@ router.post('/registro/verificar', async (req, res) => {
     if (!codigo) return res.status(400).json({ error: 'El código es requerido' });
 
     const [[cliente]] = await req.db.query(
-      'SELECT id, nombre, apellido, email_verificado FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1', [email]
+      'SELECT id, tenant_id, nombre, apellido, email_verificado FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1', [email]
     );
     const ERR_CODIGO = 'Código inválido o expirado';
     if (!cliente) return res.status(400).json({ error: ERR_CODIGO });
 
-    // Idempotente: si ya se verificó (p. ej. doble clic), simplemente entra.
+    // Ya verificado: NO se entrega sesión. Antes esto devolvía un token sin mirar el
+    // código ("idempotente" ante un doble clic), y como los clientes que carga el taller
+    // nacen con email_verificado = 1, alcanzaba con saber el correo de cualquiera de
+    // ellos para entrar a su cuenta. Si ya está confirmado, que inicie sesión.
     if (cliente.email_verificado) {
-      const { payload, token } = tokenCliente(cliente);
-      return res.json({ data: { token, cliente: payload } });
+      return res.status(409).json({ error: 'Tu correo ya está confirmado. Iniciá sesión.', ya_verificado: true });
     }
 
     const limite = consumir(`registro-verificar:${String(email).trim().toLowerCase()}`, { porMinuto: 5, porHora: 20 });
@@ -308,7 +313,7 @@ router.post('/recuperar/confirmar', async (req, res) => {
     if (password.length < 8) return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
 
     const [[cliente]] = await req.db.query(
-      'SELECT id, nombre, apellido FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND password_hash IS NOT NULL',
+      'SELECT id, tenant_id, nombre, apellido FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND password_hash IS NOT NULL',
       [email]
     );
     const ERR_CODIGO = 'Código inválido o expirado';
@@ -388,7 +393,7 @@ router.post('/otp/verificar', async (req, res) => {
     if (!codigo) return res.status(400).json({ error: 'El código es requerido' });
 
     const [[cliente]] = await req.db.query(
-      'SELECT id, nombre, apellido, foto FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1',
+      'SELECT id, tenant_id, nombre, apellido, foto FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1',
       [email]
     );
     const ERR_CODIGO = 'Código inválido o expirado';
