@@ -1,6 +1,8 @@
 export interface Vehiculo {
   id?: number;
   cliente_id: number;
+  tipo?: string;
+  atributos?: Record<string, string | number | null> | null;
   marca: string;
   modelo: string;
   anio?: number | null;

@@ -9,6 +9,11 @@
 // columnas de la tabla y valen para todos. Los de acá son los que cambian según el
 // tipo y viven en la columna JSON `atributos`.
 
+const COMBUSTIBLE_PESADO = { clave: 'combustible', etiqueta: 'Combustible', tipo: 'opcion',
+  opciones: ['Diésel', 'Gasolina', 'Híbrido', 'Eléctrico', 'GLP', 'Gas natural'] };
+const TRANSMISION_PESADO = { clave: 'transmision', etiqueta: 'Transmisión', tipo: 'opcion',
+  opciones: ['Manual', 'Automática', 'Automatizada'] };
+
 const TIPOS = {
   moto: {
     etiqueta: 'Motocicleta',
@@ -37,6 +42,50 @@ const TIPOS = {
       { clave: 'carroceria', etiqueta: 'Carrocería', tipo: 'opcion',
         opciones: ['Sedán', 'Hatchback', 'SUV', 'Pick-up', 'Camioneta', 'Coupé', 'Furgoneta'] },
       { clave: 'puertas', etiqueta: 'Puertas', tipo: 'numero', min: 2, max: 6 },
+    ],
+  },
+  camion: {
+    etiqueta: 'Camión',
+    plural: 'Camiones',
+    genero: 'm',
+    unidadUso: 'km',
+    campos: [
+      COMBUSTIBLE_PESADO,
+      TRANSMISION_PESADO,
+      { clave: 'ejes', etiqueta: 'Ejes', tipo: 'numero', min: 2, max: 10 },
+      { clave: 'capacidad_ton', etiqueta: 'Capacidad de carga (toneladas)', tipo: 'numero', min: 0, max: 100 },
+    ],
+  },
+  bus: {
+    etiqueta: 'Bus',
+    plural: 'Buses',
+    genero: 'm',
+    unidadUso: 'km',
+    campos: [
+      COMBUSTIBLE_PESADO,
+      TRANSMISION_PESADO,
+      { clave: 'pasajeros', etiqueta: 'Pasajeros', tipo: 'numero', min: 1, max: 120 },
+    ],
+  },
+  buseta: {
+    etiqueta: 'Buseta',
+    plural: 'Busetas',
+    genero: 'f',
+    unidadUso: 'km',
+    campos: [
+      COMBUSTIBLE_PESADO,
+      TRANSMISION_PESADO,
+      { clave: 'pasajeros', etiqueta: 'Pasajeros', tipo: 'numero', min: 1, max: 40 },
+    ],
+  },
+  // La salida para lo que no está en la lista: cuadraciclos, maquinaria, lanchas…
+  otro: {
+    etiqueta: 'Otro vehículo',
+    plural: 'Otros',
+    genero: 'm',
+    unidadUso: 'km',
+    campos: [
+      { clave: 'descripcion', etiqueta: '¿Qué vehículo es?', tipo: 'texto' },
     ],
   },
 };

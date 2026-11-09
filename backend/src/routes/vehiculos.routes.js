@@ -2,7 +2,7 @@ const router = require('express').Router();
 // Sin `pool`: todo pasa por req.db, scopeado al taller (ver clientes.routes.js).
 const { fail } = require('../utils/responder');
 const { getConfig } = require('../utils/configuracion');
-const { normalizarTipos, limpiarAtributos, mensaje, etiquetaPara } = require('../utils/tipos-vehiculo');
+const { TIPOS, normalizarTipos, limpiarAtributos, mensaje, etiquetaPara } = require('../utils/tipos-vehiculo');
 const auth = require('../middleware/auth');
 const { anioValido, placaValida } = require('../utils/validar');
 
@@ -35,6 +35,22 @@ router.get('/', async (req, res) => {
     sql += ` ORDER BY m.created_at DESC LIMIT ${MAX_LISTADO}`;
     const [rows] = await req.db.query(sql, params);
     res.json({ data: rows });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// GET /api/vehiculos/tipos — solo los que atiende este taller, con sus campos.
+// Va antes de /:id para que "tipos" no se lea como un id.
+router.get('/tipos', async (req, res) => {
+  try {
+    const { tipos_vehiculo: tipos } = await getConfig(req.db);
+    res.json({
+      data: normalizarTipos(tipos).map((clave) => ({
+        clave, etiqueta: TIPOS[clave].etiqueta, plural: TIPOS[clave].plural,
+        unidadUso: TIPOS[clave].unidadUso, campos: TIPOS[clave].campos,
+      })),
+    });
   } catch (err) {
     fail(res, err);
   }
@@ -124,6 +140,20 @@ router.put('/:id', async (req, res) => {
        WHERE id=? AND tenant_id = @tenant`,
       [marca, modelo, anio || null, placa || null, color || null, numero_motor || null, numero_chasis || null, kilometraje_actual || 0, foto_url || null, req.params.id]
     );
+    // El tipo y sus datos propios, solo si vinieron: otra pantalla que guarda este
+    // vehículo sin conocerlos no los borra.
+    if (req.body.tipo !== undefined) {
+      const tipo = String(req.body.tipo).toLowerCase();
+      const { tipos_vehiculo: atendidos } = await getConfig(req.db);
+      if (!normalizarTipos(atendidos).includes(tipo)) {
+        return res.status(400).json({ error: 'Este taller no atiende ese tipo de vehículo' });
+      }
+      const propios = limpiarAtributos(tipo, req.body.atributos);
+      await req.db.query(
+        'UPDATE vehiculos SET tipo = ?, atributos = ? WHERE id = ? AND tenant_id = @tenant',
+        [tipo, propios ? JSON.stringify(propios) : null, req.params.id]
+      );
+    }
     const [[actualizada]] = await req.db.query(
       'SELECT * FROM vehiculos WHERE id = ? AND tenant_id = @tenant', [req.params.id]
     );

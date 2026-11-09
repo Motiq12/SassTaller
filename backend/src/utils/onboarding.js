@@ -25,9 +25,17 @@ const SERVICIOS_COMUNES = [
   'Afinamiento',
 ];
 
+const PESADOS = [
+  'Frenos de aire', 'Revisión de suspensión y muelles', 'Cambio de embrague',
+  'Alineado y balanceo', 'Revisión técnica (RTV)',
+];
+
 const SERVICIOS_POR_TIPO = {
   moto: ['Kit de transmisión (cadena y piñones)', 'Ajuste de frenos y suspensión'],
   auto: ['Cambio de bujías', 'Alineado y balanceo', 'Cambio de correa de distribución', 'Recarga de aire acondicionado'],
+  camion: PESADOS,
+  bus: PESADOS,
+  buseta: PESADOS,
 };
 
 function serviciosIniciales(tipos) {

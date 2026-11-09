@@ -3,28 +3,34 @@
     <ion-buttons slot="start">
       <ion-back-button text=""></ion-back-button>
     </ion-buttons>
-    <ion-title>{{ esEdicion ? 'Editar' : 'Nueva' }} moto</ion-title>
+    <ion-title>{{ esEdicion ? 'Editar' : 'Registrar' }} {{ nombre }}</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content>
   <div class="moto-form">
     <div class="intro">
-      <h1>{{ esEdicion ? 'Editar moto' : 'Nueva moto' }}</h1>
-      <p>{{ esEdicion ? 'Actualizá los datos de la moto.' : 'Registrá la moto del cliente.' }}</p>
+      <h1>{{ esEdicion ? 'Editar' : 'Registrar' }} {{ nombre }}</h1>
+      <p>{{ esEdicion ? 'Actualizá los datos.' : 'Los datos del vehículo del cliente.' }}</p>
     </div>
 
     <!-- Identificación -->
     <section class="card">
       <span class="section-label">Identificación</span>
+      <div class="ig" *ngIf="tipos.length > 1">
+        <label for="tipo-vehiculo">Tipo de vehículo</label>
+        <select id="tipo-vehiculo" [(ngModel)]="form.tipo" name="tipo" (ngModelChange)="cambiarTipo()">
+          <option *ngFor="let t of tipos" [ngValue]="t.clave">{{ t.etiqueta }}</option>
+        </select>
+      </div>
       <div class="grid2">
         <div class="ig">
           <label>Marca *</label>
-          <input [(ngModel)]="form.marca" name="marca" placeholder="Honda, Yamaha…" autocapitalize="words">
+          <input [(ngModel)]="form.marca" name="marca" placeholder="Toyota, Hino, Honda…" autocapitalize="words">
         </div>
         <div class="ig">
           <label>Modelo *</label>
-          <input [(ngModel)]="form.modelo" name="modelo" placeholder="CBR150, FZ25…">
+          <input [(ngModel)]="form.modelo" name="modelo" placeholder="Modelo">
         </div>
       </div>
       <div class="grid2">
@@ -46,6 +52,19 @@
     <!-- Datos técnicos -->
     <section class="card">
       <span class="section-label">Datos técnicos</span>
+      <ng-container *ngIf="tipoActual as t">
+        <div class="ig" *ngFor="let c of t.campos">
+          <label [attr.for]="'campo-' + c.clave">{{ c.etiqueta }}</label>
+          <select *ngIf="c.tipo === 'opcion'" [id]="'campo-' + c.clave" [(ngModel)]="atributos[c.clave]" [name]="'attr_' + c.clave">
+            <option [ngValue]="undefined">Sin indicar</option>
+            <option *ngFor="let o of c.opciones" [ngValue]="o">{{ o }}</option>
+          </select>
+          <input *ngIf="c.tipo === 'numero'" type="number" inputmode="numeric" [id]="'campo-' + c.clave"
+                 [attr.min]="c.min" [attr.max]="c.max" [(ngModel)]="atributos[c.clave]" [name]="'attr_' + c.clave">
+          <input *ngIf="c.tipo !== 'opcion' && c.tipo !== 'numero'" [id]="'campo-' + c.clave"
+                 maxlength="120" [(ngModel)]="atributos[c.clave]" [name]="'attr_' + c.clave">
+        </div>
+      </ng-container>
       <div class="ig">
         <label>Kilometraje actual</label>
         <input type="number" inputmode="numeric" [(ngModel)]="form.kilometraje_actual" name="kilometraje_actual" placeholder="0">

@@ -13,6 +13,10 @@ const jwt = require('jsonwebtoken');
 const express = require('express');
 const tenantDb = require('../src/db/tenant-db');
 const { fijarPlan } = require('../src/utils/estado-tenant');
+// El middleware de sesión va contra el pool: sin esto, el resultado dependía de lo que
+// hubiera en la base del .env de quien corre la prueba.
+const { pool } = require('../src/db/pool');
+pool.query = async (sql) => (/FROM usuarios/i.test(sql) ? [[{ activo: 1, sesiones_desde_ms: null }]] : [[]]);
 
 const TALLER = 1;
 let estado;       // lo que hay en la "base" en cada test

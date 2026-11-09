@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { Vehiculo } from '../models/vehiculo.model';
 import { Orden } from '../models/orden.model';
+import { TipoVehiculo } from './taller.service';
 
 @Injectable({ providedIn: 'root' })
 export class VehiculosService {
@@ -29,5 +30,10 @@ export class VehiculosService {
 
   getHistorial(id: number): Observable<{ data: Orden[] }> {
     return this.http.get<{ data: Orden[] }>(`${this.url}/${id}/historial`);
+  }
+
+  // Los tipos que atiende este taller, con los campos propios de cada uno.
+  getTipos(): Observable<{ data: TipoVehiculo[] }> {
+    return this.http.get<{ data: TipoVehiculo[] }>(`${this.url}/tipos`);
   }
 }

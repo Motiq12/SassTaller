@@ -30,6 +30,22 @@ const VEHICULOS = {
     { marca: 'Toyota',  modelo: 'Yaris',     anio: 2018, placa: 'AUT-201', color: 'Gris' },
     { marca: 'Hyundai', modelo: 'Tucson',    anio: 2020, placa: 'AUT-202', color: 'Blanco' },
   ],
+  camion: [
+    { marca: 'Hino',    modelo: '300',       anio: 2017, placa: 'CAM-301', color: 'Blanco' },
+    { marca: 'Isuzu',   modelo: 'NPR',       anio: 2019, placa: 'CAM-302', color: 'Azul' },
+  ],
+  bus: [
+    { marca: 'Mercedes-Benz', modelo: 'OF 1721', anio: 2015, placa: 'BUS-401', color: 'Blanco' },
+    { marca: 'Volvo',   modelo: 'B7R',       anio: 2016, placa: 'BUS-402', color: 'Gris' },
+  ],
+  buseta: [
+    { marca: 'Toyota',  modelo: 'Coaster',   anio: 2018, placa: 'BUT-501', color: 'Blanco' },
+    { marca: 'Hyundai', modelo: 'County',    anio: 2017, placa: 'BUT-502', color: 'Plateado' },
+  ],
+  otro: [
+    { marca: 'Polaris', modelo: 'Sportsman', anio: 2020, placa: 'OTR-601', color: 'Verde' },
+    { marca: 'Bobcat',  modelo: 'S450',      anio: 2019, placa: 'OTR-602', color: 'Blanco' },
+  ],
 };
 
 // Órdenes repartidas por el flujo: el tablero y los filtros por estado no dicen nada si
