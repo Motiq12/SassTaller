@@ -34,5 +34,8 @@
     "acorn": "^8.19.0",
     "acorn-walk": "^8.3.5",
     "nodemon": "^3.1.14"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
