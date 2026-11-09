@@ -23,6 +23,13 @@ const routes: Routes = [
     path: 'registro-taller',
     loadChildren: () => import('./pages/registro-taller/registro-taller.module').then(m => m.RegistroTallerPageModule),
   },
+  // Términos de servicio y política de privacidad de Motiq (el SaaS). Públicas: se
+  // leen antes de registrar un taller. Las del portal de cada taller son otras
+  // (/portal/legal/…).
+  {
+    path: 'legal',
+    loadChildren: () => import('./pages/legal/legal.module').then(m => m.LegalPageModule),
+  },
   // Panel de la plataforma. Va suelto, sin AuthGuard: no es un rol más dentro de un
   // taller sino una sesión aparte, con su propio token y su propio guard.
   {

@@ -98,6 +98,19 @@
   margin-top: 40px;
   p { margin: 0; font-family: $fb; font-size: $t-chica; color: $suave; }
 }
+.legales {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  a {
+    color: $suave;
+    text-decoration: underline;
+    text-decoration-color: #525252;
+    text-underline-offset: 4px;
+    &:hover { color: $tinta; }
+    &:focus-visible { outline: 3px solid $tinta; outline-offset: 3px; border-radius: 4px; }
+  }
+}
 .accion { @include boton; min-height: 44px; padding: 0 20px; font-size: $t-chica; }
 
 .oculto { @include oculto; }
