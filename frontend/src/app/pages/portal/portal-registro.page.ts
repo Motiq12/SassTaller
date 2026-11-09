@@ -3,6 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
+import { MarcaService } from '../../services/marca.service';
 import { PortalService } from '../../services/portal.service';
 import { emailValido } from '../../shared/utils/validar.util';
 import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../shared/utils/turnstile.util';
@@ -15,6 +16,8 @@ import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../sha
 })
 export class PortalRegistroPage implements OnInit, AfterViewInit, OnDestroy {
   private portal = inject(PortalService);
+  // Solo para saber si la pantalla es la puerta de Motiq o el portal de un taller.
+  marca = inject(MarcaService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private loading = inject(LoadingController);

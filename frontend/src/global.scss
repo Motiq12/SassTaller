@@ -1,3 +1,7 @@
+// La puerta de Motiq (pantallas de acceso sin taller). Va con @use, que tiene que
+// ir primero; sus selectores son más específicos que los de .login-content de abajo,
+// así que el orden no cambia quién gana.
+@use "theme/acceso-producto";
 @import "@ionic/angular/css/core.css";
 @import "@ionic/angular/css/normalize.css";
 @import "@ionic/angular/css/structure.css";
@@ -1567,3 +1571,4 @@ ion-modal.adm-modal {
     ion-icon { font-size: 15px; }
   }
 }
+

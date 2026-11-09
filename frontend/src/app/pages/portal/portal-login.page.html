@@ -1,4 +1,4 @@
-<ion-content class="login-content">
+<ion-content class="login-content" [class.es-producto]="marca.esProducto">
   <div class="login-container">
     <div class="login-header">
       <div class="logo-wrapper">
@@ -7,6 +7,9 @@
       <!-- El panel es IDENTIDAD y nada más: de quién es este sistema. La instrucción
            de qué hacer se mudó a la columna del formulario, que es donde se hace. -->
       <h1>{{ marca.rotuloPublico }}</h1>
+      <!-- Solo en la puerta de Motiq: la promesa de la landing. En el portal de un
+           taller el panel sigue diciendo solo de quién es. -->
+      <p *ngIf="marca.esProducto" class="lema">El taller ordenado, sin cuadernos.</p>
     </div>
 
     <!-- Encabezado de la tarea. La columna del formulario arrancaba en frío, con el
