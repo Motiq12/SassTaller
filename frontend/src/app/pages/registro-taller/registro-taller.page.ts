@@ -63,7 +63,49 @@ export class RegistroTallerPage {
   motivoSlug: string | null = null;
 
   enviando = false;
+  verClave = false;
   private slugCambiado = new Subject<string>();
+
+  // La dirección donde vive la app (motiq12.com en producción). El portal de cada
+  // taller cuelga de ahí con ?taller=<slug>, igual que el enlace de admin-portal.
+  readonly dominio = window.location.host;
+
+  /** Las iniciales del taller para el sello de la ficha: "Taller Los Andes" → "LA". */
+  get iniciales(): string {
+    const palabras = this.nombre.trim().split(/\s+/).filter(Boolean)
+      .filter((p, i, todas) => !(todas.length > 1 && i === 0 && /^taller$/i.test(p)));
+    const letras = palabras.slice(0, 2).map(p => p[0]).join('');
+    return (letras || 'M').toUpperCase();
+  }
+
+  /** "Motocicletas y automóviles", según lo marcado; para la ficha. */
+  get tiposTexto(): string {
+    const nombres = this.tiposDisponibles
+      .filter(t => this.tiposMarcados[t.clave])
+      .map(t => t.plural.toLowerCase());
+    if (!nombres.length) return 'Elegí qué vehículos atienden';
+    const texto = nombres.length > 1
+      ? `${nombres.slice(0, -1).join(', ')} y ${nombres[nombres.length - 1]}`
+      : nombres[0];
+    return texto.charAt(0).toUpperCase() + texto.slice(1);
+  }
+
+  /**
+   * Por qué el botón sigue apagado, en una línea. Sin esto, un botón deshabilitado
+   * no explica nada y la persona no sabe qué le falta completar.
+   */
+  get loQueFalta(): string {
+    if (!this.nombre.trim()) return 'Falta el nombre del taller.';
+    if (this.verificando) return 'Verificando el identificador…';
+    if (this.disponible !== true) return 'Elegí un identificador disponible.';
+    if (!this.tiposElegidos.length) return 'Elegí qué vehículos atienden.';
+    if (!this.adminNombre.trim()) return 'Falta tu nombre.';
+    if (!this.adminEmail.trim()) return 'Falta tu correo.';
+    if (this.adminPassword.length < 8) return 'La contraseña necesita al menos 8 caracteres.';
+    if (!this.adminPassword2) return 'Repetí la contraseña.';
+    if (this.adminPassword !== this.adminPassword2) return 'Las contraseñas no coinciden.';
+    return '';
+  }
 
   constructor() {
     // Se espera a que deje de escribir antes de preguntar: sin esto, cada tecla

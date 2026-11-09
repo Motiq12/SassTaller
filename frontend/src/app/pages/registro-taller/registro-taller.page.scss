@@ -1,82 +1,318 @@
-.registro-wrap {
-  max-width: 520px;
-  margin: 0 auto;
+// El registro es el paso siguiente a "Probá gratis" de la landing: mismo suelo
+// oscuro, mismo carmesí, mismas fuentes. Los tokens salen de la landing para que
+// las dos pantallas no se separen con el tiempo.
+@use '../landing/partes/base' as *;
+
+ion-content.registro {
+  --background: #{$suelo};
+  --color: #{$tinta};
 }
 
-.titulo {
-  font-size: 1.5rem;
+.pagina {
+  min-height: 100%;
+  padding: 0 $margen 72px;
+  color: $tinta;
+  font-family: $fb;
+  overflow-x: clip;       // el disco de la ficha se corta en el borde, sin scroll de costado
+}
+
+// --- Barra ---------------------------------------------------------------------
+.barra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 76px;
+  padding-top: env(safe-area-inset-top);
+}
+
+.marca {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: $tinta;
+  text-decoration: none;
+  font-family: $fd;
+  font-size: $t-entrada;
   font-weight: 700;
-  margin: 0 0 0.25rem;
+  letter-spacing: -0.02em;
+  border-radius: 8px;
+  img { width: 30px; height: 30px; filter: brightness(0) invert(1); }   // isotipo en blanco
+  &:focus-visible { outline: 3px solid $tinta; outline-offset: 4px; }
 }
 
-.subtitulo {
-  color: var(--ion-color-medium);
-  margin: 0 0 1.25rem;
-  font-size: 0.9rem;
-}
-
-.bloque {
-  margin-bottom: 1rem;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-/* El estado del identificador va pegado a su campo: es la única validación que
-   depende del servidor, así que necesita un lugar fijo donde el ojo la busque. */
-.estado-slug {
-  padding: 0.4rem 1rem 0.6rem;
-  font-size: 0.85rem;
-
-  ion-note {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-  }
-
-  ion-spinner {
-    width: 16px;
-    height: 16px;
-  }
-}
-
-.aviso {
-  display: block;
-  padding: 0.25rem 1rem 0.5rem;
-  font-size: 0.8rem;
-}
-
-.pie {
-  text-align: center;
-  margin-top: 1.25rem;
-  font-size: 0.9rem;
-  color: var(--ion-color-medium);
-
-  a {
-    color: var(--ion-color-primary);
-    text-decoration: none;
-    font-weight: 600;
-  }
-}
-
-/* Selección de tipos de vehículo: su encabezado no es un campo más, así que se
-   distingue del resto del formulario para que se lea como una pregunta aparte. */
-.etiqueta-grupo {
-  --padding-start: 1rem;
-  --min-height: auto;
-  margin-top: 0.5rem;
-}
-
-.titulo-grupo {
-  font-weight: 600;
-  /* --ion-color-dark es un color de paleta y en tema oscuro queda casi negro
-     sobre fondo negro. --ion-text-color es el que sigue al tema. */
-  color: var(--ion-text-color);
-  margin: 0 0 0.15rem;
-}
-
-.ayuda-grupo {
-  color: var(--ion-color-medium);
-  font-size: 0.8rem;
+.ya {
   margin: 0;
+  font-size: $t-chica;
+  color: $suave;
+  a {
+    margin-left: 6px;
+    color: $tinta;
+    font-weight: 700;
+    text-decoration: none;
+    border-bottom: 2px solid $carmesi;
+    &:hover { color: $carmesi-texto; }
+  }
 }
 
+// --- Cuerpo: titular y ficha a la izquierda, formulario a la derecha ---------------
+.cuerpo {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: clamp(40px, 6vw, 112px);
+  align-items: start;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding-top: clamp(24px, 5vw, 72px);
+}
+
+.lado {
+  position: sticky;
+  top: 32px;
+}
+
+h1 {
+  @include titulo($t-lista);
+  font-size: clamp(36px, 3.6vw, 60px);
+  max-width: 14ch;
+}
+
+.bajada {
+  margin: 24px 0 0;
+  max-width: 44ch;
+  font-size: $t-texto;
+  line-height: 1.6;
+  color: $tinta;
+}
+
+.chica {
+  margin: 28px 0 0;
+  max-width: 44ch;
+  font-size: $t-chica;
+  line-height: 1.5;
+  color: $suave;
+}
+
+// La ficha del taller sobre el disco carmesí: el motivo de la landing.
+.escena {
+  position: relative;
+  min-height: 340px;      // el alto del disco: la nota de abajo nunca queda debajo de él
+  margin-top: 48px;
+  padding-top: 92px;
+}
+.plato {
+  position: absolute;
+  top: 0;
+  left: 14%;
+  width: min(340px, 76%);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: $carmesi;
+}
+.ficha {
+  position: relative;
+  max-width: 440px;
+  padding: 22px 24px 20px;
+  border-radius: 24px;
+  background: #fff;
+  color: #18181b;
+  box-shadow: 0 30px 60px -24px rgba(0, 0, 0, 0.6);   // taste-skill-ignore: interfaz del producto (data-ui)
+}
+.ficha-cabeza {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+.sello {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: $carmesi;
+  color: #fff;
+  font-family: $fd;
+  font-size: $t-entrada;
+  font-weight: 700;
+}
+.ficha-texto { min-width: 0; }
+.ficha-nombre {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: $fd;
+  font-size: $t-entrada;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.ficha-tipos { margin: 2px 0 0; font-size: 14px; color: #71717a; }
+.plan {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #fff1f2;
+  color: $carmesi-hondo;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ficha-rotulo { margin: 20px 0 6px; font-size: 13px; font-weight: 600; color: #71717a; }
+.ficha-enlace {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f4f4f5;
+  overflow-wrap: anywhere;
+  font-family: 'JetBrains Mono', monospace;   // taste-skill-ignore: interfaz del producto (data-ui)
+  font-size: 14px;
+  color: #3f3f46;
+  b { color: $carmesi-hondo; }
+}
+
+// --- Formulario ----------------------------------------------------------------
+.formulario { display: grid; gap: 20px; }
+
+.grupo {
+  display: grid;
+  gap: 20px;
+  padding: clamp(24px, 3vw, 36px);
+  border-radius: 24px;
+  background: $suelo-2;
+}
+
+h2 {
+  margin: 0;
+  font-family: $fd;
+  font-size: clamp(24px, 2vw, 30px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: $tinta;
+}
+
+.par { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.campo { display: grid; gap: 8px; min-width: 0; align-content: start; }
+
+label, legend {
+  font-size: $t-chica;
+  font-weight: 600;
+  color: $tinta;
+}
+.opcional { font-weight: 500; color: $suave; }
+
+input:not([type='checkbox']) {
+  width: 100%;
+  min-height: 54px;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 14px;
+  background: $suelo-3;
+  color: $tinta;
+  font-family: $fb;
+  font-size: $t-texto;    // 16 px o más: iOS no hace zoom al enfocar
+  outline: none;
+  transition: background-color 0.2s $curva, box-shadow 0.2s $curva;
+  &::placeholder { color: #6b6b6b; }
+  &::-ms-reveal { display: none; }   // el ojo de Edge: ya está el botón "Ver"
+  &:hover { background: #262626; }
+  &:focus-visible, &:focus { background: #262626; outline: 2px solid $carmesi; outline-offset: 0; }
+}
+
+.con-boton {
+  position: relative;
+  input { padding-right: 88px; }
+}
+.ver {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: $suave;
+  font-family: $fb;
+  font-size: $t-chica;
+  font-weight: 600;
+  cursor: pointer;
+  &:hover { color: $tinta; }
+  &:focus-visible { outline: 2px solid $tinta; }
+}
+
+.estado {
+  margin: 0;
+  font-size: $t-chica;
+  line-height: 1.45;
+  color: $suave;
+  .ok { color: #4ade80; font-weight: 600; }
+  .mal { color: $carmesi-texto; font-weight: 600; }
+}
+
+// Tipos de vehículo: dos opciones grandes que se prenden en carmesí.
+.tipos {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  legend { padding: 0; }
+}
+.ayuda { margin: 6px 0 14px; font-size: $t-chica; color: $suave; }
+.opciones { display: flex; flex-wrap: wrap; gap: 12px; }
+.tipo {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 0 22px 0 16px;
+  border-radius: 999px;
+  background: $suelo-3;
+  font-size: $t-texto;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s $curva, color 0.2s $curva;
+  // La casilla nativa queda (accesible y con teclado) pero invisible; el punto la dibuja.
+  input { @include oculto; }
+  &::before {
+    content: '';
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #3a3a3a;
+    transition: background-color 0.2s $curva, box-shadow 0.2s $curva;
+  }
+  &:hover { background: #262626; }
+  &.marcado {
+    background: $carmesi;
+    color: #fff;
+    &::before { background: #fff; box-shadow: inset 0 0 0 6px $carmesi-hondo; }   // taste-skill-ignore: el anillo del disco, no una sombra
+  }
+  &:focus-within { outline: 2px solid $tinta; outline-offset: 3px; }
+}
+
+.crear {
+  @include boton;
+  width: 100%;
+  min-height: 60px;
+  border: 0;
+  cursor: pointer;
+  &:disabled { cursor: not-allowed; background: $suelo-3; color: $suave; transform: none; }
+  ion-spinner { width: 22px; height: 22px; color: #fff; }
+}
+.falta { margin: -6px 0 0; text-align: center; font-size: $t-chica; color: $suave; }
+
+// --- Teléfono y tablet en vertical: una sola columna --------------------------------
+@media (max-width: 900px) {
+  .cuerpo { grid-template-columns: 1fr; gap: 32px; padding-top: 16px; }
+  .lado { position: static; }
+  .escena { min-height: 0; margin-top: 32px; padding-top: 40px; }
+  .plato { left: auto; right: -12%; width: 62%; }
+}
+@media (max-width: 560px) {
+  .ya { font-size: 0; a { font-size: $t-chica; margin: 0; } }   // en angosto queda solo "Entrar"
+  .par { grid-template-columns: 1fr; }
+  .grupo { padding: 22px 18px; border-radius: 20px; }
+  .opciones { display: grid; grid-template-columns: 1fr; }
+}

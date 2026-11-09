@@ -1,135 +1,141 @@
-<ion-header class="ion-no-border">
-  <ion-toolbar>
-    <ion-buttons slot="start">
-      <ion-back-button defaultHref="/portal/login" text="Volver"></ion-back-button>
-    </ion-buttons>
-    <ion-title>{{ producto.nombre }}</ion-title>
-  </ion-toolbar>
-</ion-header>
+<ion-content class="registro">
+  <div class="pagina">
+    <header class="barra">
+      <a routerLink="/" class="marca" aria-label="Motiq, volver al inicio">
+        <img [src]="producto.logo" alt="" width="30" height="30" />
+        <span>{{ producto.nombre }}</span>
+      </a>
+      <p class="ya">¿Ya tenés cuenta? <a routerLink="/portal/login">Entrar</a></p>
+    </header>
 
-<ion-content class="ion-padding">
-  <div class="registro-wrap">
-    <h1 class="titulo">Registrá tu taller en {{ producto.nombre }}</h1>
-    <p class="subtitulo">
-      Creás la cuenta y entrás como administrador. Después podés invitar a tu equipo
-      y personalizar el sistema con tu logo y tus colores.
-    </p>
+    <div class="cuerpo">
+      <!-- A la izquierda (arriba en el teléfono): el titular y la ficha del taller,
+           que se va llenando con lo que se escribe en el formulario. -->
+      <aside class="lado">
+        <h1>Registrá tu taller en {{ producto.nombre }}</h1>
+        <p class="bajada">
+          Creás la cuenta y entrás como administrador. Después podés invitar a tu equipo
+          y personalizar el sistema con tu logo y tus colores.
+        </p>
 
-    <form (ngSubmit)="crear()">
-      <ion-list lines="full" class="bloque">
-        <ion-list-header><ion-label>Datos del taller</ion-label></ion-list-header>
-
-        <ion-item>
-          <ion-input
-            label="Nombre del taller" labelPlacement="stacked"
-            placeholder="Taller Los Andes"
-            [(ngModel)]="nombre" name="nombre"
-            (ionInput)="onNombre()" required autocomplete="organization"></ion-input>
-        </ion-item>
-
-        <ion-item>
-          <ion-input
-            label="Identificador (tu dirección web)" labelPlacement="stacked"
-            placeholder="ms-motors"
-            [(ngModel)]="slug" name="slug"
-            (ionInput)="onSlug()" autocapitalize="off" spellcheck="false"></ion-input>
-        </ion-item>
-
-        <!-- Estado de la validación en vivo: el identificador es el único campo que
-             puede chocar con otro taller, así que se resuelve antes de enviar. -->
-        <div class="estado-slug" *ngIf="slug">
-          <ion-note *ngIf="verificando" color="medium">
-            <ion-spinner name="dots"></ion-spinner> Verificando…
-          </ion-note>
-          <ion-note *ngIf="!verificando && disponible === true" color="success">
-            ✓ Disponible — <strong>{{ slug }}</strong>
-          </ion-note>
-          <ion-note *ngIf="!verificando && disponible === false" color="danger">
-            {{ motivoSlug || 'No disponible' }}
-          </ion-note>
+        <div class="escena" aria-hidden="true">
+          <div class="plato"></div>
+          <div class="ficha" data-ui>
+            <div class="ficha-cabeza">
+              <span class="sello">{{ iniciales }}</span>
+              <div class="ficha-texto">
+                <p class="ficha-nombre">{{ nombre.trim() || 'Tu taller' }}</p>
+                <p class="ficha-tipos">{{ tiposTexto }}</p>
+              </div>
+              <span class="plan">Prueba · 30 días</span>
+            </div>
+            <p class="ficha-rotulo">Tus clientes siguen su orden en</p>
+            <p class="ficha-enlace">{{ dominio }}/portal?taller=<b>{{ slug || 'tu-taller' }}</b></p>
+          </div>
         </div>
 
-        <!-- Define su catálogo de servicios inicial, los campos del formulario de
-             vehículo y cómo lo llama la interfaz. Se puede marcar más de uno. -->
-        <ion-item lines="none" class="etiqueta-grupo">
-          <ion-label>
-            <p class="titulo-grupo">¿Qué vehículos atienden?</p>
-            <p class="ayuda-grupo">Podés marcar más de uno. Define tu catálogo de servicios.</p>
-          </ion-label>
-        </ion-item>
-        <!-- Enlace de dos vías sobre un mapa, en vez de manejar el evento a mano.
-             Con [checked] + (ionChange) el estado del checkbox y el del componente
-             son dos cosas que hay que mantener sincronizadas, y ahí aparecen los
-             clics que no toman efecto. Con ngModel hay un solo estado. -->
-        <ion-item class="tipo-item" *ngFor="let t of tiposDisponibles">
-          <ion-checkbox
-            justify="start" labelPlacement="end"
-            [(ngModel)]="tiposMarcados[t.clave]"
-            [name]="'tipo_' + t.clave">{{ t.plural }}</ion-checkbox>
-        </ion-item>
-        <ion-note color="danger" class="aviso" *ngIf="tiposDisponibles.length && !tiposElegidos.length">
-          Elegí al menos un tipo de vehículo
-        </ion-note>
+        <p class="chica">Sin tarjeta. Cuando termina la prueba, el taller sigue gratis y no se borra nada.</p>
+      </aside>
 
-        <ion-item>
-          <ion-input
-            label="Teléfono" labelPlacement="stacked" placeholder="2222-0000"
-            [(ngModel)]="telefono" name="telefono" type="tel" autocomplete="tel"></ion-input>
-        </ion-item>
+      <form class="formulario" (ngSubmit)="crear()" novalidate>
+        <section class="grupo" aria-labelledby="g-taller">
+          <h2 id="g-taller">Tu taller</h2>
 
-        <ion-item>
-          <ion-input
-            label="Dirección" labelPlacement="stacked" placeholder="Liberia, Guanacaste"
-            [(ngModel)]="direccion" name="direccion"></ion-input>
-        </ion-item>
-      </ion-list>
+          <div class="campo">
+            <label for="f-nombre">Nombre del taller</label>
+            <input id="f-nombre" [ngModel]="nombre" (ngModelChange)="nombre = $event; onNombre()" name="nombre"
+                   placeholder="Taller Los Andes" required autocomplete="organization" />
+          </div>
 
-      <ion-list lines="full" class="bloque">
-        <ion-list-header><ion-label>Tu cuenta de administrador</ion-label></ion-list-header>
+          <div class="campo">
+            <label for="f-slug">Identificador</label>
+            <input id="f-slug" [ngModel]="slug" (ngModelChange)="slug = $event; onSlug()" name="slug"
+                   placeholder="taller-los-andes" autocapitalize="off" spellcheck="false"
+                   aria-describedby="f-slug-estado" />
+            <!-- La única validación que depende del servidor: va pegada a su campo. -->
+            <p id="f-slug-estado" class="estado" aria-live="polite">
+              <ng-container *ngIf="!slug">Se arma solo con el nombre. Es lo que va en tu dirección.</ng-container>
+              <ng-container *ngIf="slug && verificando">Verificando…</ng-container>
+              <span *ngIf="slug && !verificando && disponible === true" class="ok">Disponible.</span>
+              <span *ngIf="slug && !verificando && disponible === false" class="mal">{{ motivoSlug || 'No disponible' }}</span>
+            </p>
+          </div>
 
-        <ion-item>
-          <ion-input
-            label="Tu nombre" labelPlacement="stacked" placeholder="Ana Rodríguez"
-            [(ngModel)]="adminNombre" name="adminNombre" required autocomplete="name"></ion-input>
-        </ion-item>
+          <fieldset class="tipos">
+            <legend>¿Qué vehículos atienden?</legend>
+            <p class="ayuda">Podés marcar más de uno. Define tu catálogo de servicios.</p>
+            <div class="opciones">
+              <label *ngFor="let t of tiposDisponibles" class="tipo" [class.marcado]="tiposMarcados[t.clave]">
+                <input type="checkbox" [(ngModel)]="tiposMarcados[t.clave]" [name]="'tipo_' + t.clave" />
+                <span>{{ t.plural }}</span>
+              </label>
+            </div>
+            <p class="estado" *ngIf="tiposDisponibles.length && !tiposElegidos.length">
+              <span class="mal">Elegí al menos un tipo de vehículo.</span>
+            </p>
+          </fieldset>
 
-        <ion-item>
-          <ion-input
-            label="Correo" labelPlacement="stacked" placeholder="ana@taller.com"
-            [(ngModel)]="adminEmail" name="adminEmail" type="email"
-            required autocomplete="email" autocapitalize="off"></ion-input>
-        </ion-item>
+          <div class="par">
+            <div class="campo">
+              <label for="f-tel">Teléfono <span class="opcional">(opcional)</span></label>
+              <input id="f-tel" [(ngModel)]="telefono" name="telefono" type="tel"
+                     placeholder="2222-0000" autocomplete="tel" />
+            </div>
+            <div class="campo">
+              <label for="f-dir">Dirección <span class="opcional">(opcional)</span></label>
+              <input id="f-dir" [(ngModel)]="direccion" name="direccion" placeholder="Liberia, Guanacaste" />
+            </div>
+          </div>
+        </section>
 
-        <ion-item>
-          <ion-input
-            label="Contraseña" labelPlacement="stacked" placeholder="Mínimo 8 caracteres"
-            [(ngModel)]="adminPassword" name="adminPassword" type="password"
-            required autocomplete="new-password"></ion-input>
-        </ion-item>
-        <ion-note color="danger" class="aviso" *ngIf="passwordCorta">
-          La contraseña debe tener al menos 8 caracteres
-        </ion-note>
+        <section class="grupo" aria-labelledby="g-cuenta">
+          <h2 id="g-cuenta">Tu cuenta de administrador</h2>
 
-        <ion-item>
-          <ion-input
-            label="Repetir contraseña" labelPlacement="stacked"
-            [(ngModel)]="adminPassword2" name="adminPassword2" type="password"
-            required autocomplete="new-password"></ion-input>
-        </ion-item>
-        <ion-note color="danger" class="aviso" *ngIf="passwordsDistintas">
-          Las contraseñas no coinciden
-        </ion-note>
-      </ion-list>
+          <div class="par">
+            <div class="campo">
+              <label for="f-anombre">Tu nombre</label>
+              <input id="f-anombre" [(ngModel)]="adminNombre" name="adminNombre"
+                     placeholder="Ana Rodríguez" required autocomplete="name" />
+            </div>
+            <div class="campo">
+              <label for="f-correo">Correo</label>
+              <input id="f-correo" [(ngModel)]="adminEmail" name="adminEmail" type="email"
+                     placeholder="ana@taller.com" required autocomplete="email" autocapitalize="off" />
+            </div>
+          </div>
 
-      <ion-button expand="block" type="submit" [disabled]="!puedeEnviar" class="ion-margin-top">
-        <ion-spinner name="crescent" *ngIf="enviando"></ion-spinner>
-        <span *ngIf="!enviando">Crear taller</span>
-      </ion-button>
+          <div class="par">
+            <div class="campo">
+              <label for="f-clave">Contraseña</label>
+              <div class="con-boton">
+                <input id="f-clave" [(ngModel)]="adminPassword" name="adminPassword"
+                       [type]="verClave ? 'text' : 'password'" placeholder="Mínimo 8 caracteres"
+                       required autocomplete="new-password" aria-describedby="f-clave-estado" />
+                <button type="button" class="ver" (click)="verClave = !verClave"
+                        [attr.aria-pressed]="verClave">{{ verClave ? 'Ocultar' : 'Ver' }}</button>
+              </div>
+              <p id="f-clave-estado" class="estado" *ngIf="passwordCorta">
+                <span class="mal">Tiene que tener al menos 8 caracteres.</span>
+              </p>
+            </div>
+            <div class="campo">
+              <label for="f-clave2">Repetir contraseña</label>
+              <input id="f-clave2" [(ngModel)]="adminPassword2" name="adminPassword2"
+                     [type]="verClave ? 'text' : 'password'" required autocomplete="new-password"
+                     aria-describedby="f-clave2-estado" />
+              <p id="f-clave2-estado" class="estado" *ngIf="passwordsDistintas">
+                <span class="mal">Las contraseñas no coinciden.</span>
+              </p>
+            </div>
+          </div>
+        </section>
 
-      <p class="pie">
-        ¿Ya tenés cuenta?
-        <a routerLink="/portal/login">Iniciá sesión</a>
-      </p>
-    </form>
+        <button type="submit" class="crear" [disabled]="!puedeEnviar">
+          <ion-spinner name="crescent" *ngIf="enviando"></ion-spinner>
+          <span *ngIf="!enviando">Crear taller</span>
+        </button>
+        <p class="falta" *ngIf="!puedeEnviar && !enviando">{{ loQueFalta }}</p>
+      </form>
+    </div>
   </div>
 </ion-content>
