@@ -54,13 +54,18 @@ export class HeroComponent implements AfterViewInit, OnDestroy {
     const el = this.host.nativeElement as HTMLElement;
     const w = el.clientWidth || window.innerWidth;
     const h = el.clientHeight || window.innerHeight;
+    const BARRA = 84;   // alto de la barra fija + aire: el disco nunca pasa por debajo de ella
     if (w / h >= 0.95) {
-      // Escritorio: entra por la derecha, cortado, sin tocar el titular.
-      return { cx: 0.8, cy: 0.5, diametro: Math.min(h * 0.98, w * 0.55) };
+      // Escritorio: a la derecha, entero o apenas cortado por el borde (6 %), centrado
+      // en el alto que queda debajo de la barra y sin tocar el titular.
+      const d = Math.min((h - BARRA - 40) * 0.94, w * 0.46);
+      const centroX = w + d * 0.06 - d / 2;
+      const centroY = BARRA + (h - BARRA) / 2;
+      return { cx: centroX / w, cy: centroY / h, diametro: d };
     }
-    // Teléfono: arriba, casi del ancho de la pantalla y cortado a la derecha; su
-    // borde de arriba queda debajo de la barra y el caliper, encima del titular.
-    return { cx: 0.6, cy: 0.31, diametro: w * 0.94 };
+    // Teléfono: arriba, debajo de la barra, cortado a la derecha; el titular abajo.
+    const d = Math.min(w * 0.9, h * 0.42);
+    return { cx: (w * 0.56) / w, cy: (BARRA + d / 2) / h, diametro: d };
   }
 
   private encuadrar() {

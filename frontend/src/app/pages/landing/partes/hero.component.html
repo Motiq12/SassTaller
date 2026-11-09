@@ -1,12 +1,12 @@
 <section class="hero" aria-labelledby="hero-titulo">
   <!-- El motivo: un círculo plano carmesí y, delante, el disco de freno en 3D. -->
   <div class="escena" aria-hidden="true">
-    <div class="plato"></div>
+    <div class="plato" [class.con3d]="con3d"></div>
     <canvas #lienzo class="lienzo" [class.listo]="con3d"></canvas>
   </div>
 
   <div class="texto">
-    <h1 id="hero-titulo" appAparece>El taller ordenado, sin cuadernos.</h1>
+    <h1 id="hero-titulo" appAparece>El taller ordenado, <span class="junto">sin cuadernos.</span></h1>
     <p class="bajada" appAparece [retraso]="80">
       {{ producto.nombre }} lleva las órdenes de trabajo, los clientes y la agenda de tu taller
       en un solo lugar, sin grupos de WhatsApp. Para motos, autos o lo que atiendas.
