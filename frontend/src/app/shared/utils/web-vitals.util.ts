@@ -21,13 +21,22 @@ const URL_METRICAS = `${nativo ? environment.nativeApiUrl : ''}${environment.api
 // taller no puede salir de un token: viaja en la dirección, igual que en el resto de
 // las rutas públicas del portal. Sin esto la fila no tiene a qué taller pertenecer y el
 // servidor la descarta.
-function urlConTaller(): string {
+//
+// Devuelve null cuando no hay ningún taller del que pueda ser la medición: la landing
+// de motiq12.com (el dominio del producto) no es de nadie, y mandarla igual solo
+// producía un 400 en la consola de cada visitante. Con subdominio de taller
+// (msmotors.motiq12.com) el servidor lo resuelve solo, aunque acá no haya slug; es la
+// misma regla de services/taller.service.ts.
+function urlConTaller(): string | null {
   try {
     const enUrl = new URLSearchParams(window.location.search).get('taller');
     const slug = enUrl || localStorage.getItem('tallerms_taller');
     if (slug) return `${URL_METRICAS}?taller=${encodeURIComponent(slug)}`;
-  } catch { /* modo privado o sin window: se manda sin taller y el servidor decide */ }
-  return URL_METRICAS;
+  } catch { /* modo privado o sin window: se decide por el subdominio */ }
+  const host = (window.location.hostname || '').toLowerCase();
+  const haySubdominio = host.split('.').length >= 3 && !/^www\./.test(host)
+    && !host.endsWith('.railway.app') && !/^[\d.]+$/.test(host);
+  return haySubdominio ? URL_METRICAS : null;
 }
 
 function enviar(m: Metric) {
@@ -41,6 +50,7 @@ function enviar(m: Metric) {
   });
 
   const url = urlConTaller();
+  if (!url) return;
   try {
     // sendBeacon es el único que sobrevive al cierre de la pestaña, que es
     // justamente cuando se conocen los valores definitivos de CLS e INP.
