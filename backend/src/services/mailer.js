@@ -422,7 +422,70 @@ async function enviarCorreoPrueba(email, { nombre, taller }) {
   });
 }
 
+// ─────────────────────────────────────────────────────────────
+function envoltorioMotiq(titulo, cuerpoHtml) {
+  return `
+  <div style="background:#0a0a0a;padding:32px 0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+    <div style="max-width:460px;margin:0 auto;background:#171717;border-radius:24px;overflow:hidden;border:1px solid #262626;">
+      <div style="padding:24px 32px 8px;">
+        <div style="color:#3b82f6;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Motiq</div>
+        <h1 style="color:#fafafa;font-size:22px;margin:14px 0 6px;">${escapar(titulo)}</h1>
+      </div>
+      <div style="padding:4px 32px 30px;">${cuerpoHtml}</div>
+    </div>
+  </div>`;
+}
+
+// Faltan pocos días de prueba. Se manda una sola vez, con anticipación suficiente para
+// que le dé tiempo a decidir sin sentirse apurado.
+async function enviarAvisoTrial(email, { nombre, taller, dias }) {
+  const cuerpo =
+    parrafo(`Hola ${escapar(nombre || '')}, a la prueba de <b>${escapar(taller)}</b> le quedan <b>${dias} ${dias === 1 ? 'día' : 'días'}</b>.`) +
+    parrafo('Cuando se acabe no perdés nada: tu taller sigue funcionando y tus datos quedan donde están. Pasás al plan gratuito, que incluye una sucursal y hasta dos usuarios.') +
+    parrafo('Si sos más de dos o tenés varios locales, escribinos y lo vemos.');
+  return enviarCorreo({
+    to: email,
+    subject: `Te quedan ${dias} ${dias === 1 ? 'día' : 'días'} de prueba en Motiq`,
+    html: envoltorioMotiq('Tu prueba está por terminar', cuerpo),
+    devLog: `Aviso de fin de prueba a ${email} (${taller}, ${dias} días)`,
+  });
+}
+
+// La prueba terminó y la cuenta pasó al plan gratuito. El tono importa: no es una
+// mala noticia ni un corte, y el correo tiene que dejarlo claro en la primera línea.
+async function enviarAvisoPlanGratis(email, { nombre, taller }) {
+  const cuerpo =
+    parrafo(`Hola ${escapar(nombre || '')}, la prueba de <b>${escapar(taller)}</b> terminó y tu cuenta pasó al <b>plan gratuito</b>.`) +
+    parrafo('No se borró nada y podés seguir trabajando igual: órdenes, clientes, vehículos y citas siguen sin límite, y tus clientes siguen entrando al portal.') +
+    parrafo('Lo que cambia: una sucursal, hasta dos usuarios, y el portal vuelve a la marca de Motiq.') +
+    parrafo('¿Necesitás más? Respondé este correo y lo arreglamos.');
+  return enviarCorreo({
+    to: email,
+    subject: 'Tu prueba terminó — seguís adentro, en el plan gratuito',
+    html: envoltorioMotiq('Pasaste al plan gratuito', cuerpo),
+    devLog: `Aviso de paso a plan gratuito a ${email} (${taller})`,
+  });
+}
+
+// Código para confirmar el correo del dueño del taller. Va con la marca de Motiq y no
+// con la del taller: quien lo recibe es el dueño confirmando SU cuenta con nosotros.
+async function enviarCodigoCorreoStaff(email, { nombre, codigo, minutos }) {
+  const cuerpo =
+    parrafo(`Hola ${escapar(nombre || '')}, este es el código para confirmar tu correo:`) +
+    `<div style="margin:18px 0;padding:14px;border-radius:14px;background:#0a0a0a;border:1px solid #262626;
+                 text-align:center;color:#fafafa;font-size:30px;font-weight:700;letter-spacing:8px;">${escapar(codigo)}</div>` +
+    parrafo(`Vence en ${minutos} minutos.`) +
+    parrafo('Es el correo con el que vas a recuperar tu contraseña si la perdés, así que conviene tenerlo confirmado.');
+  return enviarCorreo({
+    to: email,
+    subject: `${codigo} es tu código de Motiq`,
+    html: envoltorioMotiq('Confirmá tu correo', cuerpo),
+    devLog: `Código de verificación de staff para ${email}: ${codigo}`,
+  });
+}
+
 module.exports = {
+  enviarAvisoTrial, enviarAvisoPlanGratis, enviarCodigoCorreoStaff,
   estadoCorreo, enviarCorreoPrueba, partesDelRemitente,
   enviarCorreo, enviarCodigoReset, enviarCodigoLogin, enviarCodigoVerificacion,
   enviarCodigoCambioCorreo, enviarAvisoCambioCorreo,

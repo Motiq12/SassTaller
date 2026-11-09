@@ -49,10 +49,10 @@ async function guardarServiciosCita(citaId, lista, conn) {
   if (!conn) throw new Error('guardarServiciosCita: falta el db del taller');
   await conn.query('DELETE FROM cita_servicios WHERE cita_id = ? AND tenant_id = @tenant', [citaId]);
   if (lista.length) {
-    // El id del taller va en cada fila: el VALUES multi-fila no admite el marcador.
     await conn.query(
-      'INSERT INTO cita_servicios (tenant_id, cita_id, servicio, orden) VALUES ?',
-      [lista.map((s, i) => [conn.tenantId, citaId, s, i])]
+      `INSERT INTO cita_servicios (tenant_id, cita_id, servicio, orden)
+       VALUES ${lista.map(() => '(@tenant, ?, ?, ?)').join(', ')}`,
+      lista.flatMap((s, i) => [citaId, s, i])
     );
   }
   await conn.query(

@@ -58,8 +58,6 @@ const FUENTES = [
     (f) => ({ texto: 'Bloqueaste horario en la agenda', detalle: corto(f.motivo) })],
   ['feriado', `SELECT nombre, created_at AS fecha FROM feriados WHERE creado_por = ? ORDER BY id DESC LIMIT ?`,
     (f) => ({ texto: `Agregaste el feriado ${corto(f.nombre, 60)}` })],
-  ['sitio', `SELECT descripcion, created_at AS fecha FROM web_historial WHERE usuario_id = ? ORDER BY id DESC LIMIT ?`,
-    (f) => ({ texto: 'Cambiaste el sitio web', detalle: corto(f.descripcion) })],
   ['respaldo', `SELECT ok, created_at AS fecha FROM respaldos_registro WHERE usuario_id = ? AND origen = 'panel' ORDER BY id DESC LIMIT ?`,
     (f) => ({ texto: Number(f.ok) ? 'Hiciste un respaldo de la base' : 'Intentaste un respaldo y falló' })],
   ['eliminada', `SELECT numero_orden, motivo, created_at AS fecha FROM ordenes_eliminadas WHERE eliminada_por = ? ORDER BY id DESC LIMIT ?`,

@@ -181,7 +181,8 @@ ALTER TABLE "usuarios"
   ADD COLUMN "sesiones_desde_ms" bigint DEFAULT NULL,
   ADD COLUMN "ultimo_ingreso" timestamptz DEFAULT NULL,
   ADD COLUMN "preferencias" text DEFAULT NULL,
-  ADD COLUMN "firma" text DEFAULT NULL;
+  ADD COLUMN "firma" text DEFAULT NULL,
+  ADD COLUMN "permisos_web" text DEFAULT NULL;
 
 -- El checklist era único por orden en TODA la tabla, no por empresa.
 ALTER TABLE "orden_checklist" DROP CONSTRAINT "idx_orden_checklist_orden_id";

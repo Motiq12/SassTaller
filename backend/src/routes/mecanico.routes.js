@@ -191,11 +191,9 @@ router.post('/ordenes/:id/repuestos', exigirPermiso('taller.repuestos'), async (
     // marcado como adicional y al ponerle precio se le pide aprobación otra vez.
     const adicional = orden.total_aprobado !== null ? 1 : 0;
     const [result] = await req.db.query(
-      // Inserción masiva: el taller va DENTRO de cada fila, no como marcador @tenant.
-      // Ese marcador se expande a un `?` con un valor suelto, y acá el único `?` es el
-      // arreglo anidado de filas — mezclarlos desalinearía los parámetros.
-      "INSERT INTO orden_repuestos (tenant_id, orden_id, nombre, cantidad, costo_unitario, estado, adicional) VALUES ?",
-      [piezas.map((p) => [req.tenantId, req.params.id, p.nombre, p.cantidad, 0, 'solicitado', adicional])]
+      `INSERT INTO orden_repuestos (tenant_id, orden_id, nombre, cantidad, costo_unitario, estado, adicional)
+       VALUES ${piezas.map(() => "(@tenant, ?, ?, ?, 0, 'solicitado', ?)").join(', ')}`,
+      piezas.flatMap((p) => [req.params.id, p.nombre, p.cantidad, adicional])
     );
     const [nuevos] = await req.db.query(
       'SELECT * FROM orden_repuestos WHERE tenant_id = @tenant AND orden_id = ? AND id >= ? ORDER BY id ASC LIMIT ?',

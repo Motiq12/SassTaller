@@ -29,7 +29,7 @@ async function abrir(url) {
   return {
     query: async (sql, params = []) => {
       let n = 0;
-      return [(await c.query(sql.replace(/\?/g, () => `${++n}`), params)).rows];
+      return [(await c.query(sql.replace(/\?/g, () => '$' + (++n)), params)).rows];
     },
     end: () => c.end(),
   };
@@ -312,7 +312,7 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
 
     const errores = salida.split('\n').filter((l) => /TypeError|ReferenceError|tenant-db:/.test(l));
     ok(errores.length === 0, 'el servidor no registró errores de programación', errores.slice(0, 10).map((l) => l.slice(0, 170)));
-    if (fallos.length) console.log('--- registro del servidor ---\n' + salida.split('\n').filter((l) => /rror|⚠|Falló/.test(l)).slice(-60).join('\n').slice(-6000));
+    if (fallos.length) console.log('--- registro del servidor ---\n' + salida.split('\n').filter((l) => /rror|⚠|Falló/.test(l) && !/Layer.handleError|HEADERS_SENT/.test(l)).slice(-60).join('\n').slice(-6000));
     console.log(fallos.length ? `\n${fallos.length} FALLOS` : '\nTODO BIEN');
     fin(fallos.length ? 1 : 0);
   } catch (e) {

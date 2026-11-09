@@ -1092,7 +1092,7 @@ router.post('/mensajes-internos', exigirPermiso('equipo.mensajes'), async (req, 
     const [r] = await req.db.query(
       `INSERT INTO mensajes_internos (tenant_id, remitente_id, destino_id, mensaje, foto, orden_id, sucursal_id)
        VALUES (@tenant, ?, ?, ?, ?, ?,
-               (SELECT sucursal_id FROM usuarios WHERE m.tenant_id = @tenant AND id = ? AND tenant_id = @tenant))`,
+               (SELECT sucursal_id FROM usuarios WHERE id = ? AND tenant_id = @tenant))`,
       [req.usuario.id, destino_id, (mensaje || '').trim(), foto || null, orden_id || null, destino_id]
     );
     const [[nuevo]] = await req.db.query(`${SELECT_MSG_INT} WHERE m.id = ?`, [req.usuario.id, r.insertId]);

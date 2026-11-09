@@ -718,7 +718,7 @@ router.get('/perfil', async (req, res) => {
     const [[c]] = await req.db.query(
       `SELECT id, nombre, apellido, email, email_pendiente, telefono, cedula, foto,
               notif_avances, notif_recordatorios,
-              (password_hash IS NOT NULL) AS tiene_password, (google_sub IS NOT NULL) AS con_google
+              (password_hash IS NOT NULL)::int AS tiene_password, (google_sub IS NOT NULL)::int AS con_google
        FROM clientes WHERE tenant_id = @tenant AND id = ? AND activo = 1`,
       [req.cliente.id]
     );

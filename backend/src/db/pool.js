@@ -162,6 +162,10 @@ const pool = {
   execute: (sql, params) => ejecutar(pg, sql, params),
   async getConnection() {
     const cliente = await pg.connect();
+    // Soltarla dos veces no es un error: mysql2 lo toleraba y varias rutas sueltan la
+    // conexión antes de un return y otra vez en el finally. pg lanza una excepción, que
+    // convertía una respuesta 404 ya enviada en un fallo del servidor.
+    let suelta = false;
     return {
       query: (sql, params) => ejecutar(cliente, sql, params),
       execute: (sql, params) => ejecutar(cliente, sql, params),
@@ -169,7 +173,11 @@ const pool = {
       commit: () => cliente.query('COMMIT'),
       rollback: () => cliente.query('ROLLBACK'),
       ping: () => cliente.query('SELECT 1'),
-      release: () => cliente.release(),
+      release: () => {
+        if (suelta) return;
+        suelta = true;
+        cliente.release();
+      },
     };
   },
   end: () => pg.end(),

@@ -122,7 +122,7 @@ router.get('/resumen', async (req, res) => {
     );
     // Tasa de éxito del mes: entregadas / (entregadas + canceladas).
     const [[exito]] = await req.db.query(
-      `SELECT COALESCE(SUM(estado='entregado'),0) AS entregadas, COALESCE(SUM(estado='cancelado'),0) AS canceladas
+      `SELECT COUNT(*) FILTER (WHERE estado='entregado') AS entregadas, COUNT(*) FILTER (WHERE estado='cancelado') AS canceladas
        FROM citas WHERE tenant_id = @tenant AND ${enPeriodo('fecha', 'mes', { offset: off })}`
     );
     const cerradas = Number(exito.entregadas) + Number(exito.canceladas);

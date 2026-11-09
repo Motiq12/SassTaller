@@ -377,7 +377,7 @@ router.delete('/:id', requireRol('admin'), async (req, res) => {
         await conn.query('DELETE FROM citas WHERE tenant_id = @tenant AND id = ?', [c.id]);
       } else {
         await conn.query(
-          `UPDATE citas SET orden_id = NULL, estado = IF(estado = 'cancelado', 'cancelado', 'agendado'),
+          `UPDATE citas SET orden_id = NULL, estado = CASE WHEN estado = 'cancelado' THEN 'cancelado' ELSE 'agendado' END,
              fecha_inicio = NULL, fecha_listo = NULL
            WHERE tenant_id = @tenant AND id = ?`,
           [c.id]
