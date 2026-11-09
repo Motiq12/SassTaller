@@ -1,6 +1,7 @@
 import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
+import { MarcaService } from '../../services/marca.service';
 import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -19,6 +20,8 @@ export class PortalRecuperarPage implements AfterViewInit, OnDestroy {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private auth = inject(AuthService);
+  /** Sin taller, la pantalla se viste de Motiq (theme/acceso-producto.scss). */
+  readonly marca = inject(MarcaService);
 
   /**
    * ¿Quién recupera? `taller` = el personal (usuarios del taller); si no, un cliente

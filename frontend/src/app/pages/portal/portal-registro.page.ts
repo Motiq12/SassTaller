@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -6,6 +6,7 @@ import { takeUntil } from 'rxjs/operators';
 import { PortalService, RespuestaGoogle } from '../../services/portal.service';
 import { emailValido } from '../../utils/validar';
 import { marcarCampo } from '../../shared/errores';
+import { MarcaService } from '../../services/marca.service';
 import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../shared/turnstile.util';
 
 @Component({
@@ -16,6 +17,8 @@ import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../sha
 })
 export class PortalRegistroPage implements OnInit, AfterViewInit, OnDestroy {
   private destroy$ = new Subject<void>();
+  /** Sin taller, la pantalla se viste de Motiq (theme/acceso-producto.scss). */
+  readonly marca = inject(MarcaService);
   nombre = '';
   apellido = '';
   telefono = '';

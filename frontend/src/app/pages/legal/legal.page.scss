@@ -1,70 +1,100 @@
-@use '../landing/partes/base' as *;
+@use '../landing/partes/sistema' as *;
 
-ion-content.legal { --background: #{$suelo}; --color: #{$tinta}; }
-
-.pagina {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: 0 $margen 72px;
+// Términos y privacidad, con el sistema de la web pública: marco blanco, la cabecera
+// en una tarjeta negra y el texto sobre claro, en una columna de lectura.
+ion-content.legal {
+  --background: #{$papel};
+  --color: #{$tinta};
   font-family: $fb;
   color: $tinta;
+  @include escala;
 }
 
-.barra {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  min-height: 76px;
+.pagina { @include marco; }
+
+// ── Cabecera ─────────────────────────────────────────────────────────────────────
+.cabeza {
+  padding: u(1.5) u(1.5) u(3);
+  border-radius: $r-tarjeta-lg;
+  background:
+    radial-gradient(ellipse 60% 70% at 90% 0%, rgba(225, 29, 72, 0.22), transparent 70%),
+    $noche;
+  color: #fff;
+  @media (min-width: 640px) { padding: u(2) u(2.5) u(4); }
 }
+.barra { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: u(4); }
 .marca {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  color: $tinta;
+  color: #fff;
   text-decoration: none;
   font-family: $fd;
-  font-size: $t-entrada;
-  font-weight: 700;
-  img { width: 30px; height: 30px; filter: brightness(0) invert(1); }
-  &:focus-visible { outline: 3px solid $tinta; outline-offset: 4px; border-radius: 6px; }
+  font-size: 15px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  img { width: 22px; height: 22px; }
+  &:focus-visible { outline: 2px solid $carmesi-claro; outline-offset: 4px; border-radius: 6px; }
 }
 .docs {
   display: flex;
-  gap: 24px;
+  gap: 6px;
   a {
-    padding: 10px 0;
-    color: $suave;
-    font-size: $t-chica;
+    padding: 8px 16px;
+    border-radius: $r-pildora;
+    color: blanco(0.75);
+    font-size: 14px;
     font-weight: 600;
     text-decoration: none;
-    border-bottom: 2px solid transparent;
-    &:hover { color: $tinta; }
-    &.actual { color: $tinta; border-bottom-color: $carmesi; }
+    transition: background-color 0.25s $quart, color 0.25s $quart;
+    &:hover { color: #fff; background: blanco(0.08); }
+    &.actual { color: $tinta; background: #fff; }
+    &:focus-visible { outline: 2px solid $carmesi-claro; outline-offset: 2px; }
   }
 }
-
-article { max-width: 68ch; padding-top: clamp(32px, 6vw, 80px); }
-
-h1 { @include titulo($t-lista); font-size: clamp(36px, 4vw, 60px); }
-.bajada { margin: 20px 0 0; font-size: $t-entrada; line-height: 1.55; }
-.fecha { margin: 16px 0 0; font-size: $t-chica; color: $suave; }
-
-section { margin-top: 48px; }
-h2 {
-  margin: 0 0 12px;
-  font-family: $fd;
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+.rotulo { @include rotulo(claro); }
+h1 {
+  @include titulo-seccion;
+  max-width: 18ch;
+  font-size: min(max(38px, #{u(4)}), 11vw);
 }
-section p { margin: 0 0 12px; font-size: $t-texto; line-height: 1.65; }
+.bajada { max-width: 44rem; margin: u(1.5) 0 0; font-size: max(17px, #{u(1.125)}); line-height: 1.55; color: blanco(0.85); }
+.fecha { margin: u(1) 0 0; font-size: 14px; color: blanco(0.6); }
 
+// ── El texto ─────────────────────────────────────────────────────────────────────
+article { max-width: 52rem; margin: 0 auto; padding: u(3) u(1) 0; @media (min-width: 640px) { padding-top: u(4.5); } }
+section {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  padding: u(1.75) 0;
+  border-top: 1px solid $linea;
+  @media (min-width: 640px) { grid-template-columns: 3.5rem 1fr; gap: 0; }
+}
+.num { padding-top: 6px; font-family: $fd; font-size: 14px; font-weight: 600; color: $carmesi; }
+h2 { margin: 0 0 12px; font-family: $fd; font-size: max(21px, #{u(1.5)}); font-weight: 600; letter-spacing: -0.01em; }
+section p { margin: 0 0 12px; font-size: 17px; line-height: 1.7; color: $tinta; }
+
+// ── Pie ──────────────────────────────────────────────────────────────────────────
 .pie {
   display: flex;
   flex-wrap: wrap;
-  gap: 24px;
-  margin-top: 72px;
-  padding-top: 24px;
-  a { @include enlace; font-size: $t-chica; }
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 52rem;
+  margin: u(2) auto u(3);
+  padding: u(1.5) u(1) 0;
+  border-top: 1px solid $linea;
 }
+.volver {
+  color: $tinta;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: $carmesi;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 5px;
+  &:focus-visible { outline: 2px solid $carmesi; outline-offset: 4px; border-radius: 4px; }
+}
+.probar { @include pildora(tinta); }
