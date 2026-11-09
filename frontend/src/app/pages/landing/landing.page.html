@@ -14,12 +14,12 @@
   </header>
 
   <main>
-    <lp-hero (hablar)="irA('contacto')"></lp-hero>
-    <lp-vitrina id="problemas" class="seccion"></lp-vitrina>
-    <lp-etapas id="como" class="seccion"></lp-etapas>
-    <lp-adapta id="adapta"></lp-adapta>
-    <lp-precios id="precios" (hablar)="irA('contacto')"></lp-precios>
-    <lp-cupon id="contacto"></lp-cupon>
+    <app-lp-hero (hablar)="irA('contacto')"></app-lp-hero>
+    <app-lp-vitrina id="problemas" class="seccion"></app-lp-vitrina>
+    <app-lp-etapas id="como" class="seccion"></app-lp-etapas>
+    <app-lp-adapta id="adapta"></app-lp-adapta>
+    <app-lp-precios id="precios" (hablar)="irA('contacto')"></app-lp-precios>
+    <app-lp-cupon id="contacto"></app-lp-cupon>
   </main>
-  <lp-pie (ir)="irA($event)"></lp-pie>
+  <app-lp-pie (ir)="irA($event)"></app-lp-pie>
 </ion-content>

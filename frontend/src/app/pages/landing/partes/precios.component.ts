@@ -18,7 +18,7 @@ interface Plan {
  * Pro a convenir; los topes viven en backend/src/utils/limites.js).
  */
 @Component({
-  selector: 'lp-precios',
+  selector: 'app-lp-precios',
   templateUrl: './precios.component.html',
   styleUrls: ['./precios.component.scss'],
   standalone: false,

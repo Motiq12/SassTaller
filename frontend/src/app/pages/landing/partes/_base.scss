@@ -97,7 +97,7 @@ $curva: cubic-bezier(0.32, 0.72, 0, 1);   // la del sistema (DESIGN.md §6)
   font-size: $t-chica;   // fuera de la vista, pero dentro de la escala
 }
 
-// Entrada de cada pieza (la activa la directiva lpAparece). Sin script o con
+// Entrada de cada pieza (la activa la directiva appAparece). Sin script o con
 // movimiento reducido, todo se ve desde el principio.
 @mixin entrada {
   :host-context(.lp-js) & {

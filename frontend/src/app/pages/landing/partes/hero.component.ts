@@ -13,7 +13,7 @@ import type { Disco, Encuadre } from './disco-3d';
  * Si no hay WebGL, el círculo plano queda solo y la portada sigue entera.
  */
 @Component({
-  selector: 'lp-hero',
+  selector: 'app-lp-hero',
   templateUrl: './hero.component.html',
   styleUrls: ['./hero.component.scss'],
   standalone: false,

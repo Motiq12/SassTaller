@@ -1,5 +1,5 @@
 <section class="precios" aria-labelledby="precios-titulo">
-  <div class="nombres" lpAparece>
+  <div class="nombres" appAparece>
     <h2 id="precios-titulo">Precios</h2>
     <div role="tablist" aria-label="Planes" class="lista">
       <ng-container *ngFor="let p of planes; let i = index">
@@ -17,7 +17,7 @@
     </div>
   </div>
 
-  <div class="escenario" lpAparece [retraso]="120">
+  <div class="escenario" appAparece [retraso]="120">
     <div class="detalle escritorio" role="tabpanel" [attr.aria-label]="planes[elegido].nombre">
       <ng-container *ngTemplateOutlet="detalle; context: { $implicit: planes[elegido] }"></ng-container>
     </div>

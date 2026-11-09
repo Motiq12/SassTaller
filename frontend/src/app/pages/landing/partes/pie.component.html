@@ -1,6 +1,6 @@
 <footer class="pie" aria-labelledby="pie-titulo">
   <h2 id="pie-titulo" class="oculto">{{ producto.nombre }}</h2>
-  <div class="marca" role="img" [attr.aria-label]="producto.nombre" lpAparece>
+  <div class="marca" role="img" [attr.aria-label]="producto.nombre" appAparece>
     <span *ngFor="let b of letras; let i = index" class="bloque" [class.disco]="b.disco"
           [style.--retraso]="i * 70 + 'ms'" aria-hidden="true">{{ b.disco ? '' : b.l }}</span>
   </div>

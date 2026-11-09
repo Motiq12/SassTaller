@@ -6,7 +6,7 @@ import { PRODUCTO } from '../../../shared/producto';
  * (el motivo de toda la página). Debajo, los enlaces y una sola acción.
  */
 @Component({
-  selector: 'lp-pie',
+  selector: 'app-lp-pie',
   templateUrl: './pie.component.html',
   styleUrls: ['./pie.component.scss'],
   standalone: false,

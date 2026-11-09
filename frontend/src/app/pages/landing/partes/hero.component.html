@@ -6,15 +6,15 @@
   </div>
 
   <div class="texto">
-    <h1 id="hero-titulo" lpAparece>El taller ordenado, sin cuadernos.</h1>
-    <p class="bajada" lpAparece [retraso]="80">
+    <h1 id="hero-titulo" appAparece>El taller ordenado, sin cuadernos.</h1>
+    <p class="bajada" appAparece [retraso]="80">
       {{ producto.nombre }} lleva las órdenes de trabajo, los clientes y la agenda de tu taller
       en un solo lugar, sin grupos de WhatsApp. Para motos, autos o lo que atiendas.
     </p>
-    <div class="acciones" lpAparece [retraso]="160">
+    <div class="acciones" appAparece [retraso]="160">
       <a class="principal" routerLink="/registro-taller">Probá gratis</a>
       <button type="button" class="secundario" (click)="hablar.emit()">Hablá con nosotros</button>
     </div>
-    <p class="chica" lpAparece [retraso]="220">Sin tarjeta. Se arma en menos de 5 minutos.</p>
+    <p class="chica" appAparece [retraso]="220">Sin tarjeta. Se arma en menos de 5 minutos.</p>
   </div>
 </section>
