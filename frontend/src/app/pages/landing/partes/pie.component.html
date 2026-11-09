@@ -1,0 +1,22 @@
+<footer class="pie" aria-labelledby="pie-titulo">
+  <h2 id="pie-titulo" class="oculto">{{ producto.nombre }}</h2>
+  <div class="marca" role="img" [attr.aria-label]="producto.nombre" lpAparece>
+    <span *ngFor="let b of letras; let i = index" class="bloque" [class.disco]="b.disco"
+          [style.--retraso]="i * 70 + 'ms'" aria-hidden="true">{{ b.disco ? '' : b.l }}</span>
+  </div>
+
+  <div class="abajo">
+    <nav aria-label="Pie de página" class="enlaces">
+      <button type="button" (click)="ir.emit('como')">Cómo funciona</button>
+      <button type="button" (click)="ir.emit('precios')">Precios</button>
+      <a routerLink="/registro-taller">Registrar mi taller</a>
+      <a routerLink="/portal/login">Entrar</a>
+    </nav>
+    <p class="lema">{{ producto.nombre }} · {{ producto.descripcion }}</p>
+  </div>
+
+  <div class="ultima">
+    <p>© {{ anio }} {{ producto.nombre }}</p>
+    <a class="accion" routerLink="/registro-taller">Probá gratis</a>
+  </div>
+</footer>

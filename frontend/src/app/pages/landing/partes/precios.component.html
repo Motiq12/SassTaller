@@ -1,0 +1,32 @@
+<section class="precios" aria-labelledby="precios-titulo">
+  <div class="nombres" lpAparece>
+    <h2 id="precios-titulo">Precios</h2>
+    <div role="tablist" aria-label="Planes" class="lista">
+      <ng-container *ngFor="let p of planes; let i = index">
+        <button type="button" role="tab" class="plan" [class.elegido]="i === elegido"
+                [attr.aria-selected]="i === elegido" [attr.aria-controls]="'plan-' + i"
+                [attr.tabindex]="i === elegido ? 0 : -1"
+                (click)="elegir(i)" (focus)="elegir(i)" (keydown)="teclado($event, i)">
+          {{ p.nombre }}
+        </button>
+        <!-- En el teléfono, el detalle se abre debajo de su nombre. -->
+        <div class="detalle movil" *ngIf="i === elegido" [id]="'plan-' + i" role="tabpanel">
+          <ng-container *ngTemplateOutlet="detalle; context: { $implicit: p }"></ng-container>
+        </div>
+      </ng-container>
+    </div>
+  </div>
+
+  <div class="escenario" lpAparece [retraso]="120">
+    <div class="detalle escritorio" role="tabpanel" [attr.aria-label]="planes[elegido].nombre">
+      <ng-container *ngTemplateOutlet="detalle; context: { $implicit: planes[elegido] }"></ng-container>
+    </div>
+  </div>
+</section>
+
+<ng-template #detalle let-p>
+  <p class="cifra">{{ p.precio }} <span class="plazo">{{ p.plazo }}</span></p>
+  <p class="incluye">{{ p.incluye }}</p>
+  <a *ngIf="p.destino === 'registro'" class="accion" routerLink="/registro-taller">{{ p.accion }}</a>
+  <button *ngIf="p.destino === 'contacto'" type="button" class="accion" (click)="hablar.emit()">{{ p.accion }}</button>
+</ng-template>

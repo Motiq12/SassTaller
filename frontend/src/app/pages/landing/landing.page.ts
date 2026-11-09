@@ -1,8 +1,6 @@
-import { Component, OnInit, inject } from '@angular/core';
-import { Router } from '@angular/router';
-import { MotiqService } from '../../services/motiq.service';
+import { AfterViewInit, Component, ElementRef, NgZone, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
+import { IonContent } from '@ionic/angular';
 import { MarcaService } from '../../services/marca.service';
-import { ToastService } from '../../services/toast.service';
 import { PRODUCTO } from '../../shared/producto';
 
 /**
@@ -16,8 +14,13 @@ import { PRODUCTO } from '../../shared/producto';
  *
  *  · Un grupo con varias sucursales no se da de alta desde una página web. Decide
  *    por comité, pregunta por facturación, migración de datos y quién responde si
- *    algo falla. Para ese está el formulario: lo que deja acá cae en la bandeja del
- *    panel de Motiq y se cierra hablando.
+ *    algo falla. Para ese está el cupón de contacto (partes/cupon.component): lo que
+ *    deja ahí cae en la bandeja del panel de Motiq y se cierra hablando.
+ *
+ * El diseño: un solo motivo, el disco de freno. Enorme y en 3D en la portada, plano
+ * detrás de cada pantalla del producto, en los botones, las viñetas y la marca del
+ * cierre. Cada sección es un componente en partes/ (los estilos de una página así no
+ * entran en el tope por componente de Angular, y así cada uno se lee solo).
  *
  * Es del PRODUCTO, no de ningún taller: acá manda la marca de Motiq (ver producto.ts).
  */
@@ -27,78 +30,49 @@ import { PRODUCTO } from '../../shared/producto';
   styleUrls: ['./landing.page.scss'],
   standalone: false,
 })
-export class LandingPage implements OnInit {
-  private motiq = inject(MotiqService);
+export class LandingPage implements OnInit, AfterViewInit, OnDestroy {
   private marca = inject(MarcaService);
-  private toast = inject(ToastService);
-  private router = inject(Router);
+  private zona = inject(NgZone);
+
+  @ViewChild(IonContent) contenido?: IonContent;
+  @ViewChild('barra', { static: true }) barra!: ElementRef<HTMLElement>;
 
   producto = PRODUCTO;
+  /** Recién con el script corriendo se esconden las piezas para su entrada. */
+  conScript = false;
 
-  // Formulario de "hablá con nosotros"
-  nombre = '';
-  email = '';
-  telefono = '';
-  empresa = '';
-  volumen = '';
-  mensaje = '';
-  enviando = false;
-  enviado = false;
-  error = '';
-
-  readonly VOLUMENES = [
-    { valor: '1-20', rotulo: 'Hasta 20 vehículos al mes' },
-    { valor: '21-100', rotulo: 'Entre 20 y 100' },
-    { valor: '100+', rotulo: 'Más de 100' },
-    { valor: 'flota', rotulo: 'Manejamos flota propia' },
-  ];
+  private quitarScroll?: () => void;
 
   ngOnInit() {
     // Puede quedar pintado el color de un taller de una sesión anterior en el mismo
     // navegador. Acá se muestra Motiq, no un cliente.
     this.marca.limpiar();
+    this.conScript = true;
   }
 
-  get formularioListo(): boolean {
-    return !!this.nombre.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.email.trim());
+  async ngAfterViewInit() {
+    const el = await this.contenido?.getScrollElement();
+    if (!el) return;
+    // La barra se vuelve sólida apenas se baja. Se toca la clase a mano y fuera de
+    // Angular: un evento de scroll no merece recorrer la página entera.
+    this.zona.runOutsideAngular(() => {
+      const alScroll = () => this.barra.nativeElement.classList.toggle('solida', el.scrollTop > 24);
+      el.addEventListener('scroll', alScroll, { passive: true });
+      this.quitarScroll = () => el.removeEventListener('scroll', alScroll);
+      alScroll();
+    });
   }
 
-  probarGratis() {
-    this.router.navigate(['/registro-taller']);
-  }
+  ngOnDestroy() { this.quitarScroll?.(); }
 
   irA(id: string) {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-
-  enviar() {
-    if (!this.formularioListo || this.enviando) return;
-    this.enviando = true;
-    this.error = '';
-    this.motiq.pedirDemo({
-      nombre: this.nombre.trim(),
-      email: this.email.trim(),
-      telefono: this.telefono.trim(),
-      empresa: this.empresa.trim(),
-      volumen: this.volumen,
-      mensaje: this.mensaje.trim(),
-      origen: 'landing',
-    }).subscribe({
-      next: (r) => {
-        this.enviando = false;
-        this.enviado = true;   // se reemplaza el formulario, no se limpia y ya
-        this.toast.success(r.message, 4000);
-      },
-      error: (e) => {
-        this.enviando = false;
-        // El 429 no es un error del que escribe: ya mandó su mensaje. Decirle
-        // "algo salió mal" lo haría reintentar para nada.
-        if (e?.status === 429) {
-          this.enviado = true;
-          return;
-        }
-        this.error = e?.error?.error || 'No pudimos enviar tu mensaje. Probá de nuevo en un momento.';
-      },
+    const destino = document.getElementById(id);
+    if (!destino || !this.contenido) return;
+    // scrollIntoView no conoce el contenedor de Ionic; se calcula la posición.
+    this.contenido.getScrollElement().then((el) => {
+      const top = destino.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - 72;
+      const suave = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      el.scrollTo({ top, behavior: suave ? 'smooth' : 'auto' });
     });
   }
 }
