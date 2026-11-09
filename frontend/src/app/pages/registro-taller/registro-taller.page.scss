@@ -303,6 +303,92 @@ input:not([type='checkbox']) {
 }
 .falta { margin: -6px 0 0; text-align: center; font-size: $t-chica; color: $suave; }
 
+// --- Pasos ------------------------------------------------------------------------
+.columna { display: grid; gap: 20px; min-width: 0; }
+
+// Dos tramos con su nombre: dónde está y cuánto falta, sin numerar nada.
+.pasos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  li {
+    padding-top: 12px;
+    border-top: 4px solid $suelo-3;
+    font-size: $t-chica;
+    font-weight: 600;
+    color: $suave;
+    &.hecho { border-top-color: $carmesi; color: $tinta; }
+  }
+}
+h2:focus { outline: none; }
+
+.aviso-catalogo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  margin: 0 0 14px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(225, 29, 72, 0.12);
+  font-size: $t-chica;
+  line-height: 1.45;
+  span { flex: 1 1 260px; }
+}
+.reintentar, .volver, .confirmar, .reenviar {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  font-family: $fb;
+  font-size: $t-chica;
+  font-weight: 700;
+  cursor: pointer;
+  &:disabled { cursor: not-allowed; opacity: 0.5; }
+  &:focus-visible { outline: 3px solid $tinta; outline-offset: 3px; }
+}
+.reintentar, .volver { background: $suelo-3; color: $tinta; &:hover:not(:disabled) { background: #2a2a2a; } }
+
+.legal {
+  margin: 0;
+  font-size: $t-chica;
+  line-height: 1.5;
+  color: $suave;
+  a { color: $tinta; text-decoration-color: $carmesi; text-underline-offset: 3px; }
+}
+
+.botones {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  .volver { min-height: 60px; padding: 0 28px; font-size: $t-texto; }
+}
+
+// --- Cierre ------------------------------------------------------------------------
+.texto { margin: 0; font-size: $t-texto; line-height: 1.6; &.ok { color: #4ade80; font-weight: 600; } }
+.canje {
+  display: flex;
+  gap: 12px;
+  input { max-width: 180px; letter-spacing: 0.3em; font-size: 20px; text-align: center; }
+}
+.confirmar { min-height: 54px; background: $carmesi; color: #fff; &:hover:not(:disabled) { background: $carmesi-hondo; } }
+.reenviar { justify-self: start; padding: 0; background: none; color: $suave; text-decoration: underline; text-underline-offset: 4px; }
+
+.primeros {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  li { display: grid; gap: 2px; }
+  a { color: $tinta; font-size: $t-texto; font-weight: 700; text-decoration-color: $carmesi; text-underline-offset: 4px; }
+  span { font-size: $t-chica; color: $suave; }
+}
+a.crear { text-decoration: none; }
+
 // --- Teléfono y tablet en vertical: una sola columna --------------------------------
 @media (max-width: 900px) {
   .cuerpo { grid-template-columns: 1fr; gap: 32px; padding-top: 16px; }

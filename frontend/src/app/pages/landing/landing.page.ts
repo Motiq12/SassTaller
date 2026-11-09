@@ -1,4 +1,5 @@
 import { AfterViewInit, Component, ElementRef, NgZone, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { IonContent } from '@ionic/angular';
 import { MarcaService } from '../../services/marca.service';
 import { PRODUCTO } from '../../shared/producto';
@@ -33,6 +34,7 @@ import { PRODUCTO } from '../../shared/producto';
 export class LandingPage implements OnInit, AfterViewInit, OnDestroy {
   private marca = inject(MarcaService);
   private zona = inject(NgZone);
+  private route = inject(ActivatedRoute);
 
   @ViewChild(IonContent) contenido?: IonContent;
   @ViewChild('barra', { static: true }) barra!: ElementRef<HTMLElement>;
@@ -61,6 +63,11 @@ export class LandingPage implements OnInit, AfterViewInit, OnDestroy {
       this.quitarScroll = () => el.removeEventListener('scroll', alScroll);
       alScroll();
     });
+    // Llegar con #contacto (o cualquier sección) desde otra pantalla, por ejemplo el
+    // "escribinos" del login: el scroll vive en ion-content, así que el navegador no
+    // lo resuelve solo.
+    const destino = this.route.snapshot.fragment;
+    if (destino) setTimeout(() => this.irA(destino), 300);
   }
 
   ngOnDestroy() { this.quitarScroll?.(); }

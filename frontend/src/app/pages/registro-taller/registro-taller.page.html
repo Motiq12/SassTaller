@@ -5,17 +5,18 @@
         <img [src]="producto.logo" alt="" width="30" height="30" />
         <span>{{ producto.nombre }}</span>
       </a>
-      <p class="ya">¿Ya tenés cuenta? <a routerLink="/portal/login">Entrar</a></p>
+      <p class="ya" *ngIf="paso !== 3">¿Ya tenés cuenta? <a routerLink="/portal/login">Entrar</a></p>
     </header>
 
     <div class="cuerpo">
       <!-- A la izquierda (arriba en el teléfono): el titular y la ficha del taller,
            que se va llenando con lo que se escribe en el formulario. -->
       <aside class="lado">
-        <h1>Registrá tu taller en {{ producto.nombre }}</h1>
-        <p class="bajada">
-          Creás la cuenta y entrás como administrador. Después podés invitar a tu equipo
-          y personalizar el sistema con tu logo y tus colores.
+        <h1 *ngIf="paso !== 3">Registrá tu taller en {{ producto.nombre }}</h1>
+        <h1 *ngIf="paso === 3">Tu taller está listo.</h1>
+        <p class="bajada" *ngIf="paso !== 3">
+          Dos pasos: los datos del taller y tu cuenta de administrador. Después podés invitar
+          a tu equipo y personalizar el sistema con tu logo y tus colores.
         </p>
 
         <div class="escena" aria-hidden="true">
@@ -37,105 +38,178 @@
         <p class="chica">Sin tarjeta. Cuando termina la prueba, el taller sigue gratis y no se borra nada.</p>
       </aside>
 
-      <form class="formulario" (ngSubmit)="crear()" novalidate>
-        <section class="grupo" aria-labelledby="g-taller">
-          <h2 id="g-taller">Tu taller</h2>
+      <div class="columna">
+        <!-- Dónde está: dos pasos y nada más. El tercero es la confirmación. -->
+        <ol class="pasos" *ngIf="paso !== 3" aria-label="Pasos del registro">
+          <li class="hecho" [attr.aria-current]="paso === 1 ? 'step' : null">Tu taller</li>
+          <li [class.hecho]="paso === 2" [attr.aria-current]="paso === 2 ? 'step' : null">Tu cuenta</li>
+        </ol>
 
-          <div class="campo">
-            <label for="f-nombre">Nombre del taller</label>
-            <input id="f-nombre" [ngModel]="nombre" (ngModelChange)="nombre = $event; onNombre()" name="nombre"
-                   placeholder="Taller Los Andes" required autocomplete="organization" />
-          </div>
+        <!-- PASO 1: el taller ------------------------------------------------------ -->
+        <form class="formulario" *ngIf="paso === 1" (ngSubmit)="seguir()" novalidate>
+          <section class="grupo" aria-labelledby="g-taller">
+            <h2 id="g-taller" #encabezado tabindex="-1">Tu taller</h2>
 
-          <div class="campo">
-            <label for="f-slug">Identificador</label>
-            <input id="f-slug" [ngModel]="slug" (ngModelChange)="slug = $event; onSlug()" name="slug"
-                   placeholder="taller-los-andes" autocapitalize="off" spellcheck="false"
-                   aria-describedby="f-slug-estado" />
-            <!-- La única validación que depende del servidor: va pegada a su campo. -->
-            <p id="f-slug-estado" class="estado" aria-live="polite">
-              <ng-container *ngIf="!slug">Se arma solo con el nombre. Es lo que va en tu dirección.</ng-container>
-              <ng-container *ngIf="slug && verificando">Verificando…</ng-container>
-              <span *ngIf="slug && !verificando && disponible === true" class="ok">Disponible.</span>
-              <span *ngIf="slug && !verificando && disponible === false" class="mal">{{ motivoSlug || 'No disponible' }}</span>
-            </p>
-          </div>
-
-          <fieldset class="tipos">
-            <legend>¿Qué vehículos atienden?</legend>
-            <p class="ayuda">Podés marcar más de uno. Define tu catálogo de servicios.</p>
-            <div class="opciones">
-              <label *ngFor="let t of tiposDisponibles" class="tipo" [class.marcado]="tiposMarcados[t.clave]">
-                <input type="checkbox" [(ngModel)]="tiposMarcados[t.clave]" [name]="'tipo_' + t.clave" />
-                <span>{{ t.plural }}</span>
-              </label>
-            </div>
-            <p class="estado" *ngIf="tiposDisponibles.length && !tiposElegidos.length">
-              <span class="mal">Elegí al menos un tipo de vehículo.</span>
-            </p>
-          </fieldset>
-
-          <div class="par">
             <div class="campo">
-              <label for="f-tel">Teléfono <span class="opcional">(opcional)</span></label>
-              <input id="f-tel" [(ngModel)]="telefono" name="telefono" type="tel"
-                     placeholder="2222-0000" autocomplete="tel" />
+              <label for="f-nombre">Nombre del taller</label>
+              <input id="f-nombre" [ngModel]="nombre" (ngModelChange)="nombre = $event; onNombre()" name="nombre"
+                     placeholder="Taller Los Andes" required autocomplete="organization" />
             </div>
-            <div class="campo">
-              <label for="f-dir">Dirección <span class="opcional">(opcional)</span></label>
-              <input id="f-dir" [(ngModel)]="direccion" name="direccion" placeholder="Liberia, Guanacaste" />
-            </div>
-          </div>
-        </section>
 
-        <section class="grupo" aria-labelledby="g-cuenta">
-          <h2 id="g-cuenta">Tu cuenta de administrador</h2>
+            <fieldset class="tipos">
+              <legend>¿Qué vehículos atiende?</legend>
+              <p class="ayuda">Podés marcar más de uno. Con esto armamos tu catálogo de servicios.</p>
 
-          <div class="par">
-            <div class="campo">
-              <label for="f-anombre">Tu nombre</label>
-              <input id="f-anombre" [(ngModel)]="adminNombre" name="adminNombre"
-                     placeholder="Ana Rodríguez" required autocomplete="name" />
-            </div>
-            <div class="campo">
-              <label for="f-correo">Correo</label>
-              <input id="f-correo" [(ngModel)]="adminEmail" name="adminEmail" type="email"
-                     placeholder="ana@taller.com" required autocomplete="email" autocapitalize="off" />
-            </div>
-          </div>
-
-          <div class="par">
-            <div class="campo">
-              <label for="f-clave">Contraseña</label>
-              <div class="con-boton">
-                <input id="f-clave" [(ngModel)]="adminPassword" name="adminPassword"
-                       [type]="verClave ? 'text' : 'password'" placeholder="Mínimo 8 caracteres"
-                       required autocomplete="new-password" aria-describedby="f-clave-estado" />
-                <button type="button" class="ver" (click)="verClave = !verClave"
-                        [attr.aria-pressed]="verClave">{{ verClave ? 'Ocultar' : 'Ver' }}</button>
+              <!-- Si el catálogo no cargó, se dice y se ofrece reintentar. Mientras tanto
+                   se muestran las opciones básicas para elegir a mano: nunca se elige por
+                   el taller. -->
+              <div class="aviso-catalogo" *ngIf="catalogoFallo" role="alert">
+                <span>No pudimos cargar la lista completa de vehículos. Podés elegir entre estas opciones o reintentar.</span>
+                <button type="button" class="reintentar" (click)="cargarTipos()" [disabled]="cargandoTipos">
+                  {{ cargandoTipos ? 'Cargando…' : 'Reintentar' }}
+                </button>
               </div>
-              <p id="f-clave-estado" class="estado" *ngIf="passwordCorta">
-                <span class="mal">Tiene que tener al menos 8 caracteres.</span>
-              </p>
-            </div>
-            <div class="campo">
-              <label for="f-clave2">Repetir contraseña</label>
-              <input id="f-clave2" [(ngModel)]="adminPassword2" name="adminPassword2"
-                     [type]="verClave ? 'text' : 'password'" required autocomplete="new-password"
-                     aria-describedby="f-clave2-estado" />
-              <p id="f-clave2-estado" class="estado" *ngIf="passwordsDistintas">
-                <span class="mal">Las contraseñas no coinciden.</span>
-              </p>
-            </div>
-          </div>
-        </section>
 
-        <button type="submit" class="crear" [disabled]="!puedeEnviar">
-          <ion-spinner name="crescent" *ngIf="enviando"></ion-spinner>
-          <span *ngIf="!enviando">Crear taller</span>
-        </button>
-        <p class="falta" *ngIf="!puedeEnviar && !enviando">{{ loQueFalta }}</p>
-      </form>
+              <div class="opciones" *ngIf="tiposDisponibles.length">
+                <label *ngFor="let t of tiposDisponibles" class="tipo" [class.marcado]="tiposMarcados[t.clave]">
+                  <input type="checkbox" [(ngModel)]="tiposMarcados[t.clave]" [name]="'tipo_' + t.clave" />
+                  <span>{{ t.plural }}</span>
+                </label>
+              </div>
+              <p class="estado" *ngIf="cargandoTipos && !tiposDisponibles.length">Cargando…</p>
+            </fieldset>
+
+            <div class="campo">
+              <label for="f-slug">Identificador</label>
+              <input id="f-slug" [ngModel]="slug" (ngModelChange)="slug = $event; onSlug()" name="slug"
+                     placeholder="taller-los-andes" autocapitalize="off" spellcheck="false"
+                     aria-describedby="f-slug-estado" />
+              <!-- La única validación que depende del servidor: va pegada a su campo. -->
+              <p id="f-slug-estado" class="estado" aria-live="polite">
+                <ng-container *ngIf="!slug">Se arma solo con el nombre. Es lo que va en la dirección de tu portal.</ng-container>
+                <ng-container *ngIf="slug && verificando">Verificando…</ng-container>
+                <span *ngIf="slug && !verificando && disponible === true" class="ok">Disponible.</span>
+                <span *ngIf="slug && !verificando && disponible === false" class="mal">{{ motivoSlug || 'No disponible' }}</span>
+              </p>
+            </div>
+
+            <div class="par">
+              <div class="campo">
+                <label for="f-tel">Teléfono <span class="opcional">(opcional)</span></label>
+                <input id="f-tel" [(ngModel)]="telefono" name="telefono" type="tel"
+                       placeholder="2222-0000" autocomplete="tel" />
+              </div>
+              <div class="campo">
+                <label for="f-dir">Dirección <span class="opcional">(opcional)</span></label>
+                <input id="f-dir" [(ngModel)]="direccion" name="direccion" placeholder="Liberia, Guanacaste" />
+              </div>
+            </div>
+          </section>
+
+          <button type="submit" class="crear" [disabled]="!paso1Listo">Seguir</button>
+          <p class="falta" *ngIf="!paso1Listo">{{ faltaPaso1 }}</p>
+        </form>
+
+        <!-- PASO 2: la cuenta del dueño -------------------------------------------- -->
+        <form class="formulario" *ngIf="paso === 2" (ngSubmit)="crear()" novalidate>
+          <section class="grupo" aria-labelledby="g-cuenta">
+            <h2 id="g-cuenta" #encabezado tabindex="-1">Tu cuenta de administrador</h2>
+
+            <div class="par">
+              <div class="campo">
+                <label for="f-anombre">Tu nombre</label>
+                <input id="f-anombre" [(ngModel)]="adminNombre" name="adminNombre"
+                       placeholder="Ana Rodríguez" required autocomplete="name" />
+              </div>
+              <div class="campo">
+                <label for="f-correo">Correo</label>
+                <input id="f-correo" [(ngModel)]="adminEmail" name="adminEmail" type="email"
+                       placeholder="ana@taller.com" required autocomplete="email" autocapitalize="off" />
+              </div>
+            </div>
+
+            <div class="par">
+              <div class="campo">
+                <label for="f-clave">Contraseña</label>
+                <div class="con-boton">
+                  <input id="f-clave" [(ngModel)]="adminPassword" name="adminPassword"
+                         [type]="verClave ? 'text' : 'password'" placeholder="Mínimo 8 caracteres"
+                         required autocomplete="new-password" aria-describedby="f-clave-estado" />
+                  <button type="button" class="ver" (click)="verClave = !verClave"
+                          [attr.aria-pressed]="verClave">{{ verClave ? 'Ocultar' : 'Ver' }}</button>
+                </div>
+                <p id="f-clave-estado" class="estado" *ngIf="passwordCorta">
+                  <span class="mal">Tiene que tener al menos 8 caracteres.</span>
+                </p>
+              </div>
+              <div class="campo">
+                <label for="f-clave2">Repetir contraseña</label>
+                <input id="f-clave2" [(ngModel)]="adminPassword2" name="adminPassword2"
+                       [type]="verClave ? 'text' : 'password'" required autocomplete="new-password"
+                       aria-describedby="f-clave2-estado" />
+                <p id="f-clave2-estado" class="estado" *ngIf="passwordsDistintas">
+                  <span class="mal">Las contraseñas no coinciden.</span>
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <p class="legal">
+            Al crear el taller aceptás los
+            <a routerLink="/legal/terminos" target="_blank" rel="noopener">Términos de servicio</a>
+            y la <a routerLink="/legal/privacidad" target="_blank" rel="noopener">Política de privacidad</a>.
+          </p>
+
+          <div class="botones">
+            <button type="button" class="volver" (click)="volver()" [disabled]="enviando">Volver</button>
+            <button type="submit" class="crear" [disabled]="!puedeEnviar">
+              <ion-spinner name="crescent" *ngIf="enviando"></ion-spinner>
+              <span *ngIf="!enviando">Crear taller</span>
+            </button>
+          </div>
+          <p class="falta" *ngIf="!puedeEnviar && !enviando">{{ loQueFalta }}</p>
+        </form>
+
+        <!-- FINAL: el taller existe. Confirmar el correo y los primeros pasos. ------ -->
+        <div class="formulario" *ngIf="paso === 3">
+          <section class="grupo" aria-labelledby="g-correo">
+            <h2 id="g-correo" #encabezado tabindex="-1">Confirmá tu correo</h2>
+            <ng-container *ngIf="!correoConfirmado">
+              <p class="texto">
+                Te mandamos un código de 6 dígitos a <strong>{{ adminEmail }}</strong>. Es el correo con el
+                que vas a recuperar tu contraseña. Podés confirmarlo ahora o más tarde desde tu panel.
+              </p>
+              <div class="canje">
+                <input id="f-codigo" [(ngModel)]="codigo" name="codigo" inputmode="numeric" maxlength="6"
+                       autocomplete="one-time-code" placeholder="000000" aria-label="Código de 6 dígitos"
+                       (keyup.enter)="confirmarCorreo()" />
+                <button type="button" class="confirmar" (click)="confirmarCorreo()"
+                        [disabled]="codigo.trim().length < 6 || trabajandoCorreo">Confirmar</button>
+              </div>
+              <button type="button" class="reenviar" (click)="reenviarCodigo()" [disabled]="trabajandoCorreo">
+                No me llegó: reenviar el código
+              </button>
+            </ng-container>
+            <p class="texto ok" *ngIf="correoConfirmado">Listo, tu correo quedó confirmado.</p>
+          </section>
+
+          <section class="grupo" aria-labelledby="g-empezar">
+            <h2 id="g-empezar">Para empezar</h2>
+            <ul class="primeros">
+              <li><a routerLink="/admin/servicios">Revisá tus servicios y sus precios</a>
+                <span>Ya cargamos un catálogo base según los vehículos que atendés.</span></li>
+              <li><a routerLink="/admin/empleados">Invitá a tu equipo</a>
+                <span>Recepción y mecánicos, cada uno con su usuario.</span></li>
+              <li><a routerLink="/admin/config">Poné tu logo y tus colores</a>
+                <span>Es lo que ven tus clientes en el portal.</span></li>
+              <li><a routerLink="/admin/portal">Compartí tu portal</a>
+                <span>Un enlace y un código QR para tus clientes.</span></li>
+            </ul>
+          </section>
+
+          <a class="crear" routerLink="/admin" [replaceUrl]="true">Entrar a mi panel</a>
+        </div>
+      </div>
     </div>
   </div>
 </ion-content>
