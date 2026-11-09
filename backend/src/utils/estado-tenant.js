@@ -5,7 +5,7 @@
 // token dura 8 horas. Suspender no significaba nada hasta el día siguiente.
 //
 // Hay que mirarlo en CADA request autenticado, y por eso NO se consulta la base
-// en cada uno: eso duplicaría los viajes a MySQL de toda la aplicación para leer
+// en cada uno: eso duplicaría los viajes a la base de toda la aplicación para leer
 // un dato que cambia una vez cada varios meses. En su lugar se mantiene una foto
 // completa (son pocas filas, una por taller) que se refresca sola, y las lecturas
 // son de un Map — síncronas, sin await, sin red.
@@ -62,7 +62,7 @@ async function refrescarEstados() {
   // como un Date a medianoche de la zona del proceso, que es justo la ambigüedad que no
   // queremos arrastrar hasta el cálculo de días restantes.
   const [filas] = await pool.query(
-    `SELECT id, estado, plan, DATE_FORMAT(trial_hasta, '%Y-%m-%d') AS trial_hasta FROM tenants`
+    `SELECT id, estado, plan, to_char(trial_hasta, 'YYYY-MM-DD') AS trial_hasta FROM tenants`
   );
   cuentas.clear();
   for (const f of filas) {
@@ -73,7 +73,7 @@ async function refrescarEstados() {
 
 // La primera carga se espera (server.js la hace antes de escuchar) para no abrir
 // una ventana donde un taller suspendido trabaje. Los refrescos siguientes no
-// pueden tumbar el proceso: si MySQL parpadea, se conserva la foto anterior.
+// pueden tumbar el proceso: si la base parpadea, se conserva la foto anterior.
 async function iniciarRefrescoEstados() {
   await refrescarEstados();
   if (timer) clearInterval(timer);

@@ -115,8 +115,8 @@ async function notificarCitaAgendada(db, citaId, { reprogramada = false } = {}) 
     const config = await getConfig(db);
     if (!config.notif_estado) return;
     const [[cita]] = await db.query(
-      `SELECT ci.cliente_id, DATE_FORMAT(ci.fecha, '%d/%m') AS fecha,
-              TIME_FORMAT(ci.hora, '%H:%i') AS hora, ci.tipo_servicio, ci.motivo,
+      `SELECT ci.cliente_id, to_char(ci.fecha, 'DD/MM') AS fecha,
+              to_char(ci.hora, 'HH24:MI') AS hora, ci.tipo_servicio, ci.motivo,
               cl.notif_avances, m.marca, m.modelo
        FROM citas ci
        LEFT JOIN clientes cl ON cl.id = ci.cliente_id AND cl.tenant_id = @tenant

@@ -19,25 +19,25 @@ const MAP_ORDEN_A_CITA = {
 };
 
 // Genera numero_orden OT-YYYY-XXXX con un contador atómico por año Y POR TALLER.
-// El INSERT y el SELECT corren en la MISMA conexión (LAST_INSERT_ID es por conexión).
+//
+// Una sola sentencia: el primer pedido del año inserta 1; los siguientes chocan con la
+// PK (tenant_id, anio) y suben el contador. Postgres toma el candado de la fila en el
+// ON CONFLICT, así que dos órdenes simultáneas nunca reciben el mismo número, y
+// RETURNING devuelve el valor ya incrementado sin una segunda consulta. (En MySQL esto
+// necesitaba el truco de LAST_INSERT_ID(expr) y una conexión dedicada.)
 //
 // El contador es por taller porque la numeración es un correlativo visible para el
 // cliente: si fuera global, el taller B empezaría en OT-2026-0043 solo porque el
-// taller A ya emitió 42 órdenes. La PK (tenant_id, anio) lo garantiza en la base.
+// taller A ya emitió 42 órdenes.
 async function generarNumeroOrden(db) {
   const year = new Date().getFullYear();
-  const conn = await db.conexion();
-  try {
-    await conn.query(
-      `INSERT INTO orden_contadores (tenant_id, anio, ultimo) VALUES (@tenant, ?, LAST_INSERT_ID(1))
-       ON DUPLICATE KEY UPDATE ultimo = LAST_INSERT_ID(ultimo + 1)`,
-      [year]
-    );
-    const [[{ n }]] = await conn.sinScope('SELECT LAST_INSERT_ID() AS n');
-    return `OT-${year}-${String(n).padStart(4, '0')}`;
-  } finally {
-    conn.release();
-  }
+  const [[{ ultimo }]] = await db.query(
+    `INSERT INTO orden_contadores (tenant_id, anio, ultimo) VALUES (@tenant, ?, 1)
+     ON CONFLICT (tenant_id, anio) DO UPDATE SET ultimo = orden_contadores.ultimo + 1
+     RETURNING ultimo`,
+    [year]
+  );
+  return `OT-${year}-${String(ultimo).padStart(4, '0')}`;
 }
 
 // Refleja el estado de una orden en su cita vinculada (si existe). Nunca lanza:

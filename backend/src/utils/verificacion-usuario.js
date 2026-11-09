@@ -26,7 +26,7 @@ async function nuevoCodigo(db, usuarioId) {
   );
   await db.query(
     `INSERT INTO usuario_verify_codes (tenant_id, usuario_id, code_hash, expires_at)
-     VALUES (@tenant, ?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE))`,
+     VALUES (@tenant, ?, ?, NOW() + ?::int * INTERVAL '1 minute')`,
     [usuarioId, codeHash, VIGENCIA_MIN]
   );
   return codigo;

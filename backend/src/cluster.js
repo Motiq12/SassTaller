@@ -35,12 +35,12 @@ if (!cluster.isPrimary || WORKERS === 1) {
   require('./server');
 } else {
   const { testConnection } = require('./db/pool');
-  const { ensureSchema } = require('./db/auto-migrate');
+  const { migrar } = require('./db/migrar');
 
   (async () => {
     console.log(`🧵 Multiproceso: ${WORKERS} workers (WEB_CONCURRENCY${process.env.WEB_CONCURRENCY ? '' : ' sin definir → 2'}; el host reporta ${CPUS} núcleos, que en un contenedor NO es lo asignado)`);
     await testConnection();
-    await ensureSchema();   // una sola vez, antes de que nadie acepte requests
+    await migrar();   // una sola vez, antes de que nadie acepte requests
 
     // Se recuerda cuál es el worker de los jobs: si justo ese muere, el reemplazo
     // tiene que retomarlos, o los recordatorios dejan de salir sin que nadie se entere.

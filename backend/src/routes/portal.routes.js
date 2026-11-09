@@ -23,6 +23,7 @@ const { normalizarTipos, limpiarAtributos } = require('../utils/tipos-vehiculo')
 const { getSucursales, sucursalValida, sucursalPorDefecto } = require('../utils/sucursales');
 const { avanzarEstadoOrden, estadoTrasAprobacion } = require('../utils/ordenes');
 const { recompensas } = require('../utils/recompensas');
+const { bloquearFranja } = require('../utils/cupos');
 
 // Fecha de hoy en zona del taller (offset configurable, por defecto UTC-6).
 // Evita rechazar/permitir un día de más cuando el server corre en UTC.
@@ -115,7 +116,7 @@ async function nuevoCodigoVerificacion(db, clienteId, proposito) {
   );
   await db.query(
     `INSERT INTO email_verify_codes (tenant_id, cliente_id, code_hash, proposito, expires_at)
-     VALUES (@tenant, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))`,
+     VALUES (@tenant, ?, ?, ?, (NOW() + INTERVAL '10 minutes'))`,
     [clienteId, codeHash, proposito]
   );
   return codigo;
@@ -292,7 +293,7 @@ router.post('/recuperar/solicitar', antibot(), async (req, res) => {
       // Invalida códigos previos y guarda el nuevo (vence en 10 min).
       await req.db.query('UPDATE password_reset_codes SET used = 1 WHERE tenant_id = @tenant AND cliente_id = ? AND used = 0', [cliente.id]);
       await req.db.query(
-        'INSERT INTO password_reset_codes (tenant_id, cliente_id, code_hash, expires_at) VALUES (@tenant, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))',
+        "INSERT INTO password_reset_codes (tenant_id, cliente_id, code_hash, expires_at) VALUES (@tenant, ?, ?, NOW() + INTERVAL '10 minutes')",
         [cliente.id, codeHash]
       );
       await enviarCodigoReset(email, cliente.nombre, codigo, await marcaDelTaller(req.db, req.tallerSlug));
@@ -373,7 +374,7 @@ router.post('/otp/solicitar', antibot(), async (req, res) => {
       // Invalida códigos previos y guarda el nuevo (vence en 10 min).
       await req.db.query('UPDATE login_codes SET used = 1 WHERE tenant_id = @tenant AND cliente_id = ? AND used = 0', [cliente.id]);
       await req.db.query(
-        'INSERT INTO login_codes (tenant_id, cliente_id, code_hash, expires_at) VALUES (@tenant, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))',
+        "INSERT INTO login_codes (tenant_id, cliente_id, code_hash, expires_at) VALUES (@tenant, ?, ?, NOW() + INTERVAL '10 minutes')",
         [cliente.id, codeHash]
       );
       await enviarCodigoLogin(email, cliente.nombre, codigo, await marcaDelTaller(req.db, req.tallerSlug));
@@ -476,7 +477,7 @@ router.get('/resumen', async (req, res) => {
     //   3) vencida   → agendada pero la fecha ya pasó y nunca se inició.
     const hoy = await hoyCR(req.db);
     const [citasAbiertas] = await req.db.query(
-      `SELECT ci.id, DATE_FORMAT(ci.fecha,'%Y-%m-%d') AS fecha, TIME_FORMAT(ci.hora,'%H:%i') AS hora,
+      `SELECT ci.id, to_char(ci.fecha, 'YYYY-MM-DD') AS fecha, to_char(ci.hora, 'HH24:MI') AS hora,
               ci.tipo_servicio, ci.estado,
               m.marca, m.modelo, m.placa, t.nombre AS tecnico_nombre
        FROM citas ci
@@ -523,7 +524,7 @@ const NOTIF_RETENCION_DIAS = 7;
 router.get('/notificaciones', async (req, res) => {
   try {
     await req.db.query(
-      'DELETE FROM notificaciones WHERE tenant_id = @tenant AND cliente_id = ? AND leida = 1 AND created_at < (NOW() - INTERVAL ? DAY)',
+      "DELETE FROM notificaciones WHERE tenant_id = @tenant AND cliente_id = ? AND leida = 1 AND created_at < NOW() - ?::int * INTERVAL '1 day'",
       [req.cliente.id, NOTIF_RETENCION_DIAS]
     );
     const [rows] = await req.db.query(
@@ -879,7 +880,7 @@ router.get('/disponibilidad', async (req, res) => {
     const config = await getConfig(req.db);
     const horas = horasDisponibles(fecha, config);
     const [rows] = await req.db.query(
-      `SELECT TIME_FORMAT(hora, '%H:%i') AS hora, COUNT(*) AS n
+      `SELECT to_char(hora, 'HH24:MI') AS hora, COUNT(*) AS n
        FROM citas WHERE tenant_id = @tenant AND fecha = ? AND sucursal_id = ? AND estado != 'cancelado' GROUP BY 1`,
       [fecha, sucursalId]
     );
@@ -908,7 +909,7 @@ router.get('/proximo-libre', async (req, res) => {
 
     // Ocupación de todo el rango en una sola consulta (fecha+hora → cantidad), por sucursal.
     const [filas] = await req.db.query(
-      `SELECT DATE_FORMAT(fecha, '%Y-%m-%d') AS f, TIME_FORMAT(hora, '%H:%i') AS h, COUNT(*) AS n
+      `SELECT to_char(fecha, 'YYYY-MM-DD') AS f, to_char(hora, 'HH24:MI') AS h, COUNT(*) AS n
        FROM citas WHERE tenant_id = @tenant AND fecha BETWEEN ? AND ? AND sucursal_id = ? AND estado <> 'cancelado' GROUP BY f, h`,
       [hoy, finStr, sucursalId]
     );
@@ -1068,7 +1069,7 @@ router.get('/fidelidad', async (req, res) => {
 router.get('/recompensas', async (req, res) => {
   try {
     const [rows] = await req.db.query(
-      `SELECT rc.id, DATE_FORMAT(rc.created_at, '%Y-%m-%d') AS fecha, rc.descripcion, o.numero_orden
+      `SELECT rc.id, to_char(rc.created_at, 'YYYY-MM-DD') AS fecha, rc.descripcion, o.numero_orden
        FROM recompensas_canjeadas rc
        LEFT JOIN ordenes_trabajo o ON o.id = rc.orden_id AND o.tenant_id = @tenant
        WHERE rc.tenant_id = @tenant AND rc.cliente_id = ?
@@ -1111,7 +1112,7 @@ router.get('/vehiculos', async (req, res) => {
   try {
     const [rows] = await req.db.query(
       `SELECT m.id, m.marca, m.modelo, m.placa, m.anio, m.color, m.kilometraje_actual, m.foto,
-              (SELECT DATE_FORMAT(MAX(COALESCE(c.fecha_fin, c.fecha)), '%Y-%m-%d')
+              (SELECT to_char(MAX(COALESCE(c.fecha_fin, c.fecha)), 'YYYY-MM-DD')
                FROM citas c WHERE c.tenant_id = @tenant AND c.vehiculo_id = m.id AND c.estado = 'entregado') AS ultimo_servicio
        FROM vehiculos m WHERE m.tenant_id = @tenant AND m.cliente_id = ? AND m.activa = 1 ORDER BY m.created_at DESC`,
       [req.cliente.id]
@@ -1226,7 +1227,7 @@ router.get('/vehiculos/:id/historial', async (req, res) => {
     if (!moto) return res.status(404).json({ error: 'Moto no encontrada' });
 
     const [servicios] = await req.db.query(
-      `SELECT ci.id, DATE_FORMAT(COALESCE(ci.fecha_fin, ci.fecha), '%Y-%m-%d') AS fecha,
+      `SELECT ci.id, to_char(COALESCE(ci.fecha_fin, ci.fecha), 'YYYY-MM-DD') AS fecha,
               ci.tipo_servicio, ci.motivo, ci.monto, ci.calificacion,
               ci.orden_id, o.numero_orden, o.diagnostico,
               t.nombre AS tecnico_nombre
@@ -1247,7 +1248,7 @@ router.get('/vehiculos/:id/historial', async (req, res) => {
 router.get('/citas', async (req, res) => {
   try {
     const [rows] = await req.db.query(
-      `SELECT ci.id, DATE_FORMAT(ci.fecha,'%Y-%m-%d') AS fecha, TIME_FORMAT(ci.hora,'%H:%i') AS hora,
+      `SELECT ci.id, to_char(ci.fecha, 'YYYY-MM-DD') AS fecha, to_char(ci.hora, 'HH24:MI') AS hora,
               ci.motivo, ci.tipo_servicio, ci.estado,
               ci.monto, ci.calificacion, ci.confirmada_cliente,
               ci.orden_id, o.numero_orden, o.estado AS orden_estado, o.aprobacion_cliente,
@@ -1273,7 +1274,7 @@ router.get('/citas', async (req, res) => {
 router.get('/citas/:id', async (req, res) => {
   try {
     const [[cita]] = await req.db.query(
-      `SELECT ci.id, DATE_FORMAT(ci.fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(ci.hora, '%H:%i') AS hora,
+      `SELECT ci.id, to_char(ci.fecha, 'YYYY-MM-DD') AS fecha, to_char(ci.hora, 'HH24:MI') AS hora,
               ci.motivo, ci.tipo_servicio, ci.estado, ci.vehiculo_id,
               ci.monto, ci.calificacion, ci.comentario_satisfaccion, ci.fecha_inicio, ci.fecha_fin,
               ci.confirmada_cliente,
@@ -1312,7 +1313,7 @@ router.put('/citas/:id', async (req, res) => {
     const sucursalPedida = (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
 
     const [[cita]] = await req.db.query(
-      "SELECT id, estado, orden_id, sucursal_id, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora FROM citas WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?",
+      "SELECT id, estado, orden_id, sucursal_id, to_char(fecha, 'YYYY-MM-DD') AS fecha, to_char(hora, 'HH24:MI') AS hora FROM citas WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?",
       [req.params.id, req.cliente.id]
     );
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
@@ -1357,8 +1358,9 @@ router.put('/citas/:id', async (req, res) => {
     const conn = await req.db.conexion();
     try {
       await conn.beginTransaction();
+      await bloquearFranja(conn, sucursalId, fecha, hora);
       const [[{ ocupadas }]] = await conn.query(
-        "SELECT COUNT(*) AS ocupadas FROM citas WHERE tenant_id = @tenant AND fecha = ? AND hora = ? AND sucursal_id = ? AND estado != 'cancelado' AND id != ? FOR UPDATE",
+        "SELECT COUNT(*) AS ocupadas FROM citas WHERE tenant_id = @tenant AND fecha = ? AND hora = ? AND sucursal_id = ? AND estado != 'cancelado' AND id != ?",
         [fecha, hora, sucursalId, req.params.id]
       );
       if (ocupadas >= config.max_citas_hora) {
@@ -1435,14 +1437,15 @@ router.post('/citas', async (req, res) => {
       return res.status(400).json({ error: `descripcion no puede exceder ${MAX_MOTIVO} caracteres` });
     }
 
-    // Cupo atómico: una transacción bloquea el rango (fecha,hora) con FOR UPDATE,
+    // Cupo atómico: la transacción toma el candado de la franja (bloquearFranja),
     // cuenta y recién ahí inserta. Dos solicitudes simultáneas se serializan, así
     // nunca se superan las MAX_POR_HORA citas por franja (evita la carrera del COUNT+INSERT).
     const conn = await req.db.conexion();
     try {
       await conn.beginTransaction();
+      await bloquearFranja(conn, sucursalId, fecha, hora);
       const [[{ ocupadas }]] = await conn.query(
-        "SELECT COUNT(*) AS ocupadas FROM citas WHERE tenant_id = @tenant AND fecha = ? AND hora = ? AND sucursal_id = ? AND estado != 'cancelado' FOR UPDATE",
+        "SELECT COUNT(*) AS ocupadas FROM citas WHERE tenant_id = @tenant AND fecha = ? AND hora = ? AND sucursal_id = ? AND estado != 'cancelado'",
         [fecha, hora, sucursalId]
       );
       if (ocupadas >= config.max_citas_hora) {
@@ -1501,7 +1504,7 @@ router.post('/citas/:id/calificar', async (req, res) => {
 router.patch('/citas/:id/cancelar', async (req, res) => {
   try {
     const [[cita]] = await req.db.query(
-      "SELECT id, estado, orden_id, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora FROM citas WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?",
+      "SELECT id, estado, orden_id, to_char(fecha, 'YYYY-MM-DD') AS fecha, to_char(hora, 'HH24:MI') AS hora FROM citas WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?",
       [req.params.id, req.cliente.id]
     );
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });

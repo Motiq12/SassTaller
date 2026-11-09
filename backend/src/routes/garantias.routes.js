@@ -50,7 +50,7 @@ router.get('/', async (req, res) => {
 // GET /api/garantias/:id — un reclamo con sus fotos
 router.get('/:id', async (req, res) => {
   try {
-    const [[garantia]] = await req.db.query(SELECT_GARANTIA + ' WHERE g.id = ?', [req.params.id]);
+    const [[garantia]] = await req.db.query(SELECT_GARANTIA + ' WHERE g.tenant_id = @tenant AND g.id = ?', [req.params.id]);
     if (!garantia) return res.status(404).json({ error: 'Reclamo no encontrado' });
     const [fotos] = await req.db.query('SELECT * FROM garantia_fotos WHERE tenant_id = @tenant AND garantia_id = ? ORDER BY created_at ASC', [req.params.id]);
     res.json({ data: { ...garantia, fotos } });
@@ -76,7 +76,7 @@ router.post('/', async (req, res) => {
        VALUES (@tenant, ?, ?, ?, ?, ?)`,
       [orden_id, descripcion_problema, cubre_repuestos ? 1 : 0, cubre_mano_obra ? 1 : 0, req.usuario.id]
     );
-    const [[nueva]] = await req.db.query(SELECT_GARANTIA + ' WHERE g.id = ?', [result.insertId]);
+    const [[nueva]] = await req.db.query(SELECT_GARANTIA + ' WHERE g.tenant_id = @tenant AND g.id = ?', [result.insertId]);
     res.status(201).json({ data: nueva, message: 'Reclamo de garantía registrado' });
   } catch (err) {
     fail(res, err);
@@ -101,7 +101,7 @@ router.patch('/:id/estado', requireRol('admin'), async (req, res) => {
         req.params.id,
       ]
     );
-    const [[actualizada]] = await req.db.query(SELECT_GARANTIA + ' WHERE g.id = ?', [req.params.id]);
+    const [[actualizada]] = await req.db.query(SELECT_GARANTIA + ' WHERE g.tenant_id = @tenant AND g.id = ?', [req.params.id]);
     res.json({ data: actualizada, message: 'Trámite actualizado' });
   } catch (err) {
     fail(res, err);

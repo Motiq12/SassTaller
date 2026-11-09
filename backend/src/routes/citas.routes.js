@@ -45,7 +45,8 @@ router.get('/', async (req, res) => {
     if (tecnico_id) { sql += ' AND ci.tecnico_id = ?'; params.push(tecnico_id); }
     if (sucursal_id) { sql += ' AND ci.sucursal_id = ?'; params.push(sucursal_id); }
     if (q) {
-      sql += ' AND (c.nombre LIKE ? OR c.apellido LIKE ? OR CONCAT(c.nombre, " ", c.apellido) LIKE ? OR m.placa LIKE ?)';
+      // En Postgres " " es un identificador, no un texto: el espacio va entre comillas simples.
+      sql += " AND (c.nombre ILIKE ? OR c.apellido ILIKE ? OR (c.nombre || ' ' || c.apellido) ILIKE ? OR m.placa ILIKE ?)";
       const like = `%${q}%`;
       params.push(like, like, like, like);
     }
@@ -117,7 +118,7 @@ router.put('/:id', soloRoles(...GESTIONA_AGENDA), async (req, res) => {
     // Fecha/hora previas: si el taller mueve la cita hay que avisarle al cliente
     // (antes se le cambiaba el día y no se enteraba por ningún lado).
     const [[previa]] = await req.db.query(
-      "SELECT DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora FROM citas WHERE tenant_id = @tenant AND id = ?",
+      "SELECT to_char(fecha, 'YYYY-MM-DD') AS fecha, to_char(hora, 'HH24:MI') AS hora FROM citas WHERE tenant_id = @tenant AND id = ?",
       [req.params.id]
     );
     await req.db.query(
@@ -167,7 +168,7 @@ router.patch('/:id/asignar', requireRol('admin'), async (req, res) => {
     const { tecnico_id } = req.body;
     await req.db.query('UPDATE citas SET tecnico_id = ? WHERE tenant_id = @tenant AND id = ?', [tecnico_id || null, req.params.id]);
     if (tecnico_id) {
-      const [[cita]] = await req.db.query("SELECT DATE_FORMAT(fecha,'%Y-%m-%d') AS fecha, TIME_FORMAT(hora,'%H:%i') AS hora, tipo_servicio, motivo FROM citas WHERE tenant_id = @tenant AND id = ?", [req.params.id]);
+      const [[cita]] = await req.db.query("SELECT to_char(fecha, 'YYYY-MM-DD') AS fecha, to_char(hora, 'HH24:MI') AS hora, tipo_servicio, motivo FROM citas WHERE tenant_id = @tenant AND id = ?", [req.params.id]);
       if (cita) await notificarMecanico(req.db, tecnico_id, `Te asignaron una cita: ${cita.tipo_servicio || cita.motivo} el ${cita.fecha} a las ${cita.hora}`, req.usuario.id);
     }
     res.json({ message: tecnico_id ? 'Técnico asignado' : 'Asignación quitada' });

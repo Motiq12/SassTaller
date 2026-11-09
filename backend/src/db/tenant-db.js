@@ -1,4 +1,4 @@
-// Acceso a MySQL scopeado por tenant (taller suscriptor del SaaS).
+// Acceso a Postgres scopeado por tenant (taller suscriptor del SaaS).
 //
 // El problema que resuelve: con base compartida, una consulta a la que se le olvida
 // el filtro por tenant NO falla — devuelve datos de otros talleres. Es una fuga
@@ -24,6 +24,17 @@ const TABLAS_CON_TENANT = new Set([
   'orden_fotos', 'orden_repuestos', 'orden_tiempos', 'ordenes_trabajo',
   'password_reset_codes', 'promos', 'recompensas_canjeadas', 'servicios',
   'sucursales', 'tareas_mecanico', 'usuario_verify_codes', 'usuarios', 'web_vitals',
+]);
+
+// Tablas de la PLATAFORMA (el panel de Motiq) que también tienen tenant_id, pero con
+// otro sentido: no son datos de un taller sino registros SOBRE un taller (qué hizo un
+// admin de Motiq con él, a quién sigue, qué falla reportó). Se leen cruzando talleres
+// a propósito y siempre por el pool directo, nunca por req.db. Se declaran acá para
+// que el chequeo de arranque las distinga de un olvido: antes no estaban en ninguna
+// lista y el aviso "no coincide con el esquema" salía en cada arranque, con lo que
+// dejaba de servir para detectar una tabla nueva sin filtrar.
+const TABLAS_DE_PLATAFORMA = new Set([
+  'motiq_bitacora', 'motiq_seguidos', 'motiq_tareas', 'reportes_falla',
 ]);
 
 // Detecta las tablas nombradas en la consulta junto con su alias, si tiene.
@@ -168,10 +179,10 @@ function paraTenant(tenantId) {
 async function verificarListaContraEsquema() {
   const [filas] = await pool.query(
     `SELECT table_name AS t FROM information_schema.columns
-     WHERE table_schema = DATABASE() AND column_name = 'tenant_id'`
+     WHERE table_schema = current_schema() AND column_name = 'tenant_id'`
   );
   const enBase = new Set(filas.map(f => String(f.t).toLowerCase()));
-  const faltan = [...enBase].filter(t => !TABLAS_CON_TENANT.has(t));
+  const faltan = [...enBase].filter(t => !TABLAS_CON_TENANT.has(t) && !TABLAS_DE_PLATAFORMA.has(t));
   const sobran = [...TABLAS_CON_TENANT].filter(t => !enBase.has(t));
   if (faltan.length || sobran.length) {
     console.warn(
@@ -211,4 +222,4 @@ async function porCadaTenant(fn) {
 // `exigirScope` se exporta para que los tests auditen el SQL del repo con la MISMA
 // lógica que corre en producción. Con una copia en el test, las dos podrían divergir
 // y el test daría por buena una consulta que en runtime falla (o al revés).
-module.exports = { paraTenant, porCadaTenant, verificarListaContraEsquema, exigirScope, TABLAS_CON_TENANT };
+module.exports = { paraTenant, porCadaTenant, verificarListaContraEsquema, exigirScope, TABLAS_CON_TENANT, TABLAS_DE_PLATAFORMA };

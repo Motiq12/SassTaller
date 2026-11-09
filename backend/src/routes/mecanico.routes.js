@@ -17,7 +17,7 @@ const EN_PROCESO = ['en_revision', 'en_mantenimiento'];
 
 // Campos que devuelve cada cita del mecánico (con datos de moto y cliente).
 const SELECT_CITA = `
-  SELECT ci.id, DATE_FORMAT(ci.fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(ci.hora, '%H:%i') AS hora,
+  SELECT ci.id, to_char(ci.fecha, 'YYYY-MM-DD') AS fecha, to_char(ci.hora, 'HH24:MI') AS hora,
          ci.motivo, ci.tipo_servicio, ci.estado,
          ci.monto, ci.calificacion, ci.comentario_satisfaccion, ci.fecha_inicio, ci.fecha_fin,
          ci.confirmada_cliente,
@@ -27,20 +27,20 @@ const SELECT_CITA = `
          m.marca, m.modelo, m.placa,
          c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.telefono AS cliente_telefono
   FROM citas ci
-  LEFT JOIN vehiculos m    ON m.id = ci.vehiculo_id
-  JOIN clientes c      ON c.id = ci.cliente_id
-  LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id`;
+  LEFT JOIN vehiculos m    ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant
+  JOIN clientes c      ON c.id = ci.cliente_id AND c.tenant_id = @tenant
+  LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id AND o.tenant_id = @tenant`;
 
 // GET /api/mecanico/resumen — KPIs del técnico logueado
 router.get('/resumen', async (req, res) => {
   try {
     const yo = req.usuario.id;
     const [[{ citas_hoy }]] = await req.db.query(
-      'SELECT COUNT(*) AS citas_hoy FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND fecha = CURDATE()',
+      'SELECT COUNT(*) AS citas_hoy FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND fecha = CURRENT_DATE',
       [yo]
     );
     const [[{ completadas_hoy }]] = await req.db.query(
-      "SELECT COUNT(*) AS completadas_hoy FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND estado = 'entregado' AND DATE(fecha_fin) = CURDATE()",
+      "SELECT COUNT(*) AS completadas_hoy FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND estado = 'entregado' AND DATE(fecha_fin) = CURRENT_DATE",
       [yo]
     );
     const [[{ en_proceso }]] = await req.db.query(
@@ -52,11 +52,11 @@ router.get('/resumen', async (req, res) => {
       [yo]
     );
     const [[{ generado_hoy }]] = await req.db.query(
-      "SELECT COALESCE(SUM(monto), 0) AS generado_hoy FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND estado = 'entregado' AND DATE(fecha_fin) = CURDATE()",
+      "SELECT COALESCE(SUM(monto), 0) AS generado_hoy FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND estado = 'entregado' AND DATE(fecha_fin) = CURRENT_DATE",
       [yo]
     );
     const [[{ tiempo_promedio_min }]] = await req.db.query(
-      `SELECT ROUND(AVG(TIMESTAMPDIFF(MINUTE, fecha_inicio, COALESCE(fecha_listo, fecha_fin)))) AS tiempo_promedio_min
+      `SELECT ROUND(AVG(TRUNC(EXTRACT(EPOCH FROM (COALESCE(fecha_listo, fecha_fin)) - (fecha_inicio)) / 60))) AS tiempo_promedio_min
        FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND estado = 'entregado' AND fecha_inicio IS NOT NULL AND (fecha_listo IS NOT NULL OR fecha_fin IS NOT NULL)`,
       [yo]
     );
@@ -197,7 +197,7 @@ router.get('/tareas', async (req, res) => {
        FROM tareas_mecanico t
        LEFT JOIN usuarios a ON a.id = t.asignado_por AND a.tenant_id = @tenant
        WHERE t.tenant_id = @tenant AND t.tecnico_id = ?
-       ORDER BY t.hecha ASC, FIELD(t.prioridad, 'urgente', 'alta', 'normal', 'baja'),
+       ORDER BY t.hecha ASC, array_position(ARRAY['urgente', 'alta', 'normal', 'baja']::text[], t.prioridad::text),
                 (t.vence IS NULL), t.vence ASC, t.created_at DESC`,
       [req.usuario.id]
     );
@@ -264,14 +264,15 @@ const SELECT_MENSAJE = `
          ${LEIDO_POR_MI}, ${VISTO_POR_OTRO}
   FROM mensajes_internos m
   JOIN usuarios u ON u.id = m.remitente_id AND u.tenant_id = @tenant
-  LEFT JOIN ordenes_trabajo o ON o.id = m.orden_id`;
+  LEFT JOIN ordenes_trabajo o ON o.id = m.orden_id AND o.tenant_id = @tenant`;
 
 router.get('/mensajes', async (req, res) => {
   try {
     const yo = req.usuario.id;
     const [rows] = await req.db.query(
       `${SELECT_MENSAJE}
-       WHERE m.remitente_id = ? OR m.destino_id = ? OR (m.tipo = 'broadcast' AND m.destino_rol = 'tecnico')
+       WHERE m.tenant_id = @tenant
+         AND (m.remitente_id = ? OR m.destino_id = ? OR (m.tipo = 'broadcast' AND m.destino_rol = 'tecnico'))
        ORDER BY m.created_at ASC LIMIT 100`,
       [yo, yo, yo]
     );
@@ -309,7 +310,7 @@ router.post('/mensajes', async (req, res) => {
       "INSERT INTO mensajes_internos (tenant_id,remitente_id, destino_rol, mensaje, foto, orden_id, sucursal_id, tipo) VALUES (@tenant, ?, ?, ?, ?, ?, ?, 'directo')",
       [req.usuario.id, destino_rol, (mensaje || '').trim(), foto || null, orden_id || null, me?.sucursal_id || null]
     );
-    const [[nuevo]] = await req.db.query(`${SELECT_MENSAJE} WHERE m.id = ?`, [req.usuario.id, r.insertId]);
+    const [[nuevo]] = await req.db.query(`${SELECT_MENSAJE} WHERE m.tenant_id = @tenant AND m.id = ?`, [req.usuario.id, r.insertId]);
     res.status(201).json({ data: nuevo, message: 'Mensaje enviado' });
   } catch (err) {
     fail(res, err);
@@ -339,7 +340,7 @@ router.get('/perfil', async (req, res) => {
        FROM usuarios u LEFT JOIN sucursales s ON s.id = u.sucursal_id AND s.tenant_id = @tenant WHERE u.tenant_id = @tenant AND u.id = ?`, [yo]);
     const [[g]] = await req.db.query(
       `SELECT COUNT(*) AS completadas, COALESCE(SUM(monto), 0) AS ingresos_generados,
-              ROUND(AVG(TIMESTAMPDIFF(MINUTE, fecha_inicio, COALESCE(fecha_listo, fecha_fin)))) AS tiempo_promedio_min
+              ROUND(AVG(TRUNC(EXTRACT(EPOCH FROM (COALESCE(fecha_listo, fecha_fin)) - (fecha_inicio)) / 60))) AS tiempo_promedio_min
        FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND estado = 'entregado'`,
       [yo]
     );
@@ -348,14 +349,14 @@ router.get('/perfil', async (req, res) => {
       [yo]
     );
     const [[sat]] = await req.db.query(
-      'SELECT COUNT(*) AS total, COALESCE(SUM(calificacion >= 4), 0) AS buenas FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND calificacion IS NOT NULL',
+      'SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE calificacion >= 4) AS buenas FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND calificacion IS NOT NULL',
       [yo]
     );
     const satisfechos_pct = sat.total ? Math.round((sat.buenas / sat.total) * 100) : null;
     const [[mes]] = await req.db.query(
       `SELECT COUNT(*) AS citas_mes, COALESCE(SUM(monto), 0) AS ingresos_mes
        FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND estado = 'entregado'
-         AND MONTH(fecha_fin) = MONTH(CURDATE()) AND YEAR(fecha_fin) = YEAR(CURDATE())`,
+         AND date_trunc('month', fecha_fin) = date_trunc('month', CURRENT_DATE)`,
       [yo]
     );
     const [calificaciones] = await req.db.query(
@@ -411,17 +412,17 @@ router.get('/alertas', async (req, res) => {
        JOIN usuarios u ON u.id = m.remitente_id AND u.tenant_id = @tenant
        WHERE m.tenant_id = @tenant AND (m.destino_id = ? OR (m.tipo = 'broadcast' AND m.destino_rol = 'tecnico'))
          AND m.remitente_id != ?
-         AND m.created_at >= NOW() - INTERVAL 24 HOUR
+         AND m.created_at >= NOW() - INTERVAL '24 hours'
        ORDER BY m.created_at DESC LIMIT 10`,
       [yo, yo]
     );
     const [citas] = await req.db.query(
       `SELECT 'cita_asignada' AS tipo, ci.created_at,
-              DATE_FORMAT(ci.fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(ci.hora, '%H:%i') AS hora,
+              to_char(ci.fecha, 'YYYY-MM-DD') AS fecha, to_char(ci.hora, 'HH24:MI') AS hora,
               ci.tipo_servicio, m.marca, m.modelo
        FROM citas ci
        LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant
-       WHERE ci.tenant_id = @tenant AND ci.tecnico_id = ? AND ci.created_at >= NOW() - INTERVAL 24 HOUR
+       WHERE ci.tenant_id = @tenant AND ci.tecnico_id = ? AND ci.created_at >= NOW() - INTERVAL '24 hours'
        ORDER BY ci.created_at DESC LIMIT 10`,
       [yo]
     );
@@ -431,7 +432,7 @@ router.get('/alertas', async (req, res) => {
               o.aprobacion_cliente, m.marca, m.modelo
        FROM ordenes_trabajo o
        JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
-       WHERE o.tenant_id = @tenant AND o.tecnico_id = ? AND o.updated_at >= NOW() - INTERVAL 24 HOUR
+       WHERE o.tenant_id = @tenant AND o.tecnico_id = ? AND o.updated_at >= NOW() - INTERVAL '24 hours'
          AND o.estado NOT IN ('recepcion')
        ORDER BY o.updated_at DESC LIMIT 10`,
       [yo]

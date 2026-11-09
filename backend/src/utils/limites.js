@@ -34,7 +34,7 @@ const LIMITES = {
 
 // Lo que el panel de Motiq editó, en memoria — igual que utils/estado-tenant.js hace
 // con el estado y el plan de cada taller, y por la misma razón: se consulta en cada
-// alta de usuario o sucursal, así que no puede costar un viaje a MySQL cada vez.
+// alta de usuario o sucursal, así que no puede costar un viaje a la base cada vez.
 //
 // Vacío hasta que algo llame a refrescarLimites() (server.js lo hace al arrancar). Un
 // test unitario que importe este módulo directo — como test/limites.test.js — nunca

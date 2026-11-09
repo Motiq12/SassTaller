@@ -38,14 +38,23 @@ seguimiento de su moto, aprobación de presupuestos y calificación.
 ## Requisitos
 
 - Node.js 18+
-- MySQL Server 8.x
+- PostgreSQL 18, la misma versión que producción (lo más simple: Docker Desktop, ver abajo)
 - Ionic CLI y Angular CLI
 
 ---
 
 ## 1. Base de datos
 
-Con MySQL corriendo (en Laragon: **Start All**), importá la base del repo:
+La base es **PostgreSQL**. En desarrollo alcanza con un contenedor (se crea una vez):
+
+```bash
+docker run -d --name motiq-pg -e POSTGRES_USER=motiq -e POSTGRES_PASSWORD=motiq_dev \
+  -e POSTGRES_DB=sasstaller -p 5432:5432 -v motiq-pg18-data:/var/lib/postgresql postgres:18-alpine
+```
+
+Copiá `backend/.env.example` a `backend/.env`: ya trae los valores de ese contenedor.
+Completá `JWT_SECRET` con cualquier texto largo (en producción el server aborta si falta).
+Después:
 
 ```bash
 cd backend
@@ -53,40 +62,22 @@ npm install
 npm run db:importar
 ```
 
-Eso recrea la base `sasstaller` con el volcado `backend/db/sasstaller.sql`, que ya trae
-el esquema al día y dos talleres de prueba. **Si ya la tenías, la reemplaza**: la idea es
-que todos arranquen desde lo mismo. El detalle de qué trae está en
-[`backend/db/README.md`](backend/db/README.md).
+Eso recrea el esquema desde `backend/db/migraciones/`, carga dos talleres de prueba y
+**genera contraseñas nuevas para el personal, que imprime una sola vez**: el repo no lleva
+ninguna que funcione. **Si ya tenías la base, la reemplaza** —la idea es que todos arranquen
+desde lo mismo— y por eso se niega a correr contra un servidor que no sea local. El detalle
+está en [`backend/db/README.md`](backend/db/README.md).
 
-Después copiá `backend/.env.example` a `backend/.env` y completá los valores:
-
-```
-PORT=3000
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=
-DB_NAME=sasstaller
-CORS_ORIGIN=http://localhost:8100
-JWT_SECRET=                # obligatorio; en producción el server aborta si falta
-RESEND_API_KEY=            # opcional; sin key, los códigos se imprimen en consola
-```
-
-Las cuentas vienen en el volcado (ver `backend/db/README.md`); el `.env` no está en el
-repo porque lleva el `JWT_SECRET`, así que pedíselo a quien te pasó el proyecto.
-
-Para entrar al panel de la plataforma necesitás crear tu propia cuenta, porque esas no
-vienen en el volcado a propósito:
+Para entrar al panel de la plataforma necesitás tu propia cuenta (esas no vienen en los
+datos de prueba, a propósito):
 
 ```bash
 npm run motiq:admin -- "Tu nombre" vos@motiq.cr
 ```
 
-> **Sobre las migraciones.** La API corre migraciones idempotentes (`ensureSchema`) en
-> cada arranque, así que el esquema se mantiene al día solo en cada deploy. Los archivos
-> de `backend/migrations/` son el registro de cómo se llegó hasta acá: **no los ejecuta
-> ningún script** y el volcado ya los tiene aplicados. Solo hacen falta para entender un
-> cambio o para migrar a mano una base vieja.
+> **Sobre las migraciones.** Cada cambio de esquema es un archivo numerado en
+> `backend/db/migraciones/`, y la API aplica los pendientes al arrancar, una sola vez cada
+> uno. La carpeta `backend/migrations/` es el registro de la etapa MySQL: no la ejecuta nada.
 
 ---
 

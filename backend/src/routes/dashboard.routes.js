@@ -12,43 +12,43 @@ router.get('/resumen', async (req, res) => {
       "SELECT COUNT(*) AS motos_activas FROM ordenes_trabajo WHERE tenant_id = @tenant AND estado NOT IN ('entregada','cancelada')"
     );
     const [[{ motos_atrasadas }]] = await req.db.query(
-      "SELECT COUNT(*) AS motos_atrasadas FROM ordenes_trabajo WHERE tenant_id = @tenant AND estado NOT IN ('entregada','cancelada') AND fecha_estimada_entrega < CURDATE()"
+      "SELECT COUNT(*) AS motos_atrasadas FROM ordenes_trabajo WHERE tenant_id = @tenant AND estado NOT IN ('entregada','cancelada') AND fecha_estimada_entrega < CURRENT_DATE"
     );
     const [[{ facturacion_hoy }]] = await req.db.query(
-      "SELECT COALESCE(SUM(costo_mano_obra + costo_repuestos - descuento), 0) AS facturacion_hoy FROM ordenes_trabajo WHERE tenant_id = @tenant AND DATE(fecha_entrega_real) = CURDATE() AND estado = 'entregada'"
+      "SELECT COALESCE(SUM(costo_mano_obra + costo_repuestos - descuento), 0) AS facturacion_hoy FROM ordenes_trabajo WHERE tenant_id = @tenant AND DATE(fecha_entrega_real) = CURRENT_DATE AND estado = 'entregada'"
     );
     const [[{ facturacion_semana }]] = await req.db.query(
-      "SELECT COALESCE(SUM(costo_mano_obra + costo_repuestos - descuento), 0) AS facturacion_semana FROM ordenes_trabajo WHERE tenant_id = @tenant AND estado = 'entregada' AND YEARWEEK(fecha_entrega_real, 1) = YEARWEEK(CURDATE(), 1)"
+      "SELECT COALESCE(SUM(costo_mano_obra + costo_repuestos - descuento), 0) AS facturacion_semana FROM ordenes_trabajo WHERE tenant_id = @tenant AND estado = 'entregada' AND date_trunc('week', fecha_entrega_real) = date_trunc('week', CURRENT_DATE)"
     );
     const [[{ facturacion_mes }]] = await req.db.query(
-      "SELECT COALESCE(SUM(costo_mano_obra + costo_repuestos - descuento), 0) AS facturacion_mes FROM ordenes_trabajo WHERE tenant_id = @tenant AND estado = 'entregada' AND MONTH(fecha_entrega_real) = MONTH(CURDATE()) AND YEAR(fecha_entrega_real) = YEAR(CURDATE())"
+      "SELECT COALESCE(SUM(costo_mano_obra + costo_repuestos - descuento), 0) AS facturacion_mes FROM ordenes_trabajo WHERE tenant_id = @tenant AND estado = 'entregada' AND date_trunc('month', fecha_entrega_real) = date_trunc('month', CURRENT_DATE)"
     );
     // Facturación TOTAL del mes = órdenes + citas, sin doble conteo (una orden ligada
     // a una cita cuenta por la cita). Mismo criterio que el PDF / admin resumen.
     const [[{ facturacion_mes_total }]] = await req.db.query(
       `SELECT
          (SELECT COALESCE(SUM(monto),0) FROM citas
-            WHERE tenant_id = @tenant AND estado='entregado' AND MONTH(fecha_fin)=MONTH(CURDATE()) AND YEAR(fecha_fin)=YEAR(CURDATE()))
+            WHERE tenant_id = @tenant AND estado='entregado' AND date_trunc('month', fecha_fin) = date_trunc('month', CURRENT_DATE))
        + (SELECT COALESCE(SUM(costo_mano_obra + costo_repuestos - descuento),0) FROM ordenes_trabajo
-            WHERE tenant_id = @tenant AND estado='entregada' AND MONTH(fecha_entrega_real)=MONTH(CURDATE()) AND YEAR(fecha_entrega_real)=YEAR(CURDATE())
+            WHERE tenant_id = @tenant AND estado='entregada' AND date_trunc('month', fecha_entrega_real) = date_trunc('month', CURRENT_DATE)
               AND id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL AND tenant_id = @tenant)) AS facturacion_mes_total`
     );
     const [[{ ticket_promedio }]] = await req.db.query(
       "SELECT COALESCE(AVG(costo_mano_obra + costo_repuestos - descuento), 0) AS ticket_promedio FROM ordenes_trabajo WHERE tenant_id = @tenant AND estado = 'entregada'"
     );
     const [[{ tiempo_promedio_horas }]] = await req.db.query(
-      "SELECT ROUND(AVG(TIMESTAMPDIFF(HOUR, fecha_ingreso, fecha_entrega_real)), 1) AS tiempo_promedio_horas FROM ordenes_trabajo WHERE tenant_id = @tenant AND estado = 'entregada' AND fecha_entrega_real IS NOT NULL"
+      "SELECT ROUND(AVG(TRUNC(EXTRACT(EPOCH FROM (fecha_entrega_real) - (fecha_ingreso)) / 3600)), 1) AS tiempo_promedio_horas FROM ordenes_trabajo WHERE tenant_id = @tenant AND estado = 'entregada' AND fecha_entrega_real IS NOT NULL"
     );
     // Ingresos por citas (lo que cobra el mecánico al entregar una cita).
     // Es un canal de facturación distinto al de las órdenes de trabajo.
     const [[{ ingresos_citas_hoy }]] = await req.db.query(
-      "SELECT COALESCE(SUM(monto), 0) AS ingresos_citas_hoy FROM citas WHERE tenant_id = @tenant AND estado = 'entregado' AND DATE(fecha_fin) = CURDATE()"
+      "SELECT COALESCE(SUM(monto), 0) AS ingresos_citas_hoy FROM citas WHERE tenant_id = @tenant AND estado = 'entregado' AND DATE(fecha_fin) = CURRENT_DATE"
     );
     const [[{ ingresos_citas_mes }]] = await req.db.query(
-      "SELECT COALESCE(SUM(monto), 0) AS ingresos_citas_mes FROM citas WHERE tenant_id = @tenant AND estado = 'entregado' AND MONTH(fecha_fin) = MONTH(CURDATE()) AND YEAR(fecha_fin) = YEAR(CURDATE())"
+      "SELECT COALESCE(SUM(monto), 0) AS ingresos_citas_mes FROM citas WHERE tenant_id = @tenant AND estado = 'entregado' AND date_trunc('month', fecha_fin) = date_trunc('month', CURRENT_DATE)"
     );
     const [[{ citas_entregadas_mes }]] = await req.db.query(
-      "SELECT COUNT(*) AS citas_entregadas_mes FROM citas WHERE tenant_id = @tenant AND estado = 'entregado' AND MONTH(fecha_fin) = MONTH(CURDATE()) AND YEAR(fecha_fin) = YEAR(CURDATE())"
+      "SELECT COUNT(*) AS citas_entregadas_mes FROM citas WHERE tenant_id = @tenant AND estado = 'entregado' AND date_trunc('month', fecha_fin) = date_trunc('month', CURRENT_DATE)"
     );
     const [[{ repuestos_pendientes }]] = await req.db.query(
       "SELECT COUNT(*) AS repuestos_pendientes FROM orden_repuestos r JOIN ordenes_trabajo o ON o.id = r.orden_id AND o.tenant_id = @tenant WHERE r.tenant_id = @tenant AND r.estado IN ('pendiente','pedido_especial') AND o.estado NOT IN ('entregada','cancelada')"
@@ -109,7 +109,7 @@ router.get('/atrasos', async (req, res) => {
   try {
     const [rows] = await req.db.query(
       `SELECT o.id, o.numero_orden, o.estado, o.fecha_estimada_entrega,
-              DATEDIFF(o.fecha_estimada_entrega, CURDATE()) AS dias_restantes,
+              (o.fecha_estimada_entrega::date - CURRENT_DATE::date) AS dias_restantes,
               m.marca, m.modelo, m.placa,
               c.nombre AS cliente_nombre, c.apellido AS cliente_apellido,
               t.nombre AS tecnico_nombre
@@ -131,7 +131,7 @@ router.get('/tecnicos', async (req, res) => {
     const [rows] = await req.db.query(
       `SELECT u.id, u.nombre,
               COUNT(ot.id) AS ordenes_completadas,
-              ROUND(AVG(TIMESTAMPDIFF(HOUR, ot.fecha_ingreso, ot.fecha_entrega_real)), 1) AS horas_promedio
+              ROUND(AVG(TRUNC(EXTRACT(EPOCH FROM (ot.fecha_entrega_real) - (ot.fecha_ingreso)) / 3600)), 1) AS horas_promedio
        FROM usuarios u
        LEFT JOIN ordenes_trabajo ot ON ot.tecnico_id = u.id AND ot.estado = 'entregada' AND ot.tenant_id = @tenant
        WHERE u.tenant_id = @tenant AND u.rol = 'tecnico' AND u.activo = 1
@@ -149,10 +149,10 @@ router.get('/tiempos', async (req, res) => {
     const [rows] = await req.db.query(
       `SELECT etapa,
               COUNT(*) AS total,
-              ROUND(AVG(TIMESTAMPDIFF(HOUR, inicio, COALESCE(fin, NOW()))), 1) AS horas_promedio
+              ROUND(AVG(TRUNC(EXTRACT(EPOCH FROM (COALESCE(fin, NOW())) - (inicio)) / 3600)), 1) AS horas_promedio
        FROM orden_tiempos WHERE tenant_id = @tenant
        GROUP BY etapa
-       ORDER BY FIELD(etapa,'recepcion','diagnostico','esperando_aprobacion','esperando_repuestos','en_reparacion','lista_entrega')`
+       ORDER BY array_position(ARRAY['recepcion', 'diagnostico', 'esperando_aprobacion', 'esperando_repuestos', 'en_reparacion', 'lista_entrega']::text[], etapa::text)`
     );
     res.json({ data: rows });
   } catch (err) {

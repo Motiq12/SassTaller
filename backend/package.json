@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/cluster.js",
     "dev": "nodemon src/server.js",
-    "test": "node --test",
+    "test": "node --test --test-concurrency=1",
     "backup": "node scripts/backup-db.js",
     "crear-usuario-app": "node scripts/crear-usuario-app.js",
     "start:single": "node src/server.js",
@@ -26,10 +26,12 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
     "jsonwebtoken": "^9.0.3",
-    "mysql2": "^3.22.4",
-    "node-cron": "^4.6.0"
+    "node-cron": "^4.6.0",
+    "pg": "^8.23.1"
   },
   "devDependencies": {
+    "acorn": "^8.19.0",
+    "acorn-walk": "^8.3.5",
     "nodemon": "^3.1.14"
   }
 }

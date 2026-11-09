@@ -5,7 +5,7 @@ const compression = require('compression');
 const path = require('path');
 const fs = require('fs');
 const { testConnection } = require('./db/pool');
-const { ensureSchema } = require('./db/auto-migrate');
+const { migrar } = require('./db/migrar');
 const { verificarListaContraEsquema } = require('./db/tenant-db');
 const { iniciarJobs } = require('./jobs/scheduler');
 const { iniciarRefrescoEstados } = require('./utils/estado-tenant');
@@ -194,7 +194,7 @@ const correrJobs = bajoCluster ? process.env.JOBS === '1' : true;
 // donde la base esté a medio migrar mientras el server ya responde.
 (async () => {
   await testConnection();
-  if (!bajoCluster) await ensureSchema();
+  if (!bajoCluster) await migrar();
   // Después de migrar: avisa si alguna tabla con tenant_id quedó fuera de la lista
   // del guard (o al revés). Sin esto, una tabla nueva pasaría sin filtro por tenant
   // y el guard la dejaría entrar sin quejarse.
