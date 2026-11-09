@@ -242,6 +242,12 @@ export async function montarDisco(canvas: HTMLCanvasElement, opciones: { reducid
   let px = 0, py = 0, tx = 0, ty = 0;
   let giro = 0;
   let ultimo = 0;
+  // El giro solo sigue mientras hay algo que mirar: arranca al aparecer, se renueva
+  // con cada scroll o movimiento del puntero y se apaga solo a los pocos segundos.
+  // Con el giro apagado y el puntero quieto, cuadro() devuelve false y el
+  // componente deja de pedir cuadros: el disco queda quieto y no gasta nada.
+  const GIRO_ACTIVO_MS = 5000, GIRO_FRENADO_MS = 1500;
+  let ultimaInteraccion = performance.now();
 
   function encuadrar(e: Encuadre) {
     const w = canvas.clientWidth || 1, h = canvas.clientHeight || 1;
@@ -261,17 +267,19 @@ export async function montarDisco(canvas: HTMLCanvasElement, opciones: { reducid
     // El puntero se sigue con inercia, nunca de golpe.
     px += (tx - px) * Math.min(1, dt * 3.5);
     py += (ty - py) * Math.min(1, dt * 3.5);
-    if (!opciones.reducido) giro += dt * 0.1;        // un giro lento, casi en reposo
+    const quieto = t - ultimaInteraccion - GIRO_ACTIVO_MS;
+    const impulso = opciones.reducido ? 0 : Math.min(1, Math.max(0, 1 - quieto / GIRO_FRENADO_MS));
+    giro += dt * 0.1 * impulso;                       // un giro lento, que frena solo
     rotor.rotation.z = -(giro + scrollP * Math.PI);
     conjunto.rotation.x = INCL_X + py * 0.12;
     conjunto.rotation.y = INCL_Y + px * 0.16;
     renderer.render(escena, camara);
-    return !opciones.reducido || Math.abs(tx - px) > 0.001 || Math.abs(ty - py) > 0.001;
+    return impulso > 0 || Math.abs(tx - px) > 0.001 || Math.abs(ty - py) > 0.001;
   }
 
   return {
-    scroll(p) { scrollP = opciones.reducido ? 0 : p; },
-    puntero(x, y) { if (!opciones.reducido) { tx = x; ty = y; } },
+    scroll(p) { if (!opciones.reducido) { scrollP = p; ultimaInteraccion = performance.now(); } },
+    puntero(x, y) { if (!opciones.reducido) { tx = x; ty = y; ultimaInteraccion = performance.now(); } },
     encuadrar,
     cuadro,
     destruir() {
