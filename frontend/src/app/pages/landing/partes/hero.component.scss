@@ -1,0 +1,107 @@
+@use 'base' as *;
+
+:host { display: block; }
+
+.hero {
+  position: relative;
+  min-height: 100svh;
+  overflow: hidden;            // el disco se corta contra el borde: es a propósito
+  display: grid;
+  align-items: center;
+  padding: 120px $margen 96px;
+}
+
+.escena {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+// El círculo plano. Va un poco más abajo y a la izquierda del disco: así el
+// caliper carmesí (arriba a la derecha del disco) queda sobre el fondo oscuro
+// y no se confunde con el plato.
+.plato {
+  position: absolute;
+  left: var(--disco-cx, 77%);
+  top: var(--disco-cy, 50%);
+  width: calc(var(--disco-d, 100vh) * 1.02);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: $carmesi;
+  transform: translate(-54%, -44%);
+}
+
+.lienzo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 1.2s $curva;
+  &.listo { opacity: 1; }
+}
+
+.texto {
+  position: relative;
+  max-width: min(600px, 42vw);
+}
+
+h1 {
+  @include titulo($t-hero);
+  max-width: 13ch;
+  @include entrada;
+}
+
+.bajada {
+  margin: 36px 0 0;
+  max-width: 42ch;
+  font-family: $fb;
+  font-size: $t-entrada;
+  line-height: 1.55;
+  color: $tinta;
+  @include entrada;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 28px;
+  margin-top: 44px;
+  @include entrada;
+}
+
+.principal { @include boton; }
+.secundario {
+  @include enlace;
+  background: none;
+  border: 0;
+  padding: 12px 0;
+  cursor: pointer;
+}
+
+.chica {
+  margin: 22px 0 0;
+  font-family: $fb;
+  font-size: $t-chica;
+  color: $suave;
+  @include entrada;
+}
+
+// Teléfono, y tablet en vertical (la misma regla que el encuadre del disco en el
+// .ts: ancho/alto < 0.95): el disco arriba, más grande que la pantalla; el texto debajo.
+@media (max-width: 760px), (max-aspect-ratio: 19/20) {
+  .hero {
+    align-items: end;
+    padding: 0 $margen 56px;
+    min-height: 100svh;
+  }
+  .texto {
+    max-width: none;
+    padding-top: 52svh;
+  }
+  h1 { max-width: 12ch; }
+  .bajada { margin-top: 20px; font-size: $t-texto; }
+  .acciones { margin-top: 28px; }
+  .principal { flex: 1 1 100%; }
+}

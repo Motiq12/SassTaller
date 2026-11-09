@@ -1,0 +1,231 @@
+// Estilo de la APP (DESIGN.md, modo claro), no de la landing: esto es interfaz del
+// producto mostrada en la página. Por eso acá sí hay bordes finos, etiquetas
+// chicas y monoespaciada en montos, placas y números de orden.
+$lienzo: #fafafa;
+$blanco: #ffffff;
+$tinta: #0a0a0a;
+$gris: #737373;
+$borde: rgba(10, 10, 10, 0.08);
+$carmesi: #e11d48;
+$fd: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+$fb: 'Plus Jakarta Sans', 'Outfit', sans-serif;
+$fm: 'JetBrains Mono', ui-monospace, monospace;  // taste-skill-ignore: interfaz del producto (data-ui), con las reglas de la app
+
+:host { display: block; }
+
+.ui {
+  font-family: $fb;
+  color: $tinta;
+  text-align: left;
+}
+
+.tarjeta {
+  background: $blanco;
+  border: 1px solid $borde;  // taste-skill-ignore: interfaz del producto (data-ui), con las reglas de la app
+  border-radius: 24px;
+  padding: 22px 22px 18px;
+  // Sombra tintada: esta pieza sí flota (delante del disco).
+  box-shadow: 0 30px 60px -24px rgba(10, 10, 10, 0.55), 0 8px 18px -10px rgba(10, 10, 10, 0.3);  // taste-skill-ignore: interfaz del producto (data-ui), con las reglas de la app
+}
+
+.mono { font-family: $fm; font-variant-numeric: tabular-nums; }
+.gris { color: $gris; }
+.fuerte { font-weight: 700; color: $tinta; }
+
+.cabeza {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.titulo {
+  margin: 0;
+  font-family: $fd;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  &.mono { font-family: $fm; font-size: 17px; letter-spacing: 0; }
+}
+.sub { margin: 3px 0 0; font-size: 13px; color: $gris; }
+
+.placa {
+  flex: 0 0 auto;
+  font-family: $fm;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 5px 9px;
+  border: 1.5px solid $tinta;
+  border-radius: 6px;
+  letter-spacing: 0.04em;
+}
+
+.pastilla {
+  flex: 0 0 auto;
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  background: #f5f5f5;
+  color: #404040;
+  &.ambar { background: #fef3c7; color: #92400e; }
+  &.esmeralda { background: #ecfdf5; color: #047857; }
+  &.indigo { background: #eef2ff; color: #4338ca; }
+  &.neutro { background: #f5f5f5; color: #404040; }
+}
+
+.pie {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid $borde;  // taste-skill-ignore: interfaz del producto (data-ui), con las reglas de la app
+  font-size: 13px;
+  color: $gris;
+  .fuerte { font-size: 15px; }
+  &.total .fuerte { font-size: 20px; color: $carmesi; }
+}
+
+// --- Historial ---
+.filas { list-style: none; margin: 0; padding: 0; }
+.filas li {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid $borde;  // taste-skill-ignore: interfaz del producto (data-ui), con las reglas de la app
+  font-size: 13px;
+  &.actual { color: $tinta; }
+  .trabajo { font-weight: 600; small { display: block; font-weight: 400; color: $gris; font-size: 11px; } }
+  .monto { font-weight: 600; }
+}
+
+// --- Portal ---
+.vehiculo { margin: -6px 0 14px; font-size: 14px; font-weight: 600; }
+.seguimiento {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+  li {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 0;
+    font-size: 14px;
+    color: $gris;
+    &::before {   // la línea de tiempo entre nodos
+      content: '';
+      position: absolute;
+      left: 7px;
+      top: -10px;
+      height: 16px;
+      width: 1.5px;
+      background: #e5e5e5;
+    }
+    &:first-child::before { display: none; }
+    &.hecho { color: $tinta; &::before { background: $carmesi; } }
+    &.ahora { color: $tinta; font-weight: 700; &::before { background: $carmesi; } }
+  }
+  .nodo {
+    position: relative;
+    z-index: 1;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid #d4d4d4;
+    background: $blanco;
+  }
+  .hecho .nodo { border-color: $carmesi; background: $carmesi; }
+  .ahora .nodo { border-color: $carmesi; box-shadow: 0 0 0 5px rgba(225, 29, 72, 0.16); }  // taste-skill-ignore: interfaz del producto (data-ui), con las reglas de la app
+}
+.mensaje {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: $lienzo;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+// --- Agenda ---
+.columnas { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.mecanico { margin: 0 0 8px; font-size: 12px; font-weight: 700; color: $gris; }
+.cita {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 14px;
+  background: $lienzo;
+  border-left: 3px solid $carmesi;
+  .hora { font-size: 12px; font-weight: 700; }
+  .trabajo { font-size: 13px; font-weight: 600; small { display: block; font-weight: 400; color: $gris; } }
+  .pastilla { justify-self: start; }
+}
+
+// --- Reportes ---
+.cifra { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+.barras {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  align-items: end;
+  height: 150px;
+  margin-top: 16px;
+}
+.barra {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-end;
+  height: 100%;
+  gap: 6px;
+  text-align: center;
+  .valor { font-size: 10px; color: $gris; }
+  .relleno { display: block; border-radius: 8px 8px 3px 3px; background: #e5e5e5; min-height: 8px; }
+  .relleno.pico { background: $carmesi; }
+  .etiqueta { font-size: 11px; color: $gris; }
+}
+
+// --- Orden de trabajo ---
+.datos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+  margin: 0;
+  div { min-width: 0; }
+  .ancho { grid-column: 1 / -1; }
+  dt { font-size: 11px; font-weight: 700; color: $gris; margin-bottom: 3px; }
+  dd { margin: 0; font-size: 14px; font-weight: 600; }
+}
+.diagnostico { margin: 0 0 12px; font-size: 14px; line-height: 1.5; }
+.aviso {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  &.indigo { background: #eef2ff; color: #4338ca; }
+  &.esmeralda { background: #ecfdf5; color: #047857; }
+}
+.lineas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-top: 1px solid $borde;  // taste-skill-ignore: interfaz del producto (data-ui), con las reglas de la app
+    font-size: 13px;
+  }
+}
+.mecanico-orden { margin: 14px 0 0; font-size: 12px; color: $gris; strong { color: $tinta; } }
