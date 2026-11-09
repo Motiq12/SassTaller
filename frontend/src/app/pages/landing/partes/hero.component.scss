@@ -17,6 +17,8 @@
   background: $noche;
   color: #fff;
   @media (min-width: 640px) { height: calc(100svh - 1.5rem); }
+  // En el teléfono la portada crece si no le alcanza la pantalla: nunca recorta la acción.
+  @media (max-width: 639px) { height: auto; min-height: max(calc(100svh - 1rem), 560px); }
 }
 
 // El foco de teclado, igual para todos los enlaces y botones de la portada.
@@ -134,7 +136,7 @@
 .titulo {
   margin: 0;
   font-family: $fd;
-  font-size: 15vw;
+  font-size: 13.5vw;
   font-weight: 600;
   line-height: 0.86;
   letter-spacing: -0.03em;
@@ -176,6 +178,7 @@
 .texto { max-width: max(30rem, #{u(30)}); min-width: 0; }
 .lema {
   margin: 0;
+  @media (max-width: 639px) { display: none; }
   font-family: $fd;
   font-size: max(30px, #{u(2.4)});
   font-weight: 600;
@@ -225,7 +228,10 @@
 }
 
 // Las dos tarjetas de vidrio.
-.racimo { display: flex; align-items: flex-end; gap: u(1); }
+// En el teléfono la portada lleva solo titular, una frase y la acción: el lema, la
+// cola de vehículos y las tarjetas de vidrio quedan para pantallas más anchas.
+.racimo { display: none; align-items: flex-end; gap: u(1); @media (min-width: 640px) { display: flex; } }
+.solo-ancho { @media (max-width: 639px) { display: none; } }
 
 .momentos {
   display: none;

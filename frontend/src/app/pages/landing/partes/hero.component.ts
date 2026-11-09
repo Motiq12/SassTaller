@@ -59,6 +59,12 @@ export class HeroComponent implements AfterViewInit, OnDestroy {
 
   ngAfterViewInit() {
     this.encuadrar();
+    // En el teléfono el disco se ubica según la altura del titular, que cambia cuando
+    // llega la fuente; y con o sin 3D, el encuadre sigue al tamaño de la pantalla.
+    document.fonts?.ready.then(() => this.encuadrar());
+    const alRedimensionar = () => this.encuadrar();
+    window.addEventListener('resize', alRedimensionar, { passive: true });
+    this.quitar.push(() => window.removeEventListener('resize', alRedimensionar));
     if (!this.reducido) {
       this.reloj = setInterval(() => {
         if (this.visible && !document.hidden) this.momento = (this.momento + 1) % this.momentos.length;
@@ -102,9 +108,19 @@ export class HeroComponent implements AfterViewInit, OnDestroy {
       const d = Math.min(h * 0.66, w * 0.4);
       return { cx: 0.64, cy: 0.57, diametro: d };
     }
-    // Teléfono: entre el titular y el texto de abajo, cortado por la derecha.
-    const d = Math.min(w * 0.82, h * 0.4);
-    return { cx: 0.64, cy: 0.47, diametro: d };
+    // Teléfono: en el hueco que queda entre el titular y el texto de abajo, medido de
+    // verdad, así nunca pasa por debajo de las letras.
+    const titulo = el.querySelector('.titulo')?.getBoundingClientRect();
+    const abajo = el.querySelector('.abajo')?.getBoundingClientRect();
+    const tope = el.getBoundingClientRect().top;
+    if (titulo && abajo && abajo.top - titulo.bottom > 120) {
+      const desde = titulo.bottom - tope;
+      const hueco = abajo.top - titulo.bottom;
+      const d = Math.min(hueco * 0.92, w * 0.78);
+      return { cx: 0.5, cy: (desde + hueco / 2) / h, diametro: d };
+    }
+    const d = Math.min(w * 0.6, h * 0.3);
+    return { cx: 0.62, cy: 0.45, diametro: d };
   }
 
   private encuadrar() {
@@ -129,10 +145,6 @@ export class HeroComponent implements AfterViewInit, OnDestroy {
       this.zona.run(() => (this.con3d = true));
       marcarVariante('3d');
     });
-
-    const alRedimensionar = () => this.encuadrar();
-    window.addEventListener('resize', alRedimensionar, { passive: true });
-    this.quitar.push(() => window.removeEventListener('resize', alRedimensionar));
 
     // El scroll vive en el <ion-content>, no en la ventana.
     const contenido = (this.host.nativeElement as HTMLElement).closest('ion-content') as
