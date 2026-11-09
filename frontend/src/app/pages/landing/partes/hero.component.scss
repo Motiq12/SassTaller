@@ -178,7 +178,6 @@
 .texto { max-width: max(30rem, #{u(30)}); min-width: 0; }
 .lema {
   margin: 0;
-  @media (max-width: 639px) { display: none; }
   font-family: $fd;
   font-size: max(30px, #{u(2.4)});
   font-weight: 600;
@@ -186,6 +185,7 @@
   letter-spacing: -0.02em;
   text-transform: uppercase;
   color: blanco(0.9);
+  @media (max-width: 639px) { display: none; }
   .l { display: block; overflow: hidden; padding-bottom: 0.1em; margin-bottom: -0.1em; }
   .l > span {
     display: inline-block;
