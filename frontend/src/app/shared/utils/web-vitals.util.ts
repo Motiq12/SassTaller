@@ -15,6 +15,10 @@ import { environment } from '../../../environments/environment';
 // resuelven; se usa la URL absoluta que ya conoce el resto de la app.
 const nativo = !!(window as any).Capacitor?.isNativePlatform?.();
 const URL_METRICAS = `${nativo ? environment.nativeApiUrl : ''}${environment.apiUrl}/metricas/web-vitals`;
+// Las páginas públicas de Motiq (landing, registro, login sin taller) van a su propia
+// tabla: no son de ningún taller. Solo estas rutas; el servidor descarta el resto.
+const URL_PUBLICA = `${URL_METRICAS}-publico`;
+const RUTAS_PUBLICAS = ['/', '/registro-taller', '/portal/login', '/portal/recuperar', '/portal/registro'];
 
 // El taller al que atribuir la medición. El endpoint es público —las métricas que más
 // importan son las del login y el registro, donde todavía no hay sesión— así que el
@@ -23,8 +27,8 @@ const URL_METRICAS = `${nativo ? environment.nativeApiUrl : ''}${environment.api
 // servidor la descarta.
 //
 // Devuelve null cuando no hay ningún taller del que pueda ser la medición: la landing
-// de motiq12.com (el dominio del producto) no es de nadie, y mandarla igual solo
-// producía un 400 en la consola de cada visitante. Con subdominio de taller
+// de motiq12.com (el dominio del producto) no es de nadie. Esas visitas van a
+// URL_PUBLICA (ver enviar()). Con subdominio de taller
 // (msmotors.motiq12.com) el servidor lo resuelve solo, aunque acá no haya slug; es la
 // misma regla de services/taller.service.ts.
 function urlConTaller(): string | null {
@@ -47,9 +51,11 @@ function enviar(m: Metric) {
     calificacion: m.rating,              // 'good' | 'needs-improvement' | 'poor'
     ruta: location.pathname,             // sin querystring: puede traer datos
     movil: window.innerWidth < 768,
+    // Qué mostró la portada (disco 3D o imagen fija): la marca hero.component.ts.
+    variante: (window as Window & { __motiqPortada?: string }).__motiqPortada || 'ninguna',
   });
 
-  const url = urlConTaller();
+  const url = urlConTaller() ?? (RUTAS_PUBLICAS.includes(location.pathname) ? URL_PUBLICA : null);
   if (!url) return;
   try {
     // sendBeacon es el único que sobrevive al cierre de la pestaña, que es
