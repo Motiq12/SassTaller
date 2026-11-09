@@ -1,5 +1,6 @@
 import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild, inject } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { AuthService } from '../../services/auth.service';
 import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -19,6 +20,14 @@ export class PortalRecuperarPage implements AfterViewInit, OnDestroy {
   // Solo para saber si la pantalla es la puerta de Motiq o el portal de un taller.
   marca = inject(MarcaService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
+  private auth = inject(AuthService);
+
+  /**
+   * ¿Quién recupera? `taller` = el personal (usuarios del taller); si no, un cliente
+   * del portal. Misma pantalla y mismos pasos; cambian los pedidos y a dónde se vuelve.
+   */
+  readonly personal = this.route.snapshot.queryParamMap.get('como') === 'taller';
   private loading = inject(LoadingController);
   private toast = inject(ToastController);
 
@@ -58,15 +67,18 @@ export class PortalRecuperarPage implements AfterViewInit, OnDestroy {
 
   get validoPaso2(): boolean {
     return !!(this.codigo.trim().length === 6 &&
-      this.password.length >= 6 && this.password === this.confirmar);
+      this.password.length >= 8 && this.password === this.confirmar);
   }
 
   async solicitar() {
     if (!this.emailOk) return this.mostrar('Ingresá un correo válido', 'warning');
     const l = await this.loading.create({ message: 'Enviando código...', cssClass: 'portal-loading', spinner: 'crescent' });
     await l.present();
-    this.portal.solicitarCodigo(this.email.trim(), { website: this.website, turnstileToken: this.ts?.token() || '' })
-      .pipe(takeUntil(this.destroy$)).subscribe({
+    const antibot = { website: this.website, turnstileToken: this.ts?.token() || '' };
+    const pedido = this.personal
+      ? this.auth.solicitarRecuperacion(this.email.trim(), antibot)
+      : this.portal.solicitarCodigo(this.email.trim(), antibot);
+    pedido.pipe(takeUntil(this.destroy$)).subscribe({
       next: async (res) => {
         await l.dismiss();
         this.paso = 2;
@@ -90,13 +102,29 @@ export class PortalRecuperarPage implements AfterViewInit, OnDestroy {
   async confirmar_() {
     if (!this.validoPaso2) {
       if (this.codigo.trim().length !== 6) return this.mostrar('El código tiene 6 dígitos', 'warning');
-      if (this.password.length < 6) return this.mostrar('La contraseña debe tener al menos 6 caracteres', 'warning');
+      if (this.password.length < 8) return this.mostrar('La contraseña debe tener al menos 8 caracteres', 'warning');
       if (this.password !== this.confirmar) return this.mostrar('Las contraseñas no coinciden', 'warning');
       return;
     }
     const l = await this.loading.create({ message: 'Verificando...', cssClass: 'portal-loading', spinner: 'crescent' });
     await l.present();
-    this.portal.confirmarRecuperacion({ email: this.email.trim(), codigo: this.codigo.trim(), password: this.password }).pipe(takeUntil(this.destroy$)).subscribe({
+    const datos = { email: this.email.trim(), codigo: this.codigo.trim(), password: this.password };
+    if (this.personal) {
+      // El personal vuelve al login: si tiene verificación en dos pasos, se le pide ahí.
+      this.auth.confirmarRecuperacion(datos).pipe(takeUntil(this.destroy$)).subscribe({
+        next: async (r) => {
+          await l.dismiss();
+          this.mostrar(r.message || 'Contraseña actualizada');
+          this.router.navigate(['/portal/login'], { replaceUrl: true, queryParams: { como: 'taller' } });
+        },
+        error: async (err) => {
+          await l.dismiss();
+          this.mostrar(err.error?.error || 'No se pudo restablecer la contraseña', 'danger');
+        },
+      });
+      return;
+    }
+    this.portal.confirmarRecuperacion(datos).pipe(takeUntil(this.destroy$)).subscribe({
       next: async () => {
         await l.dismiss();
         this.mostrar('Contraseña actualizada');
@@ -110,7 +138,7 @@ export class PortalRecuperarPage implements AfterViewInit, OnDestroy {
   }
 
   irLogin() {
-    this.router.navigate(['/portal/login']);
+    this.router.navigate(['/portal/login'], this.personal ? { queryParams: { como: 'taller' } } : {});
   }
 
   private iniciarCooldown() {

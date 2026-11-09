@@ -145,16 +145,10 @@
       </p>
     </ng-container>
 
-    <!-- Personal del taller: hoy no hay recuperación de contraseña por cuenta propia
-         (solo se cambia con la sesión iniciada), así que se dice cómo pedirla. -->
+    <!-- Personal del taller: recupera la contraseña con un código a su correo
+         (/portal/recuperar en modo personal), con o sin taller resuelto. -->
     <ng-container *ngIf="!paso2fa && camino === 'taller'">
-      <button type="button" class="portal-link sub boton-enlace" (click)="ayudaClave = !ayudaClave"
-              [attr.aria-expanded]="ayudaClave">¿Olvidaste tu contraseña?</button>
-      <p *ngIf="ayudaClave" class="nota-camino">
-        Por ahora la contraseña del personal la recuperamos nosotros:
-        <a routerLink="/" fragment="contacto">escribinos desde el formulario de contacto</a>
-        con tu correo y el nombre de tu taller, y te ayudamos.
-      </p>
+      <a class="portal-link sub" routerLink="/portal/recuperar" [queryParams]="{ como: 'taller' }">¿Olvidaste tu contraseña?</a>
       <!-- Dos altas distintas que es fácil confundir: un CLIENTE se registra en el
            portal de su taller; un TALLER se da de alta en el SaaS, acá. -->
       <a class="portal-link sub" routerLink="/registro-taller">¿Tenés un taller? Registralo acá</a>
