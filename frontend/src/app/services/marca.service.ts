@@ -108,6 +108,16 @@ export class MarcaService {
    * subdominio se muestra SU nombre — el cliente entra al portal de su taller, no a
    * un producto. Si no se resolvió, quien llegó lo hizo a la puerta de Motiq.
    */
+  /**
+   * true cuando la pantalla pública no pertenece a ningún taller: quien llegó lo hizo
+   * a la puerta de Motiq (motiq12.com/portal/login), no al portal de su taller. Las
+   * pantallas de acceso usan esto para vestirse con la marca del producto —la de la
+   * landing— en vez del color de respaldo pensado para un taller sin configurar.
+   */
+  get esProducto(): boolean {
+    return !this.taller.actual();
+  }
+
   get rotuloPublico(): string {
     return this.taller.actual() ? this.actual.nombre_taller : PRODUCTO.nombre;
   }

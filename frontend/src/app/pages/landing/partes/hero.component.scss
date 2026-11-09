@@ -17,18 +17,20 @@
   pointer-events: none;
 }
 
-// El círculo plano. Va un poco más abajo y a la izquierda del disco: así el
-// caliper carmesí (arriba a la derecha del disco) queda sobre el fondo oscuro
-// y no se confunde con el plato.
+// El círculo plano carmesí: lo que se ve si no hay WebGL (o mientras el 3D carga).
+// Cuando el disco aparece, el círculo se va: detrás del disco se leía como un
+// error de registro, no como un fondo.
 .plato {
   position: absolute;
   left: var(--disco-cx, 77%);
   top: var(--disco-cy, 50%);
-  width: calc(var(--disco-d, 100vh) * 1.02);
+  width: var(--disco-d, 70vh);
   aspect-ratio: 1;
   border-radius: 50%;
   background: $carmesi;
-  transform: translate(-54%, -44%);
+  transform: translate(-50%, -50%);
+  transition: opacity 1s $curva;
+  &.con3d { opacity: 0; }
 }
 
 .lienzo {
@@ -43,12 +45,13 @@
 
 .texto {
   position: relative;
-  max-width: min(600px, 42vw);
+  max-width: min(800px, 46vw);
 }
 
 h1 {
   @include titulo($t-hero);
-  max-width: 13ch;
+  max-width: 20ch;
+  .junto { white-space: nowrap; }   // "sin cuadernos." nunca se separa: el corte cae en la coma
   @include entrada;
 }
 
@@ -98,7 +101,7 @@ h1 {
   }
   .texto {
     max-width: none;
-    padding-top: 52svh;
+    padding-top: 55svh;
   }
   h1 { max-width: 12ch; }
   .bajada { margin-top: 20px; font-size: $t-texto; }
