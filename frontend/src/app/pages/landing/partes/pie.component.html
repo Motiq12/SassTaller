@@ -16,7 +16,11 @@
   </div>
 
   <div class="ultima">
-    <p>© {{ anio }} {{ producto.nombre }}</p>
+    <p class="legales">
+      <span>© {{ anio }} {{ producto.nombre }}</span>
+      <a routerLink="/legal/terminos">Términos</a>
+      <a routerLink="/legal/privacidad">Privacidad</a>
+    </p>
     <a class="accion" routerLink="/registro-taller">Probá gratis</a>
   </div>
 </footer>

@@ -1,0 +1,70 @@
+@use '../landing/partes/base' as *;
+
+ion-content.legal { --background: #{$suelo}; --color: #{$tinta}; }
+
+.pagina {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 $margen 72px;
+  font-family: $fb;
+  color: $tinta;
+}
+
+.barra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 76px;
+}
+.marca {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: $tinta;
+  text-decoration: none;
+  font-family: $fd;
+  font-size: $t-entrada;
+  font-weight: 700;
+  img { width: 30px; height: 30px; filter: brightness(0) invert(1); }
+  &:focus-visible { outline: 3px solid $tinta; outline-offset: 4px; border-radius: 6px; }
+}
+.docs {
+  display: flex;
+  gap: 24px;
+  a {
+    padding: 10px 0;
+    color: $suave;
+    font-size: $t-chica;
+    font-weight: 600;
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    &:hover { color: $tinta; }
+    &.actual { color: $tinta; border-bottom-color: $carmesi; }
+  }
+}
+
+article { max-width: 68ch; padding-top: clamp(32px, 6vw, 80px); }
+
+h1 { @include titulo($t-lista); font-size: clamp(36px, 4vw, 60px); }
+.bajada { margin: 20px 0 0; font-size: $t-entrada; line-height: 1.55; }
+.fecha { margin: 16px 0 0; font-size: $t-chica; color: $suave; }
+
+section { margin-top: 48px; }
+h2 {
+  margin: 0 0 12px;
+  font-family: $fd;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+section p { margin: 0 0 12px; font-size: $t-texto; line-height: 1.65; }
+
+.pie {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-top: 72px;
+  padding-top: 24px;
+  a { @include enlace; font-size: $t-chica; }
+}

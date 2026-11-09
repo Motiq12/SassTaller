@@ -5,12 +5,17 @@ import { PRODUCTO } from '../../../shared/producto';
 import type { Disco, Encuadre } from './disco-3d';
 
 /**
- * La portada: el titular a la izquierda y el disco de freno enorme entrando por
- * la derecha, cortado por la pantalla. Detrás, el mismo círculo plano en carmesí
- * (el motivo de toda la página); delante, el disco en 3D que gira con el scroll y
- * se inclina hacia el puntero.
+ * La portada: el titular a la izquierda y el disco de freno a la derecha.
  *
- * Si no hay WebGL, el círculo plano queda solo y la portada sigue entera.
+ * El disco tiene dos versiones y la portada nunca espera por ninguna:
+ *  · una imagen fija (un cuadro del mismo render), que es lo que se ve primero y lo
+ *    único que ven los equipos de gama baja, quien pidió movimiento reducido o un
+ *    navegador sin WebGL;
+ *  · el 3D en vivo, que se baja recién cuando la página terminó de cargar y el
+ *    navegador está libre, y reemplaza a la imagen con un fundido.
+ * El titular, la bajada y el botón no dependen de nada de esto: se pintan primero.
+ *
+ * Variante que se usó → window.__motiqPortada, para comparar sus Web Vitals.
  */
 @Component({
   selector: 'app-lp-hero',
@@ -27,6 +32,8 @@ export class HeroComponent implements AfterViewInit, OnDestroy {
 
   producto = PRODUCTO;
   con3d = false;
+  /** Una imagen de 1,3 veces el diámetro: deja lugar al caliper, que sobresale. */
+  readonly FOTO_ESCALA = 1.3;
 
   private disco: Disco | null = null;
   private raf = 0;
@@ -35,12 +42,19 @@ export class HeroComponent implements AfterViewInit, OnDestroy {
   private scrollEl?: HTMLElement;
   private quitar: (() => void)[] = [];
   private reducido = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  private movil = window.matchMedia('(pointer: coarse)').matches;
+  private ultimoCuadro = 0;
 
   ngAfterViewInit() {
     this.encuadrar();
+    if (this.reducido || gamaBaja()) {
+      // Imagen fija y nada más: ni siquiera se baja Three.js.
+      marcarVariante('fija');
+      return;
+    }
     // Todo lo del 3D corre fuera de Angular: cada cuadro no tiene por qué
     // disparar la detección de cambios de la página entera.
-    this.zona.runOutsideAngular(() => this.iniciar());
+    this.zona.runOutsideAngular(() => cuandoEsteLibre(() => this.iniciar()));
   }
 
   ngOnDestroy() {
@@ -54,6 +68,9 @@ export class HeroComponent implements AfterViewInit, OnDestroy {
     const el = this.host.nativeElement as HTMLElement;
     const w = el.clientWidth || window.innerWidth;
     const h = el.clientHeight || window.innerHeight;
+    // Encuadre centrado y entero, solo para regenerar la imagen fija del disco
+    // (assets/landing/disco-freno.webp) a partir de este mismo render.
+    if (location.search.includes('retrato-disco')) return { cx: 0.5, cy: 0.5, diametro: Math.min(w, h) / 1.4 };
     const BARRA = 84;   // alto de la barra fija + aire: el disco nunca pasa por debajo de ella
     if (w / h >= 0.95) {
       // Escritorio: a la derecha, entero o apenas cortado por el borde (6 %), centrado
@@ -82,9 +99,14 @@ export class HeroComponent implements AfterViewInit, OnDestroy {
   private async iniciar() {
     const { montarDisco } = await import('./disco-3d');
     this.disco = await montarDisco(this.lienzo.nativeElement, { reducido: this.reducido }).catch(() => null);
-    if (!this.disco) return;
-    this.zona.run(() => (this.con3d = true));
+    if (!this.disco) { marcarVariante('fija'); return; }   // sin WebGL: queda la imagen
     this.disco.encuadrar(this.calcularEncuadre());
+    // El fundido de la imagen al 3D recién cuando hay un cuadro dibujado.
+    requestAnimationFrame((t) => {
+      this.disco?.cuadro(t);
+      this.zona.run(() => (this.con3d = true));
+      marcarVariante('3d');
+    });
 
     const alRedimensionar = () => this.encuadrar();
     window.addEventListener('resize', alRedimensionar, { passive: true });
@@ -130,10 +152,49 @@ export class HeroComponent implements AfterViewInit, OnDestroy {
     this.animando = true;
     const paso = (t: number) => {
       if (!this.disco || !this.visible || document.hidden) { this.animando = false; return; }
+      // En el teléfono, 30 cuadros por segundo: el giro es lento y no se nota la
+      // diferencia, la batería sí.
+      if (this.movil && t - this.ultimoCuadro < 1000 / 30 - 2) { this.raf = requestAnimationFrame(paso); return; }
+      this.ultimoCuadro = t;
       const sigue = this.disco.cuadro(t);
       if (sigue) this.raf = requestAnimationFrame(paso);
       else this.animando = false;
     };
     this.raf = requestAnimationFrame(paso);
   }
+}
+
+/**
+ * Equipo al que conviene ahorrarle el 3D: pidió ahorrar datos, tiene una conexión
+ * lenta, poca memoria o pocos núcleos (en el teléfono, con un umbral más alto).
+ * Las APIs que faltan en un navegador se ignoran: sin dato, no se castiga.
+ */
+function gamaBaja(): boolean {
+  const nav = navigator as Navigator & {
+    deviceMemory?: number;
+    connection?: { saveData?: boolean; effectiveType?: string };
+  };
+  if (nav.connection?.saveData) return true;
+  if (/(^|-)(2g|3g)$/.test(nav.connection?.effectiveType || '')) return true;
+  const memoria = nav.deviceMemory ?? 8;
+  const nucleos = nav.hardwareConcurrency || 8;
+  const movil = window.matchMedia('(pointer: coarse)').matches;
+  return movil ? (memoria <= 3 || nucleos <= 4) : (memoria <= 2 || nucleos <= 2);
+}
+
+/** Corre `fn` cuando la página terminó de cargar y el navegador está libre. */
+function cuandoEsteLibre(fn: () => void): void {
+  const ocioso = () => {
+    const ric = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number })
+      .requestIdleCallback;
+    if (ric) ric(fn, { timeout: 2000 });
+    else setTimeout(fn, 300);
+  };
+  if (document.readyState === 'complete') ocioso();
+  else window.addEventListener('load', ocioso, { once: true });
+}
+
+/** Qué mostró la portada, para atribuir las Web Vitals (ver web-vitals.util.ts). */
+function marcarVariante(v: '3d' | 'fija'): void {
+  (window as Window & { __motiqPortada?: string }).__motiqPortada = v;
 }

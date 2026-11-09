@@ -159,6 +159,7 @@ app.use('/api/mecanico',  require('./routes/mecanico.routes'));
 app.use('/api/recepcion', require('./routes/recepcion.routes'));
 app.use('/api/mensajeria', require('./routes/mensajeria.routes'));
 app.use('/api/admin',     require('./routes/admin.routes'));
+app.use('/api/metricas/web-vitals-publico', require('./routes/metricas-publico.routes'));
 app.use('/api/metricas',  require('./routes/metricas.routes'));
 app.use('/api/monitor',   require('./routes/monitor.routes')); // el vigilante de n8n (clave propia)
 

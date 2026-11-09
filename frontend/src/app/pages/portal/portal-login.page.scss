@@ -485,3 +485,91 @@ ion-item + .ayuda { margin: 0 0 12px; }
     text-decoration: underline;
   }
 }
+
+/* Los dos caminos de entrada: personal del taller o cliente. Mismas variables que el
+   resto de la pantalla, así se ven bien con el color de cualquier taller y en la
+   puerta de Motiq. */
+.caminos {
+  display: grid;
+  gap: 12px;
+  width: 100%;            // en la grilla del login, margin auto sin ancho lo encogía al contenido
+  margin: 0 auto;
+  max-width: 400px;
+  padding-inline: 16px;
+  box-sizing: border-box;
+  animation: acceso-entrar .42s ease-out both;
+}
+.camino {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  min-height: 84px;
+  padding: 18px 20px;
+  text-align: left;
+  border: 1px solid color-mix(in srgb, var(--ion-text-color, #000) 14%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--ion-text-color, #000) 6%, var(--lienzo, transparent));
+  color: var(--ion-text-color, #111);
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, transform .15s ease;
+  strong { font-family: var(--font-display, inherit); font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+  span { font-size: 14px; color: color-mix(in srgb, var(--ion-text-color, #111) 65%, var(--lienzo, transparent)); }
+  &:hover { border-color: var(--ion-color-primary); }
+  &:active { transform: scale(.99); }
+  &:focus-visible { outline: 3px solid var(--ion-color-primary); outline-offset: 2px; }
+}
+
+.cambiar {
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--acento-texto, var(--ion-color-primary));
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.nota-camino {
+  width: 100%;
+  max-width: 400px;
+  margin: 14px auto 0;
+  padding-inline: 16px;
+  box-sizing: border-box;
+  font-size: 13.5px;
+  line-height: 1.55;
+  text-align: center;
+  color: color-mix(in srgb, var(--ion-text-color, #111) 70%, var(--lienzo, transparent));
+  a { color: var(--acento-texto, var(--ion-color-primary)); font-weight: 600; }
+}
+
+.boton-enlace {
+  margin-inline: auto;
+  border: 0;
+  background: none;
+  font-family: inherit;
+}
+
+@media (min-width: 860px) {
+  .caminos, .nota-camino { padding-inline: 0; }
+}
+
+/* El panel de acceso es oscuro con cualquier taller: los caminos y los enlaces no pueden
+   heredar el color de texto de la app, que es oscuro y sobre este fondo no se ve. */
+.acceso-panel {
+  .caminos { max-width: none; padding-inline: 0; margin-top: 8px; }
+  .camino {
+    border-color: rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.05);
+    color: #f8fafc;
+    span { color: #b6c0ce; }
+    &:hover { border-color: #fff; background: rgba(255, 255, 255, 0.09); }
+    &:focus-visible { outline-color: #fff; }
+  }
+  .cambiar { color: #fff; text-decoration: underline; font-weight: 600; }
+  .nota-camino { color: #cbd5e1; a { color: #fff; text-decoration: underline; } }
+  .acceso-empresa a { color: #fff; }
+}

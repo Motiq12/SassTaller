@@ -1,5 +1,4 @@
-import { Component, inject } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component, ElementRef, ViewChild, inject } from '@angular/core';
 import { Subject, debounceTime, switchMap, catchError, of } from 'rxjs';
 import { TallerService, TipoVehiculo } from '../../services/taller.service';
 import { AuthService } from '../../services/auth.service';
@@ -14,6 +13,10 @@ import { PRODUCTO } from '../../shared/producto';
  * al enviar sería peor de lo que parece: el formulario tiene contraseña, así que un
  * choque de nombre obligaría a rellenarla, y el nombre es justo el campo que más
  * probablemente esté tomado.
+ *
+ * Va en dos pasos —el taller, la cuenta del dueño— y un cierre: el taller ya creado,
+ * la confirmación del correo (sin bloquear: también se puede hacer desde el panel) y
+ * los primeros pasos de la configuración.
  */
 @Component({
   selector: 'app-registro-taller',
@@ -24,8 +27,16 @@ import { PRODUCTO } from '../../shared/producto';
 export class RegistroTallerPage {
   private taller = inject(TallerService);
   private auth = inject(AuthService);
-  private router = inject(Router);
   private toast = inject(ToastService);
+
+  /** 1: el taller · 2: la cuenta del dueño · 3: creado. */
+  paso: 1 | 2 | 3 = 1;
+  @ViewChild('encabezado') set encabezado(el: ElementRef<HTMLElement> | undefined) {
+    // Al cambiar de paso el foco va al título del paso nuevo: quien usa lector de
+    // pantalla o teclado no queda parado en un botón que ya no existe.
+    if (el && this.moverFoco) { this.moverFoco = false; setTimeout(() => el.nativeElement.focus()); }
+  }
+  private moverFoco = false;
 
   // Esta pantalla identifica al PRODUCTO, no a un taller: quien la abre todavía no
   // pertenece a ninguno.
@@ -50,13 +61,13 @@ export class RegistroTallerPage {
   cedulaJuridica = '';
 
   // Qué vehículos atiende. Define su catálogo de servicios inicial, los campos del
-  // formulario de vehículo y cómo lo llama la interfaz. Arranca con motos marcado
-  // porque es el caso más común y deja el formulario válido desde el inicio; el
-  // taller de autos lo cambia con un toque.
+  // formulario de vehículo y cómo lo llama la interfaz. No arranca nada marcado: el
+  // SaaS es para motos Y autos, y marcar motos por defecto decidía por el taller.
   tiposDisponibles: TipoVehiculo[] = [];
-  // Mapa clave->marcado, para que cada checkbox tenga su propio ngModel. Arranca
-  // con motos porque es el caso más común y deja el formulario válido de entrada.
-  tiposMarcados: Record<string, boolean> = { moto: true };
+  // Mapa clave->marcado, para que cada checkbox tenga su propio ngModel.
+  tiposMarcados: Record<string, boolean> = {};
+  cargandoTipos = false;
+  catalogoFallo = false;
 
   get tiposElegidos(): string[] {
     return Object.keys(this.tiposMarcados).filter(k => this.tiposMarcados[k]);
@@ -75,6 +86,11 @@ export class RegistroTallerPage {
 
   enviando = false;
   verClave = false;
+
+  // Cierre: confirmar el correo del dueño (el código lo manda el servidor al crear).
+  codigo = '';
+  correoConfirmado = false;
+  trabajandoCorreo = false;
   private slugCambiado = new Subject<string>();
 
   // La dirección donde vive la app (motiq12.com en producción). El portal de cada
@@ -99,6 +115,19 @@ export class RegistroTallerPage {
       ? `${nombres.slice(0, -1).join(', ')} y ${nombres[nombres.length - 1]}`
       : nombres[0];
     return texto.charAt(0).toUpperCase() + texto.slice(1);
+  }
+
+  get paso1Listo(): boolean {
+    return !!this.nombre.trim() && this.disponible === true && this.tiposElegidos.length > 0;
+  }
+
+  /** Qué falta para pasar al paso 2, en una línea. */
+  get faltaPaso1(): string {
+    if (!this.nombre.trim()) return 'Falta el nombre del taller.';
+    if (!this.tiposElegidos.length) return 'Elegí qué vehículos atiende.';
+    if (this.verificando) return 'Verificando el identificador…';
+    if (this.disponible !== true) return 'Elegí un identificador disponible.';
+    return '';
   }
 
   /**
@@ -143,12 +172,27 @@ export class RegistroTallerPage {
       this.motivoSlug = res.data.motivo;
     });
 
+    this.cargarTipos();
+  }
+
+  /**
+   * El catálogo de tipos viene del servidor. Si falla, se avisa con la opción de
+   * reintentar y se ofrecen las dos opciones básicas para elegir A MANO. Antes se
+   * seguía sin catálogo y el servidor ponía 'moto' en silencio.
+   */
+  cargarTipos(): void {
+    this.cargandoTipos = true;
     this.taller.tipos().subscribe({
-      next: res => { this.tiposDisponibles = res.data; },
-      // Sin catálogo no se puede elegir, pero tampoco tiene sentido bloquear el alta:
-      // el servidor cae a 'moto' si no le llega nada, así que el taller queda creado
-      // y puede corregirlo desde su configuración.
-      error: () => { this.tiposDisponibles = []; },
+      next: res => {
+        this.cargandoTipos = false;
+        this.catalogoFallo = false;
+        this.tiposDisponibles = res.data;
+      },
+      error: () => {
+        this.cargandoTipos = false;
+        this.catalogoFallo = true;
+        if (!this.tiposDisponibles.length) this.tiposDisponibles = TIPOS_BASICOS;
+      },
     });
   }
 
@@ -196,6 +240,18 @@ export class RegistroTallerPage {
   quitarLogo(): void {
     this.logo = null;
     this.errorLogo = '';
+  }
+
+  seguir(): void {
+    if (!this.paso1Listo) return;
+    this.irAPaso(2);
+  }
+
+  volver(): void { this.irAPaso(1); }
+
+  private irAPaso(n: 1 | 2 | 3): void {
+    this.paso = n;
+    this.moverFoco = true;
   }
 
   // Mientras no toque el campo, el identificador se deriva del nombre del taller:
@@ -259,16 +315,51 @@ export class RegistroTallerPage {
         // a cuál pertenecen, incluso sin subdominio (nativo o localhost).
         this.taller.fijar(res.data.taller.slug);
         this.auth.aplicarSesionStaff(res.data.token, res.data.usuario);
-        this.toast.success(`Taller "${res.data.taller.nombre}" creado`);
-        this.router.navigate(['/admin'], { replaceUrl: true });
+        this.enviando = false;
+        // No se salta directo al panel: el cierre confirma el correo (el servidor ya
+        // mandó el código) y muestra por dónde seguir.
+        this.irAPaso(3);
       },
       error: err => {
         this.enviando = false;
         const msg = err?.error?.error || 'No se pudo crear el taller';
         this.toast.error(msg);
-        // 409 = el identificador se ocupó entre la validación y el envío.
-        if (err?.status === 409) { this.disponible = false; this.motivoSlug = msg; }
+        // 409 = el identificador se ocupó entre la validación y el envío: se vuelve
+        // al paso 1, que es donde está ese campo.
+        if (err?.status === 409) { this.disponible = false; this.motivoSlug = msg; this.irAPaso(1); }
       },
     });
   }
+
+  confirmarCorreo(): void {
+    const codigo = this.codigo.trim();
+    if (codigo.length < 6 || this.trabajandoCorreo) return;
+    this.trabajandoCorreo = true;
+    this.auth.confirmarCorreo(codigo).subscribe({
+      next: () => { this.trabajandoCorreo = false; this.correoConfirmado = true; },
+      error: e => {
+        this.trabajandoCorreo = false;
+        this.codigo = '';
+        this.toast.error(e?.error?.error || 'No se pudo confirmar el código');
+      },
+    });
+  }
+
+  reenviarCodigo(): void {
+    this.trabajandoCorreo = true;
+    this.auth.enviarCodigoCorreo().subscribe({
+      next: r => { this.trabajandoCorreo = false; this.toast.success(r.message); },
+      error: e => { this.trabajandoCorreo = false; this.toast.error(e?.error?.error || 'No se pudo enviar el código'); },
+    });
+  }
 }
+
+/**
+ * Las dos opciones que el servidor siempre conoce (utils/tipos-vehiculo.js), para
+ * elegir a mano si el catálogo no carga. Solo la clave y el nombre: los campos
+ * propios de cada tipo los pone el servidor al crear el taller.
+ */
+const TIPOS_BASICOS: TipoVehiculo[] = [
+  { clave: 'moto', etiqueta: 'Motocicleta', plural: 'Motocicletas', unidadUso: 'km', campos: [] },
+  { clave: 'auto', etiqueta: 'Automóvil', plural: 'Automóviles', unidadUso: 'km', campos: [] },
+];

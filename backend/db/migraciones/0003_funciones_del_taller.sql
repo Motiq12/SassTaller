@@ -185,5 +185,5 @@ ALTER TABLE "usuarios"
   ADD COLUMN "permisos_web" text DEFAULT NULL;
 
 -- El checklist era único por orden en TODA la tabla, no por empresa.
-ALTER TABLE "orden_checklist" DROP CONSTRAINT "idx_orden_checklist_orden_id";
+ALTER TABLE "orden_checklist" DROP CONSTRAINT IF EXISTS "idx_orden_checklist_orden_id";
 ALTER TABLE "orden_checklist" ADD CONSTRAINT "uq_checklist_tenant_orden" UNIQUE ("tenant_id", "orden_id");
