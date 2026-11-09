@@ -99,6 +99,19 @@ export class AuthService {
     return this.http.post<{ message: string }>(`${this.apiUrl}/auth/2fa/desactivar`, { password });
   }
 
+  /**
+   * Recuperar la contraseña del personal: pide el código al correo. Funciona sin
+   * taller (se resuelve por el correo); si hay uno resuelto, se acota a ese.
+   */
+  solicitarRecuperacion(email: string, antibot: { website?: string; turnstileToken?: string } = {}): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/recuperar/solicitar`, this.taller.conTaller({ email, ...antibot }));
+  }
+
+  /** Canjea el código y fija la contraseña nueva. No abre sesión: se vuelve al login. */
+  confirmarRecuperacion(datos: { email: string; codigo: string; password: string }): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/recuperar/confirmar`, this.taller.conTaller(datos));
+  }
+
   // Confirmación del correo del personal. No es 2FA ni le pone una traba a nadie: ese
   // correo es la única vía para recuperar la contraseña, y hasta ahora nadie comprobaba
   // que existiera.

@@ -5,7 +5,7 @@
         <app-marca-logo [tamano]="84"></app-marca-logo>
       </div>
       <h1>Recuperar acceso</h1>
-      <p *ngIf="paso === 1">Te enviaremos un código a tu correo</p>
+      <p *ngIf="paso === 1">{{ personal ? 'Te enviaremos un código al correo de tu usuario del taller' : 'Te enviaremos un código a tu correo' }}</p>
       <p *ngIf="paso === 2">Escribí el código que te llegó y tu nueva contraseña</p>
     </div>
 
@@ -33,7 +33,7 @@
         <p class="ayuda-correo">El código puede tardar un par de minutos. Si no llega, revisá la carpeta de spam.</p>
         <ion-item lines="full">
           <ion-label position="stacked">Nueva contraseña</ion-label>
-          <ion-input [type]="verPass ? 'text' : 'password'" [(ngModel)]="password" placeholder="Mínimo 6 caracteres">
+          <ion-input [type]="verPass ? 'text' : 'password'" [(ngModel)]="password" placeholder="Mínimo 8 caracteres">
             <ion-button fill="clear" slot="end" (click)="verPass = !verPass" aria-label="Mostrar contraseña">
               <ion-icon slot="icon-only" [name]="verPass ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
             </ion-button>

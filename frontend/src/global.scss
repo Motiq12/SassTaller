@@ -1572,3 +1572,7 @@ ion-modal.adm-modal {
   }
 }
 
+
+// Edge agrega su propio "ojo" a los campos de contraseña; en las pantallas de acceso
+// ya hay uno (el de Ionic) y quedaban dos, uno al lado del otro.
+.login-content input::-ms-reveal { display: none; }

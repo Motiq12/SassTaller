@@ -13,7 +13,8 @@ const { emailValido } = require('../utils/validar');
 const { consumir } = require('../utils/rate-limit');
 const { resumenCuenta } = require('../utils/cuenta');
 const { nuevoCodigo, canjear, VIGENCIA_MIN } = require('../utils/verificacion-usuario');
-const { enviarCodigoCorreoStaff } = require('../services/mailer');
+const { enviarCodigoCorreoStaff, enviarCodigoReset } = require('../services/mailer');
+const { antibot } = require('../utils/antibot');
 const totp = require('../utils/totp');
 
 function firmar(payload) {
@@ -384,6 +385,116 @@ router.post('/2fa/desactivar', auth, async (req, res) => {
       [req.usuario.id]
     );
     res.json({ message: 'Verificación en dos pasos desactivada' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// ── Recuperar la contraseña del PERSONAL ────────────────────────────────────────
+//
+// Hasta ahora no existía: el personal solo podía cambiarla con la sesión iniciada, y
+// quien la olvidaba tenía que escribirle a Motiq. Es la misma mecánica que la de los
+// clientes del portal (código de 6 dígitos con hash, 10 minutos, un solo uso, 5
+// intentos, respuesta genérica), con dos diferencias:
+//
+//  · No exige taller. El login de motiq12.com resuelve al usuario por el correo, y el
+//    mismo correo puede estar en varios talleres: se manda un código por cada cuenta
+//    (cada uno con la marca de su taller) y al confirmar se cambia la de la cuenta
+//    cuyo código coincide. Si llega `taller`, se acota a ese.
+//  · No abre sesión al terminar: vuelve al login. Así la verificación en dos pasos, si
+//    está activa, se sigue pidiendo; un reset de contraseña no la puede saltar.
+
+const MSG_RESET = 'Si hay una cuenta con ese correo, te enviamos un código.';
+const ERR_RESET = 'El código no es válido o ya venció. Pedí uno nuevo.';
+const MAX_INTENTOS_RESET = 5;
+
+// Las cuentas activas del personal con ese correo (acotadas a un taller si se pidió).
+async function cuentasDelCorreo(email, taller) {
+  const params = [String(email).trim().toLowerCase()];
+  let filtro = '';
+  if (taller) { filtro = ' AND t.slug = ?'; params.push(String(taller).trim().toLowerCase()); }
+  const [filas] = await pool.query(
+    `SELECT u.id, u.tenant_id, u.nombre, t.nombre AS taller_nombre, t.slug AS taller_slug
+       FROM usuarios u JOIN tenants t ON t.id = u.tenant_id
+      WHERE LOWER(u.email) = ? AND u.activo = 1 AND t.estado = 'activo'${filtro}`,
+    params
+  );
+  return filas;
+}
+
+// POST /api/auth/recuperar/solicitar — manda el código (público, con antibot).
+router.post('/recuperar/solicitar', antibot(), async (req, res) => {
+  try {
+    const { email, taller } = req.body || {};
+    if (!emailValido(email)) return res.status(400).json({ error: 'El correo no tiene un formato válido' });
+
+    const clave = String(email).trim().toLowerCase();
+    const porCorreo = consumir(`reset-staff:${clave}`, { porMinuto: 1, porHora: 5 });
+    const porIp = consumir(`reset-staff-ip:${req.ip}`, { porMinuto: 5, porHora: 30 });
+    if (!porCorreo.ok || !porIp.ok) {
+      const espera = Math.max(porCorreo.retryAfter || 0, porIp.retryAfter || 0);
+      return res.status(429).json({ error: `Esperá ${espera}s antes de pedir otro código.` });
+    }
+
+    for (const c of await cuentasDelCorreo(email, taller)) {
+      const db = paraTenant(c.tenant_id);
+      const codigo = String(Math.floor(100000 + Math.random() * 900000));
+      const codeHash = await bcrypt.hash(codigo, 10);
+      // Invalida los anteriores: si conviven dos, se prueba el del correo viejo.
+      await db.query(
+        'UPDATE usuario_reset_codes SET used = 1 WHERE tenant_id = @tenant AND usuario_id = ? AND used = 0',
+        [c.id]
+      );
+      await db.query(
+        `INSERT INTO usuario_reset_codes (tenant_id, usuario_id, code_hash, expires_at)
+         VALUES (@tenant, ?, ?, NOW() + INTERVAL '10 minutes')`,
+        [c.id, codeHash]
+      );
+      await enviarCodigoReset(clave, c.nombre, codigo, { nombre: c.taller_nombre, slug: c.taller_slug });
+    }
+
+    // La misma respuesta exista o no la cuenta: no revela qué correos hay.
+    res.json({ message: MSG_RESET });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// POST /api/auth/recuperar/confirmar — canjea el código y fija la nueva contraseña.
+router.post('/recuperar/confirmar', async (req, res) => {
+  try {
+    const { email, codigo, password, taller } = req.body || {};
+    if (!emailValido(email)) return res.status(400).json({ error: 'El correo no tiene un formato válido' });
+    if (!codigo || !password) return res.status(400).json({ error: 'Código y nueva contraseña son requeridos' });
+    if (String(password).length < 8) return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+
+    const limite = consumir(`reset-staff-conf:${String(email).trim().toLowerCase()}`, { porMinuto: 10, porHora: 30 });
+    if (!limite.ok) return res.status(429).json({ error: `Demasiados intentos. Esperá ${limite.retryAfter}s.` });
+
+    for (const c of await cuentasDelCorreo(email, taller)) {
+      const db = paraTenant(c.tenant_id);
+      const [[reg]] = await db.query(
+        `SELECT id, code_hash, attempts FROM usuario_reset_codes
+          WHERE tenant_id = @tenant AND usuario_id = ? AND used = 0 AND expires_at > NOW()
+          ORDER BY id DESC LIMIT 1`,
+        [c.id]
+      );
+      if (!reg || reg.attempts >= MAX_INTENTOS_RESET) continue;
+      if (!(await bcrypt.compare(String(codigo).trim(), reg.code_hash))) {
+        await db.query('UPDATE usuario_reset_codes SET attempts = attempts + 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
+        continue;
+      }
+      // El código llegó a esa casilla: de paso queda verificado el correo.
+      const hash = await bcrypt.hash(String(password), 10);
+      await db.query(
+        'UPDATE usuarios SET password_hash = ?, email_verificado = 1 WHERE id = ? AND tenant_id = @tenant',
+        [hash, c.id]
+      );
+      await db.query('UPDATE usuario_reset_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
+      return res.json({ message: 'Listo, tu contraseña quedó cambiada. Ya podés entrar.' });
+    }
+
+    res.status(400).json({ error: ERR_RESET });
   } catch (err) {
     fail(res, err);
   }
