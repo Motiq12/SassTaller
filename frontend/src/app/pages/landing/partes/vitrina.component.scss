@@ -2,23 +2,24 @@
 
 :host { display: block; }
 
-// Escritorio: el disco plano centrado al 58 % del ancho, la pantalla parada
-// delante y rompiendo su borde de arriba; la lista abajo a la izquierda y el
-// dato del problema elegido al costado derecho del disco.
+// Escritorio: dos columnas. A la izquierda, un solo bloque centrado en el alto:
+// el título, la lista de problemas y el dato del elegido, uno debajo del otro.
+// A la derecha, el disco plano con la pantalla parada delante.
 .vitrina {
   position: relative;
   min-height: min(100svh, 980px);
-  padding: 0 $margen;
+  padding: 72px $margen;
   display: grid;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr) minmax(0, 3fr);
-  grid-template-areas: 'lista escenario hecho';
-  align-items: end;
-  gap: 32px;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  grid-template-rows: 1fr auto auto 1fr;
+  grid-template-areas: '. escenario' 'lista escenario' 'hecho escenario' '. escenario';
+  column-gap: clamp(32px, 5vw, 96px);
 }
 
 .escenario {
   grid-area: escenario;
   position: relative;
+  margin-top: 6%;          // la pantalla sobresale arriba del disco: lugar para eso
   align-self: center;
   justify-self: center;
   width: min(64vh, 100%);
@@ -105,7 +106,8 @@ h2 {
 
 .hecho {
   grid-area: hecho;
-  margin: 0 0 14px;
+  max-width: 44ch;
+  margin: 28px 0 0;
   font-family: $fb;
   font-size: $t-texto;
   line-height: 1.55;
@@ -119,7 +121,9 @@ h2 {
   .vitrina {
     display: block;
     min-height: 0;
+    padding: 0 $margen;
   }
+  .escenario { margin-top: 0; }
   // La pantalla va en el flujo (en el teléfono es más alta que el disco) y el
   // disco queda detrás de su mitad de arriba: así nunca tapa el titular.
   .escenario {
