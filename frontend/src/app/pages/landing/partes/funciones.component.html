@@ -1,0 +1,10 @@
+<section class="funciones" aria-labelledby="funciones-titulo">
+  <h2 id="funciones-titulo" appAparece>Todo el taller, en un solo lugar.</h2>
+  <ul class="lista">
+    <li *ngFor="let f of funciones; let i = index" appAparece [retraso]="(i % 2) * 80">
+      <h3>{{ f.nombre }}</h3>
+      <p>{{ f.texto }}</p>
+      <p *ngIf="f.nota" class="nota">{{ f.nota }}</p>
+    </li>
+  </ul>
+</section>

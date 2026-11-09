@@ -4,6 +4,8 @@ import type { TipoPantalla } from './pantalla.component';
 interface Problema {
   nombre: string;
   pantalla: TipoPantalla;
+  /** Para la pantalla de la orden: en qué etapa mostrarla. */
+  etapa?: number;
   hecho: string;
 }
 
@@ -24,24 +26,25 @@ export class VitrinaComponent implements OnInit, OnDestroy {
 
   readonly problemas: Problema[] = [
     {
-      nombre: '¿Dónde anoté ese trabajo?',
+      nombre: 'Información que se pierde',
       pantalla: 'historial',
-      hecho: 'Cada vehículo que entra queda con su orden: qué se le hizo, qué repuestos llevó, quién lo atendió y cuánto se cobró. Con el historial completo de cada placa.',
+      hecho: 'Cada vehículo que entra queda con su orden: qué se le hizo, qué repuestos llevó, quién lo atendió y cuánto se cobró. Con el historial completo de cada placa, sin cuadernos ni fotos sueltas.',
     },
     {
-      nombre: '¿Ya está mi carro?',
-      pantalla: 'portal',
-      hecho: 'Tu cliente entra a su portal y lo ve solo: en qué va, qué se le encontró y cuándo lo retira. Deja de sonar el teléfono cada veinte minutos.',
-    },
-    {
-      nombre: 'Citas que nadie olvida',
+      nombre: 'Trabajos que se atrasan',
       pantalla: 'agenda',
-      hecho: 'La agenda por mecánico y por sucursal, con recordatorio automático. Menos huecos en el día y menos gente que no aparece.',
+      hecho: 'La agenda reparte el día por mecánico y cada orden muestra en qué etapa está. Lo que se está atrasando se ve en el panel, no cuando el cliente llama a reclamar.',
     },
     {
-      nombre: 'Saber cómo va el mes',
-      pantalla: 'reportes',
-      hecho: 'Cuánto entró, qué servicios se repiten, qué mecánico rinde y qué clientes no vuelven. Números, no impresiones.',
+      nombre: 'Presupuestos sin aprobar',
+      pantalla: 'orden',
+      etapa: 1,
+      hecho: 'El presupuesto le llega al cliente a su portal y lo aprueba con un toque. La orden pasa sola a reparación y queda registrado cuándo aprobó.',
+    },
+    {
+      nombre: 'Clientes que preguntan por WhatsApp',
+      pantalla: 'portal',
+      hecho: 'Tu cliente ve en su portal en qué etapa está su vehículo y cuándo puede retirarlo, y recibe un aviso por correo cuando cambia. El teléfono deja de sonar cada veinte minutos.',
     },
   ];
 

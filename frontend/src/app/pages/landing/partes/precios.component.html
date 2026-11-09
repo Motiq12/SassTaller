@@ -1,32 +1,57 @@
 <section class="precios" aria-labelledby="precios-titulo">
-  <div class="nombres" appAparece>
-    <h2 id="precios-titulo">Precios</h2>
-    <div role="tablist" aria-label="Planes" class="lista">
-      <ng-container *ngFor="let p of planes; let i = index">
-        <button type="button" role="tab" class="plan" [class.elegido]="i === elegido"
-                [attr.aria-selected]="i === elegido" [attr.aria-controls]="'plan-' + i"
-                [attr.tabindex]="i === elegido ? 0 : -1"
-                (click)="elegir(i)" (focus)="elegir(i)" (keydown)="teclado($event, i)">
-          {{ p.nombre }}
-        </button>
-        <!-- En el teléfono, el detalle se abre debajo de su nombre. -->
-        <div class="detalle movil" *ngIf="i === elegido" [id]="'plan-' + i" role="tabpanel">
-          <ng-container *ngTemplateOutlet="detalle; context: { $implicit: p }"></ng-container>
-        </div>
-      </ng-container>
-    </div>
+  <h2 id="precios-titulo" appAparece>Empezás con todo. Después, seguís gratis.</h2>
+
+  <!-- Escritorio: una tabla de verdad, para comparar fila por fila. -->
+  <div class="tabla-marco" appAparece [retraso]="80">
+    <table class="tabla">
+      <caption class="oculto">Comparación de los planes de Motiq</caption>
+      <thead>
+        <tr>
+          <td></td>
+          <th *ngFor="let c of columnas" scope="col" [class.medio]="c.clave === 'gratis'">
+            <span class="nombre">{{ c.nombre }}</span>
+            <span class="precio">{{ c.precio }}</span>
+            <span class="plazo">{{ c.plazo }}</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let f of filas">
+          <th scope="row">{{ f.rasgo }}</th>
+          <td *ngFor="let c of columnas" [class.medio]="c.clave === 'gratis'">{{ f.valores[c.clave] }}</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td></td>
+          <td *ngFor="let c of columnas" [class.medio]="c.clave === 'gratis'">
+            <a *ngIf="c.destino === 'registro'" class="accion" [class.secundaria]="c.clave === 'gratis'" routerLink="/registro-taller">{{ c.accion }}</a>
+            <button *ngIf="c.destino === 'contacto'" type="button" class="accion secundaria" (click)="hablar.emit()">{{ c.accion }}</button>
+          </td>
+        </tr>
+      </tfoot>
+    </table>
   </div>
 
-  <div class="escenario" appAparece [retraso]="120">
-    <div class="detalle escritorio" role="tabpanel" [attr.aria-label]="planes[elegido].nombre">
-      <ng-container *ngTemplateOutlet="detalle; context: { $implicit: planes[elegido] }"></ng-container>
-    </div>
+  <!-- Teléfono: cada plan con su lista, uno debajo del otro. -->
+  <div class="planes-movil">
+    <article *ngFor="let c of columnas" class="plan-movil">
+      <h3>{{ c.nombre }} <span class="precio">{{ c.precio }}</span> <span class="plazo">{{ c.plazo }}</span></h3>
+      <dl>
+        <div *ngFor="let f of filas"><dt>{{ f.rasgo }}</dt><dd>{{ f.valores[c.clave] }}</dd></div>
+      </dl>
+      <a *ngIf="c.destino === 'registro'" class="accion" [class.secundaria]="c.clave === 'gratis'" routerLink="/registro-taller">{{ c.accion }}</a>
+      <button *ngIf="c.destino === 'contacto'" type="button" class="accion secundaria" (click)="hablar.emit()">{{ c.accion }}</button>
+    </article>
+  </div>
+
+  <div class="dia31" appAparece>
+    <h3>¿Qué pasa a los {{ planes.dias_prueba }} días?</h3>
+    <p>
+      Tu taller pasa solo al plan Gratis. No se borra nada, no hay cobros automáticos y seguís
+      registrando órdenes, clientes y citas sin límite.
+      <ng-container *ngIf="topesGratis">Si en la prueba sumaste más de {{ topesGratis }}, lo que ya
+      tenés sigue funcionando; para agregar más, pasás a Pro.</ng-container>
+    </p>
   </div>
 </section>
-
-<ng-template #detalle let-p>
-  <p class="cifra">{{ p.precio }} <span class="plazo">{{ p.plazo }}</span></p>
-  <p class="incluye">{{ p.incluye }}</p>
-  <a *ngIf="p.destino === 'registro'" class="accion" routerLink="/registro-taller">{{ p.accion }}</a>
-  <button *ngIf="p.destino === 'contacto'" type="button" class="accion" (click)="hablar.emit()">{{ p.accion }}</button>
-</ng-template>

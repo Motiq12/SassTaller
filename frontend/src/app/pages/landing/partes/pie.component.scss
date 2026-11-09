@@ -111,7 +111,7 @@
     &:focus-visible { outline: 3px solid $tinta; outline-offset: 3px; border-radius: 4px; }
   }
 }
-.accion { @include boton; min-height: 44px; padding: 0 20px; font-size: $t-chica; }
+.accion { @include boton; min-height: 44px; padding: 0 20px; font-size: $t-chica; white-space: nowrap; }
 
 .oculto { @include oculto; }
 

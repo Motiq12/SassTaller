@@ -7,7 +7,9 @@ import { HeroComponent } from './partes/hero.component';
 import { PantallaComponent } from './partes/pantalla.component';
 import { VitrinaComponent } from './partes/vitrina.component';
 import { EtapasComponent } from './partes/etapas.component';
-import { AdaptaComponent } from './partes/adapta.component';
+import { FuncionesComponent } from './partes/funciones.component';
+import { ConfianzaComponent } from './partes/confianza.component';
+import { PreguntasComponent } from './partes/preguntas.component';
 import { PreciosComponent } from './partes/precios.component';
 import { CuponComponent } from './partes/cupon.component';
 import { PieComponent } from './partes/pie.component';
@@ -23,7 +25,9 @@ const routes: Routes = [{ path: '', component: LandingPage }];
     PantallaComponent,
     VitrinaComponent,
     EtapasComponent,
-    AdaptaComponent,
+    FuncionesComponent,
+    ConfianzaComponent,
+    PreguntasComponent,
     PreciosComponent,
     CuponComponent,
     PieComponent,

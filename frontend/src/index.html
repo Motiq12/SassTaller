@@ -150,6 +150,18 @@
     (function () {
       var el = document.getElementById('boot-splash');
       if (!el) return;
+      // Las páginas públicas en el navegador (la landing, el registro de un taller y
+      // los textos legales) no llevan pantalla de arranque: tapaba el titular hasta
+      // 1,6 s en la primera visita, justo lo que mira quien llega desde un buscador.
+      // El splash es para la app (nativa o ya instalada), donde sí cubre el arranque.
+      var ruta = location.pathname;
+      var nativo = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+      var publica = ruta === '/' || ruta.indexOf('/registro-taller') === 0 || ruta.indexOf('/legal') === 0;
+      if (publica && !nativo) {
+        el.remove();
+        window.__hideBootSplash = function () {};
+        return;
+      }
       // Primera carga de la sesión = apertura real de la app (respiro completo,
       // 1.6s). Si sessionStorage ya tenía la marca, es una recarga (F5, o volver a
       // cargar sin cerrar del todo la app): más corta, 0.9s. Se decide ANTES de que

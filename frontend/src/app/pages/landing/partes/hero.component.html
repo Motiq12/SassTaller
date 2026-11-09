@@ -9,14 +9,16 @@
 
   <div class="texto">
     <h1 id="hero-titulo">El taller ordenado, <span class="junto">sin cuadernos.</span></h1>
+    <!-- El resultado, no la lista de funciones: cada vehículo con su orden, el cliente
+         que aprueba y sigue el trabajo solo, y el dueño que deja de contestar. -->
     <p class="bajada">
-      {{ producto.nombre }} lleva las órdenes de trabajo, los clientes y la agenda de tu taller
-      en un solo lugar, sin grupos de WhatsApp. Para motos, autos o lo que atiendas.
+      Cada vehículo entra con su orden, el cliente aprueba el presupuesto desde el celular
+      y sigue el trabajo sin escribirte por WhatsApp. Para motos, autos o los dos.
     </p>
     <div class="acciones">
-      <a class="principal" routerLink="/registro-taller">Probá gratis</a>
+      <a class="principal" routerLink="/registro-taller">Probá gratis 30 días</a>
       <button type="button" class="secundario" (click)="hablar.emit()">Hablá con nosotros</button>
     </div>
-    <p class="chica">Sin tarjeta. Se arma en menos de 5 minutos.</p>
+    <p class="chica">Sin tarjeta. Después sigue gratis y no se borra nada.</p>
   </div>
 </section>

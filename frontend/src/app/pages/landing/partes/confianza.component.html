@@ -1,0 +1,24 @@
+<section class="confianza" aria-labelledby="confianza-titulo">
+  <h2 id="confianza-titulo" appAparece>Tu información, cuidada.</h2>
+
+  <dl class="garantias">
+    <div *ngFor="let g of garantias; let i = index" class="garantia" appAparece [retraso]="(i % 2) * 80">
+      <dt>{{ g.titulo }}</dt>
+      <dd>{{ g.texto }}</dd>
+    </div>
+  </dl>
+
+  <p class="cierre" appAparece>
+    Todo está por escrito en los <a routerLink="/legal/terminos">Términos de servicio</a> y la
+    <a routerLink="/legal/privacidad">Política de privacidad</a>. ¿Una duda? Te responde una persona:
+    <button type="button" class="enlace" (click)="hablar.emit()">escribinos</button>.
+  </p>
+
+  <!-- Testimonios: solo reales y autorizados. Apagado mientras no haya ninguno. -->
+  <ul class="testimonios" *ngIf="testimonios.length">
+    <li *ngFor="let t of testimonios">
+      <blockquote>“{{ t.cita }}”</blockquote>
+      <p>{{ t.persona }} · {{ t.taller }}, {{ t.ciudad }}</p>
+    </li>
+  </ul>
+</section>
