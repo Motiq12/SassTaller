@@ -20,7 +20,7 @@ DROP TABLE IF EXISTS usuarios;
 DROP TABLE IF EXISTS sucursales;
 DROP TABLE IF EXISTS items;
 
--- Sucursales (locales) del taller. El sistema soporta varios; se siembran Liberia y Cañas.
+-- Sucursales (locales) del taller. Cada empresa crea las suyas.
 -- La cita, la orden y el personal se asocian a una sucursal.
 CREATE TABLE IF NOT EXISTS sucursales (
   id            INT AUTO_INCREMENT PRIMARY KEY,
@@ -32,8 +32,8 @@ CREATE TABLE IF NOT EXISTS sucursales (
   created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
--- Ids explícitos: las filas viejas se rellenan a Liberia (id=1) de forma determinista.
-INSERT IGNORE INTO sucursales (id, nombre, orden) VALUES (1, 'Liberia', 1), (2, 'Cañas', 2);
+-- Ids explícitos: las filas viejas se rellenan a la primera (id=1) de forma determinista.
+INSERT IGNORE INTO sucursales (id, nombre, orden) VALUES (1, 'Sucursal principal', 1);
 
 CREATE TABLE IF NOT EXISTS usuarios (
   id            INT AUTO_INCREMENT PRIMARY KEY,

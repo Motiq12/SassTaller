@@ -18,12 +18,17 @@ const { pool } = require('./pool');
 // Tablas que llevan tenant_id. Toda consulta que toque alguna de estas DEBE filtrar.
 // `tenants` no está: es la tabla raíz, vive por encima del scope.
 const TABLAS_CON_TENANT = new Set([
+  'motiq_bitacora', 'motiq_seguidos', 'motiq_tareas', 'reportes_falla',
   'citas', 'clientes', 'configuracion', 'email_verify_codes', 'garantia_fotos',
   'garantias', 'login_codes', 'mensaje_lecturas', 'mensajes_internos', 'vehiculos',
   'notificaciones', 'orden_avances', 'orden_checklist', 'orden_contadores',
   'orden_fotos', 'orden_repuestos', 'orden_tiempos', 'ordenes_trabajo',
   'password_reset_codes', 'promos', 'recompensas_canjeadas', 'servicios',
   'sucursales', 'tareas_mecanico', 'usuario_verify_codes', 'usuarios', 'web_vitals',
+  // Las que trajo MS Motos. Fuera de esta lista el guard no las miraba, y por ahí se
+  // cruzaban roles, feriados, bloqueos y órdenes eliminadas entre talleres.
+  'actividad_personal', 'bloqueos_horario', 'cita_servicios', 'eventos_seguridad',
+  'feriados', 'ordenes_eliminadas', 'roles', 'sesiones_personal',
 ]);
 
 // Detecta las tablas nombradas en la consulta junto con su alias, si tiene.

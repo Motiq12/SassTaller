@@ -10,6 +10,9 @@ const { fail } = require('../utils/responder');
 const { emailValido } = require('../utils/validar');
 const { consumir } = require('../utils/rate-limit');
 const authPlataforma = require('../middleware/auth-plataforma');
+const { configRespaldo, respaldosGuardados, resumirRespaldos } = require('../services/respaldo');
+const { hacerRespaldo } = require('../jobs/respaldo');
+const { crearS3 } = require('../utils/s3');
 const { fijarEstado, fijarPlan } = require('../utils/estado-tenant');
 // Los planes se declaran en utils/limites junto con lo que incluye cada uno: tener acá
 // una segunda lista sería la forma de que un día acepte un plan que no tiene límites
@@ -116,6 +119,58 @@ router.post('/contacto', async (req, res) => {
 });
 
 router.use(authPlataforma);
+
+// Respaldos de la base entera, con los datos de todas las empresas: por eso viven acá
+// y no en el panel de un taller. Nunca devuelve las llaves del almacenamiento ni la
+// frase de cifrado, solo si están.
+router.get('/respaldos', async (req, res) => {
+  try {
+    const c = configRespaldo();
+    const [registro] = await pool.query(
+      `SELECT id, origen, ok, clave, bytes, tablas, filas, segundos, cifrado, error, created_at
+         FROM respaldos_registro ORDER BY id DESC LIMIT 30`
+    );
+    let guardados = null;
+    let errorAlmacen = null;
+    if (c.activo) {
+      try {
+        guardados = respaldosGuardados(await crearS3(c).listar(c.prefijo), c.prefijo);
+      } catch (err) {
+        console.error('⚠️  No se pudo listar el almacenamiento de respaldos:', err.message);
+        errorAlmacen = 'No se pudo leer el almacenamiento de los respaldos';
+      }
+    }
+    res.json({
+      data: {
+        ...resumirRespaldos({ activo: c.activo, registro, guardados }),
+        configuracion: { activo: c.activo, faltan: c.faltan, conservar: c.conservar, cifrado: !!c.frase },
+        registro,
+        guardados,
+        error_almacen: errorAlmacen,
+      },
+    });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// Un respaldo ya, además del de la noche. Uno cada 10 minutos.
+let ultimoRespaldoPanel = 0;
+router.post('/respaldos', async (req, res) => {
+  try {
+    if (!configRespaldo().activo) return res.status(409).json({ error: 'Los respaldos no están configurados en el servidor' });
+    if (Date.now() - ultimoRespaldoPanel < 10 * 60 * 1000) {
+      return res.status(429).json({ error: 'Ya se hizo un respaldo hace menos de 10 minutos' });
+    }
+    ultimoRespaldoPanel = Date.now();
+    const r = await hacerRespaldo({ origen: 'panel' });
+    res.json({ data: r, message: `Respaldo hecho: ${r.tablas} tablas, ${r.filas} filas` });
+  } catch (err) {
+    if (err.message === 'Ya hay un respaldo en curso') return res.status(409).json({ error: 'Ya hay un respaldo en curso: esperá a que termine.' });
+    console.error('⚠️  Respaldo desde el panel falló:', err.message);
+    res.status(502).json({ error: `El respaldo falló: ${String(err.message).slice(0, 200)}` });
+  }
+});
 
 // GET /api/motiq/contactos?estado= — la bandeja de quienes pidieron una demo.
 router.get('/contactos', async (req, res) => {

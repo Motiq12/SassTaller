@@ -4,6 +4,7 @@
 // como alternativa explícita, de un campo `taller` con el slug.
 //
 // Sin esto, un registro público no sabría a qué taller pertenece el cliente nuevo.
+const jwt = require('jsonwebtoken');
 const { pool } = require('../db/pool');
 const { paraTenant } = require('../db/tenant-db');
 
@@ -25,7 +26,14 @@ module.exports = async function tenantPublico(req, res, next) {
       // Si viene un Bearer, la ruta es de las autenticadas y el taller sale del
       // token: se deja pasar para que auth-cliente lo resuelva. Este middleware
       // cubre solo el tramo público, donde no hay de dónde sacarlo.
-      if (req.headers['authorization']) return next();
+      const bearer = /^Bearer\s+(.+)$/i.exec(String(req.headers.authorization || ''));
+      if (bearer) {
+        try {
+          const { tenant_id: id } = jwt.verify(bearer[1], process.env.JWT_SECRET);
+          if (id) { req.tenantId = id; req.db = paraTenant(id); }
+        } catch { /* token malo: lo rechaza el middleware de sesión de la ruta */ }
+        return next();
+      }
       return res.status(400).json({ error: 'Falta indicar el taller' });
     }
 

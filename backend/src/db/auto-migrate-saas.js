@@ -507,7 +507,7 @@ async function ensureSchema() {
       pool.query(
         `INSERT IGNORE INTO servicios (tenant_id, nombre, orden)
          SELECT t.id, v.nombre, v.orden
-         FROM tenants t
+         FROM (SELECT id FROM tenants WHERE NOT EXISTS (SELECT 1 FROM servicios s WHERE s.tenant_id = tenants.id)) t
          JOIN (
                      SELECT 'Cambio de aceite y filtros' AS nombre, 1 AS orden
            UNION ALL SELECT 'Revisión completa', 2
@@ -537,13 +537,16 @@ async function ensureSchema() {
     await addColumnIfMissing('citas', 'sucursal_id', 'INT NULL');
     await addColumnIfMissing('ordenes_trabajo', 'sucursal_id', 'INT NULL');
     await addColumnIfMissing('usuarios', 'sucursal_id', 'INT NULL');
-    // Backfill: las citas y órdenes históricas quedan en Liberia (id=1).
-    await tryStep('backfill citas.sucursal_id', () =>
-      pool.query('UPDATE citas SET sucursal_id = 1 WHERE sucursal_id IS NULL')
-    );
-    await tryStep('backfill ordenes.sucursal_id', () =>
-      pool.query('UPDATE ordenes_trabajo SET sucursal_id = 1 WHERE sucursal_id IS NULL')
-    );
+    // Lo que quedó sin sede va a la primera sucursal de SU taller, nunca a la 1 de otro.
+    for (const tabla of ['citas', 'ordenes_trabajo']) {
+      await tryStep(`backfill ${tabla}.sucursal_id`, () =>
+        pool.query(
+          `UPDATE ${tabla} x
+             JOIN (SELECT tenant_id, MIN(id) AS id FROM sucursales GROUP BY tenant_id) s ON s.tenant_id = x.tenant_id
+              SET x.sucursal_id = s.id WHERE x.sucursal_id IS NULL`
+        )
+      );
+    }
     // Índice por (sucursal, fecha, hora): hace preciso el bloqueo FOR UPDATE del cupo por local.
     await crearIndiceSiFalta('citas', 'idx_citas_sucursal_fecha_hora', '(sucursal_id, fecha, hora)');
 
@@ -846,7 +849,7 @@ async function ensureSchema() {
     await quitarFkDuplicadas('citas', 'tecnico_id');
     await quitarFkDuplicadas('citas', 'sucursal_id');
   } catch (err) {
-    console.error('⚠️  Auto-migración falló:', err.code || err.message);
+    console.error('⚠️  Auto-migración falló:', err.message);
   }
 }
 

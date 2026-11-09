@@ -12,7 +12,6 @@
 //
 // Todo lo que muestra horas libres o acepta una cita pasa por aquí (portal,
 // recepción, administración), para que no haya dos maneras de contar.
-const { pool } = require('../db/pool');
 const { fechaLocalISO, horaLocal } = require('./fecha');
 const { horasDisponibles } = require('./configuracion');
 const { caeEn } = require('./feriados');
@@ -78,9 +77,11 @@ function fechasEntre(desde, hasta) {
 // y no se pase el cupo. opts.excluirId: no contar esa cita (al moverla o alargarla).
 // Sin sucursalId cuenta todas las sedes (recepción sin sede elegida).
 async function agendaRango(desde, hasta, sucursalId, config, opts = {}) {
-  const db = opts.db || pool;
+  // Sin db del taller no se agenda: el pool global contaría citas de todas las empresas.
+  const db = opts.db;
+  if (!db) throw new Error('agendaRango: falta el db del taller (opts.db)');
   let sql = `SELECT id, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora, duracion_horas, duracion_min
-             FROM citas WHERE fecha BETWEEN ? AND ? AND estado <> 'cancelado'`;
+             FROM citas WHERE tenant_id = @tenant AND fecha BETWEEN ? AND ? AND estado <> 'cancelado'`;
   const params = [desde, hasta];
   if (sucursalId) { sql += ' AND sucursal_id = ?'; params.push(sucursalId); }
   if (opts.excluirId) { sql += ' AND id <> ?'; params.push(opts.excluirId); }
@@ -89,15 +90,15 @@ async function agendaRango(desde, hasta, sucursalId, config, opts = {}) {
 
   let sqlB = `SELECT id, DATE_FORMAT(fecha_desde, '%Y-%m-%d') AS fecha_desde, DATE_FORMAT(fecha_hasta, '%Y-%m-%d') AS fecha_hasta,
                      TIME_FORMAT(hora_desde, '%H:%i') AS hora_desde, TIME_FORMAT(hora_hasta, '%H:%i') AS hora_hasta, motivo
-              FROM bloqueos_horario WHERE fecha_desde <= ? AND fecha_hasta >= ?`;
+              FROM bloqueos_horario WHERE tenant_id = @tenant AND fecha_desde <= ? AND fecha_hasta >= ?`;
   const paramsB = [hasta, desde];
   if (sucursalId) { sqlB += ' AND (sucursal_id IS NULL OR sucursal_id = ?)'; paramsB.push(sucursalId); }
   const [bloqueos] = await db.query(sqlB, paramsB);
 
   // Feriados que se repiten (utils/feriados.js): el día entero, todos los años.
-  let sqlF = 'SELECT mes, dia, nombre FROM feriados';
+  let sqlF = 'SELECT mes, dia, nombre FROM feriados WHERE tenant_id = @tenant';
   const paramsF = [];
-  if (sucursalId) { sqlF += ' WHERE sucursal_id IS NULL OR sucursal_id = ?'; paramsF.push(sucursalId); }
+  if (sucursalId) { sqlF += ' AND (sucursal_id IS NULL OR sucursal_id = ?)'; paramsF.push(sucursalId); }
   // Si la tabla faltara (migración omitida), se agenda como antes en vez de fallar.
   const feriados = await db.query(sqlF, paramsF).then(([f]) => f, (err) => {
     console.error('⚠️  No se pudieron leer los feriados:', err.code || err.message);
@@ -184,7 +185,7 @@ const HORA = /^\d{2}:\d{2}$/;
 //     abasto o si se salta un bloqueo que puso ella misma.
 //   · Si no: la hora tiene que estar dentro del horario, sin bloquear y con lugar.
 // Devuelve { campo, error, status? }.
-async function problemaDeHorario({ fecha, hora, sucursalId = null, config, puedeForzar = false, excluirId = null, minutos = null, ahora = Date.now() }) {
+async function problemaDeHorario({ db, fecha, hora, sucursalId = null, config, puedeForzar = false, excluirId = null, minutos = null, ahora = Date.now() }) {
   const f = String(fecha || '').slice(0, 10);
   const h = String(hora || '').slice(0, 5);
   if (!FECHA.test(f)) return { campo: 'fecha', error: 'Elegí la fecha' };
@@ -195,7 +196,7 @@ async function problemaDeHorario({ fecha, hora, sucursalId = null, config, puede
   if (f === hoy && h <= horaLocal(offset, ahora)) return { campo: 'hora', error: 'Esa hora ya pasó. Elegí una más tarde.' };
   if (puedeForzar) return null;
 
-  const dia = await agendaDia(f, sucursalId, config, { excluirId });
+  const dia = await agendaDia(f, sucursalId, config, { db, excluirId });
   if (!dia.horas.length) return { campo: 'fecha', error: 'Ese día el taller está cerrado' };
   if (!dia.horas.includes(`${h.slice(0, 2)}:00`)) return { campo: 'hora', error: 'Esa hora está fuera del horario del taller' };
   const [c] = conflictosDeCita(dia, h, 1, Number(config.max_citas_hora) || 1, minutos);

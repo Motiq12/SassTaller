@@ -5,7 +5,7 @@ const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { soloRoles } = require('../middleware/roles');
 const { fotoValida } = require('../utils/validar');
-const { cargarAlcance, soloSucursal, exigirSucursal, SUCURSAL_DE_GARANTIA } = require('../utils/alcance');
+const { cargarAlcance, soloSucursal, exigirSucursal, delTaller, SUCURSAL_DE_GARANTIA } = require('../utils/alcance');
 const { exigirPermiso } = require('../middleware/permisos');
 
 // Piso de rol: recepción o superior. Sin esto, cualquier token válido (incluido el
@@ -13,6 +13,7 @@ const { exigirPermiso } = require('../middleware/permisos');
 router.use(auth, requireRol('recepcion'));
 // Los reclamos son de la sucursal de su orden (utils/alcance.js).
 router.use(cargarAlcance);
+router.param('id', delTaller('garantias'));
 router.param('id', exigirSucursal(SUCURSAL_DE_GARANTIA));
 
 const ESTADOS = ['abierto', 'en_revision', 'aprobado', 'rechazado', 'resuelto'];

@@ -8,6 +8,9 @@ const fs = require('fs');
 const { testConnection } = require('./db/pool');
 const { ensureSchema } = require('./db/auto-migrate');
 const { iniciarJobs } = require('./jobs/scheduler');
+const { verificarListaContraEsquema } = require('./db/tenant-db');
+const { iniciarRefrescoEstados } = require('./utils/estado-tenant');
+const { iniciarRefrescoLimites } = require('./utils/limites');
 const { apiLimiter, authLimiter, adminLimiter } = require('./middleware/rate-limit');
 
 const app = express();
@@ -210,6 +213,12 @@ const correrJobs = bajoCluster ? process.env.JOBS === '1' : true;
 (async () => {
   await testConnection();
   if (!bajoCluster) await ensureSchema();
+  // Avisa si alguna tabla con tenant_id quedó fuera de la lista del guard.
+  await verificarListaContraEsquema();
+  // Qué talleres están suspendidos y los límites de cada plan, antes de escuchar: sin
+  // esto, tras un reinicio cualquier suspendido vuelve a trabajar y los topes no rigen.
+  await iniciarRefrescoEstados();
+  await iniciarRefrescoLimites();
   // Tareas de fondo (recordatorios de cita, no-show). Después de migrar, para que
   // las columnas que usan (recordatorio_enviado, no_show) ya existan.
   // Solo un proceso las programa: si no, cada cliente recibiría un correo por worker.

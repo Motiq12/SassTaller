@@ -5,6 +5,10 @@ const { ROLES_FABRICA } = require('../utils/permisos');
 
 async function ensureSchema() {
   try {
+    // Las semillas y los rellenos de abajo son de cuando la base tenía un solo taller.
+    // Si ya existe tenants, repetirlos en cada arranque mezclaría datos entre empresas.
+    const [tablaTenants] = await pool.query("SHOW TABLES LIKE 'tenants'");
+    const baseSinTalleres = tablaTenants.length === 0;
     // orden_fotos.url debe ser MEDIUMTEXT para guardar imágenes base64 (data URL).
     // En esquemas viejos era VARCHAR(500) y truncaba las fotos.
     const [[col]] = await pool.query(
@@ -430,12 +434,11 @@ async function ensureSchema() {
     await addColumnIfMissing('configuracion', 'portal_textos', 'JSON NULL');
     // Siembra la fila única con valores por defecto (idempotente: INSERT IGNORE).
     // Horarios: 0=Dom … 6=Sáb. L-V 08-17, Sáb 08-13, Dom cerrado.
-    await tryStep('seed configuracion', () =>
-      pool.query(
+    await tryStep('seed configuracion', () => baseSinTalleres && pool.query(
         `INSERT IGNORE INTO configuracion
            (id, nombre_taller, telefono, email, direccion,
             max_citas_hora, dias_anticipacion, duracion_cita_min, horarios)
-         VALUES (1, 'MS Motos', '', '', '', 2, 30, 90, ?)`,
+         VALUES (1, 'Mi taller', '', '', '', 2, 30, 90, ?)`,
         [JSON.stringify([
           { dia: 0, abre: '08:00', cierra: '13:00', activo: 0 },
           { dia: 1, abre: '08:00', cierra: '17:00', activo: 1 },
@@ -464,8 +467,8 @@ async function ensureSchema() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
-    await tryStep('seed sucursales', () =>
-      pool.query("INSERT IGNORE INTO sucursales (id, nombre, orden) VALUES (1, 'Liberia', 1), (2, 'Cañas', 2)")
+    await tryStep('seed sucursales', () => baseSinTalleres &&
+      pool.query("INSERT IGNORE INTO sucursales (id, nombre, orden) VALUES (1, 'Sucursal principal', 1)")
     );
 
     // Catálogo de servicios editable desde el panel. Antes vivía hardcodeado en
@@ -522,11 +525,11 @@ async function ensureSchema() {
     await addColumnIfMissing('citas', 'sucursal_id', 'INT NULL');
     await addColumnIfMissing('ordenes_trabajo', 'sucursal_id', 'INT NULL');
     await addColumnIfMissing('usuarios', 'sucursal_id', 'INT NULL');
-    // Backfill: las citas y órdenes históricas quedan en Liberia (id=1).
-    await tryStep('backfill citas.sucursal_id', () =>
+    // Solo en una base de un único taller: con varios, la sede 1 es de otra empresa.
+    await tryStep('backfill citas.sucursal_id', () => baseSinTalleres &&
       pool.query('UPDATE citas SET sucursal_id = 1 WHERE sucursal_id IS NULL')
     );
-    await tryStep('backfill ordenes.sucursal_id', () =>
+    await tryStep('backfill ordenes.sucursal_id', () => baseSinTalleres &&
       pool.query('UPDATE ordenes_trabajo SET sucursal_id = 1 WHERE sucursal_id IS NULL')
     );
     // Índice por (sucursal, fecha, hora): hace preciso el bloqueo FOR UPDATE del cupo por local.
@@ -634,7 +637,7 @@ async function ensureSchema() {
     // momento (ms) ya no valen; y cuándo entró por última vez.
     await addColumnIfMissing('usuarios', 'sesiones_desde_ms', 'BIGINT NULL');
     await addColumnIfMissing('usuarios', 'ultimo_ingreso', 'TIMESTAMP NULL');
-    for (const r of ROLES_FABRICA) {
+    for (const r of baseSinTalleres ? ROLES_FABRICA : []) {
       await pool.query(
         'INSERT IGNORE INTO roles (clave, nombre, base, descripcion, permisos, de_fabrica) VALUES (?, ?, ?, ?, ?, 1)',
         [r.clave, r.nombre, r.base, r.descripcion, JSON.stringify(r.permisos)]
@@ -746,7 +749,7 @@ async function ensureSchema() {
         INDEX idx_actividad_usuario (usuario_id, created_at)
       ) DEFAULT CHARSET=utf8mb4`);
   } catch (err) {
-    console.error('⚠️  Auto-migración falló:', err.code || err.message);
+    console.error('⚠️  Auto-migración falló:', err.message);
   }
   // Va aparte, fuera del try de arriba: si algún paso viejo falla, las tablas del
   // sitio web se crean igual (sin ellas, la sección "Sitio web" del panel no anda).
@@ -1064,10 +1067,14 @@ async function addFkIfMissing(tabla, fkName, columna, refTabla, refColumna) {
 //   3. ensureSchemaSaaS         — encima, lo propio del SaaS: las tablas de Motiq.
 //
 // Invertir 2 y 3 no anda: la capa del SaaS da por hecho que tenant_id ya está.
-const { aplicarMultiTenant } = require('./multi-tenant');
+const { aplicarMultiTenant, renombrarVehiculos } = require('./multi-tenant');
 const { ensureSchemaSaaS } = require('./auto-migrate-saas');
 
 async function ensureSchemaCompleto() {
+  // Antes que nada: los pasos de abajo ya hablan de `vehiculos`. En una base nueva la
+  // tabla todavía se llama `motos` (schema.sql), y sin esto el primer arranque fallaba
+  // a mitad de camino y dejaba tablas sin crear hasta el arranque siguiente.
+  await renombrarVehiculos();
   await ensureSchema();
   await aplicarMultiTenant();
   await ensureSchemaSaaS();

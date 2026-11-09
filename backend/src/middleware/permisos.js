@@ -11,14 +11,14 @@ const { permisosEfectivos, puede, NOMBRE_PERMISO, BASE_DE_ROL, ajustables } = re
 
 // { rol, permisos, ajustables, rolId, rolNombre } del usuario de la petición.
 async function permisosDeUsuario(usuarioId) {
-  const [[u]] = await pool.query('SELECT rol, rol_id FROM usuarios WHERE id = ?', [usuarioId]);
+  const [[u]] = await pool.query('SELECT rol, rol_id, tenant_id FROM usuarios WHERE id = ?', [usuarioId]);
   if (!u) return { rol: null, permisos: [], ajustables: [], rolId: null, rolNombre: null };
   // El rol propio (si tiene) y el de fábrica de su rol del sistema, en una consulta.
   // La clave va como parámetro: no se compara columna con columna (ver la collation
   // de roles en auto-migrate.js).
   const [filas] = await pool.query(
-    'SELECT id, clave, nombre, base, permisos FROM roles WHERE id = ? OR clave = ?',
-    [u.rol_id || 0, u.rol]
+    'SELECT id, clave, nombre, base, permisos FROM roles WHERE tenant_id = ? AND (id = ? OR clave = ?)',
+    [u.tenant_id, u.rol_id || 0, u.rol]
   );
   const leer = (f) => {
     if (!f) return null;

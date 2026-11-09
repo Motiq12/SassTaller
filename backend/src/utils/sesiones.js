@@ -92,8 +92,8 @@ function nuevoSid() { return crypto.randomBytes(16).toString('hex'); }
 async function abrirSesion(usuarioId, req, venceSeg, sid) {
   try {
     await pool.query(
-      'INSERT INTO sesiones_personal (usuario_id, sid, agente, ip, ultima_vez, vence) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, FROM_UNIXTIME(?))',
-      [usuarioId, sid, String(req.headers['user-agent'] || '').slice(0, 255) || null, String(req.ip || '').slice(0, 64) || null, venceSeg]
+      'INSERT INTO sesiones_personal (tenant_id, usuario_id, sid, agente, ip, ultima_vez, vence) SELECT tenant_id, id, ?, ?, ?, CURRENT_TIMESTAMP, FROM_UNIXTIME(?) FROM usuarios WHERE id = ?',
+      [sid, String(req.headers['user-agent'] || '').slice(0, 255) || null, String(req.ip || '').slice(0, 64) || null, venceSeg, usuarioId]
     );
     // De paso, se borran las vencidas hace más de un mes: la tabla no crece sola.
     pool.query('DELETE FROM sesiones_personal WHERE usuario_id = ? AND vence < NOW() - INTERVAL 30 DAY', [usuarioId]).catch(() => {});

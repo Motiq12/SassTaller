@@ -36,7 +36,7 @@ const SELECT_CITA = `
          c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.telefono AS cliente_telefono
   FROM citas ci
   LEFT JOIN vehiculos m    ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant
-  JOIN clientes c      ON c.id = ci.cliente_id AND c.tenant_id = @tenant
+  JOIN clientes c      ON c.id = ci.cliente_id AND c.tenant_id = @tenant AND ci.tenant_id = @tenant
   LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id AND o.tenant_id = @tenant`;
 
 // GET /api/mecanico/resumen — KPIs del técnico logueado
@@ -44,7 +44,7 @@ router.get('/resumen', async (req, res) => {
   try {
     const yo = req.usuario.id;
     // Hoy y el mes del taller, no los de la base (utils/sql-fechas.js).
-    const off = (await getConfig()).zona_horaria_offset;
+    const off = (await getConfig(req.db)).zona_horaria_offset;
     const [[{ citas_hoy }]] = await req.db.query(
       `SELECT COUNT(*) AS citas_hoy FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND fecha = ${hoySQL(off)}`,
       [yo]
@@ -204,8 +204,8 @@ router.post('/ordenes/:id/repuestos', exigirPermiso('taller.repuestos'), async (
     // Notificar a recepción vía mensaje interno (uno por solicitud, no uno por pieza)
     const detalle = piezas.map((p) => `${p.nombre} ×${p.cantidad}`).join(', ');
     await req.db.query(
-      `INSERT INTO mensajes_internos (remitente_id, destino_rol, mensaje, orden_id, tipo, sucursal_id)
-       VALUES (?, 'recepcion', ?, ?, 'directo', (SELECT sucursal_id FROM usuarios WHERE tenant_id = @tenant AND id = ?))`,
+      `INSERT INTO mensajes_internos (tenant_id, remitente_id, destino_rol, mensaje, orden_id, tipo, sucursal_id)
+       VALUES (@tenant, ?, 'recepcion', ?, ?, 'directo', (SELECT sucursal_id FROM usuarios WHERE tenant_id = @tenant AND id = ?))`,
       [req.usuario.id, `Solicitud de repuesto (${orden.numero_orden}): ${detalle}`.slice(0, 500), req.params.id, req.usuario.id]
     );
     const unaSola = !Array.isArray(req.body.piezas);
@@ -294,7 +294,7 @@ const SELECT_MENSAJE = `
          o.numero_orden,
          ${LEIDO_POR_MI}, ${VISTO_POR_OTRO}
   FROM mensajes_internos m
-  JOIN usuarios u ON u.id = m.remitente_id AND u.tenant_id = @tenant
+  JOIN usuarios u ON u.id = m.remitente_id AND u.tenant_id = @tenant AND m.tenant_id = @tenant
   LEFT JOIN ordenes_trabajo o ON o.id = m.orden_id AND o.tenant_id = @tenant`;
 
 router.get('/mensajes', async (req, res) => {
@@ -386,7 +386,7 @@ router.get('/perfil', async (req, res) => {
     const [[mes]] = await req.db.query(
       `SELECT COUNT(*) AS citas_mes
        FROM citas WHERE tenant_id = @tenant AND tecnico_id = ? AND estado = 'entregado'
-         AND ${enPeriodo('fecha_fin', 'mes', { momento: true, offset: (await getConfig()).zona_horaria_offset })}`,
+         AND ${enPeriodo('fecha_fin', 'mes', { momento: true, offset: (await getConfig(req.db)).zona_horaria_offset })}`,
       [yo]
     );
     const [calificaciones] = await req.db.query(
@@ -493,7 +493,7 @@ router.put('/perfil/password', async (req, res) => {
     const [[u]] = await req.db.query('SELECT password_hash, email, nombre FROM usuarios WHERE tenant_id = @tenant AND id = ?', [req.usuario.id]);
     if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
     // La política de Configuración → Seguridad (utils/contrasena.js).
-    const malaClave = problemaDeContrasena(nueva, politica(await getConfig()), u);
+    const malaClave = problemaDeContrasena(nueva, politica(await getConfig(req.db)), u);
     if (malaClave) return res.status(400).json({ error: malaClave, campo: 'nueva' });
     const ok = await bcrypt.compare(String(actual), u.password_hash);
     if (!ok) return res.status(400).json({ error: 'La contraseña actual no es correcta' });

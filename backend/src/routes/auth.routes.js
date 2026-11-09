@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const { paraTenant } = require('../db/tenant-db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 // `pool` (sin scope) se usa a propósito y SOLO en /login: ahí todavía no se sabe a
@@ -417,7 +418,7 @@ router.get('/perfil', auth, async (req, res) => {
         preferencias: await preferenciasDe(req.usuario.id, req.usuario.rol),
         avisos: AVISOS[req.usuario.rol] || [],
         // Para orientar al elegir contraseña (la que manda es la del servidor).
-        politica: politica(await getConfig()),
+        politica: politica(await getConfig(req.db)),
       },
     });
   } catch (err) {

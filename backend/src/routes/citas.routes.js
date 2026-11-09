@@ -4,7 +4,7 @@ const { fail, invalido, faltante } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { soloRoles } = require('../middleware/roles');
-const { cargarAlcance, soloSucursal, sucursalParaGuardar, exigirSucursal, SUCURSAL_DE_CITA } = require('../utils/alcance');
+const { cargarAlcance, soloSucursal, sucursalParaGuardar, exigirSucursal, delTaller, SUCURSAL_DE_CITA } = require('../utils/alcance');
 const { notificarCambioEstado, notificarMecanico, notificarCitaAgendada } = require('../utils/notificaciones');
 const { TRANSICIONES_CITA, transicionPermitida } = require('../utils/transiciones');
 const { sucursalValida, tecnicoEnSucursal } = require('../utils/sucursales');
@@ -20,7 +20,7 @@ const { anotar } = require('../utils/actividad');
 // Administración se salta eso último: ella puso el bloqueo y sabe si el taller da abasto.
 async function rechazoDeHorario(req, res, { fecha, hora, sucursalId, excluirId = null, minutos = null }) {
   const p = await problemaDeHorario({
-    fecha, hora, sucursalId, excluirId, minutos, config: await getConfig(), puedeForzar: req.usuario.rol === 'admin',
+    db: req.db, fecha, hora, sucursalId, excluirId, minutos, config: await getConfig(req.db), puedeForzar: req.usuario.rol === 'admin',
   });
   if (!p) return false;
   invalido(res, p.campo, p.error, p.status || 400);
@@ -46,6 +46,7 @@ router.use(auth, soloRoles('recepcion', 'admin'));
 // Quien tiene una sucursal ve solo las citas de ella (utils/alcance.js). Todas las
 // rutas con :id de este archivo son de una cita: una de la otra sucursal da 404.
 router.use(cargarAlcance);
+router.param('id', delTaller('citas'));
 router.param('id', exigirSucursal(SUCURSAL_DE_CITA));
 
 router.get('/', async (req, res) => {
@@ -99,10 +100,10 @@ router.post('/', soloRoles(...GESTIONA_AGENDA), exigirPermiso('citas.agendar'), 
     }
     // Uno o varios servicios (o ninguno: el personal puede agendar solo con el motivo).
     const servicios = serviciosDelPedido(req.body);
-    const problemaServicios = await problemaConServicios(servicios);
+    const problemaServicios = await problemaConServicios(req.db, servicios);
     if (problemaServicios) return invalido(res, 'servicios', problemaServicios);
-    const sucursal_id = sucursalParaGuardar(req, (await sucursalValida(req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null);
-    if (!(await tecnicoEnSucursal(tecnico_id, sucursal_id))) {
+    const sucursal_id = sucursalParaGuardar(req, (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null);
+    if (!(await tecnicoEnSucursal(req.db, tecnico_id, sucursal_id))) {
       return invalido(res, 'tecnico_id', 'El mecánico no atiende en esa sucursal');
     }
     const esAdmin = req.usuario.rol === 'admin';
@@ -113,10 +114,10 @@ router.post('/', soloRoles(...GESTIONA_AGENDA), exigirPermiso('citas.agendar'), 
       'INSERT INTO citas (tenant_id, cliente_id, vehiculo_id, usuario_id, tecnico_id, sucursal_id, fecha, hora, motivo, tipo_servicio, duracion_horas) VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [cliente_id, vehiculo_id || null, req.usuario.id, tecnico_id || null, sucursal_id, fecha, hora, motivo, servicios[0] || null, duracion]
     );
-    await guardarServiciosCita(result.insertId, servicios);
+    await guardarServiciosCita(result.insertId, servicios, req.db);
     const [[nueva]] = await req.db.query('SELECT * FROM citas WHERE tenant_id = @tenant AND id = ?', [result.insertId]);
     if (tecnico_id) {
-      await notificarMecanico(tecnico_id, `Nueva cita asignada: ${textoServicios(servicios) || motivo} el ${fecha} a las ${hora}`, req.usuario.id);
+      await notificarMecanico(req.db, tecnico_id, `Nueva cita asignada: ${textoServicios(servicios) || motivo} el ${fecha} a las ${hora}`, req.usuario.id);
     }
     // El cliente también se entera: el taller le agendó una cita desde el mostrador.
     await notificarCitaAgendada(req.db, result.insertId);
@@ -194,10 +195,10 @@ router.put('/:id', soloRoles(...GESTIONA_AGENDA), exigirPermiso('citas.agendar')
     // Servicios: si la pantalla los manda, reemplazan a los que tenía; si no, se conservan.
     const cambiaServicios = pedidoTraeServicios(req.body);
     const servicios = serviciosDelPedido(req.body);
-    const problemaServicios = cambiaServicios ? await problemaConServicios(servicios) : null;
+    const problemaServicios = cambiaServicios ? await problemaConServicios(req.db, servicios) : null;
     if (problemaServicios) return invalido(res, 'servicios', problemaServicios);
     // Solo cambia la sucursal si llega una válida (no la borra al editar otros campos).
-    const sucursalNueva = sucursalParaGuardar(req, (await sucursalValida(req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null);
+    const sucursalNueva = sucursalParaGuardar(req, (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null);
     // Fecha/hora previas: si el taller mueve la cita hay que avisarle al cliente
     // (antes se le cambiaba el día y no se enteraba por ningún lado).
     const [[previa]] = await req.db.query(
@@ -218,9 +219,9 @@ router.put('/:id', soloRoles(...GESTIONA_AGENDA), exigirPermiso('citas.agendar')
          sucursal_id = COALESCE(?, sucursal_id), duracion_horas = ? WHERE tenant_id = @tenant AND id=?`,
       [cliente_id, vehiculo_id || null, tecnico_id || null, fecha, hora, motivo, sucursalNueva, duracion, req.params.id]
     );
-    if (cambiaServicios) await guardarServiciosCita(req.params.id, servicios);
+    if (cambiaServicios) await guardarServiciosCita(req.params.id, servicios, req.db);
     const [[actualizada]] = await req.db.query('SELECT * FROM citas WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
-    if (movida) await notificarCitaAgendada(req.params.id, { reprogramada: true });
+    if (movida) await notificarCitaAgendada(req.db, req.params.id, { reprogramada: true });
     res.json({ data: actualizada, message: 'Cita actualizada' });
   } catch (err) {
     fail(res, err);
@@ -244,8 +245,8 @@ router.patch('/:id/duracion', soloRoles('admin'), async (req, res) => {
     if (['entregado', 'cancelado'].includes(cita.estado)) {
       return res.status(409).json({ error: 'Esta cita ya está cerrada' });
     }
-    const config = await getConfig();
-    const dia = await agendaDia(cita.fecha, cita.sucursal_id, config, { excluirId: cita.id });
+    const config = await getConfig(req.db);
+    const dia = await agendaDia(cita.fecha, cita.sucursal_id, config, { db: req.db, excluirId: cita.id });
     const conflictos = conflictosDeCita(dia, cita.hora, duracion, Number(config.max_citas_hora) || 1);
     if (conflictos.length && !req.body.forzar) {
       return res.status(409).json({
@@ -316,7 +317,7 @@ router.post('/:id/entregar', soloRoles(...GESTIONA_AGENDA), exigirPermiso('orden
     }
     let metodo = null;
     if (metodo_pago) {
-      const config = await getConfig();
+      const config = await getConfig(req.db);
       const validos = (config.metodos_pago || []).map((m) => m.valor);
       if (!validos.includes(metodo_pago)) return res.status(400).json({ error: 'Forma de pago no válida' });
       metodo = metodo_pago;
@@ -333,7 +334,7 @@ router.post('/:id/entregar', soloRoles(...GESTIONA_AGENDA), exigirPermiso('orden
     if (metodo) { sets.push('metodo_pago = ?'); params.push(metodo); }
     params.push(req.params.id);
     await req.db.query(`UPDATE citas SET ${sets.join(', ')} WHERE id = ? AND tenant_id = @tenant`, params);
-    await notificarCambioEstado(req.params.id, 'entregado');
+    await notificarCambioEstado(req.db, req.params.id, 'entregado');
     res.json({ message: 'Cita entregada' });
   } catch (err) {
     fail(res, err);
@@ -347,7 +348,7 @@ router.patch('/:id/asignar', requireRol('admin'), async (req, res) => {
     await req.db.query('UPDATE citas SET tecnico_id = ? WHERE tenant_id = @tenant AND id = ?', [tecnico_id || null, req.params.id]);
     if (tecnico_id) {
       const [[cita]] = await req.db.query("SELECT DATE_FORMAT(fecha,'%Y-%m-%d') AS fecha, TIME_FORMAT(hora,'%H:%i') AS hora, tipo_servicio, servicios, motivo FROM citas WHERE tenant_id = @tenant AND id = ?", [req.params.id]);
-      if (cita) await notificarMecanico(tecnico_id, `Te asignaron una cita: ${cita.servicios || cita.tipo_servicio || cita.motivo} el ${cita.fecha} a las ${cita.hora}`, req.usuario.id);
+      if (cita) await notificarMecanico(req.db, tecnico_id, `Te asignaron una cita: ${cita.servicios || cita.tipo_servicio || cita.motivo} el ${cita.fecha} a las ${cita.hora}`, req.usuario.id);
     }
     res.json({ message: tecnico_id ? 'Técnico asignado' : 'Asignación quitada' });
   } catch (err) {

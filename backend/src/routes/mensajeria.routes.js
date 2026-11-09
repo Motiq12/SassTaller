@@ -29,8 +29,8 @@ const SELECT_MSG = `
          o.numero_orden,
          ${LEIDO_POR_MI}, ${VISTO_POR_OTRO}
   FROM mensajes_internos m
-  JOIN usuarios ru ON ru.id = m.remitente_id AND ru.tenant_id = @tenant
-  LEFT JOIN ordenes_trabajo o ON o.id = m.orden_id`;
+  JOIN usuarios ru ON ru.id = m.remitente_id AND ru.tenant_id = @tenant AND m.tenant_id = @tenant
+  LEFT JOIN ordenes_trabajo o ON o.id = m.orden_id AND o.tenant_id = @tenant`;
 
 // Valida que :usuarioId sea otra persona del personal, existente y activa.
 // Devuelve la fila del usuario o null (el llamador responde el error).
@@ -146,7 +146,7 @@ router.post('/conversacion/:usuarioId', exigirPermiso('equipo.mensajes'), async 
     // La sede del mensaje = la del destinatario (mismo criterio que el modelo viejo).
     const [r] = await req.db.query(
       `INSERT INTO mensajes_internos (tenant_id,remitente_id, destino_id, destino_rol, mensaje, foto, tipo, sucursal_id)
-       VALUES (@tenant, ?, ?, NULL, ?, ?, 'directo', (SELECT sucursal_id FROM usuarios WHERE id = ?))`,
+       VALUES (@tenant, ?, ?, NULL, ?, ?, 'directo', (SELECT sucursal_id FROM usuarios WHERE id = ? AND tenant_id = @tenant))`,
       [yo, otro.id, texto, foto || null, otro.id]
     );
     const [[nuevo]] = await req.db.query(`${SELECT_MSG} WHERE m.id = ?`, [yo, r.insertId]);

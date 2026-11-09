@@ -7,7 +7,6 @@
 // - `citas.tipo_servicio`: el primero. Lo que ya lo leía (recordatorios, aviso de
 //   mantenimiento, ingresos por servicio) sigue funcionando igual.
 // - `citas.servicios`: el texto para mostrar, "Cambio de aceite + Revisión de frenos".
-const { pool } = require('../db/pool');
 const { servicioValido } = require('./servicios');
 
 const MAX_SERVICIOS_CITA = 5;
@@ -31,12 +30,12 @@ function pedidoTraeServicios(body) {
 
 // Qué está mal con la lista, o null. El portal exige al menos uno y que estén en el
 // catálogo activo; el personal puede agendar sin servicio (como antes).
-async function problemaConServicios(lista, { obligatorio = false, delCatalogo = false } = {}) {
+async function problemaConServicios(db, lista, { obligatorio = false, delCatalogo = false } = {}) {
   if (obligatorio && !lista.length) return 'Elige al menos un servicio';
   if (lista.length > MAX_SERVICIOS_CITA) return `Puedes elegir hasta ${MAX_SERVICIOS_CITA} servicios`;
   if (delCatalogo) {
     for (const s of lista) {
-      if (!(await servicioValido(s))) return `Servicio no válido: ${s}`;
+      if (!(await servicioValido(db, s))) return `Servicio no válido: ${s}`;
     }
   }
   return null;
@@ -46,16 +45,18 @@ const textoServicios = (lista) => (lista.length ? lista.join(SEPARADOR).slice(0,
 
 // Guarda la lista de una cita (reemplaza la que tenía). `conn` para usarlo dentro de
 // una transacción.
-async function guardarServiciosCita(citaId, lista, conn = pool) {
-  await conn.query('DELETE FROM cita_servicios WHERE cita_id = ?', [citaId]);
+async function guardarServiciosCita(citaId, lista, conn) {
+  if (!conn) throw new Error('guardarServiciosCita: falta el db del taller');
+  await conn.query('DELETE FROM cita_servicios WHERE cita_id = ? AND tenant_id = @tenant', [citaId]);
   if (lista.length) {
+    // El id del taller va en cada fila: el VALUES multi-fila no admite el marcador.
     await conn.query(
-      'INSERT INTO cita_servicios (cita_id, servicio, orden) VALUES ?',
-      [lista.map((s, i) => [citaId, s, i])]
+      'INSERT INTO cita_servicios (tenant_id, cita_id, servicio, orden) VALUES ?',
+      [lista.map((s, i) => [conn.tenantId, citaId, s, i])]
     );
   }
   await conn.query(
-    'UPDATE citas SET tipo_servicio = ?, servicios = ? WHERE id = ?',
+    'UPDATE citas SET tipo_servicio = ?, servicios = ? WHERE id = ? AND tenant_id = @tenant',
     [lista[0] || null, textoServicios(lista), citaId]
   );
 }

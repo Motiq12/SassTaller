@@ -1,7 +1,9 @@
-// Configuración del taller (fila única en la tabla `configuracion`).
+// Configuración del taller (una fila por taller en la tabla `configuracion`).
+//
+// Recibe el `db` del taller y NO cae a un pool global: sin él revienta en vez de leer
+// la configuración de otra empresa.
 // Centraliza datos del negocio, horarios de atención, capacidad de la agenda y
 // preferencias de notificación. El portal lee de aquí los cupos/horas agendables.
-const { pool } = require('../db/pool');
 const { normalizarPlantillas } = require('./plantillas');
 const { normalizarTextosPortal } = require('./textos-portal');
 
@@ -16,6 +18,8 @@ const DEFAULTS = {
   direccion: '',
   logo: null,
   // Datos de facturación (comprobante de la orden). Vacíos hasta que el taller los cargue.
+  // Color de marca del taller. null = el sistema usa el suyo por defecto.
+  color_primario: null,
   razon_social: '',
   cedula_juridica: '',
   nota_factura: '',
@@ -59,15 +63,18 @@ const DEFAULTS = {
 
 // Caché en memoria: /disponibilidad del portal pega seguido; evita leer la BD
 // en cada request. Se invalida al guardar (clearCache) y por TTL como respaldo.
-let cache = null;
-let cacheAt = 0;
+// La caché es POR TALLER: con una variable global, la configuración del primer taller
+// consultado se le serviría al siguiente, y esa fuga no pasa por SQL.
+const cache = new Map(); // tenantId -> { config, at }
 const TTL_MS = 30 * 1000;
 
-async function getConfig() {
-  if (cache && Date.now() - cacheAt < TTL_MS) return cache;
+async function getConfig(db) {
+  if (!db || !db.tenantId) throw new Error('getConfig: falta el db del taller (req.db)');
+  const guardado = cache.get(db.tenantId);
+  if (guardado && Date.now() - guardado.at < TTL_MS) return guardado.config;
   let row = {};
   try {
-    const [[r]] = await pool.query('SELECT * FROM configuracion WHERE id = 1');
+    const [[r]] = await db.query('SELECT * FROM configuracion WHERE tenant_id = @tenant AND id = 1');
     if (r) row = r;
   } catch (_) {
     // Tabla aún no migrada / sin fila: se usan los DEFAULTS.
@@ -89,14 +96,14 @@ async function getConfig() {
     plantillas: normalizarPlantillas(row.plantillas),
     portal_textos: normalizarTextosPortal(row.portal_textos),
   };
-  cache = config;
-  cacheAt = Date.now();
+  cache.set(db.tenantId, { config, at: Date.now() });
   return config;
 }
 
-function clearCache() {
-  cache = null;
-  cacheAt = 0;
+// Invalida la caché de UN taller. Sin argumento limpia todo, que es lo que usan los tests.
+function clearCache(tenantId) {
+  if (tenantId == null) cache.clear();
+  else cache.delete(tenantId);
 }
 
 // Día de semana (0=Dom … 6=Sáb) de una fecha 'YYYY-MM-DD', estable ante la zona

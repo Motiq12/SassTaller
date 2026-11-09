@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const { normalizarTipos, limpiarAtributos } = require('../utils/tipos-vehiculo');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const crypto = require('node:crypto');
@@ -129,7 +130,7 @@ router.post('/login', async (req, res) => {
 // Invalida los códigos previos del cliente para que solo el último sea válido.
 // El propósito separa dos códigos que conviven: el de estrenar la cuenta y el de mudar
 // el correo desde el perfil. Sin distinguirlos, pedir uno anularía el otro.
-async function nuevoCodigoVerificacion(clienteId, proposito) {
+async function nuevoCodigoVerificacion(db, clienteId, proposito) {
   const codigo = codigoDeSeisDigitos();
   const codeHash = await bcrypt.hash(codigo, 10);
   await db.query(
@@ -174,7 +175,7 @@ const ERR_GOOGLE = 'No se pudo comprobar tu cuenta de Google. Intenta de nuevo.'
 
 // Entra con la cuenta que ya existe: la une a la cuenta de Google si todavía no lo
 // estaba y da el correo por verificado (Google ya lo verificó).
-async function entrarConGoogle(res, cliente, g) {
+async function entrarConGoogle(req, res, cliente, g) {
   if (!cliente.google_sub) {
     await req.db.query('UPDATE clientes SET google_sub = ?, email_verificado = 1 WHERE tenant_id = @tenant AND id = ?', [g.sub, cliente.id]);
   }
@@ -184,7 +185,7 @@ async function entrarConGoogle(res, cliente, g) {
 
 // Busca la cuenta del cliente: primero por la cuenta de Google, después por el correo.
 // Si el correo ya está unido a OTRA cuenta de Google, no se toca.
-async function clienteDeGoogle(g) {
+async function clienteDeGoogle(req, g) {
   const [[porSub]] = await req.db.query('SELECT * FROM clientes WHERE tenant_id = @tenant AND google_sub = ? AND activo = 1', [g.sub]);
   if (porSub) return { cliente: porSub };
   const [[porCorreo]] = await req.db.query('SELECT * FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 ORDER BY id LIMIT 1', [g.email]);
@@ -202,9 +203,9 @@ router.post('/google', async (req, res) => {
     let g;
     try { g = await verificarIdToken(req.body?.credential); } catch { return res.status(401).json({ error: ERR_GOOGLE }); }
 
-    const { cliente, conflicto } = await clienteDeGoogle(g);
+    const { cliente, conflicto } = await clienteDeGoogle(req, g);
     if (conflicto) return res.status(409).json({ error: 'Ese correo ya está unido a otra cuenta de Google. Entra con tu correo y contraseña.' });
-    if (cliente) return entrarConGoogle(res, cliente, g);
+    if (cliente) return entrarConGoogle(req, res, cliente, g);
 
     // Cuenta nueva: faltan teléfono y cédula. Se devuelve un pase corto (15 min) con
     // lo que ya dio Google, para no tener que volver a pedir el token.
@@ -239,9 +240,9 @@ router.post('/google/completar', async (req, res) => {
 
     // Entre el primer paso y este pudo haberse creado la cuenta (otra pestaña).
     const g = { sub: pase.sub, email: pase.email };
-    const { cliente, conflicto } = await clienteDeGoogle(g);
+    const { cliente, conflicto } = await clienteDeGoogle(req, g);
     if (conflicto) return res.status(409).json({ error: 'Ese correo ya está unido a otra cuenta de Google. Entra con tu correo y contraseña.' });
-    if (cliente) return entrarConGoogle(res, cliente, g);
+    if (cliente) return entrarConGoogle(req, res, cliente, g);
 
     const [r] = await req.db.query(
       'INSERT INTO clientes (tenant_id, nombre, apellido, telefono, email, cedula, password_hash, email_verificado, google_sub) VALUES (@tenant, ?, ?, ?, ?, ?, NULL, 1, ?)',
@@ -777,7 +778,7 @@ router.put('/perfil', async (req, res) => {
 
       // No puede pisar la cuenta de otro, ni el correo ya en uso ni uno que otro tenga
       // reservado como pendiente (se vuelve a comprobar al confirmar, por si acaso).
-      if (await correoOcupado(emailNuevo, req.cliente.id)) {
+      if (await correoOcupado(req.db, emailNuevo, req.cliente.id)) {
         return invalido(res, 'email', 'Ese correo ya está en uso por otra cuenta', 409);
       }
 
@@ -843,7 +844,7 @@ router.post('/perfil/email/confirmar', async (req, res) => {
 
     // Se vuelve a comprobar acá: entre el pedido y la confirmación alguien más pudo
     // haberse quedado con ese correo.
-    if (await correoOcupado(c.email_pendiente, req.cliente.id)) {
+    if (await correoOcupado(req.db, c.email_pendiente, req.cliente.id)) {
       await req.db.query('UPDATE clientes SET email_pendiente = NULL WHERE tenant_id = @tenant AND id = ?', [req.cliente.id]);
       return invalido(res, 'email', 'Ese correo ya está en uso por otra cuenta', 409);
     }
@@ -988,10 +989,10 @@ router.get('/disponibilidad', async (req, res) => {
     if (!fecha) return res.status(400).json({ error: 'Fecha requerida' });
     // Sucursal: la pedida (si es válida) o la primera activa por compatibilidad.
     let sucursalId = Number(req.query.sucursal_id);
-    if (!(await sucursalValida(sucursalId))) sucursalId = await sucursalPorDefecto();
-    const config = await getConfig();
+    if (!(await sucursalValida(req.db, sucursalId))) sucursalId = await sucursalPorDefecto(req.db);
+    const config = await getConfig(req.db);
     // Cada cita cuenta en todas las horas que dura (ver utils/agenda.js).
-    const dia = await agendaDia(fecha, sucursalId, config);
+    const dia = await agendaDia(fecha, sucursalId, config, { db: req.db });
     // Las horas que bloqueó administración no se ofrecen: van fuera de `horas` y
     // como llenas en `ocupacion` (la pantalla del portal las tacha). El cliente no
     // necesita saber por qué no hay lugar.
@@ -1024,7 +1025,7 @@ router.get('/proximo-libre', async (req, res) => {
     const finStr = fin.toISOString().slice(0, 10);
 
     // Ocupación (con la duración de cada cita) y bloqueos de todo el rango, por sucursal.
-    const agenda = await agendaRango(hoy, finStr, sucursalId, config);
+    const agenda = await agendaRango(hoy, finStr, sucursalId, config, { db: req.db });
 
     // Primer slot con cupo, sin bloquear y que aún no haya pasado.
     const cursor = new Date(`${hoy}T00:00:00Z`);
@@ -1415,7 +1416,7 @@ router.put('/citas/:id', async (req, res) => {
     if (!vehiculo_id || !fecha || !hora || !servicios.length) {
       return res.status(400).json({ error: 'Moto, servicio, fecha y hora son requeridos' });
     }
-    const problemaServicios = await problemaConServicios(servicios, { obligatorio: true, delCatalogo: true });
+    const problemaServicios = await problemaConServicios(req.db, servicios, { obligatorio: true, delCatalogo: true });
     if (problemaServicios) return invalido(res, 'servicios', problemaServicios);
     // Sucursal: la pedida (si es válida) o se conserva la actual de la cita más abajo.
     const sucursalPedida = (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
@@ -1452,7 +1453,7 @@ router.put('/citas/:id', async (req, res) => {
       return invalido(res, 'fecha', `Solo se puede agendar hasta ${config.dias_anticipacion} días por adelantado`);
     }
 
-    const [[moto]] = await req.db.query('SELECT id FROM motos WHERE id = ? AND cliente_id = ?', [vehiculo_id, req.cliente.id]);
+    const [[moto]] = await req.db.query('SELECT id FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?', [vehiculo_id, req.cliente.id]);
     if (!moto) return invalido(res, 'vehiculo_id', 'Moto no válida');
 
     const motivo = (descripcion || '').trim() || textoServicios(servicios).slice(0, MAX_MOTIVO);
@@ -1504,12 +1505,12 @@ router.post('/citas', async (req, res) => {
     if (!vehiculo_id || !fecha || !hora || !servicios.length) {
       return res.status(400).json({ error: 'Moto, servicio, fecha y hora son requeridos' });
     }
-    const problemaServicios = await problemaConServicios(servicios, { obligatorio: true, delCatalogo: true });
+    const problemaServicios = await problemaConServicios(req.db, servicios, { obligatorio: true, delCatalogo: true });
     if (problemaServicios) return invalido(res, 'servicios', problemaServicios);
     // Sucursal obligatoria y válida (activa). El cupo se controla por sucursal.
-    const sucursalId = (await sucursalValida(req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
+    const sucursalId = (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
     if (!sucursalId) return invalido(res, 'sucursal_id', 'Elige una sucursal válida');
-    const config = await getConfig();
+    const config = await getConfig(req.db);
     const horas = horasDisponibles(fecha, config);
     if (!horas.includes(hora)) {
       return invalido(res, 'hora', 'Ese día/hora no está disponible para agendar');
@@ -1536,7 +1537,7 @@ router.post('/citas', async (req, res) => {
     }
 
     // La moto debe ser del cliente
-    const [[moto]] = await req.db.query('SELECT id FROM motos WHERE id = ? AND cliente_id = ?', [vehiculo_id, req.cliente.id]);
+    const [[moto]] = await req.db.query('SELECT id FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?', [vehiculo_id, req.cliente.id]);
     if (!moto) return invalido(res, 'vehiculo_id', 'Moto no válida');
 
     const motivo = (descripcion || '').trim() || textoServicios(servicios).slice(0, MAX_MOTIVO);
@@ -1652,8 +1653,8 @@ router.patch('/citas/:id/confirmar', async (req, res) => {
 // Solo permite aprobar/rechazar si la orden es del cliente y está esperando aprobación.
 // Si el cliente ya había aprobado antes (total_aprobado), lo que decide ahora es un
 // adicional: rechazarlo no anula lo que ya aprobó, el trabajo sigue sin el adicional.
-async function actualizarAprobacion(ordenId, clienteId, decision, motivo) {
-  const [[orden]] = await req.db.query(
+async function actualizarAprobacion(db, ordenId, clienteId, decision, motivo) {
+  const [[orden]] = await db.query(
     "SELECT id, total_aprobado FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ? AND cliente_id = ? AND estado = 'esperando_aprobacion'",
     [ordenId, clienteId]
   );
@@ -1661,18 +1662,18 @@ async function actualizarAprobacion(ordenId, clienteId, decision, motivo) {
   // La orden no debe quedar "esperando aprobación" después de la decisión:
   // aprobado → a trabajar (o esperar repuestos); rechazado → vuelve a diagnóstico.
   if (decision === 'aprobado') {
-    await registrarAprobacion(ordenId);
+    await registrarAprobacion(db, ordenId);
   } else if (orden.total_aprobado !== null) {
-    await registrarRechazoAdicional(ordenId, motivo);
+    await registrarRechazoAdicional(db, ordenId, motivo);
   } else {
-    await req.db.query(
+    await db.query(
       `UPDATE ordenes_trabajo
          SET aprobacion_cliente = 'rechazado', motivo_rechazo = ?,
              aprobado_por_cliente = 0, fecha_aprobacion = NOW()
        WHERE tenant_id = @tenant AND id = ?`,
       [motivo, ordenId]
     );
-    await avanzarEstadoOrden(ordenId, 'diagnostico');
+    await avanzarEstadoOrden(db, ordenId, 'diagnostico');
   }
   return true;
 }

@@ -65,7 +65,7 @@ async function pedir(email, codigo) {
 let serie = 0;
 async function cliente({ verificado, codigo, vencido = false }) {
   const id = ++serie;
-  const c = { id, nombre: 'Ana', apellido: 'Mora', email: `cliente${id}@prueba.test`, email_verificado: verificado ? 1 : 0, activo: 1 };
+  const c = { id, nombre: 'Ana', apellido: 'Mora', email: `cliente${id}@prueba.test`, tenant_id: 1, email_verificado: verificado ? 1 : 0, activo: 1 };
   db.clientes.push(c);
   if (codigo) {
     db.codigos.push({ id: 100 + id, cliente_id: id, proposito: 'registro', code_hash: await bcrypt.hash(codigo, 4), attempts: 0, used: 0, vencido });
@@ -77,8 +77,8 @@ const sinSesion = (res) => assert.equal(res._body && res._body.data, undefined, 
 test('una cuenta ya verificada NO recibe sesión con un código cualquiera', async () => {
   const c = await cliente({ verificado: true });
   const res = await pedir(c.email, '000000');
-  assert.equal(res._status, 400);
-  assert.equal(res._body.error, 'Código inválido o expirado');
+  assert.equal(res._status, 409);
+  assert.equal(res._body.ya_verificado, true);
   sinSesion(res);
 });
 
@@ -86,7 +86,7 @@ test('una cuenta ya verificada tampoco entra con un código que ya se usó', asy
   const c = await cliente({ verificado: true, codigo: '123456' });
   db.codigos.find((k) => k.cliente_id === c.id).used = 1;
   const res = await pedir(c.email, '123456');
-  assert.equal(res._status, 400);
+  assert.equal(res._status, 409);
   sinSesion(res);
 });
 
@@ -105,7 +105,7 @@ test('el mismo código no sirve una segunda vez', async () => {
   const c = await cliente({ verificado: false, codigo: '222333' });
   assert.equal((await pedir(c.email, '222333'))._status, 200);
   const res = await pedir(c.email, '222333');
-  assert.equal(res._status, 400);
+  assert.equal(res._status, 409);
   sinSesion(res);
 });
 

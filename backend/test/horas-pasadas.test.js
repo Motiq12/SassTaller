@@ -40,7 +40,7 @@ async function probar(datos, base = baseCon()) {
   const original = pool.query;
   pool.query = base.query;
   try {
-    return await problemaDeHorario({ config, ahora: AHORA, ...datos });
+    return await problemaDeHorario({ db: base, config, ahora: AHORA, ...datos });
   } finally {
     pool.query = original;
   }

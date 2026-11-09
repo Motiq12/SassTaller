@@ -33,8 +33,10 @@ const DIAS_GUARDADOS = 90;
 function registrarEvento(tipo, { email = null, ip = null, usuarioId = null, actorId = null, detalle = null } = {}) {
   if (!TIPOS[tipo]) return;
   pool.query(
-    'INSERT INTO eventos_seguridad (tipo, email, ip, usuario_id, actor_id, detalle) VALUES (?, ?, ?, ?, ?, ?)',
-    [tipo, email ? String(email).trim().toLowerCase().slice(0, 190) : null, ip ? String(ip).slice(0, 64) : null,
+    // El taller sale del usuario o de quien actuó. Un intento fallido con un correo que
+    // no existe no es de ningún taller: queda en NULL, no en el taller 1.
+    'INSERT INTO eventos_seguridad (tenant_id, tipo, email, ip, usuario_id, actor_id, detalle) VALUES ((SELECT tenant_id FROM usuarios WHERE id = COALESCE(?, ?)), ?, ?, ?, ?, ?, ?)',
+    [actorId || null, usuarioId || null, tipo, email ? String(email).trim().toLowerCase().slice(0, 190) : null, ip ? String(ip).slice(0, 64) : null,
       usuarioId || null, actorId || null, detalle ? String(detalle).slice(0, 300) : null]
   ).catch((e) => console.error('No se pudo anotar el evento de seguridad:', e.code || e.message));
   // Un intento fallido cada tanto limpia lo viejo: un ataque llena la tabla rápido.

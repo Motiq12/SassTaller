@@ -48,6 +48,18 @@ function sucursalParaGuardar(req, pedida) {
 // Middleware para rutas con :id de algo que es de una sucursal. `sql` devuelve la
 // sucursal de ese registro (con un solo ? para el id). Si es de la otra sucursal,
 // responde 404, igual que si no existiera: no se le confirma a nadie que existe.
+function delTaller(tabla) {
+  return async (req, res, next, id) => {
+    try {
+      const [[fila]] = await req.db.query(`SELECT id FROM ${tabla} WHERE id = ? AND tenant_id = @tenant`, [id]);
+      if (!fila) return res.status(404).json({ error: 'No encontrado' });
+      next();
+    } catch (err) {
+      next(err);
+    }
+  };
+}
+
 function exigirSucursal(sql, param = 'id') {
   return async (req, res, next) => {
     try {
@@ -69,6 +81,6 @@ const SUCURSAL_DE_CITA = 'SELECT sucursal_id FROM citas WHERE id = ?';
 const SUCURSAL_DE_GARANTIA = 'SELECT o.sucursal_id FROM garantias g JOIN ordenes_trabajo o ON o.id = g.orden_id WHERE g.id = ?';
 
 module.exports = {
-  sucursalDeAlcance, cargarAlcance, soloSucursal, sucursalParaGuardar, exigirSucursal,
+  sucursalDeAlcance, cargarAlcance, soloSucursal, sucursalParaGuardar, exigirSucursal, delTaller,
   SUCURSAL_DE_ORDEN, SUCURSAL_DE_CITA, SUCURSAL_DE_GARANTIA,
 };

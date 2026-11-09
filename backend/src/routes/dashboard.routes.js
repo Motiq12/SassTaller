@@ -11,7 +11,7 @@ router.use(auth, requireRol('admin'));
 router.get('/resumen', async (req, res) => {
   try {
     // Hoy, la semana y el mes del taller, no los de la base (utils/sql-fechas.js).
-    const off = (await getConfig()).zona_horaria_offset;
+    const off = (await getConfig(req.db)).zona_horaria_offset;
     const [[{ motos_activas }]] = await req.db.query(
       "SELECT COUNT(*) AS motos_activas FROM ordenes_trabajo WHERE tenant_id = @tenant AND estado NOT IN ('entregada','cancelada')"
     );
@@ -32,9 +32,9 @@ router.get('/resumen', async (req, res) => {
     const [[{ facturacion_mes_total }]] = await req.db.query(
       `SELECT
          (SELECT COALESCE(SUM(monto),0) FROM citas
-            WHERE estado='entregado' AND ${enPeriodo('fecha_fin', 'mes', { momento: true, offset: off })})
+            WHERE tenant_id = @tenant AND estado='entregado' AND ${enPeriodo('fecha_fin', 'mes', { momento: true, offset: off })})
        + (SELECT COALESCE(SUM(costo_mano_obra + costo_repuestos - descuento),0) FROM ordenes_trabajo
-            WHERE estado='entregada' AND ${enPeriodo('fecha_entrega_real', 'mes', { momento: true, offset: off })}
+            WHERE tenant_id = @tenant AND estado='entregada' AND ${enPeriodo('fecha_entrega_real', 'mes', { momento: true, offset: off })}
               AND id NOT IN (SELECT orden_id FROM citas WHERE tenant_id = @tenant AND orden_id IS NOT NULL)) AS facturacion_mes_total`
     );
     const [[{ ticket_promedio }]] = await req.db.query(
@@ -113,7 +113,7 @@ router.get('/atrasos', async (req, res) => {
   try {
     const [rows] = await req.db.query(
       `SELECT o.id, o.numero_orden, o.estado, o.fecha_estimada_entrega,
-              DATEDIFF(o.fecha_estimada_entrega, ${hoySQL((await getConfig()).zona_horaria_offset)}) AS dias_restantes,
+              DATEDIFF(o.fecha_estimada_entrega, ${hoySQL((await getConfig(req.db)).zona_horaria_offset)}) AS dias_restantes,
               m.marca, m.modelo, m.placa,
               c.nombre AS cliente_nombre, c.apellido AS cliente_apellido,
               t.nombre AS tecnico_nombre

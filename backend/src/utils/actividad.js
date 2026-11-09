@@ -25,8 +25,8 @@ const TEXTO_CUENTA = {
 // Nunca lanza: anotar no puede romper la operación que lo dispara.
 function anotar(usuarioId, accion, detalle = null) {
   if (!usuarioId) return;
-  pool.query('INSERT INTO actividad_personal (usuario_id, accion, detalle) VALUES (?, ?, ?)',
-    [usuarioId, accion, detalle ? String(detalle).slice(0, 300) : null])
+  pool.query('INSERT INTO actividad_personal (tenant_id, usuario_id, accion, detalle) SELECT tenant_id, id, ?, ? FROM usuarios WHERE id = ?',
+    [accion, detalle ? String(detalle).slice(0, 300) : null, usuarioId])
     .catch((e) => console.error('No se pudo anotar la actividad:', e.code || e.message));
 }
 

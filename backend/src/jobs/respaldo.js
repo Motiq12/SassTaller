@@ -8,7 +8,6 @@
 
 const { pool } = require('../db/pool');
 const { configRespaldo, respaldar } = require('../services/respaldo');
-const { getConfig } = require('../utils/configuracion');
 const { enviarAvisoRespaldoFallido } = require('../services/mailer');
 
 const megas = (bytes) => (bytes / 1024 / 1024).toFixed(1);
@@ -49,14 +48,12 @@ async function hacerRespaldo({ origen = 'automatico', usuarioId = null } = {}) {
     if (err.message !== 'Ya hay un respaldo en curso') await anotar({ origen, ok: false, error: err.message, usuarioId });
     if (origen === 'panel') throw err;
     try {
-      const cfg = await getConfig();
-      let destinos = cfg.email ? [cfg.email] : [];
-      if (!destinos.length) {
-        const [admins] = await pool.query("SELECT email FROM usuarios WHERE rol = 'admin' AND activo = 1 AND email IS NOT NULL AND email <> ''");
-        destinos = admins.map((a) => a.email);
-      }
+      // Solo a quienes administran Motiq. Antes salía a los admins de todos los talleres,
+      // con el texto del error interno incluido.
+      const [admins] = await pool.query('SELECT email FROM plataforma_admins WHERE activo = 1');
+      const destinos = admins.map((a) => a.email);
       for (const destino of destinos) {
-        await enviarAvisoRespaldoFallido(destino, { taller: cfg.nombre_taller, error: err.message });
+        await enviarAvisoRespaldoFallido(destino, { taller: 'Motiq', error: err.message });
       }
     } catch (e) {
       console.error('No se pudo avisar por correo del respaldo fallido:', e.message);

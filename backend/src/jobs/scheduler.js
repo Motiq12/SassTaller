@@ -7,6 +7,7 @@ const cron = require('node-cron');
 const { enviarRecordatorios } = require('./recordatorios');
 const { marcarNoShows } = require('./no-show');
 const { respaldoDiario, describirRespaldo } = require('./respaldo');
+const { revisarVencimientos } = require('./vencimientos');
 
 let iniciado = false;
 
@@ -29,8 +30,11 @@ function iniciarJobs() {
   // Respaldo de la base: 08:30 UTC ≈ 02:30 en CR, con el taller cerrado y lejos de
   // los demás jobs. Si no está configurado, respaldoDiario no hace nada.
   cron.schedule('30 8 * * *', () => ejecutar('respaldo', respaldoDiario));
+  // Vencimientos de prueba: 13:00 UTC, antes del correo de recordatorios, para que quien
+  // abra el sistema en la mañana ya vea su plan al día.
+  cron.schedule('0 13 * * *', () => ejecutar('vencimientos', revisarVencimientos));
 
-  console.log('⏰ Jobs programados: recordatorios (14:00 UTC), no-show (07:00 UTC)');
+  console.log('⏰ Jobs programados: recordatorios (14:00 UTC), no-show (07:00 UTC), vencimientos (13:00 UTC)');
   console.log(describirRespaldo());
 }
 

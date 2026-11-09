@@ -127,6 +127,10 @@ router.put('/:id', async (req, res) => {
     const [[actualizada]] = await req.db.query(
       'SELECT * FROM vehiculos WHERE id = ? AND tenant_id = @tenant', [req.params.id]
     );
+    if (!actualizada) {
+      const e = etiquetaPara((await getConfig(req.db)).tipos_vehiculo);
+      return res.status(404).json({ error: `${e.singular} no encontrad${e.genero === 'f' ? 'a' : 'o'}` });
+    }
     const cfg = await getConfig(req.db);
     res.json({ data: actualizada, message: mensaje(cfg.tipos_vehiculo, 'actualizad') });
   } catch (err) {

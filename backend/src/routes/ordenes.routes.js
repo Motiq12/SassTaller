@@ -3,7 +3,7 @@ const router = require('express').Router();
 const { fail, invalido, faltante } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
-const { cargarAlcance, soloSucursal, sucursalParaGuardar, exigirSucursal, SUCURSAL_DE_ORDEN } = require('../utils/alcance');
+const { cargarAlcance, soloSucursal, sucursalParaGuardar, exigirSucursal, delTaller, SUCURSAL_DE_ORDEN } = require('../utils/alcance');
 const { soloRoles } = require('../middleware/roles');
 const {
   generarNumeroOrden, sincronizarCitaDesdeOrden, cerrarOrden, totalOrden, esAdicional, revisarAdicional,
@@ -41,6 +41,7 @@ router.use(auth, requireRol('recepcion'));
 // Quien tiene una sucursal ve solo las órdenes de ella (utils/alcance.js). Todas las
 // rutas con :id de este archivo son de una orden: una de la otra sucursal da 404.
 router.use(cargarAlcance);
+router.param('id', delTaller('ordenes_trabajo'));
 router.param('id', exigirSucursal(SUCURSAL_DE_ORDEN));
 
 // GET /api/ordenes
@@ -126,7 +127,7 @@ router.post('/', soloRoles('recepcion', 'admin'), exigirPermiso('ordenes.crear')
       return invalido(res, 'nivel_combustible', 'Nivel de combustible no válido');
     }
 
-    const sucursal_id = sucursalParaGuardar(req, (await sucursalValida(req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null);
+    const sucursal_id = sucursalParaGuardar(req, (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null);
 
     const numero_orden = await generarNumeroOrden(req.db);
 
@@ -159,7 +160,7 @@ router.post('/', soloRoles('recepcion', 'admin'), exigirPermiso('ordenes.crear')
       });
       const [[nueva]] = await conn.query('SELECT * FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ?', [result.insertId]);
       await conn.commit();
-      await notificarCambioEstado(citaId, 'en_revision');
+      await notificarCambioEstado(req.db, citaId, 'en_revision');
       res.status(201).json({ data: nueva, message: 'Orden creada' });
     } catch (e) {
       await conn.rollback();
@@ -179,7 +180,7 @@ router.get('/eliminadas', requireRol('admin'), async (req, res) => {
     const [rows] = await req.db.query(
       `SELECT id, orden_id, numero_orden, estado, cliente_nombre, moto, problema_reportado, total,
               fecha_ingreso, motivo, eliminada_por_nombre, created_at
-       FROM ordenes_eliminadas ORDER BY created_at DESC LIMIT ${MAX_LISTADO}`
+       FROM ordenes_eliminadas WHERE tenant_id = @tenant ORDER BY created_at DESC LIMIT ${MAX_LISTADO}`
     );
     res.json({ data: rows });
   } catch (err) {
@@ -226,7 +227,7 @@ router.put('/:id', requireRol('tecnico'), async (req, res) => {
       diagnostico, tiempo_estimado_horas, costo_mano_obra, costo_repuestos, descuento,
       fecha_estimada_entrega, prioridad, categoria, accesorios_entregados, estado_fisico,
     } = req.body;
-    const totalAntes = await totalOrden(req.params.id);
+    const totalAntes = await totalOrden(req.db, req.params.id);
     // El mecánico no ve los montos (middleware/ocultar-al-mecanico.js): lo que mande
     // en esos campos se ignora y quedan los de la orden, para no borrarlos en cero.
     let montos = { costo_mano_obra, costo_repuestos, descuento };
@@ -248,7 +249,7 @@ router.put('/:id', requireRol('tecnico'), async (req, res) => {
         req.params.id,
       ]
     );
-    const reaprobacion = await revisarAdicional(req.params.id, totalAntes);
+    const reaprobacion = await revisarAdicional(req.db, req.params.id, totalAntes);
     const [[actualizada]] = await req.db.query('SELECT * FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     res.json({ data: actualizada, reaprobacion, message: reaprobacion ? MSG_REAPROBACION : 'Orden actualizada' });
   } catch (err) {
@@ -284,9 +285,9 @@ router.patch('/:id/datos', soloRoles('recepcion', 'admin'), exigirPermiso('orden
     const fechaEst = b.fecha_estimada_entrega ? String(b.fecha_estimada_entrega).slice(0, 10) : null;
     if (fechaEst && !/^\d{4}-\d{2}-\d{2}$/.test(fechaEst)) return invalido(res, 'fecha_estimada_entrega', 'Fecha estimada no válida');
     // La moto tiene que ser del mismo cliente (para cambiar de cliente, se elimina y se abre otra).
-    const [[moto]] = await req.db.query('SELECT id FROM motos WHERE id = ? AND cliente_id = ?', [b.vehiculo_id, orden.cliente_id]);
+    const [[moto]] = await req.db.query('SELECT id FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?', [b.vehiculo_id, orden.cliente_id]);
     if (!moto) return invalido(res, 'vehiculo_id', 'Esa moto no es de este cliente');
-    const sucursal_id = sucursalParaGuardar(req, (await sucursalValida(b.sucursal_id)) ? Number(b.sucursal_id) : null);
+    const sucursal_id = sucursalParaGuardar(req, (await sucursalValida(req.db, b.sucursal_id)) ? Number(b.sucursal_id) : null);
     const categoria = b.categoria || 'diagnostico';
 
     await req.db.query(
@@ -354,9 +355,9 @@ router.delete('/:id', requireRol('admin'), async (req, res) => {
 
     await conn.query(
       `INSERT INTO ordenes_eliminadas
-         (orden_id, numero_orden, estado, cliente_id, cliente_nombre, moto, problema_reportado, total,
+         (tenant_id, orden_id, numero_orden, estado, cliente_id, cliente_nombre, moto, problema_reportado, total,
           fecha_ingreso, motivo, eliminada_por, eliminada_por_nombre)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT nombre FROM usuarios WHERE tenant_id = @tenant AND id = ?))`,
+       VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT nombre FROM usuarios WHERE tenant_id = @tenant AND id = ?))`,
       [o.id, o.numero_orden, o.estado, o.cliente_id, o.cliente_nombre, o.moto, o.problema_reportado,
        Number(o.total) || 0, o.fecha_ingreso, motivo, req.usuario.id, req.usuario.id]
     );
@@ -537,17 +538,17 @@ router.post('/:id/repuestos', soloRoles('recepcion', 'admin'), exigirPermiso('or
     const { nombre, cantidad, costo_unitario, estado } = req.body;
     if (!nombre) return res.status(400).json({ error: 'Nombre del repuesto requerido' });
     if (estado && !ESTADOS_REPUESTO[estado]) return res.status(400).json({ error: 'Estado de repuesto inválido' });
-    const totalAntes = await totalOrden(req.params.id);
+    const totalAntes = await totalOrden(req.db, req.params.id);
     const [result] = await req.db.query(
       'INSERT INTO orden_repuestos (tenant_id, orden_id, nombre, cantidad, costo_unitario, estado, adicional) VALUES (@tenant, ?, ?, ?, ?, ?, ?)',
-      [req.params.id, nombre, cantidad || 1, costo_unitario || 0, estado || 'pendiente', await esAdicional(req.params.id)]
+      [req.params.id, nombre, cantidad || 1, costo_unitario || 0, estado || 'pendiente', await esAdicional(req.db, req.params.id)]
     );
     // Actualizar costo_repuestos en la orden
     await req.db.query(
-      'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ?) WHERE tenant_id = @tenant AND id = ?',
+      'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ? AND tenant_id = @tenant) WHERE tenant_id = @tenant AND id = ?',
       [req.params.id, req.params.id]
     );
-    const reaprobacion = await revisarAdicional(req.params.id, totalAntes);
+    const reaprobacion = await revisarAdicional(req.db, req.params.id, totalAntes);
     const [[nuevo]] = await req.db.query('SELECT * FROM orden_repuestos WHERE tenant_id = @tenant AND id = ?', [result.insertId]);
     res.status(201).json({ data: nuevo, reaprobacion, message: reaprobacion ? MSG_REAPROBACION : 'Repuesto agregado' });
   } catch (err) {
@@ -588,16 +589,16 @@ router.put('/:id/repuestos/:rid', soloRoles('recepcion', 'admin'), exigirPermiso
     const [[existe]] = await req.db.query('SELECT id, estado FROM orden_repuestos WHERE tenant_id = @tenant AND id = ? AND orden_id = ?', [req.params.rid, req.params.id]);
     if (!existe) return res.status(404).json({ error: 'Repuesto no encontrado' });
     if (estado && !ESTADOS_REPUESTO[estado]) return res.status(400).json({ error: 'Estado de repuesto inválido' });
-    const totalAntes = await totalOrden(req.params.id);
+    const totalAntes = await totalOrden(req.db, req.params.id);
     await req.db.query(
       'UPDATE orden_repuestos SET nombre=?, cantidad=?, costo_unitario=?, estado=? WHERE tenant_id = @tenant AND id=? AND orden_id=?',
       [nombre, cantidad || 1, costo_unitario || 0, estadoAlEditarRepuesto(existe.estado, estado, costo_unitario), req.params.rid, req.params.id]
     );
     await req.db.query(
-      'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ?) WHERE tenant_id = @tenant AND id = ?',
+      'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ? AND tenant_id = @tenant) WHERE tenant_id = @tenant AND id = ?',
       [req.params.id, req.params.id]
     );
-    const reaprobacion = await revisarAdicional(req.params.id, totalAntes);
+    const reaprobacion = await revisarAdicional(req.db, req.params.id, totalAntes);
     const [[actualizado]] = await req.db.query('SELECT * FROM orden_repuestos WHERE tenant_id = @tenant AND id = ?', [req.params.rid]);
     res.json({ data: actualizado, reaprobacion, message: reaprobacion ? MSG_REAPROBACION : 'Repuesto actualizado' });
   } catch (err) {
@@ -611,7 +612,7 @@ router.delete('/:id/repuestos/:rid', requireRol('admin'), async (req, res) => {
     const [result] = await req.db.query('DELETE FROM orden_repuestos WHERE tenant_id = @tenant AND id=? AND orden_id=?', [req.params.rid, req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ error: 'Repuesto no encontrado' });
     await req.db.query(
-      'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ?) WHERE tenant_id = @tenant AND id = ?',
+      'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ? AND tenant_id = @tenant) WHERE tenant_id = @tenant AND id = ?',
       [req.params.id, req.params.id]
     );
     res.json({ message: 'Repuesto eliminado' });
@@ -662,7 +663,7 @@ router.patch('/:id/cerrar', requireRol('admin'), async (req, res) => {
     if (['entregada', 'cancelada'].includes(actual.estado)) {
       return res.status(400).json({ error: actual.estado === 'entregada' ? 'La orden ya estaba entregada' : 'La orden está cancelada' });
     }
-    const r = await cerrarOrden(req.params.id, { metodo_pago, garantia_dias, observaciones_finales });
+    const r = await cerrarOrden(req.db, req.params.id, { metodo_pago, garantia_dias, observaciones_finales });
     if (r.notFound) return res.status(404).json({ error: 'Orden no encontrada' });
     res.json({ message: 'Orden cerrada y entregada', cortesia_ganada: r.cortesiaGanada });
   } catch (err) {
@@ -724,7 +725,7 @@ const SELECT_MSG_ORDEN = `
          du.nombre AS destino_nombre,
          ${LEIDO_POR_MI}, ${VISTO_POR_OTRO}
   FROM mensajes_internos m
-  JOIN usuarios ru ON ru.id = m.remitente_id AND ru.tenant_id = @tenant
+  JOIN usuarios ru ON ru.id = m.remitente_id AND ru.tenant_id = @tenant AND m.tenant_id = @tenant
   LEFT JOIN usuarios du ON du.id = m.destino_id AND du.tenant_id = @tenant`;
 
 // GET /api/ordenes/:id/mensajes — hilo de la orden (marca leídos los míos).

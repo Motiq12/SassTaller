@@ -16,6 +16,7 @@
 //      agregan índices que nombran la tabla nueva.
 //   3. tenant_id va antes de la capa del SaaS, que ya da por hecho que está.
 const { pool } = require('./pool');
+const { ROLES_FABRICA } = require('../utils/permisos');
 
 // Las tablas que guardan datos DE UN TALLER. Toda consulta que las toque tiene que
 // filtrar (ver db/tenant-db.js, que lo exige y revienta si falta).
@@ -261,6 +262,122 @@ async function indicesPorTaller() {
   return puestos > 0;
 }
 
+// Una clave única global hace que dos empresas choquen entre sí: el mismo correo, el
+// mismo número de orden o la misma placa no podrían existir en dos talleres. Y como
+// "configuracion" tenía de clave solo id = 1, ni siquiera se podía crear un segundo
+// taller. Cada una pasa a incluir tenant_id.
+const CLAVES_POR_TALLER = [
+  { tabla: 'configuracion', quitar: 'PRIMARY', columnas: ['tenant_id', 'id'] },
+  { tabla: 'orden_contadores', quitar: 'PRIMARY', columnas: ['tenant_id', 'anio'] },
+  { tabla: 'usuarios', quitar: 'email', columnas: ['tenant_id', 'email'], nombre: 'uq_usuarios_tenant_email' },
+  { tabla: 'servicios', quitar: 'uq_servicio_nombre', columnas: ['tenant_id', 'nombre'], nombre: 'uq_servicios_tenant_nombre' },
+  { tabla: 'ordenes_trabajo', quitar: 'numero_orden', columnas: ['tenant_id', 'numero_orden'], nombre: 'uq_ordenes_tenant_numero' },
+  { tabla: 'vehiculos', quitar: 'uq_motos_placa_norm', columnas: ['tenant_id', 'placa_norm'], nombre: 'uq_vehiculos_tenant' },
+  { tabla: 'vehiculos', quitar: 'uq_vehiculos_placa_norm', columnas: ['tenant_id', 'placa_norm'], nombre: 'uq_vehiculos_tenant' },
+  { tabla: 'roles', quitar: 'uq_roles_clave', columnas: ['tenant_id', 'clave'], nombre: 'uq_roles_tenant_clave' },
+  { tabla: 'clientes', quitar: 'uq_clientes_google_sub', columnas: ['tenant_id', 'google_sub'], nombre: 'uq_clientes_tenant_google' },
+  { tabla: 'orden_checklist', quitar: 'orden_id', columnas: ['tenant_id', 'orden_id'], nombre: 'uq_checklist_tenant_orden', conservar: '(orden_id)' },
+];
+
+async function columnasDeIndice(tabla, indice) {
+  const [filas] = await pool.query(
+    `SELECT COLUMN_NAME AS c FROM information_schema.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ? ORDER BY SEQ_IN_INDEX`,
+    [tabla, indice]
+  );
+  return filas.map((f) => f.c);
+}
+
+async function clavesPorTaller() {
+  let hizo = false;
+  for (const { tabla, quitar, columnas, nombre, conservar } of CLAVES_POR_TALLER) {
+    if (!(await existeTabla(tabla)) || !(await existeColumna(tabla, 'tenant_id'))) continue;
+    const actuales = await columnasDeIndice(tabla, quitar);
+    if (!actuales.length || actuales.includes('tenant_id')) continue;
+    const lista = columnas.map((c) => `\`${c}\``).join(', ');
+    if (quitar === 'PRIMARY') {
+      await pool.query(`ALTER TABLE \`${tabla}\` DROP PRIMARY KEY, ADD PRIMARY KEY (${lista})`);
+    } else {
+      const yaEsta = (await columnasDeIndice(tabla, nombre)).length > 0;
+      // Una clave foránea puede necesitar ese índice: se deja uno común en su lugar.
+      if (conservar) await pool.query(`ALTER TABLE \`${tabla}\` ADD INDEX idx_${tabla}_fk ${conservar}`);
+      await pool.query(`ALTER TABLE \`${tabla}\` DROP INDEX \`${quitar}\`${yaEsta ? '' : `, ADD UNIQUE KEY \`${nombre}\` (${lista})`}`);
+    }
+    console.log(`🏢 ${tabla}: la clave ${quitar} ahora es por taller`);
+    hizo = true;
+  }
+  return hizo;
+}
+
+// Un registro heredado que quedó rotulado en el taller 1 por el DEFAULT pasa al taller
+// de su dueño. Es idempotente: solo toca lo que no coincide.
+const ROTULOS = [
+  ['cita_servicios', 'cita_id', 'citas'],
+  ['sesiones_personal', 'usuario_id', 'usuarios'],
+  ['actividad_personal', 'usuario_id', 'usuarios'],
+  ['eventos_seguridad', 'usuario_id', 'usuarios'],
+  ['eventos_seguridad', 'actor_id', 'usuarios'],
+  ['feriados', 'creado_por', 'usuarios'],
+  ['bloqueos_horario', 'creado_por', 'usuarios'],
+  ['ordenes_eliminadas', 'eliminada_por', 'usuarios'],
+  ['mensaje_lecturas', 'usuario_id', 'usuarios'],
+];
+
+async function corregirRotulos() {
+  let total = 0;
+  for (const [tabla, columna, padre] of ROTULOS) {
+    if (!(await existeTabla(tabla)) || !(await existeColumna(tabla, columna))) continue;
+    const [r] = await pool.query(
+      `UPDATE \`${tabla}\` x JOIN \`${padre}\` p ON p.id = x.\`${columna}\`
+          SET x.tenant_id = p.tenant_id WHERE x.tenant_id <> p.tenant_id`
+    );
+    total += r.affectedRows;
+  }
+  return total > 0;
+}
+
+// Sin valor por defecto: una fila sin empresa ahora falla al escribirse. Con DEFAULT 1,
+// cualquier INSERT olvidado caía en silencio en la primera empresa registrada.
+async function quitarDefectoTenant() {
+  let hizo = false;
+  for (const tabla of TABLAS_DE_TALLER) {
+    if (!(await existeTabla(tabla))) continue;
+    const [[c]] = await pool.query(
+      `SELECT COLUMN_DEFAULT AS d FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = 'tenant_id'`,
+      [tabla]
+    );
+    if (!c || c.d === null || String(c.d).toUpperCase() === 'NULL') continue;
+    await pool.query(`ALTER TABLE \`${tabla}\` ALTER COLUMN tenant_id DROP DEFAULT`);
+    hizo = true;
+  }
+  // Un intento de ingreso con un correo que no existe no pertenece a ninguna empresa.
+  if (await existeTabla('eventos_seguridad')) {
+    await pool.query('ALTER TABLE eventos_seguridad MODIFY tenant_id INT NULL');
+  }
+  return hizo;
+}
+
+async function colorDeMarca() {
+  if (await existeColumna('configuracion', 'color_primario')) return false;
+  await pool.query('ALTER TABLE configuracion ADD COLUMN color_primario VARCHAR(7) NULL');
+  return true;
+}
+
+// Cada empresa tiene su propia copia de los roles de fábrica: puede ajustarlos sin que
+// el cambio le llegue a otra.
+async function rolesPorTaller() {
+  if (!(await existeTabla('roles')) || !(await existeColumna('roles', 'tenant_id'))) return false;
+  for (const r of ROLES_FABRICA) {
+    await pool.query(
+      `INSERT IGNORE INTO roles (tenant_id, clave, nombre, base, descripcion, permisos, de_fabrica)
+       SELECT t.id, ?, ?, ?, ?, ?, 1 FROM tenants t`,
+      [r.clave, r.nombre, r.base, r.descripcion, JSON.stringify(r.permisos)]
+    );
+  }
+  return false;
+}
+
 async function aplicarMultiTenant() {
   console.log('🏢 Aplicando la capa multi-taller…');
   await paso('tabla tenants', crearTenants);
@@ -278,7 +395,12 @@ async function aplicarMultiTenant() {
     if (tocadas === antes) continue;
   }
   await paso('índices por taller', indicesPorTaller);
+  await paso('claves por taller', clavesPorTaller);
+  await paso('rótulos de taller', corregirRotulos);
+  await paso('color de marca', colorDeMarca);
+  await paso('roles por taller', rolesPorTaller);
+  await paso('tenant_id sin valor por defecto', quitarDefectoTenant);
   console.log(`🏢 Capa multi-taller lista (${tocadas} tabla(s) modificada(s) en esta corrida).`);
 }
 
-module.exports = { aplicarMultiTenant, TABLAS_DE_TALLER };
+module.exports = { aplicarMultiTenant, renombrarVehiculos, TABLAS_DE_TALLER };

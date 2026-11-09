@@ -10,8 +10,8 @@ const db = { usuarios: [], roles: [] };
 const pool = {
   async query(sql, params = []) {
     if (/FROM usuarios WHERE id = \?/.test(sql)) return [db.usuarios.filter((u) => u.id === params[0])];
-    if (/FROM roles WHERE id = \? OR clave = \?/.test(sql)) {
-      return [db.roles.filter((r) => r.id === params[0] || r.clave === params[1])];
+    if (/FROM roles WHERE tenant_id = \? AND \(id = \? OR clave = \?\)/.test(sql)) {
+      return [db.roles.filter((r) => r.id === params[1] || r.clave === params[2])];
     }
     throw new Error('Consulta no prevista en la prueba: ' + sql);
   },

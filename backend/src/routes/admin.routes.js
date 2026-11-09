@@ -7,6 +7,8 @@ const { fail, invalido } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { getConfig, clearCache } = require('../utils/configuracion');
+const { topeAlcanzado, puedeMarcaPropia } = require('../utils/cuenta');
+const { cargarEjemplo, borrarEjemplo } = require('../utils/ejemplo');
 const { getSucursales, clearCache: clearSucursalesCache } = require('../utils/sucursales');
 const { getServiciosFilas, clearCache: clearServicios } = require('../utils/servicios');
 const { fotoValida, textoDentroDeLimite } = require('../utils/validar');
@@ -19,9 +21,6 @@ const { CORREO_FABRICA, normalizarPlantillas } = require('../utils/plantillas');
 const { textosParaGuardar } = require('../utils/textos-portal');
 const { horasDisponibles } = require('../utils/configuracion');
 const { estadoCorreo, enviarCorreoPrueba } = require('../services/mailer');
-const { configRespaldo, respaldosGuardados, resumirRespaldos } = require('../services/respaldo');
-const { hacerRespaldo } = require('../jobs/respaldo');
-const { crearS3 } = require('../utils/s3');
 const { enPeriodo, diasDelPeriodo } = require('../utils/sql-fechas');
 const {
   BASES, CATALOGO, ROLES_FABRICA, BASES_PROPIAS, BASE_DE_ROL, ROL_DE_BASE, FIJAS, ajustables, validarRolPropio, permisosEfectivos,
@@ -71,7 +70,7 @@ router.get('/arranque', async (req, res) => {
 router.post('/arranque/ocultar', async (req, res) => {
   try {
     await req.db.query('UPDATE configuracion SET arranque_oculto = 1 WHERE id = 1 AND tenant_id = @tenant');
-    clearCache();
+    clearCache(req.db.tenantId);
     res.json({ message: 'Listo' });
   } catch (err) {
     fail(res, err);
@@ -105,7 +104,7 @@ router.delete('/ejemplo', async (req, res) => {
 router.get('/resumen', async (req, res) => {
   try {
     // El mes del taller, no el de la base (utils/sql-fechas.js).
-    const off = (await getConfig()).zona_horaria_offset;
+    const off = (await getConfig(req.db)).zona_horaria_offset;
     const [[{ total_citas }]] = await req.db.query(
       `SELECT COUNT(*) AS total_citas FROM citas WHERE tenant_id = @tenant AND ${enPeriodo('fecha', 'mes', { offset: off })}`
     );
@@ -254,7 +253,7 @@ router.get('/reportes', async (req, res) => {
 
     // El período en la hora del taller (utils/sql-fechas.js). c.fecha es un día; las
     // demás, un momento.
-    const off = (await getConfig()).zona_horaria_offset;
+    const off = (await getConfig(req.db)).zona_horaria_offset;
     const COLUMNAS_RANGO = { 'c.fecha': false, 'c.fecha_fin': true, 'o.fecha_entrega_real': true, 'o.fecha_ingreso': true };
     const rango = (col) => {
       if (!(col in COLUMNAS_RANGO)) throw new Error(`Columna no permitida en rango: ${col}`);
@@ -408,7 +407,7 @@ router.get('/tareas', async (req, res) => {
        FROM tareas_mecanico t
        JOIN usuarios u ON u.id = t.tecnico_id AND u.tenant_id = @tenant
        LEFT JOIN usuarios a ON a.id = t.asignado_por AND a.tenant_id = @tenant
-       WHERE t.asignado_por IS NOT NULL`;
+       WHERE t.tenant_id = @tenant AND t.asignado_por IS NOT NULL`;
     const params = [];
     if (empleado) { sql += ' AND t.tecnico_id = ?'; params.push(empleado); }
     sql += ` ORDER BY t.hecha ASC, FIELD(t.prioridad,'urgente','alta','normal','baja'),
@@ -514,7 +513,7 @@ router.post('/servicios', async (req, res) => {
 
     const [[max]] = await req.db.query('SELECT COALESCE(MAX(orden), 0) AS m FROM servicios WHERE tenant_id = @tenant');
     const [r] = await req.db.query('INSERT INTO servicios (tenant_id,nombre, orden) VALUES (@tenant, ?, ?)', [nombre, max.m + 1]);
-    clearServicios();
+    clearServicios(req.db.tenantId);
     const [[nuevo]] = await req.db.query('SELECT id, nombre, activo, orden FROM servicios WHERE tenant_id = @tenant AND id = ?', [r.insertId]);
     res.status(201).json({ data: nuevo, message: 'Servicio creado' });
   } catch (err) {
@@ -540,7 +539,7 @@ router.put('/servicios/:id', async (req, res) => {
     } else {
       await req.db.query('UPDATE servicios SET nombre = ?, activo = ? WHERE tenant_id = @tenant AND id = ?', [nombre, activo, req.params.id]);
     }
-    clearServicios();
+    clearServicios(req.db.tenantId);
     const [[actualizado]] = await req.db.query('SELECT id, nombre, activo, orden FROM servicios WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     res.json({ data: actualizado, message: 'Servicio actualizado' });
   } catch (err) {
@@ -555,7 +554,7 @@ router.patch('/servicios/:id/activo', async (req, res) => {
     if (!s) return res.status(404).json({ error: 'Servicio no encontrado' });
     const activo = req.body.activo === undefined ? (s.activo ? 0 : 1) : (req.body.activo ? 1 : 0);
     await req.db.query('UPDATE servicios SET activo = ? WHERE tenant_id = @tenant AND id = ?', [activo, req.params.id]);
-    clearServicios();
+    clearServicios(req.db.tenantId);
     res.json({ data: { id: Number(req.params.id), activo }, message: activo ? 'Servicio activado' : 'Servicio desactivado' });
   } catch (err) {
     fail(res, err);
@@ -583,7 +582,7 @@ router.delete('/servicios/:id', async (req, res) => {
       });
     }
     await req.db.query('DELETE FROM servicios WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
-    clearServicios();
+    clearServicios(req.db.tenantId);
     res.json({ message: 'Servicio eliminado' });
   } catch (err) {
     fail(res, err);
@@ -624,7 +623,7 @@ router.get('/configuracion', async (req, res) => {
   try {
     // Los correos de fábrica, para que la pantalla de mensajes los muestre (los de
     // WhatsApp están en el frontend).
-    res.json({ data: { ...(await getConfig()), plantillas_fabrica: { correo: CORREO_FABRICA } } });
+    res.json({ data: { ...(await getConfig(req.db)), plantillas_fabrica: { correo: CORREO_FABRICA } } });
   } catch (err) {
     fail(res, err);
   }
@@ -681,13 +680,18 @@ router.put('/configuracion', async (req, res) => {
     // Textos del portal, igual: solo si vienen. La fecha de las condiciones se pone sola.
     let portalJson = null;
     if (b.portal_textos && typeof b.portal_textos === 'object') {
-      const previa = await getConfig();
+      const previa = await getConfig(req.db);
       portalJson = JSON.stringify(textosParaGuardar(b.portal_textos, previa.portal_textos, fechaLocalISO(previa.zona_horaria_offset)));
     }
 
+    // Marca propia según el plan. Si no le toca, logo y color quedan fuera del UPDATE en
+    // vez de borrarse: quien los puso en la prueba no los pierde al pasar a gratis.
+    const marcaPropia = puedeMarcaPropia(req.db.tenantId);
+
     await req.db.query(
       `UPDATE configuracion SET
-         nombre_taller = ?, telefono = ?, email = ?, direccion = ?, logo = ?,
+         nombre_taller = ?, telefono = ?, email = ?, direccion = ?,
+         ${marcaPropia ? 'logo = ?, color_primario = ?,' : ''}
          razon_social = ?, cedula_juridica = ?, nota_factura = ?,
          pass_min_largo = ?, pass_variedad = ?,
          max_citas_hora = ?, dias_anticipacion = ?, duracion_cita_min = ?, cancelacion_horas_min = ?,
@@ -705,7 +709,7 @@ router.put('/configuracion', async (req, res) => {
         (b.telefono || '').trim() || null,
         (b.email || '').trim() || null,
         (b.direccion || '').trim() || null,
-        b.logo || null,
+        ...(marcaPropia ? [b.logo || null, /^#[0-9a-fA-F]{6}$/.test(b.color_primario || '') ? b.color_primario : null] : []),
         texto(b.razon_social, 150),
         texto(b.cedula_juridica, 30),
         texto(b.nota_factura, 300),
@@ -726,7 +730,7 @@ router.put('/configuracion', async (req, res) => {
         bit(b.notif_email_entrega),
       ]
     );
-    clearCache();
+    clearCache(req.db.tenantId);
     // Si mandó logo o color y su plan no los incluye, se lo dice. Guardar en silencio
     // algo que no se aplicó lo dejaría preguntándose por qué su portal sigue igual.
     const aviso = !marcaPropia && (b.logo || b.color_primario)
@@ -764,68 +768,12 @@ router.post('/correo/prueba', async (req, res) => {
     if (!process.env.RESEND_API_KEY) {
       return res.json({ data: { enviado: false, email: u.email }, message: 'El servidor no tiene clave de Resend: el correo no salió (modo desarrollo)' });
     }
-    const cfg = await getConfig();
+    const cfg = await getConfig(req.db);
     const ok = await enviarCorreoPrueba(u.email, { nombre: u.nombre, taller: cfg.nombre_taller });
     if (!ok) return res.status(502).json({ error: 'Resend no aceptó el correo. Revisá el remitente y el dominio.' });
     res.json({ data: { enviado: true, email: u.email }, message: `Correo de prueba enviado a ${u.email}` });
   } catch (err) {
     fail(res, err);
-  }
-});
-
-// ───────────────────────────────────────────────────────────
-// Respaldos de la base: estado, copias guardadas y respaldar ahora.
-// Nunca devuelve las llaves del almacenamiento ni la frase de cifrado: solo si están.
-// ───────────────────────────────────────────────────────────
-// GET /api/admin/respaldos
-router.get('/respaldos', async (req, res) => {
-  try {
-    const c = configRespaldo();
-    const [registro] = await req.db.query(
-      `SELECT r.id, r.origen, r.ok, r.clave, r.bytes, r.tablas, r.filas, r.segundos, r.cifrado, r.error, r.created_at,
-              u.nombre AS usuario_nombre
-       FROM respaldos_registro r LEFT JOIN usuarios u ON u.id = r.usuario_id AND u.tenant_id = @tenant
-       ORDER BY r.id DESC LIMIT 30`
-    );
-    let guardados = null;
-    let errorAlmacen = null;
-    if (c.activo) {
-      try {
-        guardados = respaldosGuardados(await crearS3(c).listar(c.prefijo), c.prefijo);
-      } catch (err) {
-        console.error('⚠️  No se pudo listar el almacenamiento de respaldos:', err.message);
-        errorAlmacen = 'No se pudo leer el almacenamiento de los respaldos';
-      }
-    }
-    res.json({
-      data: {
-        ...resumirRespaldos({ activo: c.activo, registro, guardados }),
-        configuracion: { activo: c.activo, faltan: c.faltan, conservar: c.conservar, cifrado: !!c.frase },
-        registro,
-        guardados,
-        error_almacen: errorAlmacen,
-      },
-    });
-  } catch (err) {
-    fail(res, err);
-  }
-});
-
-// POST /api/admin/respaldos — un respaldo ya, además del de la noche. Uno cada 10 min.
-let ultimoRespaldoPanel = 0;
-router.post('/respaldos', async (req, res) => {
-  try {
-    if (!configRespaldo().activo) return res.status(409).json({ error: 'Los respaldos no están configurados en el servidor' });
-    if (Date.now() - ultimoRespaldoPanel < 10 * 60 * 1000) {
-      return res.status(429).json({ error: 'Ya se hizo un respaldo hace menos de 10 minutos' });
-    }
-    ultimoRespaldoPanel = Date.now();
-    const r = await hacerRespaldo({ origen: 'panel', usuarioId: req.usuario.id });
-    res.json({ data: r, message: `Respaldo hecho: ${r.tablas} tablas, ${r.filas} filas` });
-  } catch (err) {
-    if (err.message === 'Ya hay un respaldo en curso') return res.status(409).json({ error: 'Ya hay un respaldo en curso: esperá a que termine' });
-    console.error('⚠️  Respaldo desde el panel falló:', err.message);
-    res.status(502).json({ error: `El respaldo falló: ${String(err.message).slice(0, 200)}` });
   }
 });
 
@@ -846,7 +794,7 @@ router.get('/seguridad', async (req, res) => {
       p.sesiones_cerradas = p.sesiones_desde_ms ? new Date(Number(p.sesiones_desde_ms)).toISOString() : null;
       delete p.sesiones_desde_ms;
     }
-    res.json({ data: { personal, politica: politica(await getConfig()) } });
+    res.json({ data: { personal, politica: politica(await getConfig(req.db)) } });
   } catch (err) {
     fail(res, err);
   }
@@ -905,7 +853,7 @@ router.put('/cuenta/password', async (req, res) => {
     if (!actual || !nueva) return res.status(400).json({ error: 'Contraseña actual y nueva son requeridas' });
     const [[u]] = await req.db.query('SELECT password_hash, email, nombre FROM usuarios WHERE tenant_id = @tenant AND id = ?', [req.usuario.id]);
     if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
-    const malaClave = problemaDeContrasena(nueva, politica(await getConfig()), u);
+    const malaClave = problemaDeContrasena(nueva, politica(await getConfig(req.db)), u);
     if (malaClave) return invalido(res, 'nueva', malaClave);
     const ok = await bcrypt.compare(String(actual), u.password_hash);
     if (!ok) return invalido(res, 'actual', 'La contraseña actual no es correcta');
@@ -958,7 +906,7 @@ router.post('/sucursales', async (req, res) => {
       'INSERT INTO sucursales (tenant_id, nombre, direccion, telefono, orden) VALUES (@tenant, ?, ?, ?, ?)',
       [nombre, (req.body.direccion || '').trim() || null, (req.body.telefono || '').trim() || null, orden]
     );
-    clearSucursalesCache();
+    clearSucursalesCache(req.db.tenantId);
     const [[nueva]] = await req.db.query('SELECT id, nombre, direccion, telefono, activa, orden FROM sucursales WHERE tenant_id = @tenant AND id = ?', [result.insertId]);
     res.status(201).json({ data: nueva, message: 'Sucursal creada' });
   } catch (err) {
@@ -976,7 +924,7 @@ router.put('/sucursales/:id', async (req, res) => {
       [nombre, (req.body.direccion || '').trim() || null, (req.body.telefono || '').trim() || null, req.params.id]
     );
     if (!result.affectedRows) return res.status(404).json({ error: 'Sucursal no encontrada' });
-    clearSucursalesCache();
+    clearSucursalesCache(req.db.tenantId);
     const [[actualizada]] = await req.db.query('SELECT id, nombre, direccion, telefono, activa, orden FROM sucursales WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     res.json({ data: actualizada, message: 'Sucursal actualizada' });
   } catch (err) {
@@ -1003,7 +951,7 @@ router.patch('/sucursales/:id/activa', async (req, res) => {
     }
     const [result] = await req.db.query('UPDATE sucursales SET activa = ? WHERE tenant_id = @tenant AND id = ?', [activa, req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ error: 'Sucursal no encontrada' });
-    clearSucursalesCache();
+    clearSucursalesCache(req.db.tenantId);
     res.json({ message: activa ? 'Sucursal activada' : 'Sucursal desactivada' });
   } catch (err) {
     fail(res, err);
@@ -1024,8 +972,8 @@ function leerPermisos(r) {
   try { return JSON.parse(r.permisos || '[]'); } catch { return []; }
 }
 
-async function cargarRol(id) {
-  const [[r]] = await req.db.query(
+async function cargarRol(db, id) {
+  const [[r]] = await db.query(
     'SELECT id, clave, nombre, base, descripcion, permisos, de_fabrica FROM roles WHERE tenant_id = @tenant AND id = ?',
     [id]
   );
@@ -1038,7 +986,7 @@ router.get('/roles', async (req, res) => {
   try {
     const [roles] = await req.db.query(
       `SELECT id, clave, nombre, base, descripcion, permisos, de_fabrica
-       FROM roles ORDER BY de_fabrica DESC, id`
+       FROM roles WHERE tenant_id = @tenant ORDER BY de_fabrica DESC, id`
     );
     // Se cuenta en JavaScript y no con un JOIN: así no se compara usuarios.rol con
     // roles.clave en SQL (ver la collation de roles en auto-migrate.js).
@@ -1080,11 +1028,11 @@ router.post('/roles', async (req, res) => {
     const [[repetido]] = await req.db.query('SELECT id FROM roles WHERE tenant_id = @tenant AND LOWER(nombre) = LOWER(?)', [v.datos.nombre]);
     if (repetido) return invalido(res, 'nombre', 'Ya hay un rol con ese nombre');
     const [r] = await req.db.query(
-      'INSERT INTO roles (clave, nombre, base, descripcion, permisos, de_fabrica) VALUES (NULL, ?, ?, ?, ?, 0)',
+      'INSERT INTO roles (tenant_id, clave, nombre, base, descripcion, permisos, de_fabrica) VALUES (@tenant, NULL, ?, ?, ?, ?, 0)',
       [v.datos.nombre, v.datos.base, v.datos.descripcion, JSON.stringify(v.datos.permisos)]
     );
     registrarEvento('rol_editado', { ip: req.ip, actorId: req.usuario.id, detalle: `Creó el rol «${v.datos.nombre}»` });
-    res.status(201).json({ data: await cargarRol(r.insertId), message: `Rol «${v.datos.nombre}» creado` });
+    res.status(201).json({ data: await cargarRol(req.db, r.insertId), message: `Rol «${v.datos.nombre}» creado` });
   } catch (err) {
     fail(res, err);
   }
@@ -1094,7 +1042,7 @@ router.post('/roles', async (req, res) => {
 // descripción). La base no cambia: movería de pantalla a todos los que lo tienen.
 router.put('/roles/:id', async (req, res) => {
   try {
-    const rol = await cargarRol(req.params.id);
+    const rol = await cargarRol(req.db, req.params.id);
     if (!rol) return res.status(404).json({ error: 'Rol no encontrado' });
     if (rol.de_fabrica && !FABRICA_EDITABLE.includes(rol.clave)) {
       return res.status(409).json({ error: `El rol ${rol.nombre} no se puede cambiar` });
@@ -1112,7 +1060,7 @@ router.put('/roles/:id', async (req, res) => {
       [v.datos.nombre, v.datos.descripcion, JSON.stringify(v.datos.permisos), rol.id]
     );
     registrarEvento('rol_editado', { ip: req.ip, actorId: req.usuario.id, detalle: `Cambió las casillas de «${v.datos.nombre}»` });
-    res.json({ data: await cargarRol(rol.id), message: `Rol «${v.datos.nombre}» guardado` });
+    res.json({ data: await cargarRol(req.db, rol.id), message: `Rol «${v.datos.nombre}» guardado` });
   } catch (err) {
     fail(res, err);
   }
@@ -1122,7 +1070,7 @@ router.put('/roles/:id', async (req, res) => {
 // siempre.
 router.post('/roles/:id/restablecer', async (req, res) => {
   try {
-    const rol = await cargarRol(req.params.id);
+    const rol = await cargarRol(req.db, req.params.id);
     if (!rol) return res.status(404).json({ error: 'Rol no encontrado' });
     const original = ROLES_FABRICA.find((r) => r.clave === rol.clave);
     if (!rol.de_fabrica || !original || !FABRICA_EDITABLE.includes(rol.clave)) {
@@ -1130,7 +1078,7 @@ router.post('/roles/:id/restablecer', async (req, res) => {
     }
     await req.db.query('UPDATE roles SET permisos = ? WHERE tenant_id = @tenant AND id = ?', [JSON.stringify(original.permisos), rol.id]);
     registrarEvento('rol_editado', { ip: req.ip, actorId: req.usuario.id, detalle: `Volvió «${rol.nombre}» a las casillas de fábrica` });
-    res.json({ data: await cargarRol(rol.id), message: `${rol.nombre} volvió a sus casillas de fábrica` });
+    res.json({ data: await cargarRol(req.db, rol.id), message: `${rol.nombre} volvió a sus casillas de fábrica` });
   } catch (err) {
     fail(res, err);
   }
@@ -1140,7 +1088,7 @@ router.post('/roles/:id/restablecer', async (req, res) => {
 // primero hay que pasarlo a otro rol. Los inactivos que lo tenían vuelven al de fábrica.
 router.delete('/roles/:id', async (req, res) => {
   try {
-    const rol = await cargarRol(req.params.id);
+    const rol = await cargarRol(req.db, req.params.id);
     if (!rol) return res.status(404).json({ error: 'Rol no encontrado' });
     if (rol.de_fabrica) return res.status(409).json({ error: 'Los roles de fábrica no se pueden eliminar' });
     const [[{ n }]] = await req.db.query('SELECT COUNT(*) AS n FROM usuarios WHERE tenant_id = @tenant AND rol_id = ? AND activo = 1', [rol.id]);
@@ -1171,12 +1119,12 @@ const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
 const HORA_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 // Citas (no canceladas) que caen dentro de un bloqueo.
-async function citasDentroDeBloqueo(b, config) {
+async function citasDentroDeBloqueo(db, b, config) {
   let sql = `SELECT id, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora, duracion_horas
              FROM citas WHERE tenant_id = @tenant AND fecha BETWEEN ? AND ? AND estado <> 'cancelado'`;
   const params = [b.fecha_desde, b.fecha_hasta];
   if (b.sucursal_id) { sql += ' AND sucursal_id = ?'; params.push(b.sucursal_id); }
-  const [citas] = await req.db.query(sql, params);
+  const [citas] = await db.query(sql, params);
   return citas.filter((c) => {
     const horasDia = horasDisponibles(c.fecha, config);
     const tapadas = horasDeBloqueo(b, horasDia);
@@ -1191,15 +1139,16 @@ const SELECT_BLOQUEOS = `
          b.motivo, u.nombre AS creado_por_nombre, b.created_at
   FROM bloqueos_horario b
   LEFT JOIN sucursales s ON s.id = b.sucursal_id AND s.tenant_id = @tenant
-  LEFT JOIN usuarios u ON u.id = b.creado_por AND u.tenant_id = @tenant`;
+  LEFT JOIN usuarios u ON u.id = b.creado_por AND u.tenant_id = @tenant
+  WHERE b.tenant_id = @tenant`;
 
 // GET /api/admin/bloqueos — los que todavía no terminaron, del más próximo al más lejano.
 router.get('/bloqueos', async (req, res) => {
   try {
-    const config = await getConfig();
+    const config = await getConfig(req.db);
     const hoy = fechaLocalISO(config.zona_horaria_offset);
-    const [rows] = await req.db.query(`${SELECT_BLOQUEOS} WHERE b.fecha_hasta >= ? ORDER BY b.fecha_desde, b.hora_desde`, [hoy]);
-    for (const b of rows) b.citas_afectadas = await citasDentroDeBloqueo(b, config);
+    const [rows] = await req.db.query(`${SELECT_BLOQUEOS} AND b.fecha_hasta >= ? ORDER BY b.fecha_desde, b.hora_desde`, [hoy]);
+    for (const b of rows) b.citas_afectadas = await citasDentroDeBloqueo(req.db, b, config);
     res.json({ data: rows });
   } catch (err) {
     fail(res, err);
@@ -1218,7 +1167,7 @@ router.post('/bloqueos', async (req, res) => {
     if (fechasEntre(fechaDesde, fechaHasta).length > MAX_DIAS_BLOQUEO) {
       return invalido(res, 'fecha_hasta', 'Un bloqueo puede durar hasta un año');
     }
-    const config = await getConfig();
+    const config = await getConfig(req.db);
     if (fechaHasta < fechaLocalISO(config.zona_horaria_offset)) {
       return invalido(res, 'fecha_desde', 'Esas fechas ya pasaron');
     }
@@ -1241,12 +1190,12 @@ router.post('/bloqueos', async (req, res) => {
     if (motivo.length > 150) return invalido(res, 'motivo', 'El motivo no puede pasar de 150 caracteres');
 
     const [r] = await req.db.query(
-      `INSERT INTO bloqueos_horario (sucursal_id, fecha_desde, fecha_hasta, hora_desde, hora_hasta, motivo, creado_por)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO bloqueos_horario (tenant_id, sucursal_id, fecha_desde, fecha_hasta, hora_desde, hora_hasta, motivo, creado_por)
+       VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?)`,
       [sucursalId, fechaDesde, fechaHasta, horaDesde, horaHasta, motivo, req.usuario.id]
     );
-    const [[nuevo]] = await req.db.query(`${SELECT_BLOQUEOS} WHERE b.id = ?`, [r.insertId]);
-    nuevo.citas_afectadas = await citasDentroDeBloqueo(nuevo, config);
+    const [[nuevo]] = await req.db.query(`${SELECT_BLOQUEOS} AND b.id = ?`, [r.insertId]);
+    nuevo.citas_afectadas = await citasDentroDeBloqueo(req.db, nuevo, config);
     res.status(201).json({ data: nuevo, message: 'Horario bloqueado' });
   } catch (err) {
     fail(res, err);
@@ -1260,15 +1209,16 @@ router.post('/bloqueos', async (req, res) => {
 // ese día; y los de ley que todavía no se marcaron.
 router.get('/feriados', async (req, res) => {
   try {
-    const config = await getConfig();
+    const config = await getConfig(req.db);
     const hoy = fechaLocalISO(config.zona_horaria_offset);
     const [rows] = await req.db.query(
       `SELECT f.id, f.mes, f.dia, f.nombre, f.sucursal_id, s.nombre AS sucursal_nombre
-       FROM feriados f LEFT JOIN sucursales s ON s.id = f.sucursal_id ORDER BY f.mes, f.dia AND s.tenant_id = @tenant`
+       FROM feriados f LEFT JOIN sucursales s ON s.id = f.sucursal_id AND s.tenant_id = @tenant
+       WHERE f.tenant_id = @tenant ORDER BY f.mes, f.dia`
     );
     for (const f of rows) {
       f.proxima = proximaFecha(f.mes, f.dia, hoy);
-      let sql = "SELECT COUNT(*) AS n FROM citas WHERE fecha = ? AND estado <> 'cancelado'";
+      let sql = "SELECT COUNT(*) AS n FROM citas WHERE tenant_id = @tenant AND fecha = ? AND estado <> 'cancelado'";
       const params = [f.proxima];
       if (f.sucursal_id) { sql += ' AND sucursal_id = ?'; params.push(f.sucursal_id); }
       const [[c]] = await req.db.query(sql, params);
@@ -1289,7 +1239,7 @@ router.post('/feriados', async (req, res) => {
   try {
     const lista = Array.isArray(req.body?.lista) ? req.body.lista : [req.body || {}];
     if (!lista.length || lista.length > 40) return invalido(res, 'lista', 'Elegí al menos un feriado');
-    const [actuales] = await req.db.query('SELECT mes, dia, sucursal_id FROM feriados');
+    const [actuales] = await req.db.query('SELECT mes, dia, sucursal_id FROM feriados WHERE tenant_id = @tenant');
     const nuevos = [];
     for (const f of lista) {
       const mes = Number(f.mes);
@@ -1309,7 +1259,7 @@ router.post('/feriados', async (req, res) => {
       nuevos.push({ mes, dia, nombre, sucursal_id: sucursalId });
     }
     for (const f of nuevos) {
-      await req.db.query('INSERT INTO feriados (mes, dia, nombre, sucursal_id, creado_por) VALUES (?, ?, ?, ?, ?)',
+      await req.db.query('INSERT INTO feriados (tenant_id, mes, dia, nombre, sucursal_id, creado_por) VALUES (@tenant, ?, ?, ?, ?, ?)',
         [f.mes, f.dia, f.nombre, f.sucursal_id, req.usuario.id]);
     }
     const n = nuevos.length;

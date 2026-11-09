@@ -7,6 +7,7 @@
 // corría. La configuración de un taller depende de lo que ESE taller declaró al
 // registrarse, así que su lugar natural es el alta, no el boot.
 const bcrypt = require('bcrypt');
+const { ROLES_FABRICA } = require('./permisos');
 const { DEFAULTS } = require('./configuracion');
 const { normalizarTipos } = require('./tipos-vehiculo');
 const { finDeTrial } = require('./limites');
@@ -117,6 +118,14 @@ async function crearTaller(conn, datos) {
       JSON.stringify(tipos),
     ]
   );
+
+  // Sus propios roles de fábrica: los ajustes de una empresa no le llegan a otra.
+  for (const r of ROLES_FABRICA) {
+    await conn.query(
+      'INSERT INTO roles (tenant_id, clave, nombre, base, descripcion, permisos, de_fabrica) VALUES (?, ?, ?, ?, ?, ?, 1)',
+      [tenantId, r.clave, r.nombre, r.base, r.descripcion, JSON.stringify(r.permisos)]
+    );
+  }
 
   // 3) Primera sucursal. El sistema asume que hay al menos una: sin ella el portal
   //    no puede ofrecer dónde agendar.

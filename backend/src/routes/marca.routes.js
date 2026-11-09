@@ -64,6 +64,7 @@ router.get('/logo', tenantPublico, async (req, res) => {
 // (nombre, logo, color): nada que no publicaría en su puerta.
 router.get('/publica', tenantPublico, async (req, res) => {
   try {
+    if (!req.db) return res.status(400).json({ error: 'Falta indicar el taller' });
     const c = await getConfig(req.db);
     res.json({
       data: {
@@ -83,9 +84,10 @@ router.get('/publica', tenantPublico, async (req, res) => {
 // dirección de Configuración). Público a propósito: lo muestra la política de
 // privacidad del portal, que se lee antes de tener cuenta. Es lo mismo que el taller
 // le da a cualquier cliente; nada de lo demás de la configuración sale de aquí.
-router.get('/contacto', async (req, res) => {
+router.get('/contacto', tenantPublico, async (req, res) => {
+  if (!req.db) return res.status(400).json({ error: 'Falta indicar el taller' });
   try {
-    const c = await getConfig();
+    const c = await getConfig(req.db);
     res.setHeader('Cache-Control', 'no-cache');
     res.json({
       data: {
@@ -103,9 +105,10 @@ router.get('/contacto', async (req, res) => {
 // GET /api/marca/portal — los textos del portal que escribió el taller: el aviso de
 // bienvenida y las condiciones del servicio. Público: los Términos se leen antes de
 // tener cuenta. Vacío = el portal usa los de fábrica.
-router.get('/portal', async (req, res) => {
+router.get('/portal', tenantPublico, async (req, res) => {
+  if (!req.db) return res.status(400).json({ error: 'Falta indicar el taller' });
   try {
-    const c = await getConfig();
+    const c = await getConfig(req.db);
     res.setHeader('Cache-Control', 'no-cache');
     res.json({ data: c.portal_textos });
   } catch (err) {

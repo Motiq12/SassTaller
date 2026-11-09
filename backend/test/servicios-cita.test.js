@@ -19,10 +19,10 @@ test('al editar, sin servicios en el pedido se conservan los que tenía', () => 
 });
 
 test('el portal exige al menos uno; nadie pasa del máximo', async () => {
-  assert.equal(await problemaConServicios([], { obligatorio: true }), 'Elige al menos un servicio');
-  assert.equal(await problemaConServicios([]), null);
+  assert.equal(await problemaConServicios({}, [], { obligatorio: true }), 'Elige al menos un servicio');
+  assert.equal(await problemaConServicios({}, []), null);
   const demasiados = Array.from({ length: MAX_SERVICIOS_CITA + 1 }, (_, i) => `Servicio ${i}`);
-  assert.match(await problemaConServicios(demasiados), /hasta/);
+  assert.match(await problemaConServicios({}, demasiados), /hasta/);
 });
 
 test('el texto para mostrar une los servicios con +', () => {

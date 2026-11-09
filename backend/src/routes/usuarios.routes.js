@@ -17,8 +17,8 @@ const { topeAlcanzado } = require('../utils/cuenta');
 router.use(auth, requireRol('admin'));
 
 // Normaliza el sucursal_id del body: id válido (activo) o null = "atiende ambas".
-async function sucursalDelBody(valor) {
-  return (await sucursalValida(valor)) ? Number(valor) : null;
+async function sucursalDelBody(db, valor) {
+  return (await sucursalValida(db, valor)) ? Number(valor) : null;
 }
 
 // Roles válidos del personal (debe coincidir con el ENUM de la tabla usuarios).
@@ -36,9 +36,9 @@ function permisosParaGuardar(rol, valor) {
 // tabla roles, o vacío para el de fábrica de su rol. Un rol propio decide también el
 // rol del sistema (la pantalla que usa): uno de Mostrador es 'recepcion' y uno de
 // Taller es 'tecnico'. Devuelve { rol, rol_id } o { error }.
-async function rolDelBody(rol, valor) {
+async function rolDelBody(db, rol, valor) {
   if (valor === undefined || valor === null || valor === '' || Number(valor) === 0) return { rol, rol_id: null };
-  const [[r]] = await req.db.query('SELECT id, clave, base, de_fabrica FROM roles WHERE id = ?', [Number(valor) || 0]);
+  const [[r]] = await db.query('SELECT id, clave, base, de_fabrica FROM roles WHERE id = ? AND tenant_id = @tenant', [Number(valor) || 0]);
   if (!r) return { error: 'Ese rol ya no existe' };
   // Uno de fábrica es lo mismo que no tener rol propio.
   if (r.de_fabrica) return { rol: ROL_DE_BASE[r.base] || rol, rol_id: null };
@@ -78,10 +78,10 @@ router.post('/', async (req, res) => {
     if (faltante(res, req.body, [['nombre', 'el nombre'], ['email', 'el correo'], ['password', 'la contraseña'], ['rol', 'el rol']])) return;
     if (!emailValido(email)) return invalido(res, 'email', 'El correo no tiene un formato válido');
     // La política de Configuración → Seguridad (utils/contrasena.js).
-    const malaClave = problemaDeContrasena(password, politica(await getConfig()), { email, nombre });
+    const malaClave = problemaDeContrasena(password, politica(await getConfig(req.db)), { email, nombre });
     if (malaClave) return invalido(res, 'password', malaClave);
     if (!ROLES.includes(rol)) return invalido(res, 'rol', 'Rol no válido');
-    const elegido = await rolDelBody(rol, req.body.rol_id);
+    const elegido = await rolDelBody(req.db, rol, req.body.rol_id);
     if (elegido.error) return invalido(res, 'rol', elegido.error);
 
     // Tope del plan. Se comprueba antes del hash: bcrypt cuesta ~100ms y no tiene
@@ -92,7 +92,7 @@ router.post('/', async (req, res) => {
     if (tope) return res.status(402).json({ error: tope, tope: 'usuarios' });
 
     const hash = await bcrypt.hash(password, 10);
-    const sucursal_id = await sucursalDelBody(req.body.sucursal_id);
+    const sucursal_id = await sucursalDelBody(req.db, req.body.sucursal_id);
     const [result] = await req.db.query(
       'INSERT INTO usuarios (tenant_id, nombre, email, password_hash, rol, rol_id, telefono, sucursal_id, permisos_web) VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, ?)',
       [nombre, email, hash, elegido.rol, elegido.rol_id, telefono || null, sucursal_id, permisosParaGuardar(elegido.rol, req.body.permisos_web)]
@@ -125,14 +125,14 @@ router.put('/:id', async (req, res) => {
       );
       rolIdPedido = actual && actual.rol_id && ROL_DE_BASE[actual.base] === req.body.rol ? actual.rol_id : null;
     }
-    const elegido = await rolDelBody(req.body.rol, rolIdPedido);
+    const elegido = await rolDelBody(req.db, req.body.rol, rolIdPedido);
     if (elegido.error) return invalido(res, 'rol', elegido.error);
     const rol = elegido.rol;
     // Anti-lockout: el admin logueado no puede quitarse a sí mismo el rol admin.
     if (Number(req.params.id) === req.usuario.id && rol !== 'admin') {
       return invalido(res, 'rol', 'No podés cambiar tu propio rol de administrador');
     }
-    const sucursal_id = await sucursalDelBody(req.body.sucursal_id);
+    const sucursal_id = await sucursalDelBody(req.db, req.body.sucursal_id);
     const [[antes]] = await req.db.query('SELECT rol, rol_id FROM usuarios WHERE id = ? AND tenant_id = @tenant', [req.params.id]);
     // permisos_web es opcional en el PUT: si el formulario no lo manda, se conservan.
     const camposPermisos = 'permisos_web' in req.body ? ', permisos_web=?' : '';
@@ -174,7 +174,8 @@ router.patch('/:id/activo', async (req, res) => {
         if (tope) return res.status(402).json({ error: tope, tope: 'usuarios' });
       }
     }
-    await req.db.query('UPDATE usuarios SET activo = ? WHERE id = ? AND tenant_id = @tenant', [activo ? 1 : 0, req.params.id]);
+    const [hecho] = await req.db.query('UPDATE usuarios SET activo = ? WHERE id = ? AND tenant_id = @tenant', [activo ? 1 : 0, req.params.id]);
+    if (!hecho.affectedRows) return res.status(404).json({ error: 'Usuario no encontrado' });
     olvidar(req.params.id); // desactivado: deja de entrar en el próximo pedido
     registrarEvento(activo ? 'usuario_activado' : 'usuario_desactivado', { ip: req.ip, usuarioId: Number(req.params.id), actorId: req.usuario.id });
     res.json({ message: activo ? 'Usuario activado' : 'Usuario desactivado' });
@@ -186,7 +187,7 @@ router.patch('/:id/activo', async (req, res) => {
 // PATCH /:id/sucursal — cambia el local de un empleado desde la lista (null = Ambas).
 router.patch('/:id/sucursal', async (req, res) => {
   try {
-    const sucursal_id = await sucursalDelBody(req.body.sucursal_id);
+    const sucursal_id = await sucursalDelBody(req.db, req.body.sucursal_id);
     const [result] = await req.db.query('UPDATE usuarios SET sucursal_id = ? WHERE id = ? AND tenant_id = @tenant', [sucursal_id, req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ error: 'Usuario no encontrado' });
     res.json({ data: { sucursal_id }, message: 'Sucursal actualizada' });
