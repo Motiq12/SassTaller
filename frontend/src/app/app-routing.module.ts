@@ -4,10 +4,17 @@ import { PrecargaPorRol } from './shared/precarga-por-rol';
 import { AuthGuard } from './guards/auth.guard';
 import { RolHomeGuard } from './guards/rol-home.guard';
 import { RolGuard } from './guards/rol.guard';
+import { InicioGuard } from './guards/inicio.guard';
 import { PanelAdminGuard } from './guards/panel-admin.guard';
 
 const routes: Routes = [
-  { path: '', redirectTo: 'tabs', pathMatch: 'full' },
+  // La raíz es la portada pública. InicioGuard manda a su panel a quien ya tenga sesión.
+  {
+    path: '',
+    pathMatch: 'full',
+    canActivate: [InicioGuard],
+    loadChildren: () => import('./pages/landing/landing.module').then(m => m.LandingPageModule),
+  },
   // Login unificado (personal + clientes): vive en /portal/login. /login redirige ahí.
   { path: 'login', redirectTo: 'portal/login', pathMatch: 'full' },
     // Alta de un taller nuevo en el SaaS. Pública y sin guard a propósito: quien entra

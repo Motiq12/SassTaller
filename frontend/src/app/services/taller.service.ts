@@ -155,6 +155,10 @@ export class TallerService {
     nombre: string;
     slug?: string;
     tipos: string[];
+    logo?: string | null;
+    color_primario?: string | null;
+    razon_social?: string;
+    cedula_juridica?: string;
     admin: { nombre: string; email: string; password: string; telefono?: string };
     contacto?: { telefono?: string; direccion?: string };
     sucursal?: { nombre?: string };

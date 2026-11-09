@@ -1,10 +1,11 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Capacitor } from '@capacitor/core';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { Usuario, LoginResponse } from '../models/usuario.model';
 import { secureGet, secureSet, secureRemove } from '../shared/secure-store.util';
+import { TallerService } from './taller.service';
 
 const TOKEN_KEY = 'tallerms_token';
 const USUARIO_KEY = 'tallerms_usuario';
@@ -32,7 +33,18 @@ export class AuthService {
 
   usuario$ = this.usuarioSubject.asObservable();
 
+  private taller = inject(TallerService);
+
   constructor(private http: HttpClient) {}
+
+  // Confirmación del correo del personal: es la única vía para recuperar la contraseña.
+  enviarCodigoCorreo(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/verificar-correo/enviar`, {});
+  }
+
+  confirmarCorreo(codigo: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/verificar-correo`, { codigo });
+  }
 
   // Hidrata la sesión desde el Keychain/Keystore en plataforma nativa. Se llama desde
   // un APP_INITIALIZER (app.module.ts) para que termine ANTES de que arranquen los
@@ -47,7 +59,7 @@ export class AuthService {
   }
 
   login(email: string, password: string): Observable<{ data: LoginResponse }> {
-    return this.http.post<{ data: LoginResponse }>(`${this.apiUrl}/auth/login`, { email, password }).pipe(
+    return this.http.post<{ data: LoginResponse }>(`${this.apiUrl}/auth/login`, this.taller.conTaller({ email, password })).pipe(
       tap(res => this.guardarSesion(res.data.token, res.data.usuario))
     );
   }
@@ -56,7 +68,7 @@ export class AuthService {
   // Si el usuario tiene verificación en dos pasos, la respuesta NO trae sesión:
   // llega `requiere_2fa` + `token_parcial` para canjear en verificar2FA().
   loginUnificado(email: string, password: string): Observable<{ data: LoginUnificadoResp }> {
-    return this.http.post<{ data: LoginUnificadoResp }>(`${this.apiUrl}/auth/login`, { email, password });
+    return this.http.post<{ data: LoginUnificadoResp }>(`${this.apiUrl}/auth/login`, this.taller.conTaller({ email, password }));
   }
 
   // ── Verificación en dos pasos (personal) ──

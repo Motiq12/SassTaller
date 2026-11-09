@@ -74,7 +74,7 @@ function motivoSlugInvalido(slug) {
 //
 // `conn` debe ser una conexión con transacción ya abierta. Devuelve { tenantId, adminId }.
 async function crearTaller(conn, datos) {
-  const { nombre, slug, plan = 'trial', admin, sucursal, contacto = {} } = datos;
+  const { nombre, slug, plan = 'trial', admin, sucursal, contacto = {}, marca = {} } = datos;
   // Tipos que atiende el taller. normalizarTipos nunca devuelve vacío: un taller sin
   // ningún tipo no podría registrar vehículos.
   const tipos = normalizarTipos(datos.tipos);
@@ -107,8 +107,8 @@ async function crearTaller(conn, datos) {
        (tenant_id, id, nombre_taller, telefono, email, direccion,
         max_citas_hora, dias_anticipacion, duracion_cita_min, cancelacion_horas_min,
         horarios, garantia_dias, metodos_pago, visitas_para_cortesia, zona_horaria_offset,
-        tipos_vehiculo)
-     VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        tipos_vehiculo, logo, color_primario, razon_social, cedula_juridica)
+     VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       tenantId, nombre, contacto.telefono || '', contacto.email || admin.email, contacto.direccion || '',
       DEFAULTS.max_citas_hora, DEFAULTS.dias_anticipacion, DEFAULTS.duracion_cita_min,
@@ -116,6 +116,7 @@ async function crearTaller(conn, datos) {
       DEFAULTS.garantia_dias, JSON.stringify(DEFAULTS.metodos_pago),
       DEFAULTS.visitas_para_cortesia, DEFAULTS.zona_horaria_offset,
       JSON.stringify(tipos),
+      marca.logo || null, marca.color || null, marca.razonSocial || null, marca.cedulaJuridica || null,
     ]
   );
 

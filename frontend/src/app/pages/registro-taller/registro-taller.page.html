@@ -1,7 +1,7 @@
 <ion-header class="ion-no-border">
   <ion-toolbar>
     <ion-buttons slot="start">
-      <ion-back-button defaultHref="/portal/login" text="Volver"></ion-back-button>
+      <ion-back-button defaultHref="/" text="Volver"></ion-back-button>
     </ion-buttons>
     <ion-title>{{ producto.nombre }}</ion-title>
   </ion-toolbar>
@@ -9,19 +9,19 @@
 
 <ion-content class="ion-padding">
   <div class="registro-wrap">
-    <h1 class="titulo">Registrá tu taller en {{ producto.nombre }}</h1>
+    <h1 class="titulo">Registrá tu empresa en {{ producto.nombre }}</h1>
     <p class="subtitulo">
-      Creás la cuenta y entrás como administrador. Después podés invitar a tu equipo
-      y personalizar el sistema con tu logo y tus colores.
+      Creás la cuenta de tu taller y entrás como administrador. Tus clientes, órdenes y
+      datos quedan separados de los de cualquier otra empresa.
     </p>
 
     <form (ngSubmit)="crear()">
       <ion-list lines="full" class="bloque">
-        <ion-list-header><ion-label>Datos del taller</ion-label></ion-list-header>
+        <ion-list-header><ion-label>Tu empresa</ion-label></ion-list-header>
 
         <ion-item>
           <ion-input
-            label="Nombre del taller" labelPlacement="stacked"
+            label="Nombre de la empresa" labelPlacement="stacked"
             placeholder="Taller Los Andes"
             [(ngModel)]="nombre" name="nombre"
             (ionInput)="onNombre()" required autocomplete="organization"></ion-input>
@@ -85,6 +85,50 @@
       </ion-list>
 
       <ion-list lines="full" class="bloque">
+        <ion-list-header><ion-label>Tu marca</ion-label></ion-list-header>
+        <div class="marca">
+          <div class="marca-logo" [style.border-color]="color">
+            <img *ngIf="logo; else sinLogo" [src]="logo" alt="Vista previa del logo">
+            <ng-template #sinLogo><ion-icon name="image-outline" aria-hidden="true"></ion-icon></ng-template>
+          </div>
+          <div class="marca-acciones">
+            <label class="boton-archivo">
+              {{ logo ? 'Cambiar logo' : 'Subir logo' }}
+              <input type="file" accept="image/png,image/jpeg,image/webp" (change)="elegirLogo($event)">
+            </label>
+            <button type="button" class="quitar" *ngIf="logo" (click)="quitarLogo()">Quitar</button>
+            <p class="ayuda-grupo">PNG, JPG o WebP. Opcional: también podés ponerlo después.</p>
+          </div>
+        </div>
+        <ion-note color="danger" class="aviso" *ngIf="errorLogo" role="alert">{{ errorLogo }}</ion-note>
+
+        <div class="marca-color">
+          <p class="titulo-grupo" id="titulo-color">Color de tu marca</p>
+          <div class="muestras" role="group" aria-labelledby="titulo-color">
+            <button type="button" class="muestra" *ngFor="let c of colores"
+                    [style.background]="c" [class.elegida]="color === c"
+                    [attr.aria-label]="'Color ' + c" [attr.aria-pressed]="color === c"
+                    (click)="color = c"></button>
+            <input type="color" class="muestra-libre" [(ngModel)]="color" name="color" aria-label="Elegir otro color">
+          </div>
+        </div>
+      </ion-list>
+
+      <ion-list lines="full" class="bloque">
+        <ion-list-header><ion-label>Para tus facturas (opcional)</ion-label></ion-list-header>
+        <ion-item>
+          <ion-input
+            label="Razón social" labelPlacement="stacked"
+            [(ngModel)]="razonSocial" name="razonSocial" maxlength="150" autocomplete="organization"></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-input
+            label="Cédula jurídica" labelPlacement="stacked" placeholder="3-101-000000"
+            [(ngModel)]="cedulaJuridica" name="cedulaJuridica" maxlength="30"></ion-input>
+        </ion-item>
+      </ion-list>
+
+      <ion-list lines="full" class="bloque">
         <ion-list-header><ion-label>Tu cuenta de administrador</ion-label></ion-list-header>
 
         <ion-item>
@@ -123,7 +167,7 @@
 
       <ion-button expand="block" type="submit" [disabled]="!puedeEnviar" class="ion-margin-top">
         <ion-spinner name="crescent" *ngIf="enviando"></ion-spinner>
-        <span *ngIf="!enviando">Crear taller</span>
+        <span *ngIf="!enviando">Crear mi empresa</span>
       </ion-button>
 
       <p class="pie">

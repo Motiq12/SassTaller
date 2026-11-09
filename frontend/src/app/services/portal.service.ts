@@ -1,9 +1,10 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Capacitor } from '@capacitor/core';
 import { BehaviorSubject, Observable, of, tap, catchError, throwError, map, shareReplay } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { secureGet, secureSet, secureRemove } from '../shared/secure-store.util';
+import { TallerService } from './taller.service';
 
 export interface ClientePortal {
   id: number;
@@ -53,6 +54,8 @@ export class PortalService {
   private noLeidasSubject = new BehaviorSubject<number>(0);
   noLeidas$ = this.noLeidasSubject.asObservable();
 
+  private taller = inject(TallerService);
+
   constructor(private http: HttpClient) {}
 
   // Hidrata la sesión desde el Keychain/Keystore en plataforma nativa. Se llama desde
@@ -68,7 +71,7 @@ export class PortalService {
   }
 
   login(email: string, password: string): Observable<{ data: { token: string; cliente: ClientePortal } }> {
-    return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/login`, { email, password }).pipe(
+    return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/login`, this.taller.conTaller({ email, password })).pipe(
       tap(res => this.guardarSesion(res.data.token, res.data.cliente))
     );
   }
@@ -90,14 +93,14 @@ export class PortalService {
   // Con el token del botón: si la cuenta existe, entra (guarda la sesión); si no,
   // devuelve el pase para completar teléfono y cédula.
   conGoogle(credential: string): Observable<RespuestaGoogle> {
-    return this.http.post<{ data: RespuestaGoogle }>(`${this.url}/google`, { credential }).pipe(
+    return this.http.post<{ data: RespuestaGoogle }>(`${this.url}/google`, this.taller.conTaller({ credential })).pipe(
       map(r => r.data),
       tap(d => { if (d.token && d.cliente) this.guardarSesion(d.token, d.cliente); }),
     );
   }
 
   completarGoogle(data: { pase_google: string; nombre: string; apellido: string; telefono: string; cedula: string }): Observable<{ data: { token: string; cliente: ClientePortal } }> {
-    return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/google/completar`, data).pipe(
+    return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/google/completar`, this.taller.conTaller(data)).pipe(
       tap(res => this.guardarSesion(res.data.token, res.data.cliente))
     );
   }
@@ -110,36 +113,36 @@ export class PortalService {
 
   // Paso 2 del registro: confirma el código de 6 dígitos y recién ahí entra (auto-login).
   verificarRegistro(email: string, codigo: string): Observable<{ data: { token: string; cliente: ClientePortal } }> {
-    return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/registro/verificar`, { email, codigo }).pipe(
+    return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/registro/verificar`, this.taller.conTaller({ email, codigo })).pipe(
       tap(res => this.guardarSesion(res.data.token, res.data.cliente))
     );
   }
 
   // Pide un código de verificación nuevo (no llegó / venció). Respuesta genérica.
   reenviarVerificacion(email: string, antibot: AntiBot = {}): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.url}/registro/reenviar`, { email, ...antibot });
+    return this.http.post<{ message: string }>(`${this.url}/registro/reenviar`, this.taller.conTaller({ email, ...antibot }));
   }
 
   // Paso 1: pide que envíen un código de recuperación al correo (respuesta genérica).
   solicitarCodigo(email: string, antibot: AntiBot = {}): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.url}/recuperar/solicitar`, { email, ...antibot });
+    return this.http.post<{ message: string }>(`${this.url}/recuperar/solicitar`, this.taller.conTaller({ email, ...antibot }));
   }
 
   // Paso 2: valida el código y define la nueva contraseña (auto-login).
   confirmarRecuperacion(data: { email: string; codigo: string; password: string }): Observable<{ data: { token: string; cliente: ClientePortal } }> {
-    return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/recuperar/confirmar`, data).pipe(
+    return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/recuperar/confirmar`, this.taller.conTaller(data)).pipe(
       tap(res => this.guardarSesion(res.data.token, res.data.cliente))
     );
   }
 
   // Ingreso sin contraseña (OTP). Paso 1: pide el código al correo (respuesta genérica).
   solicitarCodigoLogin(email: string, antibot: AntiBot = {}): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.url}/otp/solicitar`, { email, ...antibot });
+    return this.http.post<{ message: string }>(`${this.url}/otp/solicitar`, this.taller.conTaller({ email, ...antibot }));
   }
 
   // Paso 2: valida el código y entra (auto-login, guarda la sesión).
   verificarCodigoLogin(email: string, codigo: string): Observable<{ data: { token: string; cliente: ClientePortal } }> {
-    return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/otp/verificar`, { email, codigo }).pipe(
+    return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/otp/verificar`, this.taller.conTaller({ email, codigo })).pipe(
       tap(res => this.guardarSesion(res.data.token, res.data.cliente))
     );
   }
@@ -202,19 +205,19 @@ export class PortalService {
   }
 
   getMotos(): Observable<{ data: any[] }> {
-    return this.conCache('motos', this.http.get<{ data: any[] }>(`${this.url}/motos`));
+    return this.conCache('motos', this.http.get<{ data: any[] }>(`${this.url}/vehiculos`));
   }
 
   crearMoto(data: { marca: string; modelo: string; placa: string; anio?: number | null; color?: string; kilometraje_actual?: number | null; foto?: string | null }): Observable<{ data: any }> {
-    return this.http.post<{ data: any }>(`${this.url}/motos`, data);
+    return this.http.post<{ data: any }>(`${this.url}/vehiculos`, data);
   }
 
   editarMoto(id: number, data: { marca: string; modelo: string; placa: string; anio?: number | null; color?: string; kilometraje_actual?: number | null; foto?: string | null }): Observable<{ data: any }> {
-    return this.http.put<{ data: any }>(`${this.url}/motos/${id}`, data);
+    return this.http.put<{ data: any }>(`${this.url}/vehiculos/${id}`, data);
   }
 
   eliminarMoto(id: number): Observable<any> {
-    return this.http.delete(`${this.url}/motos/${id}`);
+    return this.http.delete(`${this.url}/vehiculos/${id}`);
   }
 
   // Cache offline "suave": guarda la última respuesta buena en localStorage y, si la
@@ -314,7 +317,7 @@ export class PortalService {
 
   // Línea de tiempo de servicios de una moto (citas entregadas).
   getMotoHistorial(id: number): Observable<{ data: { moto: any; servicios: any[] } }> {
-    return this.http.get<{ data: any }>(`${this.url}/motos/${id}/historial`);
+    return this.http.get<{ data: any }>(`${this.url}/vehiculos/${id}/historial`);
   }
 
   calificarCita(id: number, calificacion: number, comentario?: string): Observable<any> {

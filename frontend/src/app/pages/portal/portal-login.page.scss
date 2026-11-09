@@ -474,3 +474,14 @@ ion-item + .ayuda { margin: 0 0 12px; }
   .pits-tabs a::after,
   .acceso-form ion-button.btn-principal ion-icon { transition: none; }
 }
+
+.acceso-empresa {
+  margin: 20px 0 0;
+  text-align: center;
+  font-size: 0.95rem;
+
+  a {
+    font-weight: 700;
+    text-decoration: underline;
+  }
+}

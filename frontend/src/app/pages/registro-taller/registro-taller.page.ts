@@ -38,6 +38,17 @@ export class RegistroTallerPage {
   telefono = '';
   direccion = '';
 
+  // La marca: se ve desde el primer minuto en el panel, en el portal de sus clientes,
+  // en las facturas y en los correos. Opcional: se puede poner después.
+  logo: string | null = null;
+  errorLogo = '';
+  color = '#b91c1c';
+  readonly colores = ['#b91c1c', '#c2410c', '#a16207', '#15803d', '#0f766e', '#1d4ed8', '#6d28d9', '#27272a'];
+
+  // Para sus facturas. Opcional.
+  razonSocial = '';
+  cedulaJuridica = '';
+
   // Qué vehículos atiende. Define su catálogo de servicios inicial, los campos del
   // formulario de vehículo y cómo lo llama la interfaz. Arranca con motos marcado
   // porque es el caso más común y deja el formulario válido desde el inicio; el
@@ -99,6 +110,52 @@ export class RegistroTallerPage {
     });
   }
 
+  // Se achica acá y no en el servidor: una foto de celular pesa varios MB, y el logo se
+  // muestra en un cuadro chico. Cae a 512 px como máximo, sin deformarla.
+  elegirLogo(ev: Event): void {
+    const input = ev.target as HTMLInputElement;
+    const archivo = input.files?.[0];
+    input.value = '';
+    this.errorLogo = '';
+    if (!archivo) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(archivo.type)) {
+      this.errorLogo = 'Elegí una imagen PNG, JPG o WebP.';
+      return;
+    }
+    if (archivo.size > 10 * 1024 * 1024) {
+      this.errorLogo = 'La imagen pesa más de 10 MB.';
+      return;
+    }
+    const url = URL.createObjectURL(archivo);
+    const img = new Image();
+    img.onload = () => {
+      const escala = Math.min(1, 512 / Math.max(img.width, img.height));
+      const lienzo = document.createElement('canvas');
+      lienzo.width = Math.max(1, Math.round(img.width * escala));
+      lienzo.height = Math.max(1, Math.round(img.height * escala));
+      lienzo.getContext('2d')?.drawImage(img, 0, 0, lienzo.width, lienzo.height);
+      URL.revokeObjectURL(url);
+      // PNG conserva el fondo transparente; si queda pesado, WebP.
+      let dato = lienzo.toDataURL('image/png');
+      if (dato.length > 650 * 1024) dato = lienzo.toDataURL('image/webp', 0.85);
+      if (dato.length > 650 * 1024 || !dato.startsWith('data:image/')) {
+        this.errorLogo = 'No pudimos achicar esa imagen. Probá con otra.';
+        return;
+      }
+      this.logo = dato;
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      this.errorLogo = 'No pudimos abrir esa imagen.';
+    };
+    img.src = url;
+  }
+
+  quitarLogo(): void {
+    this.logo = null;
+    this.errorLogo = '';
+  }
+
   // Mientras no toque el campo, el identificador se deriva del nombre del taller:
   // es lo que quiere el 95% de los casos y evita pedirle algo que no entiende.
   onNombre(): void {
@@ -144,6 +201,10 @@ export class RegistroTallerPage {
       nombre: this.nombre.trim(),
       slug: this.slug,
       tipos: this.tiposElegidos,
+      logo: this.logo,
+      color_primario: this.color,
+      razon_social: this.razonSocial.trim(),
+      cedula_juridica: this.cedulaJuridica.trim(),
       admin: {
         nombre: this.adminNombre.trim(),
         email: this.adminEmail.trim().toLowerCase(),

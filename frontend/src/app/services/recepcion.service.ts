@@ -109,7 +109,7 @@ export class RecepcionService {
     return this.http.get<{ data: any }>(`${this.url}/disponibilidad`, { params });
   }
   getMotos(clienteId: number): Observable<{ data: any[] }> {
-    return this.http.get<{ data: any[] }>(`${environment.apiUrl}/motos`, { params: { cliente_id: clienteId } as any });
+    return this.http.get<{ data: any[] }>(`${environment.apiUrl}/vehiculos`, { params: { cliente_id: clienteId } as any });
   }
   crearCita(data: { cliente_id: number; vehiculo_id: number | null; fecha: string; hora: string; motivo: string; servicios: string[]; tecnico_id: number | null; sucursal_id?: number | null; duracion_horas?: number }): Observable<{ data: any }> {
     return this.http.post<{ data: any }>(`${environment.apiUrl}/citas`, data);

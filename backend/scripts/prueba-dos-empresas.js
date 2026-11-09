@@ -80,9 +80,10 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     const [[{ eventoInicial }]] = await db.query('SELECT COALESCE(MAX(id), 0) AS "eventoInicial" FROM eventos_seguridad');
 
     // ── Alta de dos empresas ──
-    const alta = (slug, email) => pedir('POST', '/onboarding', { body: { nombre: `Taller ${slug}`, slug, admin: { nombre: `Dueño ${slug}`, email, password: 'ClaveSegura123' }, tipos: ['auto'] } });
+    const alta = (slug, email, extra = {}) => pedir('POST', '/onboarding', { body: { nombre: `Taller ${slug}`, slug, admin: { nombre: `Dueño ${slug}`, email, password: 'ClaveSegura123' }, tipos: ['auto'], ...extra } });
     const sello = Date.now().toString(36);
-    const ra = await alta(`alfa-${sello}`, `alfa-${sello}@prueba.test`);
+    const LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAEBgIApD5fRAAAAABJRU5ErkJggg==';
+    const ra = await alta(`alfa-${sello}`, `alfa-${sello}@prueba.test`, { logo: LOGO, color_primario: '#15803d', razon_social: 'Alfa S.A.' });
     const rb = await alta(`beta-${sello}`, `beta-${sello}@prueba.test`);
     ok(ra.status === 201, 'se registra la empresa A', ra.json);
     ok(rb.status === 201, 'se registra la empresa B', rb.json);
@@ -289,7 +290,10 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     // ── Portal público de cada una ──
     const pa = await pedir('GET', `/marca/publica?taller=${A.slug}`);
     const pb = await pedir('GET', `/marca/publica?taller=${Bb.slug}`);
-    console.log(`   marca pública A ${pa.status}, B ${pb.status}`);
+    ok(pa.status === 200 && pa.json.data.logo === LOGO && pa.json.data.color_primario === '#15803d', 'A se ve con su logo y su color', pa.json);
+    ok(pb.status === 200 && !pb.json.data.logo && pb.json.data.color_primario !== '#15803d', 'B no recibe la marca de A', pb.json);
+    const logoMalo = await alta(`gamma-${sello}`, `gamma-${sello}@prueba.test`, { logo: 'data:image/svg+xml;base64,PHN2Zz4=' });
+    ok(logoMalo.status === 400, 'un logo SVG se rechaza al registrarse', logoMalo.json);
     const sinTaller = await pedir('GET', '/portal/servicios');
     ok(sinTaller.status >= 400, 'el portal sin decir de qué taller no responde datos', sinTaller.status);
 

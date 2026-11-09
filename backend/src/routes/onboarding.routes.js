@@ -17,6 +17,10 @@ const { nuevoCodigo, VIGENCIA_MIN } = require('../utils/verificacion-usuario');
 const { enviarCodigoCorreoStaff } = require('../services/mailer');
 
 const MIN_PASSWORD = 8;
+// El navegador ya la achica a 512 px antes de mandarla. SVG no: puede llevar código.
+const LOGO_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
+const LOGO_MAX = 700 * 1024;
+const COLOR_RE = /^#[0-9a-f]{6}$/i;
 
 // El código de verificación del dueño, en cuanto el taller existe. Necesita un cliente
 // scopeado al tenant recién creado: el pool sin scope de este archivo es la excepción
@@ -80,6 +84,14 @@ router.post('/', antibot(), async (req, res) => {
       return res.status(400).json({ error: `La contraseña debe tener al menos ${MIN_PASSWORD} caracteres` });
     }
 
+    const { logo, color_primario: color, razon_social: razon, cedula_juridica: cedula } = req.body;
+    if (logo && (typeof logo !== 'string' || logo.length > LOGO_MAX || !LOGO_RE.test(logo))) {
+      return res.status(400).json({ error: 'El logo tiene que ser una imagen PNG, JPG o WebP de menos de 500 KB' });
+    }
+    if (color && !COLOR_RE.test(String(color))) {
+      return res.status(400).json({ error: 'El color no es válido' });
+    }
+
     // El slug se acepta explícito o se deriva del nombre del taller.
     const slug = normalizarSlug(req.body.slug || nombre);
     const motivo = motivoSlugInvalido(slug);
@@ -119,6 +131,12 @@ router.post('/', antibot(), async (req, res) => {
       sucursal,
       tipos: req.body.tipos,
       contacto,
+      marca: {
+        logo: logo || null,
+        color: color ? String(color).toLowerCase() : null,
+        razonSocial: String(razon || '').trim().slice(0, 150) || null,
+        cedulaJuridica: String(cedula || '').trim().slice(0, 30) || null,
+      },
     });
 
     await conn.commit();

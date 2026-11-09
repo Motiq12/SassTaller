@@ -687,11 +687,15 @@ router.put('/configuracion', async (req, res) => {
     // Marca propia según el plan. Si no le toca, logo y color quedan fuera del UPDATE en
     // vez de borrarse: quien los puso en la prueba no los pierde al pasar a gratis.
     const marcaPropia = puedeMarcaPropia(req.db.tenantId);
+    // Solo se toca lo que vino: guardar otra pantalla de Configuración no puede borrar el
+    // logo ni el color que la empresa eligió al registrarse.
+    const tocaLogo = marcaPropia && b.logo !== undefined;
+    const tocaColor = marcaPropia && b.color_primario !== undefined;
 
     await req.db.query(
       `UPDATE configuracion SET
          nombre_taller = ?, telefono = ?, email = ?, direccion = ?,
-         ${marcaPropia ? 'logo = ?, color_primario = ?,' : ''}
+         ${tocaLogo ? 'logo = ?,' : ''} ${tocaColor ? 'color_primario = ?,' : ''}
          razon_social = ?, cedula_juridica = ?, nota_factura = ?,
          pass_min_largo = ?, pass_variedad = ?,
          max_citas_hora = ?, dias_anticipacion = ?, duracion_cita_min = ?, cancelacion_horas_min = ?,
@@ -709,7 +713,8 @@ router.put('/configuracion', async (req, res) => {
         (b.telefono || '').trim() || null,
         (b.email || '').trim() || null,
         (b.direccion || '').trim() || null,
-        ...(marcaPropia ? [b.logo || null, /^#[0-9a-fA-F]{6}$/.test(b.color_primario || '') ? b.color_primario : null] : []),
+        ...(tocaLogo ? [b.logo || null] : []),
+        ...(tocaColor ? [/^#[0-9a-fA-F]{6}$/.test(b.color_primario || '') ? b.color_primario : null] : []),
         texto(b.razon_social, 150),
         texto(b.cedula_juridica, 30),
         texto(b.nota_factura, 300),

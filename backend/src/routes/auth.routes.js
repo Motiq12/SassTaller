@@ -187,7 +187,7 @@ async function casillasDeSesion(usuarioId) {
 router.get('/me', auth, async (req, res) => {
   try {
     const [[usuario]] = await pool.query(
-      'SELECT id, nombre, email, rol, activo, created_at, permisos_web, foto FROM usuarios WHERE id = ?',
+      'SELECT id, nombre, email, rol, activo, email_verificado, created_at, permisos_web, foto FROM usuarios WHERE id = ?',
       [req.usuario.id]
     );
     if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -203,6 +203,8 @@ router.get('/me', auth, async (req, res) => {
         rol_nombre: p.rolNombre,
         preferencias: await preferenciasDe(usuario.id, usuario.rol),
       },
+      // Lo primero que pide la app: el aviso de días de prueba y los topes del plan.
+      cuenta: await resumenCuenta(req.db),
     });
   } catch (err) {
     fail(res, err);

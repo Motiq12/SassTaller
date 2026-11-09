@@ -1,3 +1,5 @@
+import { CuentaFranjaComponent } from './cuenta-franja.component';
+import { ArranqueComponent } from './arranque.component';
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -21,11 +23,11 @@ import { ElegirServiciosComponent } from './elegir-servicios.component';
 import { MarcaLogoComponent } from './marca-logo.component';
 
 @NgModule({
-  declarations: [EstadoLabelPipe, EstadoColorPipe, ChatContactosComponent, ChatHiloComponent, DosFaComponent, VolverWebComponent, EntregarOrdenComponent,
+  declarations: [CuentaFranjaComponent, ArranqueComponent, EstadoLabelPipe, EstadoColorPipe, ChatContactosComponent, ChatHiloComponent, DosFaComponent, VolverWebComponent, EntregarOrdenComponent,
     MisSesionesComponent, MiActividadComponent, MiFirmaComponent, MisPreferenciasComponent, RecortarFotoComponent, PerfilListaComponent,
     ElegirServiciosComponent],
   imports: [CommonModule, FormsModule, IonicModule, RouterModule, MarcaLogoComponent],
-  exports: [
+  exports: [CuentaFranjaComponent, ArranqueComponent, 
     CommonModule, FormsModule, IonicModule, EstadoLabelPipe, EstadoColorPipe,
     ChatContactosComponent, ChatHiloComponent, DosFaComponent, VolverWebComponent,
     MisSesionesComponent, MiActividadComponent, MiFirmaComponent, MisPreferenciasComponent, PerfilListaComponent, MarcaLogoComponent,

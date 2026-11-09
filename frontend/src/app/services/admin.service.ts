@@ -197,4 +197,21 @@ export class AdminService {
   toggleSucursal(id: number, activa: boolean): Observable<{ message: string }> {
     return this.http.patch<{ message: string }>(`${this.url}/sucursales/${id}/activa`, { activa });
   }
+
+  // Primeros pasos de un taller nuevo (ver shared/arranque.component.ts).
+  getArranque(): Observable<{ data: { pasos: any; completo: boolean; oculto: boolean; hay_ejemplo: boolean } }> {
+    return this.http.get<{ data: any }>(`${this.url}/arranque`);
+  }
+
+  ocultarArranque(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.url}/arranque/ocultar`, {});
+  }
+
+  cargarEjemplo(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.url}/ejemplo`, {});
+  }
+
+  borrarEjemplo(): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.url}/ejemplo`);
+  }
 }

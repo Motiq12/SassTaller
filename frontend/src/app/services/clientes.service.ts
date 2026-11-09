@@ -30,7 +30,7 @@ export class ClientesService {
   }
 
   getMotos(id: number): Observable<{ data: Moto[] }> {
-    return this.http.get<{ data: Moto[] }>(`${this.url}/${id}/motos`);
+    return this.http.get<{ data: Moto[] }>(`${this.url}/${id}/vehiculos`);
   }
 
   getOrdenes(id: number): Observable<{ data: Orden[] }> {
