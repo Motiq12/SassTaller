@@ -11,7 +11,7 @@ $fd: 'Outfit', 'Plus Jakarta Sans', sans-serif;
 $fb: 'Plus Jakarta Sans', 'Outfit', sans-serif;
 $fm: 'JetBrains Mono', ui-monospace, monospace;  // taste-skill-ignore: interfaz del producto (data-ui), con las reglas de la app
 
-:host { display: block; }
+:host { display: block; container-type: inline-size; }
 
 .ui {
   position: relative;
@@ -120,6 +120,12 @@ $fm: 'JetBrains Mono', ui-monospace, monospace;  // taste-skill-ignore: interfaz
   &.actual { color: $tinta; }
   .trabajo { font-weight: 600; small { display: block; font-weight: 400; color: $gris; font-size: 11px; } }
   .monto { font-weight: 600; }
+}
+// Tarjeta angosta (teléfono): sin la columna de la fecha, para que entren el estado y
+// el monto.
+@container (max-width: 340px) {
+  .filas li { grid-template-columns: 1fr auto auto; gap: 8px; }
+  .filas li > .gris { display: none; }
 }
 
 // --- Portal ---

@@ -1,0 +1,29 @@
+<div class="menu" [class.abierto]="abierto" [attr.aria-hidden]="!abierto" [attr.inert]="abierto ? null : ''">
+  <div class="fondo" (click)="cerrar.emit()"></div>
+  <div class="panel" role="dialog" aria-modal="true" aria-label="Menú">
+    <div class="arriba">
+      <a class="marca" routerLink="/" (click)="cerrar.emit()">
+        <img [src]="producto.logo" alt="" width="20" height="20" />
+        <span>{{ producto.nombre }}</span>
+      </a>
+      <button #botonCerrar type="button" class="cerrar" (click)="cerrar.emit()" aria-label="Cerrar el menú">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      </button>
+    </div>
+
+    <nav class="enlaces" aria-label="Secciones">
+      <button *ngFor="let e of enlaces; let i = index" type="button" [style.--i]="i" (click)="ir.emit(e.id)">{{ e.texto }}</button>
+    </nav>
+
+    <div class="abajo">
+      <a class="principal" routerLink="/registro-taller" (click)="cerrar.emit()">
+        Probá gratis 30 días
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+      </a>
+      <div class="secundarios">
+        <a routerLink="/portal/login" (click)="cerrar.emit()">Entrar</a>
+        <button type="button" (click)="hablar.emit()">Hablá con nosotros</button>
+      </div>
+    </div>
+  </div>
+</div>

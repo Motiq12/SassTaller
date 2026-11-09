@@ -11,7 +11,9 @@ import { FuncionesComponent } from './partes/funciones.component';
 import { ConfianzaComponent } from './partes/confianza.component';
 import { PreguntasComponent } from './partes/preguntas.component';
 import { PreciosComponent } from './partes/precios.component';
-import { CuponComponent } from './partes/cupon.component';
+import { MenuComponent } from './partes/menu.component';
+import { ContactoComponent } from './partes/contacto.component';
+import { NumerosComponent } from './partes/numeros.component';
 import { PieComponent } from './partes/pie.component';
 
 const routes: Routes = [{ path: '', component: LandingPage }];
@@ -29,7 +31,9 @@ const routes: Routes = [{ path: '', component: LandingPage }];
     ConfianzaComponent,
     PreguntasComponent,
     PreciosComponent,
-    CuponComponent,
+    MenuComponent,
+    ContactoComponent,
+    NumerosComponent,
     PieComponent,
   ],
 })

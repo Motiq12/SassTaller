@@ -2,8 +2,9 @@ import { Component, EventEmitter, Output } from '@angular/core';
 import { PRODUCTO } from '../../../shared/producto';
 
 /**
- * El cierre: la marca en grande, de borde a borde, y la "o" es el disco de freno
- * (el motivo de toda la página). Debajo, los enlaces y una sola acción.
+ * El pie oscuro de Baseline: arriba la última invitación, en el medio las columnas de
+ * enlaces y abajo la marca en grande, de borde a borde. Sin correo ni teléfono: el
+ * contacto es el formulario.
  */
 @Component({
   selector: 'app-lp-pie',
@@ -13,14 +14,7 @@ import { PRODUCTO } from '../../../shared/producto';
 })
 export class PieComponent {
   @Output() ir = new EventEmitter<string>();
+  @Output() hablar = new EventEmitter<void>();
   readonly producto = PRODUCTO;
   readonly anio = new Date().getFullYear();
-  /** Las letras de la marca; la "o" se dibuja como el disco. */
-  readonly letras = [
-    { l: 'M' },
-    { l: 'o', disco: true },
-    { l: 't' },
-    { l: 'i' },
-    { l: 'q' },
-  ];
 }

@@ -1,0 +1,63 @@
+@use 'sistema' as *;
+
+:host { display: block; }
+
+// La banda oscura: una tarjeta negra dentro del marco, con las cuatro cifras.
+.numeros {
+  position: relative;
+  overflow: hidden;
+  margin-top: u(0.75);
+  padding-top: u(4);
+  padding-bottom: u(4);
+  border-radius: $r-tarjeta-lg;
+  background: $noche;
+  color: #fff;
+  @include lados;
+  @media (min-width: 640px) { padding-top: u(5.5); padding-bottom: u(5.5); }
+  // Un brillo carmesí apenas, desde la esquina: el mismo del disco de la portada.
+  &::before {
+    content: '';
+    position: absolute;
+    right: -20%;
+    top: -40%;
+    width: 70%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(225, 29, 72, 0.22), transparent);
+    pointer-events: none;
+  }
+}
+.cabeza { position: relative; }
+.rotulo { @include rotulo(claro); @include entrada(u(0.75)); }
+.titulo { @include titulo-seccion; font-size: min(max(34px, #{u(3)}), 10.5vw); @include lineas; }
+
+.celdas {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: u(2) u(1.25);
+  margin: u(3) 0 0;
+  @media (min-width: 1024px) { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: u(2); margin-top: u(4.5); }
+}
+.celda {
+  padding-top: u(1.25);
+  border-top: 1px solid blanco(0.18);
+  @include entrada(u(1.25));
+}
+dt { display: grid; gap: 6px; }
+.valor {
+  font-family: $fd;
+  font-size: max(52px, #{u(5)});
+  font-weight: 600;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.rot {
+  font-size: max(12px, #{u(0.75)});
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: $carmesi-claro;
+}
+dd { margin: u(0.75) 0 0; max-width: 16rem; font-size: max(14px, #{u(0.9)}); line-height: 1.55; color: blanco(0.72); }

@@ -1,71 +1,116 @@
-@use 'base' as *;
+@use 'sistema' as *;
 
 :host { display: block; }
 
-.precios { padding: $entre-secciones $margen 0; }
-
-h2 { @include titulo($t-seccion); max-width: 16ch; @include entrada; }
+.precios {
+  padding-top: u(4);
+  padding-bottom: u(4);
+  @include lados;
+  @media (min-width: 640px) { padding-top: u(5); padding-bottom: u(5); }
+}
 .oculto { @include oculto; }
+.rotulo { @include rotulo; @include entrada(u(0.75)); }
+.titulo { @include titulo-seccion; font-size: min(max(34px, #{u(3)}), 10.5vw); @include lineas; }
 
-// --- Escritorio: la tabla -----------------------------------------------------------
-.tabla-marco { margin-top: clamp(48px, 6vw, 80px); @include entrada; }
+// ── Escritorio: la tabla, dentro de una tarjeta gris ─────────────────────────────
+.tabla-marco {
+  display: none;
+  margin-top: u(3);
+  padding: u(1) u(1.5) u(1.5);
+  border-radius: $r-tarjeta-lg;
+  background: $superficie;
+  @include entrada(u(1.5));
+  @media (min-width: 900px) { display: block; }
+}
 .tabla {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  table-layout: fixed;
-  font-family: $fb;
-  font-size: $t-texto;
+  font-size: max(14px, #{u(0.9)});
+  th, td { padding: u(0.875) u(1); text-align: left; vertical-align: top; }
+  thead th { padding-top: u(1.5); padding-bottom: u(1.5); }
+  tbody th { width: 30%; font-weight: 500; color: $tinta-suave; }
+  tbody tr + tr th, tbody tr + tr td { border-top: 1px solid $linea; }
+  tbody td { color: $tinta; font-weight: 500; }
+  // La columna del plan Gratis va en blanco, como la tarjeta destacada.
+  .medio { background: $papel; }
+  thead .medio { border-radius: $r-tarjeta $r-tarjeta 0 0; }
+  tfoot .medio { border-radius: 0 0 $r-tarjeta $r-tarjeta; }
+  tfoot td { padding-top: u(1.25); padding-bottom: u(1.5); }
+}
+.nombre {
+  display: block;
+  font-size: max(12px, #{u(0.75)});
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: $tinta-suave;
+}
+.precio {
+  display: block;
+  margin-top: u(0.5);
+  font-family: $fd;
+  font-size: max(36px, #{u(3)});
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.03em;
   color: $tinta;
-  th, td { padding: 18px 20px; text-align: left; vertical-align: middle; }
-  thead th { padding-top: 28px; padding-bottom: 24px; vertical-align: bottom; }
-  tbody th { width: 28%; font-weight: 600; color: $suave; }
-  // Separador de filas de una tabla de datos: la línea es la tabla, no un adorno.
-  tbody tr + tr > * { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07); }   // taste-skill-ignore: separador de filas de tabla
-  // La columna del medio (Gratis) sobre el escalón de tono: es donde queda el taller.
-  .medio { background: $suelo-2; }
-  thead .medio { border-radius: 24px 24px 0 0; }
-  tfoot .medio { border-radius: 0 0 24px 24px; }
-  tfoot td { padding-top: 24px; padding-bottom: 28px; }
 }
-.nombre, .precio, .plazo { display: block; }
-.nombre { font-family: $fd; font-size: $t-lista; font-weight: 700; letter-spacing: -0.03em; }
-.precio { margin-top: 10px; font-family: $fd; font-size: clamp(40px, 4vw, 64px); font-weight: 700; letter-spacing: -0.04em; line-height: 1; }
-.plazo { margin-top: 8px; font-size: $t-chica; font-weight: 500; color: $suave; }
+.plazo { display: block; margin-top: 6px; font-size: max(14px, #{u(0.85)}); font-weight: 500; color: $tinta-suave; }
 
-.accion {
-  @include boton;
-  width: 100%;
-  box-sizing: border-box;
-  text-align: center;
-  &.secundaria { @include boton($suelo-3, $tinta); width: 100%; box-sizing: border-box; }
+.accion { width: 100%; @include pildora(tinta); }
+.accion.secundaria { width: 100%; @include pildora(contorno); }
+
+// ── Teléfono: un plan debajo del otro ────────────────────────────────────────────
+.planes-movil {
+  display: grid;
+  gap: u(0.75);
+  margin-top: u(2.5);
+  @media (min-width: 900px) { display: none; }
 }
-
-// --- Teléfono: un plan debajo del otro ----------------------------------------------
-.planes-movil { display: none; }
-
-.dia31 {
-  margin-top: 48px;
-  max-width: 60ch;
-  @include entrada;
-  h3 { margin: 0 0 10px; font-family: $fd; font-size: clamp(24px, 2.2vw, 32px); font-weight: 700; letter-spacing: -0.02em; color: $tinta; }
-  p { margin: 0; font-family: $fb; font-size: $t-texto; line-height: 1.6; color: $tinta; }
-}
-
-@media (max-width: 860px) {
-  h2 { font-size: 30px; max-width: none; }   // en dos líneas en el teléfono
-  .tabla-marco { display: none; }
-  .planes-movil { display: grid; gap: 16px; margin-top: 40px; }
-  .plan-movil {
-    padding: 24px 20px;
-    border-radius: 24px;
-    background: $suelo-2;
-    h3 { margin: 0 0 16px; font-family: $fd; font-size: $t-lista; font-weight: 700; letter-spacing: -0.03em; color: $tinta; }
-    .precio, .plazo { display: inline; margin: 0 0 0 6px; }
-    .precio { font-size: $t-lista; }
-    dl { display: grid; gap: 10px; margin: 0 0 20px; }
-    dl div { display: flex; justify-content: space-between; gap: 16px; font-family: $fb; font-size: $t-chica; }
-    dt { color: $suave; }
-    dd { margin: 0; color: $tinta; font-weight: 600; text-align: right; }
+.plan-movil {
+  padding: u(1.5);
+  border-radius: $r-tarjeta;
+  background: $superficie;
+  &:nth-child(2) { background: $papel; border: 1px solid $linea; }
+  h3 {
+    display: grid;
+    margin: 0;
+    font-family: $fb;
+    font-size: max(12px, #{u(0.75)});
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: $tinta-suave;
+    .precio { font-size: 44px; letter-spacing: -0.03em; text-transform: none; }
+    .plazo { text-transform: none; letter-spacing: 0; }
   }
+  dl { margin: u(1.25) 0; }
+  dl > div { display: flex; justify-content: space-between; gap: u(1); padding: 10px 0; border-top: 1px solid $linea; font-size: 14px; }
+  dt { color: $tinta-suave; }
+  dd { margin: 0; text-align: right; font-weight: 600; color: $tinta; }
+}
+
+// ── El día 31, dicho sin letra chica ─────────────────────────────────────────────
+.dia31 {
+  display: grid;
+  gap: u(1.25);
+  align-items: center;
+  margin-top: u(1);
+  padding: u(1.75);
+  border-radius: $r-tarjeta-lg;
+  background: $noche;
+  color: #fff;
+  @include entrada(u(1.25));
+  @media (min-width: 640px) { grid-template-columns: auto 1fr; gap: u(2.5); padding: u(2.5); margin-top: u(1.25); }
+  h3 { margin: 0; font-family: $fd; font-size: max(22px, #{u(1.75)}); font-weight: 600; letter-spacing: -0.01em; }
+  p { margin: u(0.75) 0 0; max-width: 46rem; font-size: max(15px, #{u(0.95)}); line-height: 1.6; color: blanco(0.78); }
+}
+.dia31-num {
+  font-family: $fd;
+  font-size: max(72px, #{u(7)});
+  font-weight: 600;
+  line-height: 0.85;
+  letter-spacing: -0.05em;
+  color: $carmesi;
 }

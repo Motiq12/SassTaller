@@ -3,7 +3,7 @@ import { Component, EventEmitter, Output } from '@angular/core';
 interface Pregunta { q: string; a: string; }
 
 /**
- * Preguntas frecuentes y el cierre con la acción final.
+ * Preguntas frecuentes. La acción final ya no vive acá: la lleva el pie.
  *
  * Cada respuesta dice lo que el sistema hace hoy (revisado contra el código y contra
  * los términos). Si algo no está resuelto —la recuperación de contraseña del personal,
@@ -23,8 +23,8 @@ export class PreguntasComponent {
       a: 'No. Creás el taller con tu correo y una contraseña, y tenés 30 días con el sistema completo. No pedimos datos de pago.' },
     { q: '¿Qué pasa cuando terminan los 30 días?',
       a: 'Tu taller pasa solo al plan Gratis. No se borra nada, no hay cobros automáticos y seguís registrando órdenes, clientes y citas sin límite.' },
-    { q: '¿Sirve para talleres de motos y de autos?',
-      a: 'Sí. Al registrarte elegís qué atendés —motos, autos o los dos— y el catálogo de servicios y los datos de cada vehículo se arman según eso.' },
+    { q: '¿Qué tipos de vehículo puedo atender?',
+      a: 'Motocicletas, automóviles, camiones, buses, busetas y otros. Al registrarte elegís cuáles atiende tu taller, y el catálogo de servicios y los datos de cada vehículo se arman según eso.' },
     { q: '¿Mis clientes tienen que instalar algo?',
       a: 'No. El portal se abre desde el navegador del celular con el enlace o el código QR que les compartís. Ahí siguen su vehículo, aprueban presupuestos y agendan citas.' },
     { q: '¿Lo puedo usar desde el celular?',

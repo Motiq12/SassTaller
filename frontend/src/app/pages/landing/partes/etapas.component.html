@@ -1,35 +1,35 @@
 <section class="etapas" aria-labelledby="etapas-titulo">
-  <div class="campos">
-    <div class="campo-frase">
-      <h2 id="etapas-titulo" class="frase" aria-live="polite" appAparece>
-        <ng-container *ngFor="let e of etapas; let i = index">
-          <span class="clausula" [class.activa]="i === etapa" [attr.aria-hidden]="i !== etapa">{{ e.frase }}</span>
-        </ng-container>
-      </h2>
-      <div class="explica" appAparece [retraso]="80">
-        <p class="detalle" aria-live="polite">{{ etapas[etapa].detalle }}</p>
-        <p class="ayuda">Arrastrá la orden por sus etapas, o tocá cada una.</p>
-      </div>
-    </div>
-
-    <div class="campo-pantalla">
-      <app-lp-pantalla class="pantalla" tipo="orden" [etapa]="etapa" appAparece [retraso]="140"></app-lp-pantalla>
-    </div>
+  <div class="cabeza">
+    <p class="rotulo" appAparece>Cómo funciona</p>
+    <h2 id="etapas-titulo" class="titulo" appAparece>
+      <span class="l"><span style="--i: 0">Una orden, de la</span></span>
+      <span class="l"><span style="--i: 1">recepción a la entrega</span></span>
+    </h2>
   </div>
 
-  <div class="control" appAparece [retraso]="200">
-    <div class="pista" aria-hidden="true">
-      <span class="recorrido" [style.width.%]="avance"></span>
-    </div>
-    <label class="oculto" for="etapa-orden">Etapa de la orden de trabajo</label>
-    <input id="etapa-orden" type="range" min="0" max="3" step="1"
-           [value]="etapa" (input)="cambiar($any($event.target).value)"
-           [attr.aria-valuetext]="etapas[etapa].nombre" />
-    <ol class="nombres">
-      <li *ngFor="let e of etapas; let i = index">
-        <button type="button" [class.actual]="i === etapa" [class.pasada]="i < etapa"
-                (click)="cambiar(i)" [attr.aria-pressed]="i === etapa">{{ e.nombre }}</button>
+  <div class="cuerpo">
+    <ol class="filas" aria-label="Etapas de la orden">
+      <li *ngFor="let e of etapas; let i = index" appAparece [retraso]="i * 70">
+        <button type="button" class="fila" [class.activa]="i === etapa" [attr.aria-pressed]="i === etapa"
+                aria-controls="etapa-pantalla" (click)="cambiar(i)" (keydown)="teclas($event, i)">
+          <span class="num">0{{ i + 1 }}</span>
+          <span class="textos">
+            <span class="nombre">{{ e.nombre }}</span>
+            <span class="frase">{{ e.frase }}</span>
+            <span class="detalle"><span>{{ e.detalle }}</span></span>
+          </span>
+          <span class="circulo" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+          </span>
+        </button>
       </li>
     </ol>
+
+    <div class="lado">
+      <div class="pegada" appAparece [retraso]="140">
+        <app-lp-pantalla id="etapa-pantalla" class="pantalla" tipo="orden" [etapa]="etapa" aria-live="polite"></app-lp-pantalla>
+        <p class="ayuda">Tocá cada etapa y mirá cómo cambia la orden.</p>
+      </div>
+    </div>
   </div>
 </section>

@@ -1,185 +1,129 @@
-@use 'base' as *;
+@use 'sistema' as *;
 
 :host { display: block; }
 
-// Dos campos planos que se tocan en un borde limpio: la frase sobre el escalón
-// oscuro, la orden sobre el carmesí. Debajo, de lado a lado, el control.
-.etapas { background: $suelo-2; }
+// La sección de superficie gris, redondeada, con espacio de más abajo: la tarjeta
+// blanca de "Funciones" se monta encima.
+.etapas {
+  margin-top: u(0.75);
+  padding-top: u(4);
+  padding-bottom: u(6);
+  border-radius: $r-tarjeta-lg;
+  background: $superficie;
+  @include lados;
+  @media (min-width: 640px) { padding-top: u(5.5); padding-bottom: u(8); }
+}
 
-.campos {
+.cabeza { max-width: 60rem; }
+.rotulo { @include rotulo; @include entrada(u(0.75)); }
+.titulo {
+  @include titulo-seccion;
+  font-size: min(max(34px, #{u(3)}), 10.5vw);
+  @include lineas;
+}
+
+.cuerpo {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  min-height: min(78svh, 820px);
+  gap: u(2.5);
+  margin-top: u(2.5);
+  @media (min-width: 900px) {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: u(4);
+    margin-top: u(4);
+    align-items: start;
+  }
 }
 
-.campo-frase {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 32px;
-  padding: clamp(56px, 8vw, 120px) $margen 48px;
-}
-
-.frase {
-  @include titulo($t-seccion);
+// ── Las filas ────────────────────────────────────────────────────────────────────
+.filas { margin: 0; padding: 0; list-style: none; border-top: 1px solid $linea; }
+.filas li { border-bottom: 1px solid $linea; @include entrada(u(1)); }
+.fila {
   display: grid;
-  max-width: 11ch;
-  @include entrada;
-}
-// Las cuatro frases en la misma celda: se cruzan sin mover el resto.
-.clausula {
-  grid-area: 1 / 1;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  &.activa { opacity: 1; }
-}
-
-// Lo que pasa en cada etapa: cambia con el control, debajo de la frase grande.
-.explica {
-  display: grid;
-  gap: 14px;
-  @include entrada;
-}
-.detalle {
-  margin: 0;
-  max-width: 40ch;
-  min-height: 3.1em;         // dos líneas reservadas: al cambiar de etapa no salta nada
-  font-family: $fb;
-  font-size: $t-entrada;
-  line-height: 1.55;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: u(1.25);
+  width: 100%;
+  padding: u(1.5) 0;
+  border: 0;
+  background: none;
   color: $tinta;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  &:focus-visible { outline: 2px solid $carmesi; outline-offset: 4px; border-radius: $r-xl; }
 }
-.ayuda {
-  margin: 0;
-  font-family: $fb;
-  font-size: $t-chica;
-  color: $suave;
+.num {
+  padding-top: 0.2em;
+  font-family: $fd;
+  font-size: max(14px, #{u(0.875)});
+  font-weight: 600;
+  color: $tinta-suave;
+  transition: color 0.3s $quart;
+  .activa & { color: $carmesi; }
 }
-
-.campo-pantalla {
+.textos { display: grid; min-width: 0; }
+.nombre {
+  font-family: $fd;
+  font-size: max(24px, #{u(2)});
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: $tinta-suave;
+  transition: color 0.3s $quart;
+  .activa & { color: $tinta; }
+}
+.frase { margin-top: 6px; font-size: max(15px, #{u(0.95)}); color: $tinta-suave; }
+// El detalle se abre solo en la fila elegida (grid 0fr → 1fr: altura animable).
+.detalle {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.5s $expo;
+  > span {
+    overflow: hidden;
+    max-width: 34rem;
+    font-size: max(15px, #{u(0.95)});
+    line-height: 1.6;
+    color: $tinta;
+    opacity: 0;
+    transition: opacity 0.35s $quart;
+  }
+  .activa & { grid-template-rows: 1fr; }
+  .activa & > span { padding-top: u(0.75); opacity: 1; }
+}
+.circulo {
   display: grid;
   place-items: center;
-  padding: 56px $margen;
-  background: $carmesi;
+  width: max(40px, #{u(2.75)});
+  height: max(40px, #{u(2.75)});
+  border: 1px solid $linea;
+  border-radius: $r-pildora;
+  color: $tinta;
+  transition: background-color 0.3s $quart, border-color 0.3s $quart, color 0.3s $quart;
+  svg {
+    width: 18px; height: 18px;
+    fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+    transform: rotate(-45deg);
+    transition: transform 0.4s $resorte;
+  }
+  .activa & { background: $carmesi; border-color: $carmesi; color: #fff; svg { transform: none; } }
 }
-.pantalla {
-  width: min(440px, 100%);
-  @include entrada;
-}
-
-.control {
-  position: relative;
-  padding: 36px $margen 40px;
-  @include entrada;
-}
-
-.pista {
-  position: relative;
-  height: 8px;
-  border-radius: 999px;
-  background: $suelo-3;
-  margin: 12px 16px 0;   // medio pulgar a cada lado: el pulgar cae justo en cada parada
-}
-.recorrido {
-  position: absolute;
-  inset: 0 auto 0 0;
-  border-radius: 999px;
-  background: $tinta;
-  transition: width 0.25s $curva;
+@media (hover: hover) and (min-width: 769px) {
+  .fila:hover .nombre { color: $tinta; }
+  .fila:hover .circulo { border-color: $tinta; }
+  .fila.activa:hover .circulo { border-color: $carmesi; }
 }
 
-// El <input> real va encima de la pista dibujada, transparente salvo el pulgar.
-input[type='range'] {
-  position: absolute;
-  left: $margen;
-  right: $margen;
-  top: 36px;
-  width: calc(100% - 2 * #{$margen});
-  height: 32px;
-  margin: -12px 0 0;
-  background: transparent;
-  appearance: none;
-  -webkit-appearance: none;
-  cursor: grab;
-  &:active { cursor: grabbing; }
-  &::-webkit-slider-runnable-track { height: 32px; background: transparent; }
-  &::-moz-range-track { height: 32px; background: transparent; }
-  // El pulgar: el disco, en el acento.
-  &::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 32px; height: 32px;
-    border-radius: 50%;
-    background: $carmesi;
-    border: 4px solid $suelo-2;
-    transition: transform 0.2s $curva;
-  }
-  &::-moz-range-thumb {
-    width: 24px; height: 24px;
-    border-radius: 50%;
-    background: $carmesi;
-    border: 4px solid $suelo-2;
-  }
-  &:hover::-webkit-slider-thumb { transform: scale(1.12); }
-  &:focus-visible { outline: none; }
-  &:focus-visible::-webkit-slider-thumb { outline: 3px solid $tinta; outline-offset: 2px; }
-  &:focus-visible::-moz-range-thumb { outline: 3px solid $tinta; outline-offset: 2px; }
+// ── La pantalla, fija mientras se leen las filas ─────────────────────────────────
+.lado { min-width: 0; }
+.pegada {
+  @include entrada(u(1.5));
+  @media (min-width: 900px) { position: sticky; top: u(2); }
 }
+.pantalla { display: block; max-width: 30rem; margin: 0 auto; }
+.ayuda { margin: u(1) 0 0; text-align: center; font-size: max(13px, #{u(0.8)}); color: $tinta-suave; }
 
-.nombres {
-  list-style: none;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  margin: 22px 0 0;
-  padding: 0;
-  li:nth-child(2) { text-align: center; padding-right: 8%; }
-  li:nth-child(3) { text-align: center; padding-left: 8%; }
-  li:last-child { text-align: right; }
-  button {
-    border: 0;
-    background: none;
-    padding: 8px 0;
-    min-height: 44px;
-    font-family: $fb;
-    font-size: $t-texto;
-    font-weight: 600;
-    color: $suave;
-    cursor: pointer;
-    transition: color 0.2s $curva;
-    &:hover, &.pasada { color: $tinta; }
-    &.actual { color: $carmesi-texto; }
-    &:focus-visible { outline: 3px solid $tinta; outline-offset: 2px; border-radius: 6px; }
-  }
-}
-
-.oculto { @include oculto; }
-
-// Teléfono: primero la orden (recortada a lo que importa), el control justo
-// debajo en la costura, y la frase al final.
-@media (max-width: 760px) {
-  .campos {
-    grid-template-columns: 1fr;
-    min-height: 0;
-  }
-  .campo-pantalla {
-    order: -1;
-    min-height: 46svh;
-    padding: 40px $margen;
-  }
-  .campo-frase { padding: 32px $margen 56px; }
-  .frase { font-size: $t-hero; }
-  .control { padding-top: 28px; }
-  input[type='range'] { top: 28px; height: 40px;
-    &::-webkit-slider-thumb { width: 40px; height: 40px; }
-  }
-  .nombres {
-    grid-template-columns: 1fr 1fr;
-    gap: 4px 12px;
-    li, li:nth-child(n) { text-align: left; padding: 0; }
-    button { font-size: 15px; }
-  }
-  // En el teléfono el control queda entre la orden y la frase.
-  .etapas { display: flex; flex-direction: column; }
-  .campos { display: contents; }
-  .control { order: 0; }
-  .campo-frase { order: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .detalle, .detalle > span, .circulo, .circulo svg { transition: none !important; }
 }
