@@ -1640,3 +1640,7 @@ ion-item.campo-error { --border-width: 0 0 2px 0; }
   }
   .pg-cal-nav { display: flex; gap: 6px; .btn { min-width: 40px; } }
 }
+
+// Edge agrega su propio "ojo" a los campos de contraseña; en las pantallas de acceso
+// ya hay uno (el de Ionic) y quedaban dos, uno al lado del otro.
+.login-content input::-ms-reveal { display: none; }

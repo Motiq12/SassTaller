@@ -1,0 +1,23 @@
+<section class="preguntas" aria-labelledby="preguntas-titulo">
+  <h2 id="preguntas-titulo" appAparece>Preguntas frecuentes</h2>
+
+  <!-- <details> nativo: se abre con teclado y lector de pantalla, y sin script. -->
+  <div class="lista" appAparece [retraso]="80">
+    <details *ngFor="let p of preguntas">
+      <summary>{{ p.q }}</summary>
+      <p>{{ p.a }}</p>
+    </details>
+  </div>
+</section>
+
+<!-- El cierre: un campo carmesí con la acción principal, una sola vez más. -->
+<section class="cierre" aria-labelledby="cierre-titulo">
+  <div class="campo" appAparece>
+    <h2 id="cierre-titulo">Tu taller, ordenado desde hoy.</h2>
+    <p>30 días con todo, sin tarjeta. Después sigue gratis y no se borra nada.</p>
+    <div class="acciones">
+      <a class="principal" routerLink="/registro-taller">Probá gratis 30 días</a>
+      <button type="button" class="secundario" (click)="hablar.emit()">Hablá con nosotros</button>
+    </div>
+  </div>
+</section>

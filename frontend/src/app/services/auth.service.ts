@@ -101,6 +101,19 @@ export class AuthService {
     return this.http.post<{ message: string }>(`${this.apiUrl}/auth/2fa/desactivar`, { password });
   }
 
+  /**
+   * Recuperar la contraseña del personal: pide el código al correo. Funciona sin
+   * taller (se resuelve por el correo); si hay uno resuelto, se acota a ese.
+   */
+  solicitarRecuperacion(email: string, antibot: { website?: string; turnstileToken?: string } = {}): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/recuperar/solicitar`, this.taller.conTaller({ email, ...antibot }));
+  }
+
+  /** Canjea el código y fija la contraseña nueva. No abre sesión: se vuelve al login. */
+  confirmarRecuperacion(datos: { email: string; codigo: string; password: string }): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/recuperar/confirmar`, this.taller.conTaller(datos));
+  }
+
   // Guarda la sesión del personal (la usa el login unificado cuando tipo === 'staff').
   aplicarSesionStaff(token: string, usuario: Usuario) {
     this.guardarSesion(token, usuario);

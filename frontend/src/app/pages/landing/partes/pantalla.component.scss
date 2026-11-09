@@ -14,9 +14,26 @@ $fm: 'JetBrains Mono', ui-monospace, monospace;  // taste-skill-ignore: interfaz
 :host { display: block; }
 
 .ui {
+  position: relative;
   font-family: $fb;
   color: $tinta;
   text-align: left;
+}
+
+// "Vista de ejemplo": discreto, sobre el borde de la tarjeta. Los datos son ficticios
+// y se dice; las pantallas, los estados y los nombres son los de la app.
+.ejemplo {
+  position: absolute;
+  z-index: 1;
+  top: -11px;
+  right: 18px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #18181b;
+  color: #e4e4e7;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .tarjeta {

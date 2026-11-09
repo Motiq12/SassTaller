@@ -30,6 +30,21 @@ export interface CampoTipo {
   max?: number;
 }
 
+/** Topes de un plan; `null` = sin límite. */
+export interface LimitesPlan {
+  usuarios: number | null;
+  sucursales: number | null;
+  marca_propia: boolean;
+  reportes_dias: number | null;
+  precio_mensual: number | null;
+}
+export interface PlanesPublicos {
+  dias_prueba: number;
+  trial: LimitesPlan;
+  gratis: LimitesPlan;
+  pro: LimitesPlan;
+}
+
 export interface TipoVehiculo {
   clave: string;
   etiqueta: string;
@@ -140,6 +155,20 @@ export class TallerService {
    * es un catálogo fijo que no cambia entre pantallas, y lo consultan tanto el
    * alta del taller como el formulario de vehículo.
    */
+  /**
+   * Los planes como rigen hoy (topes y precio), los mismos que aplica el servidor en
+   * utils/limites.js. Los usa la landing para no prometer otra cosa que el sistema.
+   */
+  planes(): Observable<{ data: PlanesPublicos }> {
+    if (!this.planesCache) {
+      this.planesCache = this.http
+        .get<{ data: PlanesPublicos }>(`${this.apiUrl}/onboarding/planes`)
+        .pipe(shareReplay(1));
+    }
+    return this.planesCache;
+  }
+  private planesCache: Observable<{ data: PlanesPublicos }> | null = null;
+
   tipos(): Observable<{ data: TipoVehiculo[] }> {
     if (!this.tiposCache) {
       this.tiposCache = this.http

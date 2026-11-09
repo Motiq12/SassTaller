@@ -23,7 +23,7 @@ const TABLAS_CON_TENANT = new Set([
   'notificaciones', 'orden_avances', 'orden_checklist', 'orden_contadores',
   'orden_fotos', 'orden_repuestos', 'orden_tiempos', 'ordenes_trabajo',
   'password_reset_codes', 'promos', 'recompensas_canjeadas', 'servicios',
-  'sucursales', 'tareas_mecanico', 'usuario_verify_codes', 'usuarios', 'web_vitals',
+  'sucursales', 'tareas_mecanico', 'usuario_reset_codes', 'usuario_verify_codes', 'usuarios', 'web_vitals',
   // Las que trajo MS Motos. Fuera de esta lista el guard no las miraba, y por ahí se
   // cruzaban roles, feriados, bloqueos y órdenes eliminadas entre talleres.
   'actividad_personal', 'bloqueos_horario', 'cita_servicios', 'eventos_seguridad',

@@ -4,7 +4,7 @@
 
     <main class="acceso-panel">
       <div class="acceso-caja">
-        <a class="enlace volver-arriba" routerLink="/portal/login">
+        <a class="enlace volver-arriba" routerLink="/portal/login" [queryParams]="personal ? { como: 'taller' } : {}">
           <ion-icon name="arrow-back-outline" aria-hidden="true"></ion-icon> Volver a entrar
         </a>
         <header class="acceso-head">

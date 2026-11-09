@@ -10,7 +10,7 @@ const { consumir } = require('../utils/rate-limit');
 const { antibot } = require('../utils/antibot');
 const { crearTaller, normalizarSlug, motivoSlugInvalido } = require('../utils/onboarding');
 const { fijarPlan } = require('../utils/estado-tenant');
-const { finDeTrial } = require('../utils/limites');
+const { finDeTrial, limitesDe, precioDe, DIAS_TRIAL } = require('../utils/limites');
 const { TIPOS } = require('../utils/tipos-vehiculo');
 const { paraTenant } = require('../db/tenant-db');
 const { nuevoCodigo, VIGENCIA_MIN } = require('../utils/verificacion-usuario');
@@ -63,6 +63,18 @@ router.get('/tipos', (req, res) => {
       clave, etiqueta: t.etiqueta, plural: t.plural, unidadUso: t.unidadUso, campos: t.campos,
     })),
   });
+});
+
+// GET /api/onboarding/planes — los planes tal como rigen hoy, para la landing.
+//
+// La landing mostraba los topes escritos a mano, pero el panel de Motiq puede
+// editarlos (planes_config): en cuanto alguien los cambiara, la página prometería otra
+// cosa que el sistema. Esto expone lo mismo que aplica utils/limites.js. Es público:
+// son los precios y límites de la página de venta, nada de ningún taller.
+router.get('/planes', (req, res) => {
+  const plan = (p) => ({ ...limitesDe(p), precio_mensual: precioDe(p) || null });
+  res.set('Cache-Control', 'public, max-age=300');
+  res.json({ data: { dias_prueba: DIAS_TRIAL, trial: plan('trial'), gratis: plan('gratis'), pro: plan('pro') } });
 });
 
 // POST /api/onboarding — da de alta un taller y devuelve la sesión de su admin.

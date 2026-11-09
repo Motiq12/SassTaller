@@ -1,0 +1,70 @@
+@use 'base' as *;
+
+:host { display: block; }
+
+.confianza { padding: $entre-secciones $margen 0; }
+
+h2 { @include titulo($t-seccion); max-width: 13ch; @include entrada; }
+
+// Cuatro hechos en dos columnas, sobre el escalón de tono: una superficie, sin bordes.
+.garantias {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  margin: clamp(48px, 6vw, 80px) 0 0;
+  border-radius: 24px;
+  overflow: hidden;
+}
+.garantia {
+  padding: clamp(28px, 3vw, 44px);
+  background: $suelo-2;
+  @include entrada;
+}
+dt {
+  margin: 0 0 10px;
+  font-family: $fd;
+  font-size: clamp(22px, 2vw, 30px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: $tinta;
+}
+dd { margin: 0; max-width: 44ch; font-family: $fb; font-size: $t-texto; line-height: 1.6; color: $tinta; }
+
+.cierre {
+  margin: 32px 0 0;
+  max-width: 60ch;
+  font-family: $fb;
+  font-size: $t-texto;
+  line-height: 1.6;
+  color: $suave;
+  @include entrada;
+  a, .enlace {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: $tinta;
+    font: inherit;
+    text-decoration: underline;
+    text-decoration-color: $carmesi;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
+    cursor: pointer;
+    &:hover { color: #fff; }
+    &:focus-visible { outline: 3px solid $tinta; outline-offset: 3px; border-radius: 4px; }
+  }
+}
+
+.testimonios {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 32px;
+  margin: 64px 0 0;
+  padding: 0;
+  list-style: none;
+  blockquote { margin: 0 0 12px; font-family: $fd; font-size: $t-lista; line-height: 1.2; color: $tinta; }
+  p { margin: 0; font-size: $t-chica; color: $suave; }
+}
+
+@media (max-width: 760px) {
+  .garantias { grid-template-columns: 1fr; }
+}

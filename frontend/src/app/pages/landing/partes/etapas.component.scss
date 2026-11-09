@@ -34,14 +34,26 @@
   &.activa { opacity: 1; }
 }
 
-.ayuda {
+// Lo que pasa en cada etapa: cambia con el control, debajo de la frase grande.
+.explica {
+  display: grid;
+  gap: 14px;
+  @include entrada;
+}
+.detalle {
   margin: 0;
-  max-width: 34ch;
+  max-width: 40ch;
+  min-height: 3.1em;         // dos líneas reservadas: al cambiar de etapa no salta nada
   font-family: $fb;
-  font-size: $t-texto;
+  font-size: $t-entrada;
   line-height: 1.55;
   color: $tinta;
-  @include entrada;
+}
+.ayuda {
+  margin: 0;
+  font-family: $fb;
+  font-size: $t-chica;
+  color: $suave;
 }
 
 .campo-pantalla {

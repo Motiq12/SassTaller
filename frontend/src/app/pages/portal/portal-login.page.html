@@ -93,14 +93,8 @@
 
                 <div class="fila-olvido">
                   <a *ngIf="camino === 'cliente' && conTaller" class="enlace" routerLink="/portal/recuperar">¿Olvidaste tu contraseña?</a>
-                  <button *ngIf="camino === 'taller'" type="button" class="enlace" (click)="ayudaClave = !ayudaClave"
-                          [attr.aria-expanded]="ayudaClave">¿Olvidaste tu contraseña?</button>
+                  <a *ngIf="camino === 'taller'" class="enlace" routerLink="/portal/recuperar" [queryParams]="{ como: 'taller' }">¿Olvidaste tu contraseña?</a>
                 </div>
-                <p *ngIf="camino === 'taller' && ayudaClave" class="nota-camino">
-                  Por ahora la contraseña del personal la recuperamos nosotros:
-                  <a routerLink="/" fragment="contacto">escribinos desde el formulario de contacto</a>
-                  con tu correo y el nombre de tu taller, y te ayudamos.
-                </p>
                 <p *ngIf="camino === 'cliente' && !conTaller" class="nota-camino">
                   ¿Primera vez, o no recordás tu contraseña? Abrí el enlace del portal que te compartió tu taller:
                   ahí podés crear tu cuenta, entrar con un código o recuperarla.

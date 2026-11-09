@@ -35,7 +35,6 @@ export class PortalLoginPage implements OnInit, OnDestroy {
    * el navegador y se puede fijar con ?como=taller|cliente.
    */
   camino: 'taller' | 'cliente' | null = null;
-  ayudaClave = false;
   /** Hay un taller resuelto (subdominio o ?taller=): las rutas de cliente funcionan. */
   get conTaller(): boolean { return !!this.taller.actual(); }
 
@@ -76,7 +75,6 @@ export class PortalLoginPage implements OnInit, OnDestroy {
 
   cambiarCamino() {
     this.camino = null;
-    this.ayudaClave = false;
     this.modo = 'clave';
     try { localStorage.removeItem(CLAVE_CAMINO); } catch { /* modo privado */ }
   }

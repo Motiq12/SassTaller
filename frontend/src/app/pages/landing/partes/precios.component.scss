@@ -2,106 +2,70 @@
 
 :host { display: block; }
 
-.precios {
-  display: grid;
-  grid-template-columns: minmax(0, 6fr) minmax(0, 6fr);
-  gap: 48px;
-  align-items: start;
-  padding: $entre-secciones $margen 0;
-}
+.precios { padding: $entre-secciones $margen 0; }
 
-.nombres { @include entrada; }
+h2 { @include titulo($t-seccion); max-width: 16ch; @include entrada; }
+.oculto { @include oculto; }
 
-h2 {
-  @include titulo($t-lista);
-  color: $suave;
-  font-weight: 600;
-  margin-bottom: 18px;
-}
-
-.lista { display: flex; flex-direction: column; align-items: flex-start; }
-
-.plan {
-  display: flex;
-  align-items: center;
-  gap: 0.3em;
-  padding: 2px 0;
-  border: 0;
-  background: none;
-  font-family: $fd;
-  font-size: $t-hero;
-  font-weight: 700;
-  line-height: 1.08;
-  letter-spacing: -0.045em;
-  color: $suave;
-  cursor: pointer;
-  transition: color 0.25s $curva;
-  // El punto del elegido: el disco del sistema, a escala de texto.
-  &::before {
-    content: '';
-    width: 0.3em;
-    height: 0.3em;
-    border-radius: 50%;
-    background: $carmesi;
-    opacity: 0;
-    transform: scale(0.6);
-    transition: transform 0.3s $curva, opacity 0.3s $curva;
-  }
-  &:hover { color: $tinta; }
-  &.elegido { color: $tinta; &::before { opacity: 1; transform: none; } }
-  &:focus-visible { outline: 3px solid $tinta; outline-offset: 4px; border-radius: 8px; }
-}
-
-.escenario {
-  position: sticky;
-  top: 120px;
-  padding-top: 56px;
-  @include entrada;
-}
-
-.cifra {
-  margin: 0;
-  font-family: $fd;
-  font-size: clamp(64px, 7.5vw, 128px);
-  font-weight: 700;
-  line-height: 0.95;
-  letter-spacing: -0.05em;
-  color: $tinta;
-}
-.plazo {
-  font-family: $fd;   // la misma familia que la cifra: un titular, una fuente
-  font-size: $t-texto;
-  font-weight: 600;
-  letter-spacing: 0;
-  color: $suave;
-  white-space: nowrap;
-}
-
-.incluye {
-  margin: 28px 0 36px;
-  max-width: 44ch;
+// --- Escritorio: la tabla -----------------------------------------------------------
+.tabla-marco { margin-top: clamp(48px, 6vw, 80px); @include entrada; }
+.tabla {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
   font-family: $fb;
   font-size: $t-texto;
-  line-height: 1.6;
   color: $tinta;
+  th, td { padding: 18px 20px; text-align: left; vertical-align: middle; }
+  thead th { padding-top: 28px; padding-bottom: 24px; vertical-align: bottom; }
+  tbody th { width: 28%; font-weight: 600; color: $suave; }
+  // Separador de filas de una tabla de datos: la línea es la tabla, no un adorno.
+  tbody tr + tr > * { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07); }   // taste-skill-ignore: separador de filas de tabla
+  // La columna del medio (Gratis) sobre el escalón de tono: es donde queda el taller.
+  .medio { background: $suelo-2; }
+  thead .medio { border-radius: 24px 24px 0 0; }
+  tfoot .medio { border-radius: 0 0 24px 24px; }
+  tfoot td { padding-top: 24px; padding-bottom: 28px; }
+}
+.nombre, .precio, .plazo { display: block; }
+.nombre { font-family: $fd; font-size: $t-lista; font-weight: 700; letter-spacing: -0.03em; }
+.precio { margin-top: 10px; font-family: $fd; font-size: clamp(40px, 4vw, 64px); font-weight: 700; letter-spacing: -0.04em; line-height: 1; }
+.plazo { margin-top: 8px; font-size: $t-chica; font-weight: 500; color: $suave; }
+
+.accion {
+  @include boton;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  &.secundaria { @include boton($suelo-3, $tinta); width: 100%; box-sizing: border-box; }
 }
 
-.accion { @include boton; }
+// --- Teléfono: un plan debajo del otro ----------------------------------------------
+.planes-movil { display: none; }
 
-.detalle {
-  animation: aparecer 0.2s ease both;
+.dia31 {
+  margin-top: 48px;
+  max-width: 60ch;
+  @include entrada;
+  h3 { margin: 0 0 10px; font-family: $fd; font-size: clamp(24px, 2.2vw, 32px); font-weight: 700; letter-spacing: -0.02em; color: $tinta; }
+  p { margin: 0; font-family: $fb; font-size: $t-texto; line-height: 1.6; color: $tinta; }
 }
-@keyframes aparecer { from { opacity: 0; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .detalle { animation: none; } }
 
-.movil { display: none; }
-
-@media (max-width: 760px) {
-  .precios { grid-template-columns: 1fr; gap: 0; }
-  .escenario { display: none; }
-  .movil { display: block; padding: 12px 0 88px; }
-  .plan { font-size: $t-hero; }
-  .cifra { font-size: 64px; }
-  .incluye { font-size: $t-texto; margin: 18px 0 24px; }
-  .accion { width: 100%; }
+@media (max-width: 860px) {
+  h2 { font-size: 30px; max-width: none; }   // en dos líneas en el teléfono
+  .tabla-marco { display: none; }
+  .planes-movil { display: grid; gap: 16px; margin-top: 40px; }
+  .plan-movil {
+    padding: 24px 20px;
+    border-radius: 24px;
+    background: $suelo-2;
+    h3 { margin: 0 0 16px; font-family: $fd; font-size: $t-lista; font-weight: 700; letter-spacing: -0.03em; color: $tinta; }
+    .precio, .plazo { display: inline; margin: 0 0 0 6px; }
+    .precio { font-size: $t-lista; }
+    dl { display: grid; gap: 10px; margin: 0 0 20px; }
+    dl div { display: flex; justify-content: space-between; gap: 16px; font-family: $fb; font-size: $t-chica; }
+    dt { color: $suave; }
+    dd { margin: 0; color: $tinta; font-weight: 600; text-align: right; }
+  }
 }

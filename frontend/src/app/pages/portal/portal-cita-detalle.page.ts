@@ -5,7 +5,7 @@ import { Subject, interval } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PortalService } from '../../services/portal.service';
 import { MarcaService } from '../../services/marca.service';
-import { FLUJO_CITA, ESTADO_CITA_LABEL } from '../../utils/servicios';
+import { FLUJO_CITA, ESTADO_CITA_LABEL, ETAPAS_PORTAL } from '../../shared/utils/servicios.util';
 
 @Component({
   standalone: false,
@@ -28,13 +28,8 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
   readonly estadoLabel = ESTADO_CITA_LABEL;
 
   // Etapas de la timeline (cockpit): los estados macro que ve el cliente, con su ícono.
-  private readonly etapasMeta = [
-    { key: 'agendado', label: 'Agendado', icon: 'calendar-outline' },
-    { key: 'en_revision', label: 'En revisión', icon: 'search-outline' },
-    { key: 'en_mantenimiento', label: 'En mantenimiento', icon: 'construct-outline' },
-    { key: 'listo', label: 'Listo para entrega', icon: 'checkmark-done-outline' },
-    { key: 'entregado', label: 'Entregado', icon: 'flag-outline' },
-  ];
+  // Compartidas con la vista de ejemplo de la landing (ver ETAPAS_PORTAL).
+  private readonly etapasMeta = ETAPAS_PORTAL;
 
   constructor(
     private route: ActivatedRoute,

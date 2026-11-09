@@ -6,9 +6,10 @@
           <span class="clausula" [class.activa]="i === etapa" [attr.aria-hidden]="i !== etapa">{{ e.frase }}</span>
         </ng-container>
       </h2>
-      <p class="ayuda" appAparece [retraso]="80">
-        Arrastrá la orden por sus etapas y mirá lo que queda registrado en cada una.
-      </p>
+      <div class="explica" appAparece [retraso]="80">
+        <p class="detalle" aria-live="polite">{{ etapas[etapa].detalle }}</p>
+        <p class="ayuda">Arrastrá la orden por sus etapas, o tocá cada una.</p>
+      </div>
     </div>
 
     <div class="campo-pantalla">
