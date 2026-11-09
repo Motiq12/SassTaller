@@ -243,19 +243,21 @@ router.get('/web-vitals', async (req, res) => {
   try {
     const dias = Math.min(Math.max(Number(req.query.dias) || 30, 1), 365);
     const [filas] = await pool.query(
-      `SELECT ruta, metrica, COALESCE(variante, '-') AS variante, (movil = 1) AS movil,
+      `SELECT ruta, metrica, COALESCE(variante, '-') AS variante, movil,
               COUNT(*)::int AS muestras,
               percentile_disc(0.75) WITHIN GROUP (ORDER BY valor) AS p75
          FROM web_vitals_publico
         WHERE created_at >= NOW() - ?::int * INTERVAL '1 day'
-        GROUP BY ruta, metrica, COALESCE(variante, '-'), (movil = 1)
+        GROUP BY ruta, metrica, COALESCE(variante, '-'), movil
         ORDER BY ruta, metrica, variante, movil`,
       [dias]
     );
     const UMBRAL = { LCP: 2500, CLS: 0.1, INP: 200, FCP: 1800, TTFB: 800 };
     res.json({
       dias,
-      data: filas.map(f => ({ ...f, p75: Number(f.p75), umbral: UMBRAL[f.metrica], cumple: Number(f.p75) <= UMBRAL[f.metrica] })),
+      // movil sale como 0/1 (smallint): las consultas no devuelven booleanos de
+      // Postgres, la regla de test/pg-sql.test.js. Se pasa a true/false acá.
+      data: filas.map(f => ({ ...f, movil: f.movil === 1, p75: Number(f.p75), umbral: UMBRAL[f.metrica], cumple: Number(f.p75) <= UMBRAL[f.metrica] })),
     });
   } catch (err) {
     fail(res, err);
