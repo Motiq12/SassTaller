@@ -41,9 +41,10 @@ if (esProduccion) {
   }
 }
 
-// En producción la app va detrás del proxy de Railway: confiar en el primer hop
-// para que req.ip sea la IP real del cliente (necesario para el rate limiting).
-if (esProduccion) app.set('trust proxy', 1);
+// En producción la app va detrás del proxy de Railway (y, si se prende, del de
+// Cloudflare): se confía en esos saltos para que req.ip sea la IP real del cliente,
+// que es con la que cuenta el límite de intentos. Ver utils/proxy.js.
+if (esProduccion) app.set('trust proxy', require('./utils/proxy').saltosDeProxy());
 
 // No revelar el framework (Express manda "X-Powered-By" por defecto): menos pistas
 // para un atacante que busca vulnerabilidades conocidas del stack.

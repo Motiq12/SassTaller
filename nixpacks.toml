@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["nodejs_20"]
+nixPkgs = ["nodejs_22"]
 
 # La app corre con NODE_ENV=production (variable de Railway), y con eso npm omite las
 # devDependencies. El backend no las necesita, pero el frontend sí: @angular/cli, que
