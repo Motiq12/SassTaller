@@ -80,6 +80,15 @@ router.post('/', antibot(), async (req, res) => {
       return res.status(400).json({ error: `La contraseña debe tener al menos ${MIN_PASSWORD} caracteres` });
     }
 
+    // Qué vehículos atiende: lo elige el taller, siempre. normalizarTipos() cae a
+    // 'moto' cuando no llega nada (lo usan otros caminos), pero en el alta pública eso
+    // decidía por el taller en silencio: uno de autos que no marcó nada —o al que no
+    // le cargó el catálogo— terminaba con el catálogo de motos. Acá se exige.
+    const tiposPedidos = Array.isArray(req.body.tipos) ? req.body.tipos.map(t => String(t).toLowerCase()) : [];
+    if (!tiposPedidos.length || tiposPedidos.some(t => !TIPOS[t])) {
+      return res.status(400).json({ error: 'Elegí qué vehículos atiende el taller' });
+    }
+
     // El slug se acepta explícito o se deriva del nombre del taller.
     const slug = normalizarSlug(req.body.slug || nombre);
     const motivo = motivoSlugInvalido(slug);
