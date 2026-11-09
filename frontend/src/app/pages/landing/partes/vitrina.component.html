@@ -4,7 +4,7 @@
     <div class="pantallas" [class.lento]="lento">
       <app-lp-pantalla *ngFor="let p of problemas; let i = index"
                    class="pantalla" [class.activa]="i === activo"
-                   [tipo]="p.pantalla" [attr.aria-hidden]="i !== activo"></app-lp-pantalla>
+                   [tipo]="p.pantalla" [etapa]="p.etapa ?? 0" [attr.aria-hidden]="i !== activo"></app-lp-pantalla>
     </div>
   </div>
 

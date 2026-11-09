@@ -8,17 +8,23 @@
     <nav aria-label="Principal">
       <button type="button" class="enlace" (click)="irA('como')">Cómo funciona</button>
       <button type="button" class="enlace" (click)="irA('precios')">Precios</button>
+      <button type="button" class="enlace" (click)="irA('preguntas')">Preguntas</button>
       <a class="enlace" routerLink="/portal/login">Entrar</a>
       <a class="accion" routerLink="/registro-taller">Probá gratis</a>
     </nav>
   </header>
 
   <main>
+    <!-- El orden es el argumento de venta: la promesa, la prueba (una orden real de
+         punta a punta), los problemas que se van, lo que trae, por qué confiar, cuánto
+         cuesta y qué pasa a los 30 días, las dudas y la acción final. -->
     <app-lp-hero (hablar)="irA('contacto')"></app-lp-hero>
-    <app-lp-vitrina id="problemas" class="seccion"></app-lp-vitrina>
     <app-lp-etapas id="como" class="seccion"></app-lp-etapas>
-    <app-lp-adapta id="adapta"></app-lp-adapta>
+    <app-lp-vitrina id="problemas" class="seccion"></app-lp-vitrina>
+    <app-lp-funciones id="funciones"></app-lp-funciones>
+    <app-lp-confianza id="confianza" (hablar)="irA('contacto')"></app-lp-confianza>
     <app-lp-precios id="precios" (hablar)="irA('contacto')"></app-lp-precios>
+    <app-lp-preguntas id="preguntas" (hablar)="irA('contacto')"></app-lp-preguntas>
     <app-lp-cupon id="contacto"></app-lp-cupon>
   </main>
   <app-lp-pie (ir)="irA($event)"></app-lp-pie>

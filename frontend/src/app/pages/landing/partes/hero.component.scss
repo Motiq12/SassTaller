@@ -105,3 +105,15 @@ h1 {
   .acciones { margin-top: 28px; }
   .principal { flex: 1 1 100%; }
 }
+
+// Llegada del texto: solo un desplazamiento corto, con opacidad plena todo el tiempo.
+// El titular se lee desde el primer cuadro (es el LCP) y la portada igual se siente
+// viva al abrir. Asentada antes de 1,2 s.
+@keyframes llegar { from { transform: translateY(14px); } to { transform: none; } }
+h1, .bajada, .acciones, .chica { animation: llegar 0.8s $curva both; }
+.bajada { animation-delay: 80ms; }
+.acciones { animation-delay: 160ms; }
+.chica { animation-delay: 220ms; }
+@media (prefers-reduced-motion: reduce) {
+  h1, .bajada, .acciones, .chica { animation: none; }
+}

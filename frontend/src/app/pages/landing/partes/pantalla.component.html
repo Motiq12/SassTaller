@@ -1,4 +1,6 @@
 <div class="ui" data-ui [ngSwitch]="tipo">
+  <!-- Datos ficticios para mostrar el producto: se dice, sin esconderlo. -->
+  <span class="ejemplo">Vista de ejemplo</span>
 
   <!-- Historial de una placa -->
   <section *ngSwitchCase="'historial'" class="tarjeta" aria-label="Historial de la placa {{ orden.placa }}">
@@ -66,9 +68,8 @@
           <span class="mono hora">{{ c.hora }}</span>
           <span class="trabajo">{{ c.vehiculo }}<small>{{ c.servicio }}</small></span>
           <span class="pastilla"
-                [class.esmeralda]="c.estado === 'Confirmada'"
-                [class.indigo]="c.estado === 'Aviso enviado'"
-                [class.ambar]="c.estado === 'Por confirmar'">{{ c.estado }}</span>
+                [class.indigo]="c.estado === 'En mantenimiento'"
+                [class.ambar]="c.estado === 'En revisión'">{{ c.estado }}</span>
         </div>
       </div>
     </div>
