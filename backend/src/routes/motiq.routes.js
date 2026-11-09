@@ -235,6 +235,33 @@ router.post('/contactos/:id/taller', async (req, res) => {
 const ESTADOS_REPORTE = ['nuevo', 'revisando', 'resuelto', 'descartado'];
 
 // GET /api/motiq/reportes?estado= — la bandeja de fallas reportadas.
+// GET /api/motiq/web-vitals — Core Web Vitals de las páginas públicas (landing,
+// registro, login sin taller), medidos en navegadores reales. p75 por ruta, métrica y
+// variante de la portada (disco 3D, imagen fija o nada), para ver con datos si el 3D
+// le cuesta algo a la entrada. El p75 es el criterio de Google.
+router.get('/web-vitals', async (req, res) => {
+  try {
+    const dias = Math.min(Math.max(Number(req.query.dias) || 30, 1), 365);
+    const [filas] = await pool.query(
+      `SELECT ruta, metrica, COALESCE(variante, '-') AS variante, (movil = 1) AS movil,
+              COUNT(*)::int AS muestras,
+              percentile_disc(0.75) WITHIN GROUP (ORDER BY valor) AS p75
+         FROM web_vitals_publico
+        WHERE created_at >= NOW() - ?::int * INTERVAL '1 day'
+        GROUP BY ruta, metrica, COALESCE(variante, '-'), (movil = 1)
+        ORDER BY ruta, metrica, variante, movil`,
+      [dias]
+    );
+    const UMBRAL = { LCP: 2500, CLS: 0.1, INP: 200, FCP: 1800, TTFB: 800 };
+    res.json({
+      dias,
+      data: filas.map(f => ({ ...f, p75: Number(f.p75), umbral: UMBRAL[f.metrica], cumple: Number(f.p75) <= UMBRAL[f.metrica] })),
+    });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
 router.get('/reportes', async (req, res) => {
   try {
     const where = ESTADOS_REPORTE.includes(req.query.estado) ? 'WHERE estado = ?' : '';
