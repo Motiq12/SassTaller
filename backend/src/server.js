@@ -33,8 +33,11 @@ if (esProduccion) {
   if (!process.env.CORS_ORIGIN && !hasFrontend) {
     console.warn('⚠️  CORS_ORIGIN no definido en producción. Usando default restrictivo.');
   }
-  if (!process.env.DB_HOST || !process.env.DB_NAME) {
-    console.warn('⚠️  Variables de DB incompletas (DB_HOST, DB_NAME). Verificá la configuración.');
+  // En Railway la conexión viene entera en DATABASE_URL (ver db/pool.js) y las DB_* no
+  // existen. Antes se exigían igual, así que el aviso salía en cada arranque aunque la
+  // base conectara bien, y un aviso que siempre sale deja de leerse.
+  if (!process.env.DATABASE_URL && (!process.env.DB_HOST || !process.env.DB_NAME)) {
+    console.warn('⚠️  Falta la conexión a la base: DATABASE_URL, o DB_HOST y DB_NAME.');
   }
 }
 
