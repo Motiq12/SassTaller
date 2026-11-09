@@ -1,6 +1,7 @@
 import { Component, ElementRef, OnInit, OnDestroy, ViewChild, inject } from '@angular/core';
 import { MarcaService } from '../../services/marca.service';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { TallerService } from '../../services/taller.service';
 import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -24,6 +25,18 @@ export class PortalLoginPage implements OnInit, OnDestroy {
   private loading = inject(LoadingController);
   private toast = inject(ToastController);
   marca = inject(MarcaService);
+  private route = inject(ActivatedRoute);
+  private taller = inject(TallerService);
+
+  /**
+   * Por dónde entra: el personal de un taller o un cliente. Es la misma autenticación
+   * (login unificado); lo que cambia es lo que se le ofrece a cada uno. Se recuerda en
+   * el navegador y se puede fijar con ?como=taller|cliente.
+   */
+  camino: 'taller' | 'cliente' | null = null;
+  ayudaClave = false;
+  /** Hay un taller resuelto (subdominio o ?taller=): las rutas de cliente funcionan. */
+  get conTaller(): boolean { return !!this.taller.actual(); }
 
   private destroy$ = new Subject<void>();
   email = '';
@@ -59,7 +72,26 @@ export class PortalLoginPage implements OnInit, OnDestroy {
     if (el && !this.ts) montarTurnstile(el.nativeElement).then(w => (this.ts = w));
   }
 
+  elegirCamino(c: 'taller' | 'cliente') {
+    this.camino = c;
+    if (c === 'taller') this.modo = 'clave';   // el código por correo es solo de clientes
+    try { localStorage.setItem(CLAVE_CAMINO, c); } catch { /* modo privado */ }
+  }
+
+  cambiarCamino() {
+    this.camino = null;
+    this.ayudaClave = false;
+    this.modo = 'clave';
+    try { localStorage.removeItem(CLAVE_CAMINO); } catch { /* modo privado */ }
+  }
+
   ngOnInit() {
+    const pedido = this.route.snapshot.queryParamMap.get('como');
+    let guardado: string | null = null;
+    try { guardado = localStorage.getItem(CLAVE_CAMINO); } catch { /* modo privado */ }
+    const c = pedido || guardado;
+    if (c === 'taller' || c === 'cliente') this.camino = c;
+
     // Si ya hay una sesión activa, mandamos a la zona que corresponde.
     if (this.portal.isLoggedIn()) this.router.navigate(['/portal'], { replaceUrl: true });
     else if (this.auth.isLoggedIn()) this.router.navigate([this.rutaStaff()], { replaceUrl: true });
@@ -245,3 +277,5 @@ export class PortalLoginPage implements OnInit, OnDestroy {
 
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); this.ts?.destroy(); }
 }
+
+const CLAVE_CAMINO = 'motiq_acceso_camino';

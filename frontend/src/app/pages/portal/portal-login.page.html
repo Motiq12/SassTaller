@@ -16,9 +16,29 @@
          campo "CORREO" y nada arriba: media pantalla vacía y ningún punto de entrada
          para la vista. Acá además no se repite el panel, porque la izquierda ya no
          dice qué hacer — dice de quién es. -->
-    <div class="acceso-intro" *ngIf="!paso2fa">
-      <h2>Iniciá sesión</h2>
-      <p>Entrá con el correo de tu cuenta.</p>
+    <!-- Dos caminos, una sola autenticación: quien entra sabe a qué está entrando.
+         El backend es el mismo (login unificado); cambia lo que se ofrece en cada uno. -->
+    <div class="acceso-intro" *ngIf="!paso2fa && !camino">
+      <h2>¿Cómo entrás?</h2>
+      <p>Elegí tu caso. Lo recordamos para la próxima vez.</p>
+    </div>
+    <div class="caminos" *ngIf="!paso2fa && !camino">
+      <button type="button" class="camino" (click)="elegirCamino('taller')">
+        <strong>Trabajo en un taller</strong>
+        <span>Administración, recepción y mecánicos.</span>
+      </button>
+      <button type="button" class="camino" (click)="elegirCamino('cliente')">
+        <strong>Soy cliente</strong>
+        <span>Seguí tu vehículo en el portal de tu taller.</span>
+      </button>
+    </div>
+
+    <div class="acceso-intro" *ngIf="!paso2fa && camino">
+      <h2>{{ camino === 'taller' ? 'Entrá a tu taller' : 'Entrá a tu portal' }}</h2>
+      <p>
+        {{ camino === 'taller' ? 'Con el correo y la contraseña de tu usuario del taller.' : 'Con el correo de tu cuenta de cliente.' }}
+        <button type="button" class="cambiar" (click)="cambiarCamino()">Cambiar</button>
+      </p>
     </div>
 
     <!-- PASO 2: verificación en dos pasos (personal con 2FA activo) -->
@@ -46,7 +66,7 @@
       </ion-card-content>
     </ion-card>
 
-    <ion-card *ngIf="!paso2fa" [class.rechazado]="fallo">
+    <ion-card *ngIf="!paso2fa && camino" [class.rechazado]="fallo">
       <ion-card-content>
         <ion-item lines="full">
           <ion-label position="stacked">Correo</ion-label>
@@ -75,7 +95,8 @@
             Ingresar con huella / Face ID
           </ion-button>
 
-          <a class="portal-link sub codigo-toggle" (click)="usarCodigo()">Entrar con un código a mi correo</a>
+          <!-- El código por correo es solo para clientes, y necesita saber de qué taller. -->
+          <a *ngIf="camino === 'cliente' && conTaller" class="portal-link sub codigo-toggle" (click)="usarCodigo()">Entrar con un código a mi correo</a>
         </ng-container>
 
         <!-- MODO CÓDIGO (OTP sin contraseña, solo clientes) -->
@@ -110,10 +131,33 @@
       </ion-card-content>
     </ion-card>
 
-    <a *ngIf="!paso2fa" class="portal-link strong" routerLink="/portal/registro">Crear una cuenta</a>
-    <a *ngIf="!paso2fa && modo === 'clave'" class="portal-link sub" routerLink="/portal/recuperar">¿Olvidaste tu contraseña?</a>
-    <!-- Dos altas distintas que es fácil confundir: arriba, un CLIENTE que se registra
-         en este taller; acá, un TALLER que se da de alta en el SaaS. -->
-    <a *ngIf="!paso2fa" class="portal-link sub" routerLink="/registro-taller">¿Tenés un taller? Registralo acá</a>
+    <!-- Cliente: crear cuenta y recuperar la contraseña son del portal de SU taller.
+         Sin taller resuelto (motiq12.com a secas) esas rutas no saben de quién es, así
+         que se explica dónde hacerlo en vez de mandar a un formulario que fallaría. -->
+    <ng-container *ngIf="!paso2fa && camino === 'cliente'">
+      <ng-container *ngIf="conTaller">
+        <a class="portal-link strong" routerLink="/portal/registro">Crear una cuenta</a>
+        <a *ngIf="modo === 'clave'" class="portal-link sub" routerLink="/portal/recuperar">¿Olvidaste tu contraseña?</a>
+      </ng-container>
+      <p *ngIf="!conTaller" class="nota-camino">
+        ¿Primera vez, o no recordás tu contraseña? Abrí el enlace del portal que te compartió tu taller:
+        ahí podés crear tu cuenta, entrar con un código o recuperarla.
+      </p>
+    </ng-container>
+
+    <!-- Personal del taller: hoy no hay recuperación de contraseña por cuenta propia
+         (solo se cambia con la sesión iniciada), así que se dice cómo pedirla. -->
+    <ng-container *ngIf="!paso2fa && camino === 'taller'">
+      <button type="button" class="portal-link sub boton-enlace" (click)="ayudaClave = !ayudaClave"
+              [attr.aria-expanded]="ayudaClave">¿Olvidaste tu contraseña?</button>
+      <p *ngIf="ayudaClave" class="nota-camino">
+        Por ahora la contraseña del personal la recuperamos nosotros:
+        <a routerLink="/" fragment="contacto">escribinos desde el formulario de contacto</a>
+        con tu correo y el nombre de tu taller, y te ayudamos.
+      </p>
+      <!-- Dos altas distintas que es fácil confundir: un CLIENTE se registra en el
+           portal de su taller; un TALLER se da de alta en el SaaS, acá. -->
+      <a class="portal-link sub" routerLink="/registro-taller">¿Tenés un taller? Registralo acá</a>
+    </ng-container>
   </div>
 </ion-content>
