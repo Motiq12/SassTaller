@@ -1,10 +1,16 @@
 [phases.setup]
 nixPkgs = ["nodejs_22"]
 
+# La app corre con NODE_ENV=production (variable de Railway), y con eso npm omite las
+# devDependencies. El backend no las necesita, pero el frontend sí: @angular/cli, que
+# trae el comando `ng`, es de desarrollo. El build dependía de que Nixpacks forzara
+# NPM_CONFIG_PRODUCTION=false por su cuenta; el 2026-11-09 dejó de hacerlo y tres
+# despliegues seguidos fallaron con "could not determine executable to run".
+# `--include=dev` lo pide explícitamente, pase lo que pase con el entorno del build.
 [phases.install]
 cmds = [
-  "npm install --prefix backend",
-  "npm install --prefix frontend"
+  "npm install --prefix backend --omit=dev",
+  "npm install --prefix frontend --include=dev"
 ]
 
 [phases.build]
