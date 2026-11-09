@@ -13,7 +13,7 @@ interface Ajuste {
  * que cambia. Son botones role="switch": clic, Espacio y Enter.
  */
 @Component({
-  selector: 'lp-adapta',
+  selector: 'app-lp-adapta',
   templateUrl: './adapta.component.html',
   styleUrls: ['./adapta.component.scss'],
   standalone: false,

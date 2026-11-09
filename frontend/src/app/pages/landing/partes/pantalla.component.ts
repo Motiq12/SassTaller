@@ -16,7 +16,7 @@ export type TipoPantalla = 'historial' | 'portal' | 'agenda' | 'reportes' | 'ord
  * (bordes, etiquetas chicas, monoespaciada en los montos).
  */
 @Component({
-  selector: 'lp-pantalla',
+  selector: 'app-lp-pantalla',
   templateUrl: './pantalla.component.html',
   styleUrls: ['./pantalla.component.scss'],
   standalone: false,

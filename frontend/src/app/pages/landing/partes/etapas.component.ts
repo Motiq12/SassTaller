@@ -10,7 +10,7 @@ import { ETAPAS } from './datos';
  * flechas del teclado y un lector de pantalla, y no depende del scroll.
  */
 @Component({
-  selector: 'lp-etapas',
+  selector: 'app-lp-etapas',
   templateUrl: './etapas.component.html',
   styleUrls: ['./etapas.component.scss'],
   standalone: false,

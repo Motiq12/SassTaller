@@ -13,7 +13,7 @@ interface Problema {
  * (la firma de movimiento de la página) hasta que el visitante elige uno.
  */
 @Component({
-  selector: 'lp-vitrina',
+  selector: 'app-lp-vitrina',
   templateUrl: './vitrina.component.html',
   styleUrls: ['./vitrina.component.scss'],
   standalone: false,

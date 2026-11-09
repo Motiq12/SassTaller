@@ -9,7 +9,7 @@ import { PRODUCTO } from '../../../shared/producto';
  * no se da de alta solo: lo que se deja acá cae en la bandeja del panel de Motiq.
  */
 @Component({
-  selector: 'lp-cupon',
+  selector: 'app-lp-cupon',
   templateUrl: './cupon.component.html',
   styleUrls: ['./cupon.component.scss'],
   standalone: false,

@@ -8,7 +8,7 @@ import { Directive, ElementRef, Input, OnDestroy, OnInit, inject } from '@angula
  * `.lp-js`, que la landing pone cuando el script ya está corriendo, y con
  * movimiento reducido el estilo lo anula.
  */
-@Directive({ selector: '[lpAparece]', standalone: false })
+@Directive({ selector: '[appAparece]', standalone: false })
 export class ApareceDirective implements OnInit, OnDestroy {
   private el = inject(ElementRef<HTMLElement>);
   private obs?: IntersectionObserver;
