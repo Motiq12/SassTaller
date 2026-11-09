@@ -1,70 +1,89 @@
-@use 'base' as *;
+@use 'sistema' as *;
 
 :host { display: block; }
 
-.confianza { padding: $entre-secciones $margen 0; }
+.confianza {
+  padding-top: u(4);
+  padding-bottom: u(4);
+  @include lados;
+  @media (min-width: 640px) { padding-top: u(5.5); padding-bottom: u(5); }
+}
+.rotulo { @include rotulo; @include entrada(u(0.75)); }
+.titulo { @include titulo-seccion; font-size: min(max(34px, #{u(3)}), 10.5vw); @include lineas; }
 
-h2 { @include titulo($t-seccion); max-width: 13ch; @include entrada; }
-
-// Cuatro hechos en dos columnas, sobre el escalón de tono: una superficie, sin bordes.
+// Las cuatro garantías como tarjetas, al estilo de los testimonios de Baseline: se
+// levantan apenas al pasar el puntero.
 .garantias {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2px;
-  margin: clamp(48px, 6vw, 80px) 0 0;
-  border-radius: 24px;
-  overflow: hidden;
+  gap: u(1);
+  margin: u(2.5) 0 0;
+  @media (min-width: 640px) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (min-width: 1200px) { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: u(3.5); }
 }
 .garantia {
-  padding: clamp(28px, 3vw, 44px);
-  background: $suelo-2;
-  @include entrada;
+  display: flex;
+  flex-direction: column;
+  min-height: max(15rem, #{u(17)});
+  padding: u(1.5);
+  border-radius: $r-tarjeta;
+  background: $superficie;
+  transition: transform 0.5s $expo, box-shadow 0.5s $expo, background-color 0.3s $quart;
+  @include entrada(u(1.5));
+  @media (hover: hover) and (min-width: 769px) {
+    &.visto:hover, &:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 u(1) u(2.5) rgba(10, 10, 10, 0.08);
+      background: $papel;
+    }
+  }
+}
+.indice {
+  align-self: flex-start;
+  padding: 4px 12px;
+  border-radius: $r-pildora;
+  background: $papel;
+  font-family: $fd;
+  font-size: max(13px, #{u(0.8)});
+  font-weight: 600;
+  color: $carmesi;
 }
 dt {
-  margin: 0 0 10px;
+  margin-top: auto;
+  padding-top: u(2);
   font-family: $fd;
-  font-size: clamp(22px, 2vw, 30px);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: $tinta;
+  font-size: max(20px, #{u(1.375)});
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
 }
-dd { margin: 0; max-width: 44ch; font-family: $fb; font-size: $t-texto; line-height: 1.6; color: $tinta; }
+dd { margin: 8px 0 0; font-size: max(15px, #{u(0.9)}); line-height: 1.6; color: $tinta; }
 
 .cierre {
-  margin: 32px 0 0;
-  max-width: 60ch;
-  font-family: $fb;
-  font-size: $t-texto;
+  max-width: 44rem;
+  margin: u(2.5) 0 0;
+  font-size: max(15px, #{u(0.95)});
   line-height: 1.6;
-  color: $suave;
-  @include entrada;
+  color: $tinta-suave;
+  @include entrada(u(0.75));
   a, .enlace {
-    padding: 0;
-    border: 0;
-    background: none;
     color: $tinta;
-    font: inherit;
+    font-weight: 600;
     text-decoration: underline;
     text-decoration-color: $carmesi;
-    text-decoration-thickness: 2px;
-    text-underline-offset: 4px;
-    cursor: pointer;
-    &:hover { color: #fff; }
-    &:focus-visible { outline: 3px solid $tinta; outline-offset: 3px; border-radius: 4px; }
+    text-underline-offset: 3px;
   }
+  .enlace { padding: 0; border: 0; background: none; font: inherit; font-weight: 600; cursor: pointer; }
+  a:focus-visible, .enlace:focus-visible { outline: 2px solid $carmesi; outline-offset: 2px; border-radius: 4px; }
 }
 
 .testimonios {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 32px;
-  margin: 64px 0 0;
+  gap: u(1);
+  margin: u(2.5) 0 0;
   padding: 0;
   list-style: none;
-  blockquote { margin: 0 0 12px; font-family: $fd; font-size: $t-lista; line-height: 1.2; color: $tinta; }
-  p { margin: 0; font-size: $t-chica; color: $suave; }
-}
-
-@media (max-width: 760px) {
-  .garantias { grid-template-columns: 1fr; }
+  @media (min-width: 900px) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  li { padding: u(1.75); border-radius: $r-tarjeta; background: $noche; color: #fff; }
+  blockquote { margin: 0; font-family: $fd; font-size: max(20px, #{u(1.375)}); line-height: 1.35; }
+  p { margin: u(1) 0 0; color: blanco(0.7); font-size: 14px; }
 }

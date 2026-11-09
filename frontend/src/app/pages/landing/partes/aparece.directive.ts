@@ -2,7 +2,7 @@ import { Directive, ElementRef, Input, OnDestroy, OnInit, inject } from '@angula
 
 /**
  * Entrada de una pieza cuando su sección entra en pantalla: le pone `.visto` una
- * sola vez y el estilo (mixin `entrada` de _base.scss) la hace subir y aparecer.
+ * sola vez y el estilo (mixin `entrada` de _sistema.scss) la hace subir y aparecer.
  *
  * El contenido nunca depende de esto: el estado oculto solo se aplica bajo
  * `.lp-js`, que la landing pone cuando el script ya está corriendo, y con

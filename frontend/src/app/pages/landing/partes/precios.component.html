@@ -1,5 +1,11 @@
 <section class="precios" aria-labelledby="precios-titulo">
-  <h2 id="precios-titulo" appAparece>Empezás con todo. Después, seguís gratis.</h2>
+  <div class="cabeza">
+    <p class="rotulo" appAparece>Precios</p>
+    <h2 id="precios-titulo" class="titulo" appAparece>
+      <span class="l"><span style="--i: 0">Empezás con todo.</span></span>
+      <span class="l"><span style="--i: 1">Después, seguís gratis</span></span>
+    </h2>
+  </div>
 
   <!-- Escritorio: una tabla de verdad, para comparar fila por fila. -->
   <div class="tabla-marco" appAparece [retraso]="80">
@@ -25,8 +31,8 @@
         <tr>
           <td></td>
           <td *ngFor="let c of columnas" [class.medio]="c.clave === 'gratis'">
-            <a *ngIf="c.destino === 'registro'" class="accion" [class.secundaria]="c.clave === 'gratis'" routerLink="/registro-taller">{{ c.accion }}</a>
-            <button *ngIf="c.destino === 'contacto'" type="button" class="accion secundaria" (click)="hablar.emit()">{{ c.accion }}</button>
+            <a *ngIf="c.destino === 'registro'" class="accion" [class.secundaria]="c.clave === 'gratis'" routerLink="/registro-taller">{{ c.accion }} <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></a>
+            <button *ngIf="c.destino === 'contacto'" type="button" class="accion secundaria" (click)="hablar.emit()">{{ c.accion }} <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></button>
           </td>
         </tr>
       </tfoot>
@@ -40,12 +46,14 @@
       <dl>
         <div *ngFor="let f of filas"><dt>{{ f.rasgo }}</dt><dd>{{ f.valores[c.clave] }}</dd></div>
       </dl>
-      <a *ngIf="c.destino === 'registro'" class="accion" [class.secundaria]="c.clave === 'gratis'" routerLink="/registro-taller">{{ c.accion }}</a>
-      <button *ngIf="c.destino === 'contacto'" type="button" class="accion secundaria" (click)="hablar.emit()">{{ c.accion }}</button>
+      <a *ngIf="c.destino === 'registro'" class="accion" [class.secundaria]="c.clave === 'gratis'" routerLink="/registro-taller">{{ c.accion }} <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></a>
+      <button *ngIf="c.destino === 'contacto'" type="button" class="accion secundaria" (click)="hablar.emit()">{{ c.accion }} <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></button>
     </article>
   </div>
 
   <div class="dia31" appAparece>
+    <span class="dia31-num" aria-hidden="true">{{ planes.dias_prueba + 1 }}</span>
+    <div>
     <h3>¿Qué pasa a los {{ planes.dias_prueba }} días?</h3>
     <p>
       Tu taller pasa solo al plan Gratis. No se borra nada, no hay cobros automáticos y seguís
@@ -53,5 +61,6 @@
       <ng-container *ngIf="topesGratis">Si en la prueba sumaste más de {{ topesGratis }}, lo que ya
       tenés sigue funcionando; para agregar más, pasás a Pro.</ng-container>
     </p>
+    </div>
   </div>
 </section>

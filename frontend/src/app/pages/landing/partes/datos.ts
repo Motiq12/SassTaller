@@ -41,7 +41,7 @@ export const ORDEN = {
 export const TOTAL_ORDEN = ORDEN.lineas.reduce((s, l) => s + l.monto, 0);   // 84.500
 
 export const ETAPAS = [
-  { nombre: 'Recepción', frase: 'Primero, la moto entra.', estado: E.recepcion.label, tono: 'neutro',
+  { nombre: 'Recepción', frase: 'Primero, el vehículo entra.', estado: E.recepcion.label, tono: 'neutro',
     detalle: 'Recepción registra la placa, el kilometraje, el combustible y lo que cuenta el cliente, y la orden queda asignada a un mecánico.' },
   { nombre: 'Diagnóstico', frase: 'Después, el diagnóstico.', estado: E.esperando_aprobacion.label, tono: 'ambar',
     detalle: 'El mecánico anota lo que encontró y se arma el presupuesto, que le llega al cliente a su portal.' },
@@ -109,3 +109,16 @@ export const SERVICIOS_TOP = [
   { nombre: 'Frenos', veces: 9 },
   { nombre: 'Kit de arrastre', veces: 6 },
 ];
+
+/**
+ * Tres momentos del producto que pasan en la portada (tarjeta de vidrio). Salen de
+ * los mismos datos de ejemplo que las pantallas: la orden, la agenda y el historial.
+ */
+export const MOMENTOS = [
+  { sello: 'OT', rotulo: ORDEN.numero, titulo: 'Presupuesto aprobado', nota: 'Desde el portal del cliente' },
+  { sello: '9:30', rotulo: 'Agenda de Diego', titulo: 'Toyota Yaris · Frenos', nota: ESTADO_CITA_LABEL['en_revision'] },
+  { sello: 'MOT', rotulo: 'Historial de la placa', titulo: `${HISTORIAL.length} órdenes este año`, nota: crc(TOTAL_HISTORIAL) },
+];
+
+/** Los tipos de vehículo que atiende Motiq, en palabras (ver utils/tipos-vehiculo.js). */
+export const VEHICULOS_TEXTO = 'motos, autos, camiones, buses y busetas';

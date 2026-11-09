@@ -3,6 +3,7 @@ import {
 } from '@angular/core';
 import { PRODUCTO } from '../../../shared/producto';
 import type { Disco, Encuadre } from './disco-3d';
+import { MOMENTOS, VEHICULOS_TEXTO } from './datos';
 
 /**
  * La portada: el titular a la izquierda y el disco de freno a la derecha.
@@ -29,8 +30,19 @@ export class HeroComponent implements AfterViewInit, OnDestroy {
 
   @ViewChild('lienzo', { static: true }) lienzo!: ElementRef<HTMLCanvasElement>;
   @Output() hablar = new EventEmitter<void>();
+  /** Abre el menú de pantalla completa. */
+  @Output() menu = new EventEmitter<void>();
+  /** Lleva a una sección de la página. */
+  @Output() ir = new EventEmitter<string>();
 
   producto = PRODUCTO;
+  readonly vehiculos = VEHICULOS_TEXTO;
+
+  // Momentos del producto en la tarjeta de vidrio: pasan solos cada 3,8 s mientras
+  // la portada se ve, y se detienen con movimiento reducido o al elegir uno.
+  readonly momentos = MOMENTOS;
+  momento = 0;
+  private reloj?: ReturnType<typeof setInterval>;
   con3d = false;
   /** Una imagen de 1,3 veces el diámetro: deja lugar al caliper, que sobresale. */
   readonly FOTO_ESCALA = 1.3;
@@ -47,6 +59,11 @@ export class HeroComponent implements AfterViewInit, OnDestroy {
 
   ngAfterViewInit() {
     this.encuadrar();
+    if (!this.reducido) {
+      this.reloj = setInterval(() => {
+        if (this.visible && !document.hidden) this.momento = (this.momento + 1) % this.momentos.length;
+      }, 3800);
+    }
     if (this.reducido || gamaBaja()) {
       // Imagen fija y nada más: ni siquiera se baja Three.js.
       marcarVariante('fija');
@@ -57,7 +74,14 @@ export class HeroComponent implements AfterViewInit, OnDestroy {
     this.zona.runOutsideAngular(() => cuandoEsteLibre(() => this.iniciar()));
   }
 
+  /** Elegir un momento a mano detiene el paso automático. */
+  elegirMomento(i: number) {
+    this.momento = i;
+    clearInterval(this.reloj);
+  }
+
   ngOnDestroy() {
+    clearInterval(this.reloj);
     cancelAnimationFrame(this.raf);
     this.quitar.forEach((f) => f());
     this.disco?.destruir();
@@ -71,18 +95,16 @@ export class HeroComponent implements AfterViewInit, OnDestroy {
     // Encuadre centrado y entero, solo para regenerar la imagen fija del disco
     // (assets/landing/disco-freno.webp) a partir de este mismo render.
     if (location.search.includes('retrato-disco')) return { cx: 0.5, cy: 0.5, diametro: Math.min(w, h) / 1.4 };
-    const BARRA = 84;   // alto de la barra fija + aire: el disco nunca pasa por debajo de ella
     if (w / h >= 0.95) {
-      // Escritorio: a la derecha, entero o apenas cortado por el borde (6 %), centrado
-      // en el alto que queda debajo de la barra y sin tocar el titular.
-      const d = Math.min((h - BARRA - 40) * 0.94, w * 0.46);
-      const centroX = w + d * 0.06 - d / 2;
-      const centroY = BARRA + (h - BARRA) / 2;
-      return { cx: centroX / w, cy: centroY / h, diametro: d };
+      // Escritorio: el disco es la "foto" de la tarjeta oscura. Va a la derecha del
+      // centro, debajo del titular gigante; las tarjetas de vidrio quedan sobre su
+      // borde de abajo.
+      const d = Math.min(h * 0.66, w * 0.4);
+      return { cx: 0.64, cy: 0.57, diametro: d };
     }
-    // Teléfono: arriba, debajo de la barra, cortado a la derecha; el titular abajo.
-    const d = Math.min(w * 0.9, h * 0.42);
-    return { cx: (w * 0.56) / w, cy: (BARRA + d / 2) / h, diametro: d };
+    // Teléfono: entre el titular y el texto de abajo, cortado por la derecha.
+    const d = Math.min(w * 0.82, h * 0.4);
+    return { cx: 0.64, cy: 0.47, diametro: d };
   }
 
   private encuadrar() {

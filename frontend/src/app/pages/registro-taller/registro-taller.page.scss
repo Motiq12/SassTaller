@@ -1,7 +1,27 @@
-// El registro es el paso siguiente a "Probá gratis" de la landing: mismo suelo
-// oscuro, mismo carmesí, mismas fuentes. Los tokens salen de la landing para que
-// las dos pantallas no se separen con el tiempo.
-@use '../landing/partes/base' as *;
+// El registro es el paso siguiente a "Probá gratis" de la landing, con su mismo
+// sistema (landing/partes/_sistema.scss): página clara con marco, la columna de la
+// izquierda como tarjeta negra y el formulario en grupos grises con campos blancos.
+@use '../landing/partes/sistema' as s;
+
+// Los nombres de siempre de este archivo, apuntando a los tokens del sistema.
+$suelo: s.$papel;          // la página
+$suelo-2: s.$superficie;   // los grupos del formulario
+$suelo-3: #fff;            // campos y opciones, sobre el gris
+$tinta: s.$tinta;
+$suave: s.$tinta-suave;
+$carmesi: s.$carmesi;
+$carmesi-hondo: s.$carmesi-hondo;
+$carmesi-texto: s.$carmesi-hondo;   // carmesí como texto sobre claro
+$fd: s.$fd;
+$fb: s.$fb;
+$t-entrada: clamp(18px, 1.4vw, 21px);
+$t-texto: 17px;
+$t-chica: 15px;
+$margen: clamp(16px, 4vw, 56px);
+$curva: s.$quart;
+$verde: #15803d;
+
+@mixin oculto { @include s.oculto; }
 
 ion-content.registro {
   --background: #{$suelo};
@@ -37,8 +57,8 @@ ion-content.registro {
   font-weight: 700;
   letter-spacing: -0.02em;
   border-radius: 8px;
-  img { width: 30px; height: 30px; filter: brightness(0) invert(1); }   // isotipo en blanco
-  &:focus-visible { outline: 3px solid $tinta; outline-offset: 4px; }
+  img { width: 30px; height: 30px; filter: brightness(0); }   // isotipo en negro, sobre claro
+  &:focus-visible { outline: 2px solid $carmesi; outline-offset: 4px; }
 }
 
 .ya {
@@ -66,15 +86,29 @@ ion-content.registro {
   padding-top: clamp(24px, 5vw, 72px);
 }
 
+// La tarjeta negra, como la portada de la landing.
 .lado {
   position: sticky;
-  top: 32px;
+  top: 16px;
+  overflow: hidden;
+  padding: clamp(28px, 3vw, 44px);
+  border-radius: 32px;
+  background:
+    radial-gradient(ellipse 70% 50% at 80% 0%, rgba(225, 29, 72, 0.24), transparent 70%),
+    s.$noche;
+  color: #fff;
 }
 
 h1 {
-  @include titulo($t-lista);
-  font-size: clamp(36px, 3.6vw, 60px);
+  margin: 0;
   max-width: 14ch;
+  font-family: $fd;
+  font-size: clamp(36px, 3.6vw, 60px);
+  font-weight: 600;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  color: #fff;
 }
 
 .bajada {
@@ -82,7 +116,7 @@ h1 {
   max-width: 44ch;
   font-size: $t-texto;
   line-height: 1.6;
-  color: $tinta;
+  color: s.blanco(0.85);
 }
 
 .chica {
@@ -90,7 +124,7 @@ h1 {
   max-width: 44ch;
   font-size: $t-chica;
   line-height: 1.5;
-  color: $suave;
+  color: s.blanco(0.65);
 }
 
 // La ficha del taller sobre el disco carmesí: el motivo de la landing.
@@ -185,8 +219,8 @@ h2 {
   margin: 0;
   font-family: $fd;
   font-size: clamp(24px, 2vw, 30px);
-  font-weight: 700;
-  letter-spacing: -0.03em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   color: $tinta;
 }
 
@@ -204,18 +238,18 @@ input:not([type='checkbox']) {
   width: 100%;
   min-height: 54px;
   padding: 12px 16px;
-  border: 0;
+  border: 1px solid s.$linea;
   border-radius: 14px;
   background: $suelo-3;
   color: $tinta;
   font-family: $fb;
   font-size: $t-texto;    // 16 px o más: iOS no hace zoom al enfocar
   outline: none;
-  transition: background-color 0.2s $curva, box-shadow 0.2s $curva;
-  &::placeholder { color: #6b6b6b; }
+  transition: border-color 0.2s $curva, box-shadow 0.2s $curva;
+  &::placeholder { color: #9b9ba3; }
   &::-ms-reveal { display: none; }   // el ojo de Edge: ya está el botón "Ver"
-  &:hover { background: #262626; }
-  &:focus-visible, &:focus { background: #262626; outline: 2px solid $carmesi; outline-offset: 0; }
+  &:hover { border-color: #c4c4cc; }
+  &:focus-visible, &:focus { border-color: $carmesi; box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.15); }
 }
 
 .con-boton {
@@ -238,7 +272,7 @@ input:not([type='checkbox']) {
   font-weight: 600;
   cursor: pointer;
   &:hover { color: $tinta; }
-  &:focus-visible { outline: 2px solid $tinta; }
+  &:focus-visible { outline: 2px solid $carmesi; }
 }
 
 .estado {
@@ -246,7 +280,7 @@ input:not([type='checkbox']) {
   font-size: $t-chica;
   line-height: 1.45;
   color: $suave;
-  .ok { color: #4ade80; font-weight: 600; }
+  .ok { color: $verde; font-weight: 600; }
   .mal { color: $carmesi-texto; font-weight: 600; }
 }
 
@@ -267,6 +301,7 @@ input:not([type='checkbox']) {
   gap: 12px;
   min-height: 56px;
   padding: 0 22px 0 16px;
+  border: 1px solid s.$linea;
   border-radius: 999px;
   background: $suelo-3;
   font-size: $t-texto;
@@ -280,25 +315,42 @@ input:not([type='checkbox']) {
     width: 22px;
     height: 22px;
     border-radius: 50%;
-    background: #3a3a3a;
+    background: s.$linea;
     transition: background-color 0.2s $curva, box-shadow 0.2s $curva;
   }
-  &:hover { background: #262626; }
+  &:hover { border-color: #c4c4cc; }
   &.marcado {
+    border-color: $carmesi;
     background: $carmesi;
     color: #fff;
     &::before { background: #fff; box-shadow: inset 0 0 0 6px $carmesi-hondo; }   // taste-skill-ignore: el anillo del disco, no una sombra
   }
-  &:focus-within { outline: 2px solid $tinta; outline-offset: 3px; }
+  &:focus-within { outline: 2px solid $carmesi; outline-offset: 3px; }
 }
 
 .crear {
-  @include boton;
   width: 100%;
   min-height: 60px;
+  // La píldora carmesí de la landing, escrita a mano: el mixin completo pasaba el
+  // tope de tamaño del componente.
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   border: 0;
+  border-radius: 999px;
+  background: $carmesi;
+  color: #fff;
+  font-family: $fb;
+  font-size: 15px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   cursor: pointer;
-  &:disabled { cursor: not-allowed; background: $suelo-3; color: $suave; transform: none; }
+  transition: background-color 0.25s $curva;
+  &:hover:not(:disabled) { background: $carmesi-hondo; }
+  &:focus-visible { outline: 2px solid $carmesi; outline-offset: 3px; }
+  &:disabled { cursor: not-allowed; background: s.$linea; color: $suave; opacity: 1; transform: none; }
   ion-spinner { width: 22px; height: 22px; color: #fff; }
 }
 .falta { margin: -6px 0 0; text-align: center; font-size: $t-chica; color: $suave; }
@@ -316,7 +368,7 @@ input:not([type='checkbox']) {
   list-style: none;
   li {
     padding-top: 12px;
-    border-top: 4px solid $suelo-3;
+    border-top: 4px solid s.$linea;
     font-size: $t-chica;
     font-weight: 600;
     color: $suave;
@@ -348,9 +400,9 @@ h2:focus { outline: none; }
   font-weight: 700;
   cursor: pointer;
   &:disabled { cursor: not-allowed; opacity: 0.5; }
-  &:focus-visible { outline: 3px solid $tinta; outline-offset: 3px; }
+  &:focus-visible { outline: 2px solid $carmesi; outline-offset: 3px; }
 }
-.reintentar, .volver { background: $suelo-3; color: $tinta; &:hover:not(:disabled) { background: #2a2a2a; } }
+.reintentar, .volver { border: 1px solid s.$linea; background: $suelo-3; color: $tinta; &:hover:not(:disabled) { border-color: $tinta; } }
 
 .legal {
   margin: 0;
@@ -368,7 +420,7 @@ h2:focus { outline: none; }
 }
 
 // --- Cierre ------------------------------------------------------------------------
-.texto { margin: 0; font-size: $t-texto; line-height: 1.6; &.ok { color: #4ade80; font-weight: 600; } }
+.texto { margin: 0; font-size: $t-texto; line-height: 1.6; &.ok { color: $verde; font-weight: 600; } }
 .canje {
   display: flex;
   gap: 12px;
@@ -415,6 +467,7 @@ h2 .opcional { font-family: $fb; font-size: $t-chica; }
   display: grid;
   place-items: center;
   overflow: hidden;
+  border: 1px solid s.$linea;
   border-radius: 18px;
   background: $suelo-3;
   color: $suave;
@@ -431,12 +484,13 @@ h2 .opcional { font-family: $fb; font-size: $t-chica; }
   align-items: center;
   min-height: 44px;
   padding: 0 18px;
+  border: 1px solid s.$linea;
   border-radius: 999px;
   background: $suelo-3;
   color: $tinta;
   cursor: pointer;
-  transition: background-color 0.2s $curva;
-  &:hover { background: #262626; }
+  transition: border-color 0.2s $curva;
+  &:hover { border-color: $tinta; }
   &:focus-within { outline: 2px solid $carmesi; outline-offset: 2px; }
   input { position: absolute; width: 1px; height: 1px; padding: 0; min-height: 0; opacity: 0; }
 }
@@ -464,7 +518,7 @@ h2 .opcional { font-family: $fb; font-size: $t-chica; }
   border-radius: 12px;
   cursor: pointer;
   &.elegida { outline: 3px solid $tinta; outline-offset: 2px; }
-  &:focus-visible { outline: 2px solid $tinta; outline-offset: 2px; }
+  &:focus-visible { outline: 2px solid $carmesi; outline-offset: 2px; }
 }
 input.muestra-libre {
   width: 44px;

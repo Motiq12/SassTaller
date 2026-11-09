@@ -1,24 +1,53 @@
-<section class="vitrina" aria-labelledby="vitrina-titulo">
-  <div class="escenario" appAparece [retraso]="120">
-    <div class="plato" aria-hidden="true"></div>
-    <div class="pantallas" [class.lento]="lento">
-      <app-lp-pantalla *ngFor="let p of problemas; let i = index"
-                   class="pantalla" [class.activa]="i === activo"
-                   [tipo]="p.pantalla" [etapa]="p.etapa ?? 0" [attr.aria-hidden]="i !== activo"></app-lp-pantalla>
+<section class="vitrina" aria-labelledby="vitrina-titulo" aria-roledescription="carrusel" appAparece>
+  <h2 id="vitrina-titulo" class="oculto">Lo que deja de pasar en tu taller</h2>
+
+  <div class="arriba">
+    <div class="insignia" appAparece>
+      <span class="insignia-valor">6</span>
+      <span class="insignia-texto">tipos de vehículo, de motos a buses</span>
     </div>
+
+    <article class="problema" appAparece [retraso]="120" aria-live="polite">
+      <span class="indice">#0{{ activo + 1 }}</span>
+      <div>
+        <h3>{{ problemas[activo].nombre }}</h3>
+        <p>{{ problemas[activo].hecho }}</p>
+      </div>
+    </article>
   </div>
 
-  <div class="lista">
-    <h2 id="vitrina-titulo" appAparece>Lo que deja de pasar</h2>
-    <div class="nombres" role="tablist" aria-label="Problemas del taller" appAparece [retraso]="60">
-      <button *ngFor="let p of problemas; let i = index" type="button" role="tab" class="nombre"
-              [class.activo]="i === activo" [attr.aria-selected]="i === activo"
-              [attr.tabindex]="i === activo ? 0 : -1"
-              (click)="elegir(i)" (keydown)="teclado($event, i)">
-        {{ p.nombre }}
-      </button>
-    </div>
+  <!-- Las palabras gigantes de fondo. Se re-crean con cada diapositiva, así vuelven a
+       subir desde su máscara. Son decorado: el texto que importa está en la tarjeta. -->
+  <div class="fantasmas" aria-hidden="true">
+    <ng-container *ngFor="let d of diapositiva">
+      <div class="fila">
+        <span class="palabra p1"><span>{{ problemas[d].palabras[0] }}</span></span>
+        <span class="palabra p2"><span>{{ problemas[d].palabras[1] }}</span></span>
+      </div>
+      <div class="fila">
+        <span class="palabra p3 tinta"><span>{{ problemas[d].palabras[2] }}</span></span>
+        <span class="palabra p4"><span>{{ problemas[d].palabras[3] }}</span></span>
+      </div>
+    </ng-container>
   </div>
 
-  <p class="hecho" aria-live="polite" appAparece [retraso]="180">{{ problemas[activo].hecho }}</p>
+  <!-- La pantalla que resuelve el problema, inclinada en el centro. -->
+  <figure class="pantalla-marco" appAparece>
+    <ng-container *ngFor="let d of diapositiva">
+      <app-lp-pantalla class="pantalla" [tipo]="problemas[d].pantalla" [etapa]="problemas[d].etapa ?? 0"></app-lp-pantalla>
+    </ng-container>
+  </figure>
+
+  <div class="controles">
+    <button type="button" class="flecha anterior" (click)="ir(activo - 1)" aria-label="Problema anterior">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+    </button>
+    <div class="puntos" role="group" aria-label="Problemas">
+      <button *ngFor="let p of problemas; let i = index" type="button" (click)="ir(i)"
+              [attr.aria-current]="i === activo" [attr.aria-label]="p.nombre"><span></span></button>
+    </div>
+    <button type="button" class="flecha siguiente" (click)="ir(activo + 1)" aria-label="Problema siguiente">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+    </button>
+  </div>
 </section>

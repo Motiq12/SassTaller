@@ -1,0 +1,246 @@
+// El sistema de la web pública de Motiq: la estructura y el movimiento de "Baseline"
+// llevados a los colores de Motiq. Lo usan la landing, el registro, los legales y la
+// puerta de acceso (sin taller). La app del personal y el portal de cada taller NO lo
+// usan: tienen su propio tema.
+//
+//   · Página clara, secciones oscuras como tarjetas redondeadas dentro de un marco.
+//   · Negro #0A0A0A donde Baseline usa azul marino; carmesí #E11D48 donde usa azul.
+//   · Todo se mide en `u()`: una unidad que escala con el ancho (como el rem adaptativo
+//     de Baseline) pero vive en --u, así no toca el tamaño de letra del resto de la app.
+//
+// Cada parte lo importa con `@use 'sistema' as *;` (o la ruta que le toque).
+
+// ── Escala ────────────────────────────────────────────────────────────────────────
+// 1u = 16 px en 1920 y en 1440, escala proporcional entre medio, y en el teléfono
+// toma 360 px de base. Se fija con @include escala en la raíz de cada página.
+@function u($n) { @return calc(var(--u, 16px) * #{$n}); }
+
+@mixin escala {
+  --u: 16px;
+  @media (max-width: 1920px) { --u: 0.833333vw; }
+  @media (max-width: 1440px) { --u: 1.111111vw; }
+  @media (max-width: 1024px) { --u: 1.5625vw; }
+  @media (max-width: 640px) { --u: 4.444444vw; }
+  @media (min-width: 1921px) { --u: calc(16px + (100vw - 1920px) * 0.0055); }
+}
+
+// ── Color ─────────────────────────────────────────────────────────────────────────
+$papel: #ffffff;          // el fondo de la página
+$superficie: #f4f4f5;     // secciones claras de segundo plano
+$tinta: #0a0a0a;          // títulos y texto sobre claro
+$tinta-suave: #66666f;    // texto secundario (5,6:1 sobre blanco, 5,1:1 sobre la superficie)
+$fantasma: #e1e1e6;       // las palabras gigantes de fondo
+$linea: #e4e4e9;          // separadores sobre claro
+$noche: #0a0a0a;          // tarjetas oscuras: portada, números, pie
+$noche-2: #18181b;
+$carmesi: #e11d48;        // el único acento
+$carmesi-hondo: #be123c;  // hover del carmesí
+$carmesi-claro: #fb7185;  // carmesí como texto o foco sobre negro
+
+// Blanco con transparencia, para lo que va sobre las tarjetas oscuras.
+@function blanco($a) { @return rgba(255, 255, 255, $a); }
+
+// ── Forma ─────────────────────────────────────────────────────────────────────────
+$r-xl: u(0.75);
+$r-tarjeta: u(1.5);
+$r-tarjeta-lg: u(2);
+$r-pildora: 999px;
+
+// ── Letra ─────────────────────────────────────────────────────────────────────────
+$fd: 'Outfit', 'Plus Jakarta Sans', system-ui, sans-serif;     // títulos
+$fb: 'Plus Jakarta Sans', 'Outfit', system-ui, sans-serif;     // cuerpo
+
+// ── Movimiento ────────────────────────────────────────────────────────────────────
+$expo: cubic-bezier(0.16, 1, 0.3, 1);          // revelados: sube rápido y se asienta
+$quart: cubic-bezier(0.25, 1, 0.5, 1);
+$resorte: cubic-bezier(0.34, 1.36, 0.64, 1);   // micro-interacciones con un poco de rebote
+
+// ── Marco de la página ────────────────────────────────────────────────────────────
+// El borde blanco alrededor de todo: es lo que hace que las secciones oscuras se lean
+// como tarjetas.
+@mixin marco {
+  padding: u(0.5);
+  @media (min-width: 640px) { padding: u(0.75); }
+}
+@mixin lados {
+  padding-left: u(1.5);
+  padding-right: u(1.5);
+  @media (min-width: 640px) { padding-left: u(2.5); padding-right: u(2.5); }
+}
+
+// ── Piezas ────────────────────────────────────────────────────────────────────────
+// Rótulo chico con un punto delante. Va una sola vez por sección, encima del título.
+@mixin rotulo($tono: oscuro) {
+  display: inline-flex;
+  align-items: center;
+  gap: u(0.5);
+  margin: 0;
+  font-family: $fb;
+  font-size: u(0.75);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: if($tono == claro, blanco(0.7), $tinta-suave);
+  &::before {
+    content: '';
+    width: u(0.375);
+    height: u(0.375);
+    border-radius: $r-pildora;
+    background: if($tono == claro, $carmesi-claro, $carmesi);
+  }
+}
+
+@mixin titulo-seccion {
+  margin: u(1) 0 0;
+  font-family: $fd;
+  font-size: u(3);
+  font-weight: 600;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+}
+
+// Botón píldora con una flecha que se adelanta al pasar el puntero.
+@mixin pildora($variante: tinta) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: u(0.5);
+  min-height: 44px;
+  padding: u(0.875) u(1.75);
+  border: 1px solid transparent;
+  border-radius: $r-pildora;
+  font-family: $fb;
+  font-size: max(14px, #{u(0.875)});
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.25s $quart, color 0.25s $quart, border-color 0.25s $quart;
+  -webkit-tap-highlight-color: transparent;
+  @if $variante == carmesi { background: $carmesi; color: #fff; }
+  @if $variante == tinta { background: $tinta; color: #fff; }
+  @if $variante == clara { background: #fff; color: $tinta; }
+  @if $variante == contorno { background: transparent; color: $tinta; border-color: currentColor; }
+  svg {
+    width: u(1); height: u(1); min-width: 14px; min-height: 14px;
+    fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+    transition: transform 0.35s $resorte;
+  }
+  @media (hover: hover) and (min-width: 769px) {
+    &:hover svg { transform: translateX(5px); }
+    @if $variante == carmesi { &:hover { background: $carmesi-hondo; } }
+    @if $variante == tinta { &:hover { background: $carmesi; } }
+    @if $variante == clara { &:hover { background: $carmesi; color: #fff; } }
+    @if $variante == contorno { &:hover { background: $tinta; color: #fff; border-color: $tinta; } }
+  }
+  &:active { transform: scale(0.98); }
+  &:focus-visible { outline: 2px solid $carmesi-claro; outline-offset: 3px; }
+  &:disabled { opacity: 0.45; cursor: not-allowed; }
+}
+
+// Botón redondo con flecha, para los carruseles.
+@mixin boton-flecha($variante: contorno) {
+  display: grid;
+  place-items: center;
+  width: max(44px, #{u(3)});
+  height: max(44px, #{u(3)});
+  border-radius: $r-pildora;
+  border: 1px solid $linea;
+  background: transparent;
+  color: $tinta;
+  cursor: pointer;
+  transition: background-color 0.25s $quart, border-color 0.25s $quart;
+  @if $variante == solido { background: $tinta; border-color: $tinta; color: #fff; }
+  @media (min-width: 640px) { width: u(3.5); height: u(3.5); }
+  svg { width: u(1.25); height: u(1.25); min-width: 18px; min-height: 18px; transition: transform 0.3s $resorte; }
+  @media (hover: hover) and (min-width: 769px) {
+    &:hover svg { transform: scale(1.15); }
+    @if $variante == solido { &:hover { background: $carmesi; border-color: $carmesi; } }
+    @else { &:hover { border-color: $tinta; } }
+  }
+  &:focus-visible { outline: 2px solid $carmesi; outline-offset: 3px; }
+}
+
+// Puntos de un carrusel: el activo se estira.
+@mixin puntos($tono: oscuro) {
+  display: flex;
+  align-items: center;
+  gap: u(0.25);
+  button {
+    padding: u(0.375);
+    border: 0;
+    background: none;
+    cursor: pointer;
+    span {
+      display: block;
+      width: u(0.375);
+      height: u(0.375);
+      min-width: 6px;
+      min-height: 6px;
+      border-radius: $r-pildora;
+      background: if($tono == claro, blanco(0.4), $fantasma);
+      transition: width 0.35s $expo, background-color 0.35s $expo;
+    }
+    &[aria-current='true'] span { width: u(1.25); min-width: 20px; background: if($tono == claro, #fff, $tinta); }
+    &:focus-visible { outline: 2px solid $carmesi; outline-offset: 2px; border-radius: $r-pildora; }
+  }
+}
+
+// Tarjeta de vidrio sobre las secciones oscuras.
+@mixin vidrio {
+  border: 1px solid blanco(0.15);
+  background: blanco(0.08);
+  border-radius: $r-tarjeta;
+  box-shadow: 0 u(1.25) u(2.5) rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+@mixin oculto {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+// ── Revelados ─────────────────────────────────────────────────────────────────────
+// Sin script o con movimiento reducido, todo se ve desde el principio: los estados
+// "ocultos" solo existen bajo .lp-js (la raíz los activa cuando corre el script).
+
+// Líneas o palabras que suben desde detrás de una máscara. Marcado:
+//   <h2 class="lineas"><span class="l"><span style="--i:0">Primera</span></span>…</h2>
+// y el elemento recibe .visto (directiva appAparece) cuando entra en pantalla.
+@mixin lineas($escalon: 120ms, $duracion: 950ms, $base: 0ms) {
+  .l {
+    display: block;
+    overflow: hidden;
+    padding-bottom: 0.14em;
+    margin-bottom: -0.14em;
+  }
+  .l > span { display: inline-block; }
+  :host-context(.lp-js) & .l > span {
+    transform: translateY(115%);
+    transition: transform $duracion $expo;
+    transition-delay: calc(#{$base} + var(--i, 0) * #{$escalon});
+  }
+  :host-context(.lp-js) &.visto .l > span { transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    :host-context(.lp-js) & .l > span { transform: none; transition: none; }
+  }
+}
+
+// Una pieza que sube y aparece al entrar en pantalla (una sola vez).
+@mixin entrada($desde: u(1.75)) {
+  :host-context(.lp-js) & {
+    opacity: 0;
+    transform: translateY($desde);
+    transition: opacity 0.7s $quart, transform 0.9s $expo;
+    transition-delay: var(--retraso, 0ms);
+  }
+  :host-context(.lp-js) &.visto { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    :host-context(.lp-js) & { opacity: 1; transform: none; transition: none; }
+  }
+}

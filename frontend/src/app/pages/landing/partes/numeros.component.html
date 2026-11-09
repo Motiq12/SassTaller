@@ -1,0 +1,19 @@
+<section class="numeros" aria-labelledby="numeros-titulo">
+  <div class="cabeza">
+    <p class="rotulo" appAparece>En números</p>
+    <h2 id="numeros-titulo" class="titulo" appAparece>
+      <span class="l"><span style="--i: 0">Lo que incluye,</span></span>
+      <span class="l"><span style="--i: 1">sin letra chica</span></span>
+    </h2>
+  </div>
+
+  <dl class="celdas">
+    <div *ngFor="let c of cifras; let i = index" class="celda" appAparece [retraso]="i * 80">
+      <dt>
+        <span class="valor">{{ c.valor }}</span>
+        <span class="rot">{{ c.rotulo }}</span>
+      </dt>
+      <dd>{{ c.texto }}</dd>
+    </div>
+  </dl>
+</section>

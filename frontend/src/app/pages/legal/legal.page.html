@@ -1,32 +1,41 @@
 <ion-content class="legal">
   <div class="pagina">
-    <header class="barra">
-      <a routerLink="/" class="marca" aria-label="Motiq, volver al inicio">
-        <img [src]="producto.logo" alt="" width="30" height="30" />
-        <span>{{ producto.nombre }}</span>
-      </a>
-      <nav aria-label="Documentos legales" class="docs">
-        <a routerLink="/legal/terminos" [class.actual]="clave === 'terminos'"
-           [attr.aria-current]="clave === 'terminos' ? 'page' : null">Términos</a>
-        <a routerLink="/legal/privacidad" [class.actual]="clave === 'privacidad'"
-           [attr.aria-current]="clave === 'privacidad' ? 'page' : null">Privacidad</a>
-      </nav>
-    </header>
-
-    <article>
+    <!-- La cabecera es una tarjeta negra dentro del marco blanco, como la portada. -->
+    <header class="cabeza">
+      <div class="barra">
+        <a routerLink="/" class="marca" aria-label="Motiq, volver al inicio">
+          <img [src]="producto.logoClaro" alt="" width="24" height="24" />
+          <span>{{ producto.nombre }}</span>
+        </a>
+        <nav aria-label="Documentos legales" class="docs">
+          <a routerLink="/legal/terminos" [class.actual]="clave === 'terminos'"
+             [attr.aria-current]="clave === 'terminos' ? 'page' : null">Términos</a>
+          <a routerLink="/legal/privacidad" [class.actual]="clave === 'privacidad'"
+             [attr.aria-current]="clave === 'privacidad' ? 'page' : null">Privacidad</a>
+        </nav>
+      </div>
+      <p class="rotulo">Legal</p>
       <h1>{{ doc.titulo }}</h1>
       <p class="bajada">{{ doc.bajada }}</p>
       <p class="fecha">Actualizado en {{ doc.actualizado }}. Versión preliminar, en revisión legal.</p>
+    </header>
 
-      <section *ngFor="let s of doc.secciones">
-        <h2>{{ s.titulo }}</h2>
-        <p *ngFor="let p of s.parrafos">{{ p }}</p>
+    <article>
+      <section *ngFor="let s of doc.secciones; let i = index">
+        <span class="num" aria-hidden="true">{{ (i + 1).toString().padStart(2, '0') }}</span>
+        <div>
+          <h2>{{ s.titulo }}</h2>
+          <p *ngFor="let p of s.parrafos">{{ p }}</p>
+        </div>
       </section>
     </article>
 
     <footer class="pie">
-      <a routerLink="/">Volver a {{ producto.nombre }}</a>
-      <a routerLink="/registro-taller">Registrar mi taller</a>
+      <a routerLink="/" class="volver">Volver a {{ producto.nombre }}</a>
+      <a routerLink="/registro-taller" class="probar">
+        Registrar mi taller
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+      </a>
     </footer>
   </div>
 </ion-content>

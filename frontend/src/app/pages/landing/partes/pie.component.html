@@ -1,26 +1,53 @@
 <footer class="pie" aria-labelledby="pie-titulo">
-  <h2 id="pie-titulo" class="oculto">{{ producto.nombre }}</h2>
-  <div class="marca" role="img" [attr.aria-label]="producto.nombre" appAparece>
-    <span *ngFor="let b of letras; let i = index" class="bloque" [class.disco]="b.disco"
-          [style.--retraso]="i * 70 + 'ms'" aria-hidden="true">{{ b.disco ? '' : b.l }}</span>
+  <div class="llamada">
+    <h2 id="pie-titulo" class="titulo" appAparece>
+      <span class="l"><span style="--i: 0">¿Listo para</span></span>
+      <span class="l"><span style="--i: 1">ordenar tu taller?</span></span>
+    </h2>
+    <div class="acciones" appAparece [retraso]="160">
+      <p>30 días con todo, sin tarjeta. Después sigue gratis y no se borra nada.</p>
+      <div class="botones">
+        <a class="probar" routerLink="/registro-taller">
+          Probá gratis 30 días
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+        </a>
+        <button type="button" class="hablar" (click)="hablar.emit()">Hablá con nosotros</button>
+      </div>
+    </div>
   </div>
 
-  <div class="abajo">
-    <nav aria-label="Pie de página" class="enlaces">
+  <div class="columnas">
+    <div class="marca-col">
+      <a class="marca" routerLink="/" aria-label="{{ producto.nombre }}, inicio">
+        <img [src]="producto.logoClaro" alt="" width="28" height="28" />
+        <span>{{ producto.nombre }}</span>
+      </a>
+      <p>El sistema para ordenar tu taller: órdenes, agenda, mecánicos y un portal para tus clientes.</p>
+    </div>
+    <nav class="col" aria-labelledby="pie-producto">
+      <h3 id="pie-producto">Producto</h3>
       <button type="button" (click)="ir.emit('como')">Cómo funciona</button>
+      <button type="button" (click)="ir.emit('funciones')">Funciones</button>
       <button type="button" (click)="ir.emit('precios')">Precios</button>
-      <a routerLink="/registro-taller">Registrar mi taller</a>
-      <a routerLink="/portal/login">Entrar</a>
+      <button type="button" (click)="ir.emit('preguntas')">Preguntas</button>
     </nav>
-    <p class="lema">{{ producto.nombre }} · {{ producto.descripcion }}</p>
+    <nav class="col" aria-labelledby="pie-cuenta">
+      <h3 id="pie-cuenta">Cuenta</h3>
+      <a routerLink="/registro-taller">Probá gratis</a>
+      <a routerLink="/portal/login">Entrar</a>
+      <button type="button" (click)="hablar.emit()">Contacto</button>
+    </nav>
+    <nav class="col" aria-labelledby="pie-legal">
+      <h3 id="pie-legal">Legal</h3>
+      <a routerLink="/legal/terminos">Términos</a>
+      <a routerLink="/legal/privacidad">Privacidad</a>
+    </nav>
   </div>
 
   <div class="ultima">
-    <p class="legales">
-      <span>© {{ anio }} {{ producto.nombre }}</span>
-      <a routerLink="/legal/terminos">Términos</a>
-      <a routerLink="/legal/privacidad">Privacidad</a>
-    </p>
-    <a class="accion" routerLink="/registro-taller">Probá gratis</a>
+    <span>© {{ anio }} {{ producto.nombre }}</span>
+    <span>{{ producto.descripcion }}</span>
   </div>
+
+  <p class="gigante" aria-hidden="true">{{ producto.nombre }}</p>
 </footer>

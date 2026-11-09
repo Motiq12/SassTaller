@@ -1,79 +1,19 @@
-@use 'partes/base' as *;
+@use 'partes/sistema' as *;
 
-// La landing es oscura y fija: no sigue el tema claro/oscuro del visitante. Es una
-// página de venta y su identidad (carmesí sobre casi negro) no cambia con la
-// configuración del sistema.
+// La landing tiene su propio sistema (partes/_sistema.scss): página clara con un marco
+// blanco y secciones oscuras como tarjetas. No sigue el tema claro/oscuro del
+// visitante: es una página de venta y su identidad no cambia con el sistema.
 .landing {
-  --background: #{$suelo};
+  --background: #{$papel};
   --color: #{$tinta};
   font-family: $fb;
-}
-
-main { display: block; }
-
-.seccion { display: block; }
-#problemas { padding-top: $entre-secciones; }
-#como { margin-top: $entre-secciones; }
-
-.barra {
-  position: absolute;
-  inset: 0 0 auto 0;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px $margen;
-  background: transparent;
-  transition: background-color 0.3s $curva;
-  &.solida { background: $suelo; }
-}
-
-.marca {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
   color: $tinta;
-  text-decoration: none;
-  font-family: $fd;
-  font-size: $t-entrada;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  border-radius: 8px;
-  &:focus-visible { outline: 3px solid $tinta; outline-offset: 4px; }
-}
-// El isotipo es azul marino: sobre fondo oscuro se pasa a blanco.
-.iso { width: 28px; height: 28px; object-fit: contain; filter: brightness(0) invert(1); }
-
-nav {
-  display: flex;
-  align-items: center;
-  gap: 28px;
+  @include escala;
 }
 
-.enlace {
-  padding: 10px 0;
-  border: 0;
-  background: none;
-  font-family: $fb;
-  font-size: $t-chica;
-  font-weight: 600;
-  color: $tinta;
-  text-decoration: none;
-  cursor: pointer;
-  transition: color 0.2s $curva;
-  &:hover { color: $carmesi-texto; }
-  &:focus-visible { outline: 3px solid $tinta; outline-offset: 3px; border-radius: 4px; }
-}
-
-.accion {
-  @include boton;
-  min-height: 44px;
-  padding: 0 20px;
-  font-size: $t-chica;
-}
-
-@media (max-width: 760px) {
-  nav { gap: 16px; }
-  nav .enlace:not([href]) { display: none; }   // en el teléfono: solo Entrar y la acción
+.pagina {
+  display: block;
+  width: 100%;
+  overflow-x: clip;
+  @include marco;
 }

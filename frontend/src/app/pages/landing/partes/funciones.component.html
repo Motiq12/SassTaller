@@ -1,7 +1,38 @@
 <section class="funciones" aria-labelledby="funciones-titulo">
-  <h2 id="funciones-titulo" appAparece>Todo el taller, en un solo lugar.</h2>
+  <div class="intro">
+    <div>
+      <p class="rotulo" appAparece>Funciones</p>
+      <h2 id="funciones-titulo" class="titulo" appAparece>
+        <span class="l"><span style="--i: 0">Todo el taller,</span></span>
+        <span class="l"><span style="--i: 1">en un solo lugar</span></span>
+      </h2>
+    </div>
+    <p class="bajada" appAparece [retraso]="120">
+      Órdenes, agenda, mecánicos, clientes y sucursales en el mismo sistema, y un portal para
+      que tus clientes sigan su vehículo sin llamarte.
+    </p>
+  </div>
+
+  <div class="figuras">
+    <figure class="figura" appAparece>
+      <div class="escena"><app-lp-pantalla class="pantalla" tipo="portal"></app-lp-pantalla></div>
+      <figcaption>
+        <span class="fc-titulo">Portal de clientes</span>
+        <span class="fc-texto">Tu cliente ve en qué etapa está su vehículo y aprueba el presupuesto desde el celular.</span>
+      </figcaption>
+    </figure>
+    <figure class="figura" appAparece [retraso]="120">
+      <div class="escena"><app-lp-pantalla class="pantalla" tipo="reportes"></app-lp-pantalla></div>
+      <figcaption>
+        <span class="fc-titulo">Reportes del mes</span>
+        <span class="fc-texto">Lo facturado por semana, las órdenes entregadas y los servicios que más se repiten.</span>
+      </figcaption>
+    </figure>
+  </div>
+
   <ul class="lista">
-    <li *ngFor="let f of funciones; let i = index" appAparece [retraso]="(i % 2) * 80">
+    <li *ngFor="let f of funciones; let i = index" appAparece [retraso]="(i % 3) * 70">
+      <span class="num">0{{ i + 1 }}</span>
       <h3>{{ f.nombre }}</h3>
       <p>{{ f.texto }}</p>
       <p *ngIf="f.nota" class="nota">{{ f.nota }}</p>

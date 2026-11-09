@@ -1,24 +1,90 @@
 <section class="hero" aria-labelledby="hero-titulo">
-  <!-- El disco: primero la imagen fija (un cuadro del mismo render) y, cuando está
-       listo, el 3D en vivo encima. -->
+  <!-- El disco es la "foto" de la tarjeta: primero la imagen fija (un cuadro del mismo
+       render) y, cuando está listo, el 3D en vivo encima. -->
   <div class="escena" aria-hidden="true">
     <img class="foto" [class.con3d]="con3d" src="assets/landing/disco-freno.webp" alt=""
          width="1170" height="1170" decoding="async" />
     <canvas #lienzo class="lienzo" [class.listo]="con3d"></canvas>
+    <div class="velo"></div>
   </div>
 
-  <div class="texto">
-    <h1 id="hero-titulo">El taller ordenado, <span class="junto">sin cuadernos.</span></h1>
-    <!-- El resultado, no la lista de funciones: cada vehículo con su orden, el cliente
-         que aprueba y sigue el trabajo solo, y el dueño que deja de contestar. -->
-    <p class="bajada">
-      Cada vehículo entra con su orden, el cliente aprueba el presupuesto desde el celular
-      y sigue el trabajo sin escribirte por WhatsApp. Para motos, autos o los dos.
-    </p>
-    <div class="acciones">
-      <a class="principal" routerLink="/registro-taller">Probá gratis 30 días</a>
-      <button type="button" class="secundario" (click)="hablar.emit()">Hablá con nosotros</button>
+  <header class="cabeza">
+    <nav class="secciones" aria-label="Secciones">
+      <button type="button" (click)="ir.emit('como')">Cómo funciona</button>
+      <button type="button" (click)="ir.emit('precios')">Precios</button>
+      <button type="button" (click)="ir.emit('preguntas')">Preguntas</button>
+    </nav>
+    <a class="marca" routerLink="/" [attr.aria-label]="producto.nombre + ', inicio'">
+      <img [src]="producto.logo" alt="" width="20" height="20" />
+      <span>{{ producto.nombre }}</span>
+    </a>
+    <div class="derecha">
+      <a class="entrar" routerLink="/portal/login">Entrar</a>
+      <button type="button" class="hamburguesa" (click)="menu.emit()" aria-label="Abrir el menú">
+        <span></span><span></span>
+      </button>
     </div>
-    <p class="chica">Sin tarjeta. Después sigue gratis y no se borra nada.</p>
+  </header>
+
+  <!-- El titular gigante entra palabra por palabra desde detrás de una máscara, con
+       la página: no espera a ningún telón ni a que se cargue nada. -->
+  <div class="titulo-zona">
+    <h1 id="hero-titulo" class="titulo">
+      <span class="p"><span style="--i: 0">El taller</span></span>
+      <span class="p"><span style="--i: 1">ordenado</span></span>
+    </h1>
+  </div>
+
+  <div class="abajo">
+    <div class="texto">
+      <p class="lema">
+        <span class="l"><span style="--i: 0">Sin cuadernos.</span></span>
+        <span class="l"><span style="--i: 1">Sin WhatsApp.</span></span>
+      </p>
+      <p class="bajada">
+        Cada vehículo entra con su orden, el cliente aprueba el presupuesto desde el celular
+        y sigue el trabajo sin escribirte. Para {{ vehiculos }}.
+      </p>
+      <div class="acciones">
+        <a class="principal" routerLink="/registro-taller">
+          Probá gratis 30 días
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+        </a>
+        <button type="button" class="secundario" (click)="hablar.emit()">Hablá con nosotros</button>
+      </div>
+    </div>
+
+    <div class="racimo">
+      <!-- Tres momentos del producto, con datos de ejemplo. -->
+      <div class="momentos" appAparece [retraso]="250">
+        <div class="momento-marco" aria-live="polite">
+          <article *ngFor="let m of momentos; let i = index" class="momento" [class.activo]="i === momento"
+                   [attr.aria-hidden]="i !== momento">
+            <span class="sello">{{ m.sello }}</span>
+            <span class="momento-texto">
+              <span class="rotulo">{{ m.rotulo }}</span>
+              <span class="titulo-m">{{ m.titulo }}</span>
+              <span class="nota">{{ m.nota }}</span>
+            </span>
+          </article>
+        </div>
+        <div class="pie-momentos">
+          <span class="ejemplo">Vista de ejemplo</span>
+          <div class="puntos" role="group" aria-label="Momentos del producto">
+            <button *ngFor="let m of momentos; let i = index" type="button" (click)="elegirMomento(i)"
+                    [attr.aria-current]="i === momento" [attr.aria-label]="m.titulo"><span></span></button>
+          </div>
+        </div>
+      </div>
+
+      <article class="prueba" appAparece [retraso]="380">
+        <div class="prueba-texto">
+          <p class="valor">30</p>
+          <p class="valor-rotulo">días con todo</p>
+          <p class="nota">Sin tarjeta. Después sigue gratis y no se borra nada.</p>
+        </div>
+        <img class="prueba-foto" src="assets/landing/disco-freno.webp" alt="" width="1170" height="1170" loading="lazy" decoding="async" />
+      </article>
+    </div>
   </div>
 </section>

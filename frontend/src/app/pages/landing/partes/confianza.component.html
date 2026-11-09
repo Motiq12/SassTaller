@@ -1,8 +1,15 @@
 <section class="confianza" aria-labelledby="confianza-titulo">
-  <h2 id="confianza-titulo" appAparece>Tu información, cuidada.</h2>
+  <div class="cabeza">
+    <p class="rotulo" appAparece>Por qué confiar</p>
+    <h2 id="confianza-titulo" class="titulo" appAparece>
+      <span class="l"><span style="--i: 0">Tu información,</span></span>
+      <span class="l"><span style="--i: 1">cuidada</span></span>
+    </h2>
+  </div>
 
   <dl class="garantias">
-    <div *ngFor="let g of garantias; let i = index" class="garantia" appAparece [retraso]="(i % 2) * 80">
+    <div *ngFor="let g of garantias; let i = index" class="garantia" appAparece [retraso]="i * 80">
+      <span class="indice" aria-hidden="true">0{{ i + 1 }}</span>
       <dt>{{ g.titulo }}</dt>
       <dd>{{ g.texto }}</dd>
     </div>

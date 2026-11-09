@@ -1,0 +1,74 @@
+<div class="contacto" [class.abierto]="abierto" [attr.aria-hidden]="!abierto" [attr.inert]="abierto ? null : ''">
+  <div class="fondo" (click)="cerrar.emit()"></div>
+
+  <div class="ventana" role="dialog" aria-modal="true" aria-labelledby="contacto-titulo">
+    <div class="cabeza">
+      <div>
+        <p class="rotulo">Hablá con nosotros</p>
+        <h2 id="contacto-titulo" class="titulo">
+          <span class="l"><span style="--i: 0">Contanos de</span></span>
+          <span class="l"><span style="--i: 1">tu taller</span></span>
+        </h2>
+      </div>
+      <button type="button" class="cerrar" (click)="cerrar.emit()" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      </button>
+    </div>
+
+    <ng-container *ngIf="!enviado">
+      <p class="bajada">
+        Te mostramos {{ producto.nombre }} funcionando con tu caso. Si tenés varias sucursales,
+        lo armamos con vos y migramos tus datos.
+      </p>
+
+      <form (ngSubmit)="enviar()" novalidate>
+        <div class="campo">
+          <label for="c-nombre">Tu nombre</label>
+          <input #campoNombre id="c-nombre" name="nombre" autocomplete="name" required [(ngModel)]="nombre" placeholder="Ana Rodríguez" />
+        </div>
+        <div class="campo">
+          <label for="c-email">Correo</label>
+          <input id="c-email" name="email" type="email" inputmode="email" autocomplete="email" required [(ngModel)]="email" placeholder="ana@taller.com" />
+        </div>
+        <div class="par">
+          <div class="campo">
+            <label for="c-tel">Teléfono <span class="opcional">(opcional)</span></label>
+            <input id="c-tel" name="telefono" type="tel" inputmode="tel" autocomplete="tel" [(ngModel)]="telefono" placeholder="8888-0000" />
+          </div>
+          <div class="campo">
+            <label for="c-empresa">Empresa <span class="opcional">(opcional)</span></label>
+            <input id="c-empresa" name="empresa" autocomplete="organization" [(ngModel)]="empresa" placeholder="Taller Los Andes" />
+          </div>
+        </div>
+        <div class="campo">
+          <label for="c-volumen">Cuántos vehículos atienden</label>
+          <select id="c-volumen" name="volumen" [(ngModel)]="volumen">
+            <option value="">Elegí una opción</option>
+            <option *ngFor="let v of VOLUMENES" [value]="v.valor">{{ v.rotulo }}</option>
+          </select>
+        </div>
+        <div class="campo">
+          <label for="c-mensaje">¿Qué necesitás resolver?</label>
+          <textarea id="c-mensaje" name="mensaje" rows="3" maxlength="2000" [(ngModel)]="mensaje"
+                    placeholder="Tenemos dos sucursales y hoy llevamos todo en cuadernos…"></textarea>
+        </div>
+
+        <p class="error" *ngIf="error" role="alert">{{ error }}</p>
+
+        <button type="submit" class="enviar" [disabled]="!formularioListo || enviando">
+          {{ enviando ? 'Enviando…' : 'Enviar' }}
+        </button>
+        <p class="nota">Usamos tus datos solo para contactarte.</p>
+      </form>
+    </ng-container>
+
+    <div class="listo" *ngIf="enviado" role="status">
+      <span class="tilde" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" /></svg>
+      </span>
+      <p class="listo-titulo">Recibimos tu mensaje</p>
+      <p>{{ gracias }} Te contactamos en menos de un día hábil.</p>
+      <button type="button" class="enviar" (click)="cerrar.emit()">Listo</button>
+    </div>
+  </div>
+</div>

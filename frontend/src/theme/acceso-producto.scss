@@ -1,201 +1,174 @@
-// Pantallas de acceso (login, registro de cliente, recuperar) cuando NO pertenecen a
-// ningún taller: la puerta de Motiq en motiq12.com. Ahí se visten como la landing
-// —suelo negro, carmesí, Outfit— en vez del azul de respaldo pensado para un taller
-// sin configurar, que hacía que el login pareciera de otro producto.
+// Entrar, crear cuenta y recuperar el acceso cuando la pantalla NO pertenece a ningún
+// taller: la puerta de Motiq en motiq12.com. Ahí se visten con el sistema de la web
+// pública (landing/partes/_sistema.scss): página clara con marco blanco, la marca en
+// una tarjeta negra con el carmesí como único acento, y el formulario sobre claro.
 //
-// Con un taller resuelto (subdominio o ?taller=) no aplica nada de esto: el panel
-// sigue con el color, el logo y el nombre de ESE taller (ver global.scss).
+// Con un taller resuelto (subdominio o ?taller=) no aplica nada de esto: la pantalla
+// sigue oscura, con el color, el logo y el nombre de ESE taller (portal-login.page.scss
+// y acceso-marca.component.scss). La clase la pone cada pantalla con marca.esProducto.
 //
-// Los valores salen de los tokens de la landing para que las dos no se separen.
-@use '../app/pages/landing/partes/base' as lp;
+// Va en un archivo global (sin tope de tamaño). Los estilos del componente suman un
+// atributo de alcance por cada parte del selector, así que la raíz repite la clase
+// para ganarles sin !important.
+@use '../app/pages/landing/partes/sistema' as s;
 
-.login-content.es-producto {
-  // El tema del producto, solo dentro de esta pantalla. Los componentes de Ionic
-  // leen estas variables, así que el botón, el foco y los enlaces toman el carmesí
-  // sin tocar nada del resto de la app.
-  --ion-color-primary: #{lp.$carmesi};
+$raiz: 'ion-content.acceso-content.es-producto.es-producto.es-producto';
+
+#{$raiz} {
+  // El tema del producto, solo dentro de esta pantalla: Ionic y los estilos de la
+  // pantalla leen estas variables, así el foco, las rayas y los acentos toman el
+  // carmesí sin tocar el resto de la app.
+  --ion-color-primary: #{s.$carmesi};
   --ion-color-primary-rgb: 225, 29, 72;
   --ion-color-primary-contrast: #fff;
-  --ion-color-primary-shade: #{lp.$carmesi-hondo};
-  --ion-color-primary-tint: #{lp.$carmesi-texto};
-  --ion-text-color: #{lp.$tinta};
-  --ion-background-color: #{lp.$suelo};
-  --lienzo: #{lp.$suelo};
-  --background: #{lp.$suelo};
-  --acento-texto: #{lp.$tinta};
-  color: lp.$tinta;
+  --ion-color-primary-shade: #{s.$carmesi-hondo};
+  --ion-color-primary-tint: #{s.$carmesi-claro};
+  --ion-text-color: #{s.$tinta};
+  --font-display: #{s.$fd};
+  --ion-font-family: #{s.$fb};
+  --background: #{s.$papel};
+  --color: #{s.$tinta};
+  font-family: s.$fb;
+  color: s.$tinta;
+  color-scheme: light;
 
-  // ---- Panel de marca: el disco de la landing con el taller adentro ------------
-  .login-header {
-    isolation: isolate;          // el multiply del duotono se queda en el panel
-    background: lp.$suelo-2;
-    box-shadow: none;
-    display: grid;
-    grid-template-columns: auto 1fr;
-    align-items: center;
-    align-content: start;
-    column-gap: 12px;
-    text-align: left;
-    padding: 28px lp.$margen 56px;
+  // El marco blanco de la landing alrededor de la tarjeta de la marca.
+  .acceso { background: s.$papel; padding: 8px; gap: 8px; }
 
-    // La foto del taller, en blanco y negro y recortada en el disco...
-    &::before,
-    &::after {
-      inset: auto;
-      right: -18%;
-      bottom: -34%;
-      width: 82%;
-      aspect-ratio: 1;
-      border-radius: 50%;
-    }
-    &::before {
-      filter: grayscale(1) contrast(1.15) brightness(0.95);
-    }
-    // ...y el carmesí multiplicado encima: un duotono carmesí y negro. Lleva la
-    // misma animación que la foto para que los dos círculos se muevan juntos.
-    &::after {
-      background: lp.$carmesi;
-      mix-blend-mode: multiply;
-      animation: acceso-acercar 40s ease-in-out infinite alternate;
-    }
+  // ── La marca: la tarjeta negra ───────────────────────────────────────────────
+  .marca {
+    border-radius: 24px;
+    background:
+      radial-gradient(ellipse 70% 60% at 62% 26%, rgba(225, 29, 72, 0.26), transparent 72%),
+      s.$noche;
+    color: #fff;
+  }
+  .marca-rotulo {
+    padding: 6px 12px;
+    border-color: s.blanco(0.16);
+    border-radius: s.$r-pildora;
+    background: s.blanco(0.06);
+    font-family: s.$fb;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    color: s.blanco(0.75);
+    &::before { background: s.$carmesi-claro; }
+  }
+  .marca-titulo {
+    font-family: s.$fd;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    text-shadow: none;
+    span { color: s.$carmesi-claro; }
+  }
+  .marca-lista {
+    border-top-color: s.blanco(0.16);
+    strong { font-family: s.$fd; font-size: 16px; font-weight: 600; }
+    li > span:last-child { color: s.blanco(0.7); }
+  }
+  .marca-n { font-family: s.$fd; font-weight: 600; letter-spacing: 0.04em; color: s.$carmesi-claro; }
 
-    .logo-wrapper {
-      width: 36px;
-      height: 36px;
-      margin: 0;
-      background: none;
-      box-shadow: none;
-      border-radius: 0;
-      // El isotipo de Motiq en blanco, sin el recuadro blanco que app-marca-logo le
-      // pone para los logos de taller (con el filtro quedaba un rectángulo blanco).
-      // !important porque el componente fija el tamaño en un style en línea.
-      img {
-        width: 32px !important;
-        height: 32px !important;
-        padding: 0 !important;
-        background: none !important;
-        filter: brightness(0) invert(1);
-      }
-    }
+  // ── El panel del formulario, sobre claro ───────────────────────────────────────
+  .acceso-panel {
+    background: s.$papel;
+    &::before { display: none; }   // la franja a cuadros es del portal de un taller
+  }
 
-    h1 {
-      margin: 0;
-      font-family: lp.$fd;
-      font-size: 22px;
-      letter-spacing: -0.02em;
-      text-shadow: none;
-    }
-
-    // La promesa, a tamaño de titular. Sin mayúsculas ni tracking: no es una etiqueta.
-    p {
-      grid-column: 1 / -1;
-      max-width: 12ch;
-      margin: 40px 0 0;
-      font-family: lp.$fd;
-      font-size: clamp(30px, 3.6vw, 64px);
-      font-weight: 700;
-      line-height: 1.02;
-      letter-spacing: -0.035em;
-      text-transform: none;
-      color: lp.$tinta;
-      text-shadow: none;
+  .pits-tabs {
+    border-bottom-color: s.$linea;
+    a {
+      font-family: s.$fb;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      color: s.$tinta-suave;
+      &:hover, &.on { color: s.$tinta; }
     }
   }
 
-  // ---- Columna del formulario ---------------------------------------------------
-  .acceso-intro {
-    h2 {
-      font-family: lp.$fd;
-      font-size: clamp(30px, 2.6vw, 40px);
-      font-weight: 700;
-      letter-spacing: -0.035em;
-      color: lp.$tinta;
-    }
-    p { font-size: lp.$t-chica; color: lp.$suave; }
+  .acceso-head {
+    h1 { font-family: s.$fd; font-weight: 600; letter-spacing: -0.02em; text-transform: uppercase; line-height: 1; color: s.$tinta; }
+    p { color: s.$tinta-suave; strong { color: s.$tinta; } }
   }
+  .acceso-ico { border-color: s.$linea; border-radius: s.$r-pildora; background: s.$superficie; ion-icon { color: s.$carmesi; } }
+  .pasos { span { background: s.$linea; &.on { background: s.$carmesi; } } em { font-family: s.$fb; color: s.$tinta-suave; } }
 
-  ion-card {
+  // Los dos caminos: tarjetas grises que se levantan, como las garantías de la landing.
+  .acceso-panel .camino {
+    border: 1px solid transparent;
+    border-radius: 24px;
+    background: s.$superficie;
+    color: s.$tinta;
+    transition: transform 0.5s s.$expo, box-shadow 0.5s s.$expo, background-color 0.3s s.$quart, border-color 0.3s s.$quart;
+    strong { font-family: s.$fd; font-weight: 600; }
+    span { color: s.$tinta-suave; }
+    &:hover { border-color: s.$linea; background: s.$papel; transform: translateY(-3px); box-shadow: 0 16px 40px rgba(10, 10, 10, 0.08); }
+    &:focus-visible { outline: 2px solid s.$carmesi; outline-offset: 3px; }
+  }
+  .acceso-panel .cambiar { color: s.$tinta; text-decoration-color: s.$carmesi; }
+  .acceso-panel .nota-camino { color: s.$tinta-suave; a { color: s.$tinta; text-decoration-color: s.$carmesi; } }
+
+  // Campos: la misma raya de abajo, en gris claro; carmesí al escribir.
+  .acceso-form {
+    --color: #{s.$tinta};
     ion-item {
-      --background: #{lp.$suelo-3};
-      --min-height: 64px;
-      border: 0;
-      border-radius: 14px;
-      margin-bottom: 12px;
-
-      &:focus-within {
-        --background: #262626;
-        box-shadow: inset 0 0 0 2px lp.$carmesi;   // el anillo de foco, dentro del campo
-      }
-
-      // Etiquetas como en la landing: en minúscula y legibles, no un rótulo
-      // en mayúsculas de 11 px.
-      ion-label {
-        color: #d4d4d4 !important;
-        font-size: 13px !important;
-        font-weight: 600 !important;
-        text-transform: none;
-        letter-spacing: 0;
-      }
-      ion-input {
-        font-size: 17px;
-        --placeholder-color: #737373;
-        --placeholder-opacity: 1;
-      }
+      --color: #{s.$tinta};
+      border-bottom-color: s.$linea;
+      &:hover { border-bottom-color: #b8b8c0; }
+      ion-label { color: s.$tinta-suave !important; font-family: s.$fb; letter-spacing: 0.14em; }
+      &:focus-within ion-label { color: s.$carmesi !important; }
+      ion-input { --color: #{s.$tinta}; --placeholder-color: #9b9ba3; }
+      .ver-pass { color: s.$tinta-suave; &:hover { color: s.$tinta; } }
     }
-
-    // La acción principal: la píldora carmesí de la landing, sin sombra de color.
-    ion-button[expand="block"] {
-      height: 56px;
-      margin-top: 18px;
-      --border-radius: 999px;
-      --box-shadow: none;
-      font-family: lp.$fb;
-      font-size: 17px;
-      &.button-disabled { opacity: 1; --background: #{lp.$suelo-3}; --color: #{lp.$suave}; }
-    }
-    ion-button[fill="outline"] { --border-color: #3a3a3a; --color: #{lp.$tinta}; }
-    ion-button[fill="clear"] { --color: #{lp.$suave}; }
   }
 
-  // Los enlaces de abajo: blancos con el subrayado carmesí de la landing.
-  .portal-link {
-    font-size: lp.$t-chica;
-    color: lp.$tinta;
-    text-decoration-color: lp.$carmesi;
-    text-decoration-thickness: 2px;
-    &:hover { color: lp.$carmesi-texto; }
-    &.strong { font-size: 16px; color: lp.$tinta; text-decoration-color: lp.$carmesi; }
-    &.sub { font-size: 14px; color: lp.$suave; text-decoration-color: #525252; }
+  // La acción principal: la píldora carmesí de la landing, sin sombra de color.
+  .acceso-form ion-button.btn-principal {
+    --border-radius: 999px;
+    --box-shadow: none;
+    font-family: s.$fb;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    &.button-disabled { --background: #{s.$superficie}; --color: #9b9ba3; }
+  }
+  .acceso-form ion-button.btn-secundario {
+    --border-radius: 999px;
+    --border-color: #{s.$linea} !important;
+    --color: #{s.$tinta} !important;
+    --background-hover: #{s.$superficie};
+    &:hover { --border-color: #{s.$tinta} !important; }
+    ion-icon { color: s.$tinta-suave; }
   }
 
-  // Teléfono: el panel es una banda arriba. El disco se achica y se corre a la
-  // derecha para no pasar por debajo del titular, y el formulario respeta el margen.
-  @media (max-width: 859px) {
-    .login-header {
-      padding: 20px 16px 36px;
-      &::before,
-      &::after { width: 58%; right: -16%; bottom: -46%; }
-      p { margin-top: 28px; max-width: 11ch; font-size: 30px; }
-    }
-    .acceso-intro { margin-top: 32px; padding-inline: 16px; }
-    ion-card { width: auto; margin-inline: 16px; }
+  .separador { color: s.$tinta-suave; &::before, &::after { background: s.$linea; } }
+  .enlace {
+    color: s.$tinta-suave;
+    text-decoration-color: s.$carmesi;
+    &:hover { color: s.$tinta; }
   }
+  .ayuda, .aviso-legal { color: s.$tinta-suave; }
+  .aviso-legal a { color: s.$carmesi-hondo; }
+  .pass-reglas { color: s.$tinta-suave; li.ok { color: #15803d; } li.mal { color: s.$carmesi-hondo; } }
 
-  // Escritorio: el panel ocupa el alto entero; el texto arriba, el disco abajo a
-  // la derecha cortado por los bordes.
-  @media (min-width: 860px) {
-    .login-header {
-      display: grid;
-      padding: 40px lp.$margen;
-      justify-content: start;
-      box-shadow: none;
-      &::before,
-      &::after {
-        right: -18%;
-        bottom: -20%;
-        width: min(88vh, 100%);
-      }
-      p { margin-top: 12vh; }
+  .acceso-empresa { color: s.$tinta-suave; a { color: s.$tinta; text-decoration-color: s.$carmesi; text-underline-offset: 3px; } }
+  .acceso-legal { color: s.$tinta-suave; a { color: s.$tinta-suave; &:hover { color: s.$tinta; } } }
+
+  // ── Escritorio: la tarjeta de la marca a la izquierda, el formulario a la derecha ──
+  @media (min-width: 1024px) {
+    .acceso { padding: 12px; gap: 12px; background: s.$papel; }
+    .marca {
+      top: 12px;
+      height: calc(100vh - 24px);
+      height: calc(100dvh - 24px);
+      min-height: 596px;
+      border-radius: 32px;
+      background:
+        radial-gradient(ellipse 62% 52% at 54% 34%, rgba(225, 29, 72, 0.28), transparent 74%),
+        s.$noche;
     }
+    .acceso-panel { min-height: calc(100dvh - 24px); padding: 48px 56px 24px; }
+    .acceso-head h1 { font-size: 40px; }
   }
 }

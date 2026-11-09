@@ -3,9 +3,10 @@ import { Component } from '@angular/core';
 interface Funcion { nombre: string; texto: string; nota?: string; }
 
 /**
- * Lo que trae Motiq, en seis partes. Cada frase describe algo que el sistema hace hoy
+ * Lo que trae Motiq, con la forma de "Facilities" de Baseline: una tarjeta blanca que
+ * se monta sobre "Cómo funciona", con dos pantallas grandes y las seis partes debajo. Cada frase describe algo que el sistema hace hoy
  * (revisado contra el código): si una función cambia, esta lista cambia con ella.
- * Sin íconos en tarjetas: el nombre grande y una línea que dice para qué sirve.
+ * Sin íconos: el número, el nombre y una línea que dice para qué sirve.
  */
 @Component({
   selector: 'app-lp-funciones',

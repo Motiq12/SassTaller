@@ -1,0 +1,143 @@
+@use 'sistema' as *;
+
+:host { display: block; }
+
+.contacto {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: u(0.75);
+  pointer-events: none;
+  visibility: hidden;
+  transition: visibility 0s linear 0.45s;
+  &.abierto { pointer-events: auto; visibility: visible; transition: none; }
+  @media (min-width: 640px) { align-items: center; padding: u(1.5); }
+}
+.fondo {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 10, 10, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity 0.4s $quart;
+  .abierto & { opacity: 1; }
+}
+.ventana {
+  position: relative;
+  width: 100%;
+  max-height: 92svh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: u(1.5);
+  border-radius: $r-tarjeta-lg;
+  background: $papel;
+  color: $tinta;
+  box-shadow: 0 u(1.5) u(4) rgba(10, 10, 10, 0.35);
+  opacity: 0;
+  transform: translateY(u(1.75)) scale(0.96);
+  transition: opacity 0.4s $quart, transform 0.6s $expo;
+  .abierto & { opacity: 1; transform: none; }
+  @media (min-width: 640px) { max-width: max(32rem, #{u(34)}); padding: u(2); }
+}
+.cabeza { display: flex; align-items: flex-start; justify-content: space-between; gap: u(1); }
+.rotulo { @include rotulo; }
+.titulo {
+  @include titulo-seccion;
+  margin-top: u(0.75);
+  font-size: max(32px, #{u(2.5)});
+  .l { display: block; overflow: hidden; padding-bottom: 0.12em; margin-bottom: -0.12em; }
+  .l > span {
+    display: inline-block;
+    transform: translateY(110%);
+    transition: transform 0.8s $expo;
+    transition-delay: calc(var(--i) * 90ms + 120ms);
+  }
+  .abierto & .l > span { transform: none; }
+}
+.cerrar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: $r-pildora;
+  background: $superficie;
+  color: $tinta;
+  cursor: pointer;
+  svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; transition: transform 0.35s $resorte; }
+  &:hover { background: $linea; svg { transform: rotate(90deg); } }
+  &:focus-visible { outline: 2px solid $carmesi; outline-offset: 3px; }
+}
+.bajada { margin: u(1) 0 0; font-size: max(15px, #{u(0.9)}); line-height: 1.55; color: $tinta-suave; }
+
+form { display: flex; flex-direction: column; gap: u(1); margin-top: u(1.5); }
+.par {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: u(1);
+  @media (max-width: 520px) { grid-template-columns: 1fr; }
+}
+.campo { display: grid; gap: 6px; min-width: 0; }
+label {
+  font-size: max(12px, #{u(0.72)});
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: $tinta-suave;
+}
+.opcional { text-transform: none; letter-spacing: 0; font-weight: 500; }
+input, select, textarea {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 16px;
+  border: 1px solid $linea;
+  border-radius: $r-xl;
+  background: $papel;
+  color: $tinta;
+  font-family: $fb;
+  font-size: 16px;   // 16 px: iOS no hace zoom al enfocar
+  outline: none;
+  transition: border-color 0.2s $quart, box-shadow 0.2s $quart;
+  &::placeholder { color: #9b9ba3; }
+  &:focus { border-color: $carmesi; box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.15); }
+}
+select { appearance: none; cursor: pointer; }
+textarea { resize: vertical; min-height: 96px; line-height: 1.5; }
+
+.enviar {
+  width: 100%;
+  margin-top: u(0.5);
+  @include pildora(tinta);
+}
+.nota { margin: 0; text-align: center; font-size: max(13px, #{u(0.8)}); color: $tinta-suave; }
+.error { margin: 0; padding: 10px 14px; border-radius: $r-xl; background: #fff1f2; color: $carmesi-hondo; font-size: 14px; }
+
+.listo {
+  margin-top: u(2);
+  padding: u(1.5);
+  border-radius: $r-tarjeta;
+  background: $superficie;
+  text-align: center;
+  p { margin: 0; color: $tinta-suave; line-height: 1.55; }
+  .enviar { margin-top: u(1.25); }
+}
+.tilde {
+  display: inline-grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: u(0.75);
+  border-radius: $r-pildora;
+  background: $carmesi;
+  svg { width: 22px; height: 22px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+}
+.listo .listo-titulo { margin-bottom: 4px; color: $tinta; font-family: $fd; font-size: max(18px, #{u(1.125)}); font-weight: 600; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fondo, .ventana, .titulo .l > span { transition: none !important; }
+}
