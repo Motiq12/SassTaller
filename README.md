@@ -37,48 +37,47 @@ seguimiento de su moto, aprobación de presupuestos y calificación.
 
 ## Requisitos
 
-- Node.js 22+
-- MySQL Server 8.x
+- Node.js 18+
+- PostgreSQL 18, la misma versión que producción (lo más simple: Docker Desktop, ver abajo)
 - Ionic CLI y Angular CLI
 
 ---
 
 ## 1. Base de datos
 
-Creá la base y configurá `backend/.env` (copia de `backend/.env.example`):
+La base es **PostgreSQL**. En desarrollo alcanza con un contenedor (se crea una vez):
 
-```
-PORT=3000
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=
-DB_NAME=taller_motos
-CORS_ORIGIN=http://localhost:8100
-RESEND_API_KEY=          # opcional; sin key, los códigos se imprimen en consola
+```bash
+docker run -d --name motiq-pg -e POSTGRES_USER=motiq -e POSTGRES_PASSWORD=motiq_dev \
+  -e POSTGRES_DB=sasstaller -p 5432:5432 -v motiq-pg18-data:/var/lib/postgresql postgres:18-alpine
 ```
 
-Cargá el esquema:
+Copiá `backend/.env.example` a `backend/.env`: ya trae los valores de ese contenedor.
+Completá `JWT_SECRET` con cualquier texto largo (en producción el server aborta si falta).
+Después:
 
 ```bash
 cd backend
-node src/db/migrate.js
+npm install
+npm run db:importar
 ```
 
-Crea las tablas (`backend/schema.sql`). Las cuentas iniciales se crean **solo** si
-definís sus contraseñas en variables de entorno antes de migrar, para que nunca quede
-una contraseña escrita en el repositorio:
+Eso recrea el esquema desde `backend/db/migraciones/`, carga dos talleres de prueba y
+**genera contraseñas nuevas para el personal, que imprime una sola vez**: el repo no lleva
+ninguna que funcione. **Si ya tenías la base, la reemplaza** —la idea es que todos arranquen
+desde lo mismo— y por eso se niega a correr contra un servidor que no sea local. El detalle
+está en [`backend/db/README.md`](backend/db/README.md).
 
+Para entrar al panel de la plataforma necesitás tu propia cuenta (esas no vienen en los
+datos de prueba, a propósito):
+
+```bash
+npm run motiq:admin -- "Tu nombre" vos@motiq.cr
 ```
-SEED_ADMIN_PASSWORD=...   # cuenta de administración (SEED_ADMIN_EMAIL, por defecto admin@taller.com)
-SEED_RECEP_PASSWORD=...   # cuenta de recepción (SEED_RECEP_EMAIL, por defecto recepcion@taller.com)
-```
 
-> Versiones anteriores de este README traían contraseñas de ejemplo. Si alguna cuenta
-> todavía usa una de ellas, cambiala desde **Mi perfil → Cambiar contraseña**.
-
-> La API además corre **migraciones idempotentes** (`ensureSchema`) en cada arranque,
-> así que el esquema se mantiene al día solo en cada deploy.
+> **Sobre las migraciones.** Cada cambio de esquema es un archivo numerado en
+> `backend/db/migraciones/`, y la API aplica los pendientes al arrancar, una sola vez cada
+> uno. La carpeta `backend/migrations/` es el registro de la etapa MySQL: no la ejecuta nada.
 
 ---
 
@@ -86,15 +85,14 @@ SEED_RECEP_PASSWORD=...   # cuenta de recepción (SEED_RECEP_EMAIL, por defecto 
 
 ```bash
 cd backend
-npm install
-npm run dev        # recarga automática (nodemon)
+npm run dev        # recarga automática (nodemon), un solo proceso
 # o
-npm start
+npm start          # multiproceso (cluster), como en producción
 npm test           # tests unitarios
 ```
 
-API en **http://localhost:3000**, montada bajo `/api` (auth, clientes, motos, citas,
-ordenes, recepcion, mecanico, admin, garantias, promos, portal…).
+API en **http://localhost:3000**, montada bajo `/api` (auth, clientes, vehiculos, citas,
+ordenes, recepcion, mecanico, admin, garantias, promos, portal, motiq…).
 
 ---
 
@@ -117,13 +115,3 @@ La URL de la API se configura en `frontend/src/environments/`.
 
 Railway despliega automáticamente al hacer **push a `main`**. La API sirve el build
 del frontend y ejecuta las migraciones al arrancar; no hay pasos manuales de base de datos.
-
-### Variables de producción (servicio Proyecto-taller)
-
-- `MYSQL_URL` y `JWT_SECRET`: la conexión a la base y la firma de las sesiones.
-- `RESEND_API_KEY` y `MAIL_FROM`: los correos. `MAIL_FROM` tiene que ser una dirección
-  de un **dominio verificado en Resend** (por ejemplo `MS Motos <no-reply@dominio-del-taller>`).
-  Con el remitente de prueba (`onboarding@resend.dev`) Resend solo entrega a la dueña de
-  la cuenta: los clientes no reciben el código para registrarse ni los avisos.
-- `RESPALDO_*`: el respaldo diario de la base (`backend/scripts/respaldos.js`).
-- `SITIO_WEB_ACTIVO=1`: enciende lo del sitio web en el panel; sin la variable queda apagado.

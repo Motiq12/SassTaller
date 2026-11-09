@@ -35,13 +35,13 @@ function registrarEvento(tipo, { email = null, ip = null, usuarioId = null, acto
   pool.query(
     // El taller sale del usuario o de quien actuó. Un intento fallido con un correo que
     // no existe no es de ningún taller: queda en NULL, no en el taller 1.
-    'INSERT INTO eventos_seguridad (tenant_id, tipo, email, ip, usuario_id, actor_id, detalle) VALUES ((SELECT tenant_id FROM usuarios WHERE id = COALESCE(?, ?)), ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO eventos_seguridad (tenant_id, tipo, email, ip, usuario_id, actor_id, detalle) VALUES ((SELECT tenant_id FROM usuarios WHERE id = COALESCE(?::int, ?::int)), ?, ?, ?, ?, ?, ?)',
     [actorId || null, usuarioId || null, tipo, email ? String(email).trim().toLowerCase().slice(0, 190) : null, ip ? String(ip).slice(0, 64) : null,
       usuarioId || null, actorId || null, detalle ? String(detalle).slice(0, 300) : null]
   ).catch((e) => console.error('No se pudo anotar el evento de seguridad:', e.code || e.message));
   // Un intento fallido cada tanto limpia lo viejo: un ataque llena la tabla rápido.
   if (Math.random() < 0.01) {
-    pool.query(`DELETE FROM eventos_seguridad WHERE created_at < NOW() - INTERVAL ${DIAS_GUARDADOS} DAY`).catch(() => {});
+    pool.query(`DELETE FROM eventos_seguridad WHERE created_at < NOW() - ${DIAS_GUARDADOS} * INTERVAL '1 day'`).catch(() => {});
   }
 }
 
@@ -72,7 +72,7 @@ async function resumenSeguridad(minutos) {
      FROM eventos_seguridad e
      LEFT JOIN usuarios a ON a.id = e.actor_id
      LEFT JOIN usuarios u ON u.id = e.usuario_id
-     WHERE e.created_at >= NOW() - INTERVAL ? MINUTE
+     WHERE e.created_at >= NOW() - ?::int * INTERVAL '1 minute'
      ORDER BY e.id`,
     [minutos]
   );
@@ -116,7 +116,7 @@ async function ultimoRespaldo() {
       'SELECT ok, error, created_at FROM respaldos_registro WHERE origen = ? ORDER BY id DESC LIMIT 1', ['automatico']
     );
     const [[bueno]] = await pool.query(
-      `SELECT TIMESTAMPDIFF(HOUR, created_at, NOW()) AS horas FROM respaldos_registro
+      `SELECT FLOOR(EXTRACT(EPOCH FROM (NOW() - created_at)) / 3600)::int AS horas FROM respaldos_registro
        WHERE ok = 1 ORDER BY id DESC LIMIT 1`
     );
     return {

@@ -23,7 +23,7 @@ router.use(auth, requireRol('recepcion'));
 // GET /mensaje/:id/foto y el cliente la cachea por id (un mensaje no cambia nunca).
 // Mismo patrón que ya usaba el listado de promociones.
 const SELECT_MSG = `
-  SELECT m.id, m.mensaje, (m.foto IS NOT NULL) AS tiene_foto, m.orden_id, m.tipo, m.created_at,
+  SELECT m.id, m.mensaje, (m.foto IS NOT NULL)::int AS tiene_foto, m.orden_id, m.tipo, m.created_at,
          m.remitente_id, m.destino_id,
          ru.nombre AS remitente_nombre, ru.rol AS remitente_rol,
          o.numero_orden,
@@ -40,7 +40,7 @@ async function contactoValido(req) {
   const [[u]] = await req.db.query(
     // Sin el avatar: lo devuelve el hilo en cada refresco (cada 12 s) y es base64.
     // Se pide aparte por /contacto/:id/foto y el cliente lo cachea.
-    'SELECT id, nombre, rol, (foto IS NOT NULL) AS tiene_foto, telefono FROM usuarios WHERE tenant_id = @tenant AND id = ? AND activo = 1',
+    'SELECT id, nombre, rol, (foto IS NOT NULL)::int AS tiene_foto, telefono FROM usuarios WHERE tenant_id = @tenant AND id = ? AND activo = 1',
     [otro]
   );
   return u || null;
@@ -62,7 +62,7 @@ router.get('/contactos', async (req, res) => {
     // `u.foto` tampoco viaja: es el avatar en base64 y esta lista se refresca cada 15 s.
     const [contactos] = await req.db.query(
       `SELECT u.id, u.nombre, u.rol, u.telefono,
-              (u.foto IS NOT NULL) AS tiene_foto,
+              (u.foto IS NOT NULL)::int AS tiene_foto,
               ult.mensaje       AS ultimo_mensaje,
               ult.es_foto       AS ultimo_es_foto,
               ult.remitente_id  AS ultimo_remitente_id,
@@ -71,10 +71,10 @@ router.get('/contactos', async (req, res) => {
        FROM usuarios u
        LEFT JOIN (
          SELECT otro, mensaje, es_foto, remitente_id, created_at FROM (
-           SELECT IF(m.remitente_id = ?, m.destino_id, m.remitente_id) AS otro,
-                  m.mensaje, (m.foto IS NOT NULL) AS es_foto, m.remitente_id, m.created_at,
+           SELECT CASE WHEN m.remitente_id = ? THEN m.destino_id ELSE m.remitente_id END AS otro,
+                  m.mensaje, (m.foto IS NOT NULL)::int AS es_foto, m.remitente_id, m.created_at,
                   ROW_NUMBER() OVER (
-                    PARTITION BY IF(m.remitente_id = ?, m.destino_id, m.remitente_id)
+                    PARTITION BY CASE WHEN m.remitente_id = ? THEN m.destino_id ELSE m.remitente_id END
                     ORDER BY m.created_at DESC, m.id DESC
                   ) AS rn
            FROM mensajes_internos m
@@ -119,7 +119,7 @@ router.get('/conversacion/:usuarioId', async (req, res) => {
     if (!otro) return res.status(404).json({ error: 'Contacto no válido' });
     const [rows] = await req.db.query(
       `${SELECT_MSG}
-       WHERE m.tipo IN ('directo','sistema')
+       WHERE m.tenant_id = @tenant AND m.tipo IN ('directo','sistema')
          AND ((m.remitente_id = ? AND m.destino_id = ?) OR (m.remitente_id = ? AND m.destino_id = ?))
        ORDER BY m.created_at DESC LIMIT 200`,
       [yo, yo, otro.id, otro.id, yo]
@@ -149,7 +149,7 @@ router.post('/conversacion/:usuarioId', exigirPermiso('equipo.mensajes'), async 
        VALUES (@tenant, ?, ?, NULL, ?, ?, 'directo', (SELECT sucursal_id FROM usuarios WHERE id = ? AND tenant_id = @tenant))`,
       [yo, otro.id, texto, foto || null, otro.id]
     );
-    const [[nuevo]] = await req.db.query(`${SELECT_MSG} WHERE m.id = ?`, [yo, r.insertId]);
+    const [[nuevo]] = await req.db.query(`${SELECT_MSG} WHERE m.tenant_id = @tenant AND m.id = ?`, [yo, r.insertId]);
     res.status(201).json({ data: nuevo, message: 'Mensaje enviado' });
   } catch (err) {
     fail(res, err);
@@ -202,7 +202,7 @@ router.post('/avisos', soloRoles('recepcion', 'admin'), exigirPermiso('equipo.me
       "INSERT INTO mensajes_internos (tenant_id,remitente_id, destino_rol, tipo, mensaje, foto) VALUES (@tenant, ?, 'tecnico', 'broadcast', ?, ?)",
       [req.usuario.id, texto, foto || null]
     );
-    const [[nuevo]] = await req.db.query(`${SELECT_MSG} WHERE m.id = ?`, [req.usuario.id, r.insertId]);
+    const [[nuevo]] = await req.db.query(`${SELECT_MSG} WHERE m.tenant_id = @tenant AND m.id = ?`, [req.usuario.id, r.insertId]);
     res.status(201).json({ data: nuevo, message: 'Aviso enviado a todos los mecánicos' });
   } catch (err) {
     fail(res, err);

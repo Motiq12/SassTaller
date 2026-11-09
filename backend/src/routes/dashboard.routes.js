@@ -41,7 +41,7 @@ router.get('/resumen', async (req, res) => {
       "SELECT COALESCE(AVG(costo_mano_obra + costo_repuestos - descuento), 0) AS ticket_promedio FROM ordenes_trabajo WHERE tenant_id = @tenant AND estado = 'entregada'"
     );
     const [[{ tiempo_promedio_horas }]] = await req.db.query(
-      "SELECT ROUND(AVG(TIMESTAMPDIFF(HOUR, fecha_ingreso, fecha_entrega_real)), 1) AS tiempo_promedio_horas FROM ordenes_trabajo WHERE tenant_id = @tenant AND estado = 'entregada' AND fecha_entrega_real IS NOT NULL"
+      "SELECT ROUND(AVG(TRUNC(EXTRACT(EPOCH FROM (fecha_entrega_real) - (fecha_ingreso)) / 3600)), 1) AS tiempo_promedio_horas FROM ordenes_trabajo WHERE tenant_id = @tenant AND estado = 'entregada' AND fecha_entrega_real IS NOT NULL"
     );
     // Ingresos por citas (lo que cobra el mecánico al entregar una cita).
     // Es un canal de facturación distinto al de las órdenes de trabajo.
@@ -113,7 +113,7 @@ router.get('/atrasos', async (req, res) => {
   try {
     const [rows] = await req.db.query(
       `SELECT o.id, o.numero_orden, o.estado, o.fecha_estimada_entrega,
-              DATEDIFF(o.fecha_estimada_entrega, ${hoySQL((await getConfig(req.db)).zona_horaria_offset)}) AS dias_restantes,
+              (o.fecha_estimada_entrega::date - ${hoySQL((await getConfig(req.db)).zona_horaria_offset)}::date) AS dias_restantes,
               m.marca, m.modelo, m.placa,
               c.nombre AS cliente_nombre, c.apellido AS cliente_apellido,
               t.nombre AS tecnico_nombre
@@ -135,7 +135,7 @@ router.get('/tecnicos', async (req, res) => {
     const [rows] = await req.db.query(
       `SELECT u.id, u.nombre,
               COUNT(ot.id) AS ordenes_completadas,
-              ROUND(AVG(TIMESTAMPDIFF(HOUR, ot.fecha_ingreso, ot.fecha_entrega_real)), 1) AS horas_promedio
+              ROUND(AVG(TRUNC(EXTRACT(EPOCH FROM (ot.fecha_entrega_real) - (ot.fecha_ingreso)) / 3600)), 1) AS horas_promedio
        FROM usuarios u
        LEFT JOIN ordenes_trabajo ot ON ot.tecnico_id = u.id AND ot.estado = 'entregada' AND ot.tenant_id = @tenant
        WHERE u.tenant_id = @tenant AND u.rol = 'tecnico' AND u.activo = 1
@@ -153,10 +153,10 @@ router.get('/tiempos', async (req, res) => {
     const [rows] = await req.db.query(
       `SELECT etapa,
               COUNT(*) AS total,
-              ROUND(AVG(TIMESTAMPDIFF(HOUR, inicio, COALESCE(fin, NOW()))), 1) AS horas_promedio
+              ROUND(AVG(TRUNC(EXTRACT(EPOCH FROM (COALESCE(fin, NOW())) - (inicio)) / 3600)), 1) AS horas_promedio
        FROM orden_tiempos WHERE tenant_id = @tenant
        GROUP BY etapa
-       ORDER BY FIELD(etapa,'recepcion','diagnostico','esperando_aprobacion','esperando_repuestos','en_reparacion','lista_entrega')`
+       ORDER BY array_position(ARRAY['recepcion', 'diagnostico', 'esperando_aprobacion', 'esperando_repuestos', 'en_reparacion', 'lista_entrega']::text[], etapa::text)`
     );
     res.json({ data: rows });
   } catch (err) {

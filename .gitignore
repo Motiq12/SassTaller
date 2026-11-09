@@ -27,3 +27,6 @@ backend/backups/
 
 # Informes crudos de Lighthouse: pesan MB y se regeneran con el comando de INFORME.md
 pruebas-carga/lighthouse/
+
+# Capturas y mediciones de la skill de diseño (se regeneran)
+.taste-skill/

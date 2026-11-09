@@ -1,0 +1,173 @@
+@use 'base' as *;
+
+:host { display: block; }
+
+// Dos campos planos que se tocan en un borde limpio: la frase sobre el escalón
+// oscuro, la orden sobre el carmesí. Debajo, de lado a lado, el control.
+.etapas { background: $suelo-2; }
+
+.campos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: min(78svh, 820px);
+}
+
+.campo-frase {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 32px;
+  padding: clamp(56px, 8vw, 120px) $margen 48px;
+}
+
+.frase {
+  @include titulo($t-seccion);
+  display: grid;
+  max-width: 11ch;
+  @include entrada;
+}
+// Las cuatro frases en la misma celda: se cruzan sin mover el resto.
+.clausula {
+  grid-area: 1 / 1;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  &.activa { opacity: 1; }
+}
+
+.ayuda {
+  margin: 0;
+  max-width: 34ch;
+  font-family: $fb;
+  font-size: $t-texto;
+  line-height: 1.55;
+  color: $tinta;
+  @include entrada;
+}
+
+.campo-pantalla {
+  display: grid;
+  place-items: center;
+  padding: 56px $margen;
+  background: $carmesi;
+}
+.pantalla {
+  width: min(440px, 100%);
+  @include entrada;
+}
+
+.control {
+  position: relative;
+  padding: 36px $margen 40px;
+  @include entrada;
+}
+
+.pista {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: $suelo-3;
+  margin: 12px 16px 0;   // medio pulgar a cada lado: el pulgar cae justo en cada parada
+}
+.recorrido {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: $tinta;
+  transition: width 0.25s $curva;
+}
+
+// El <input> real va encima de la pista dibujada, transparente salvo el pulgar.
+input[type='range'] {
+  position: absolute;
+  left: $margen;
+  right: $margen;
+  top: 36px;
+  width: calc(100% - 2 * #{$margen});
+  height: 32px;
+  margin: -12px 0 0;
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: grab;
+  &:active { cursor: grabbing; }
+  &::-webkit-slider-runnable-track { height: 32px; background: transparent; }
+  &::-moz-range-track { height: 32px; background: transparent; }
+  // El pulgar: el disco, en el acento.
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: $carmesi;
+    border: 4px solid $suelo-2;
+    transition: transform 0.2s $curva;
+  }
+  &::-moz-range-thumb {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: $carmesi;
+    border: 4px solid $suelo-2;
+  }
+  &:hover::-webkit-slider-thumb { transform: scale(1.12); }
+  &:focus-visible { outline: none; }
+  &:focus-visible::-webkit-slider-thumb { outline: 3px solid $tinta; outline-offset: 2px; }
+  &:focus-visible::-moz-range-thumb { outline: 3px solid $tinta; outline-offset: 2px; }
+}
+
+.nombres {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 22px 0 0;
+  padding: 0;
+  li:nth-child(2) { text-align: center; padding-right: 8%; }
+  li:nth-child(3) { text-align: center; padding-left: 8%; }
+  li:last-child { text-align: right; }
+  button {
+    border: 0;
+    background: none;
+    padding: 8px 0;
+    min-height: 44px;
+    font-family: $fb;
+    font-size: $t-texto;
+    font-weight: 600;
+    color: $suave;
+    cursor: pointer;
+    transition: color 0.2s $curva;
+    &:hover, &.pasada { color: $tinta; }
+    &.actual { color: $carmesi-texto; }
+    &:focus-visible { outline: 3px solid $tinta; outline-offset: 2px; border-radius: 6px; }
+  }
+}
+
+.oculto { @include oculto; }
+
+// Teléfono: primero la orden (recortada a lo que importa), el control justo
+// debajo en la costura, y la frase al final.
+@media (max-width: 760px) {
+  .campos {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+  .campo-pantalla {
+    order: -1;
+    min-height: 46svh;
+    padding: 40px $margen;
+  }
+  .campo-frase { padding: 32px $margen 56px; }
+  .frase { font-size: $t-hero; }
+  .control { padding-top: 28px; }
+  input[type='range'] { top: 28px; height: 40px;
+    &::-webkit-slider-thumb { width: 40px; height: 40px; }
+  }
+  .nombres {
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+    li, li:nth-child(n) { text-align: left; padding: 0; }
+    button { font-size: 15px; }
+  }
+  // En el teléfono el control queda entre la orden y la frase.
+  .etapas { display: flex; flex-direction: column; }
+  .campos { display: contents; }
+  .control { order: 0; }
+  .campo-frase { order: 1; }
+}

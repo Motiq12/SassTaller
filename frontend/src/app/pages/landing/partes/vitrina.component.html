@@ -1,0 +1,24 @@
+<section class="vitrina" aria-labelledby="vitrina-titulo">
+  <div class="escenario" appAparece [retraso]="120">
+    <div class="plato" aria-hidden="true"></div>
+    <div class="pantallas" [class.lento]="lento">
+      <app-lp-pantalla *ngFor="let p of problemas; let i = index"
+                   class="pantalla" [class.activa]="i === activo"
+                   [tipo]="p.pantalla" [attr.aria-hidden]="i !== activo"></app-lp-pantalla>
+    </div>
+  </div>
+
+  <div class="lista">
+    <h2 id="vitrina-titulo" appAparece>Lo que deja de pasar</h2>
+    <div class="nombres" role="tablist" aria-label="Problemas del taller" appAparece [retraso]="60">
+      <button *ngFor="let p of problemas; let i = index" type="button" role="tab" class="nombre"
+              [class.activo]="i === activo" [attr.aria-selected]="i === activo"
+              [attr.tabindex]="i === activo ? 0 : -1"
+              (click)="elegir(i)" (keydown)="teclado($event, i)">
+        {{ p.nombre }}
+      </button>
+    </div>
+  </div>
+
+  <p class="hecho" aria-live="polite" appAparece [retraso]="180">{{ problemas[activo].hecho }}</p>
+</section>

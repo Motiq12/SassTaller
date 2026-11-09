@@ -1,6 +1,6 @@
 // "Hoy", "esta semana", "este mes"… en la hora del taller, para las consultas.
 //
-// En Railway MySQL corre en UTC: CURDATE() y MONTH(NOW()) cambian de día a las 6 p. m.
+// La base corre en UTC: CURRENT_DATE y el mes de NOW() cambian de día a las 6 p. m.
 // de Costa Rica. Después de esa hora, la agenda "de hoy" de recepción mostraba las
 // citas de mañana y lo cobrado "hoy" volvía a cero. Acá el período se calcula en Node
 // con la zona del taller (configuracion.zona_horaria_offset) y la consulta compara
@@ -8,11 +8,9 @@
 //
 // Las columnas de día (DATE: citas.fecha, fecha_estimada_entrega) se comparan contra
 // días; las de momento (TIMESTAMP: fecha_fin, fecha_entrega_real, fecha_ingreso),
-// contra el instante en que empieza ese día en el taller. mysql2 escribe ese instante
-// en la zona del proceso, que es la misma que usa la base al guardar (UTC en Railway,
-// la de la computadora en local), así que la comparación vale en las dos.
+// contra el instante en que empieza ese día en el taller, escrito en UTC: la zona de la
+// sesión (db/pool.js).
 
-const mysql = require('mysql2');
 const { fechaLocalISO } = require('./fecha');
 
 const PERIODOS = ['hoy', 'semana', 'mes', 'mes_pasado', 'anio'];
@@ -44,13 +42,14 @@ const COLUMNA = /^[a-z_]+(\.[a-z_]+)?$/;
 function enPeriodo(col, periodo, { momento = false, offset = -6, ahora = Date.now() } = {}) {
   if (!COLUMNA.test(col)) throw new Error(`Columna no válida: ${col}`);
   const r = rangoDelTaller(periodo, offset, ahora);
-  const valor = (f) => mysql.escape(momento ? inicioDelDia(f, offset) : f);
+  const valor = (f) => (momento ? `'${inicioDelDia(f, offset).toISOString().replace('T', ' ').replace('Z', '')}'` : `'${f}'`);
   return `(${col} >= ${valor(r.desde)} AND ${col} < ${valor(r.hasta)})`;
 }
 
 // El día de hoy del taller, ya escapado para meterlo en una consulta ('2026-10-24').
 function hoySQL(offset = -6, ahora = Date.now()) {
-  return mysql.escape(fechaLocalISO(offset, 0, ahora));
+  // Viene de fechaLocalISO, no del usuario: solo dígitos y guiones.
+  return `'${fechaLocalISO(offset, 0, ahora)}'`;
 }
 
 // Cuántos días tiene el período (para la serie diaria de los reportes).

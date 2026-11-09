@@ -8,19 +8,30 @@ const jwt = require('jsonwebtoken');
 const { pool } = require('../db/pool');
 const { paraTenant } = require('../db/tenant-db');
 
-// Subdominios que no identifican a un taller (entorno local, apex, www).
-const NO_SON_TALLER = new Set(['www', 'localhost', 'api', 'app', '127', '0']);
+// Subdominios que no identifican a un taller (infraestructura).
+const NO_SON_TALLER = new Set(['www', 'localhost', 'api', 'app']);
+// Dominios del hosting: su primera parte es un identificador de Railway, no un taller.
+const DOMINIOS_DE_PLATAFORMA = ['.railway.app'];
 
-function slugDelHost(req) {
-  const host = String(req.hostname || '').toLowerCase();
-  if (!host || !host.includes('.')) return null;   // 'localhost' y equivalentes
-  const primero = host.split('.')[0];
-  return NO_SON_TALLER.has(primero) ? null : primero;
+// El slug del taller que trae el host, o null si el host no es de un taller.
+//
+// Un subdominio de taller tiene al menos TRES partes (msmotors.motiq12.com). Antes
+// bastaba con que hubiera un punto, así que el dominio del producto, motiq12.com,
+// se leía como el taller "motiq12": cada visita a la landing pedía la marca de un
+// taller inexistente y mostraba "Taller no encontrado o inactivo". La misma regla
+// vive en el frontend (services/taller.service.ts): si cambia acá, cambia allá.
+function slugDelHost(hostname) {
+  const host = String(hostname || '').toLowerCase();
+  if (!host || /^[\d.]+$/.test(host) || host.includes(':')) return null;   // IPv4 / IPv6
+  if (DOMINIOS_DE_PLATAFORMA.some((d) => host.endsWith(d))) return null;
+  const partes = host.split('.');
+  if (partes.length < 3) return null;   // localhost, motiq12.com
+  return NO_SON_TALLER.has(partes[0]) ? null : partes[0];
 }
 
 module.exports = async function tenantPublico(req, res, next) {
   try {
-    const slug = String(req.body?.taller || req.query?.taller || slugDelHost(req) || '').trim().toLowerCase();
+    const slug = String(req.body?.taller || req.query?.taller || slugDelHost(req.hostname) || '').trim().toLowerCase();
 
     if (!slug) {
       // Si viene un Bearer, la ruta es de las autenticadas y el taller sale del
@@ -53,3 +64,4 @@ module.exports = async function tenantPublico(req, res, next) {
     next(err);
   }
 };
+module.exports.slugDelHost = slugDelHost;

@@ -1,0 +1,160 @@
+@use 'base' as *;
+
+:host { display: block; }
+
+// Escritorio: el disco plano centrado al 58 % del ancho, la pantalla parada
+// delante y rompiendo su borde de arriba; la lista abajo a la izquierda y el
+// dato del problema elegido al costado derecho del disco.
+.vitrina {
+  position: relative;
+  min-height: min(100svh, 980px);
+  padding: 0 $margen;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr) minmax(0, 3fr);
+  grid-template-areas: 'lista escenario hecho';
+  align-items: end;
+  gap: 32px;
+}
+
+.escenario {
+  grid-area: escenario;
+  position: relative;
+  align-self: center;
+  justify-self: center;
+  width: min(64vh, 100%);
+  aspect-ratio: 1;
+  @include entrada;
+}
+
+.plato {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: $carmesi;
+}
+
+.pantallas {
+  position: absolute;
+  left: 50%;
+  top: -7%;
+  width: min(440px, 92%);
+  transform: translateX(-50%);
+  display: grid;
+}
+
+// Las cuatro pantallas apiladas en la misma celda; se cruzan con un fundido.
+.pantalla {
+  grid-area: 1 / 1;
+  opacity: 0;
+  transform: translateY(14px) scale(0.985);
+  transition: opacity 0.3s $curva, transform 0.3s $curva;
+  pointer-events: none;
+  &.activa { opacity: 1; transform: none; pointer-events: auto; }
+}
+.lento .pantalla { transition-duration: 1.6s; }
+
+.lista {
+  grid-area: lista;
+  padding-bottom: 8px;
+}
+
+h2 {
+  @include titulo($t-lista);
+  color: $suave;
+  font-weight: 600;
+  line-height: 1.15;
+  margin-bottom: 6px;
+  @include entrada;
+}
+
+.nombres {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  @include entrada;
+}
+
+.nombre {
+  display: flex;
+  gap: 0.4em;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-family: $fd;
+  font-size: $t-lista;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  color: $suave;
+  cursor: pointer;
+  transition: color 0.3s $curva, transform 0.3s $curva;
+  &::before {
+    @include vineta;
+    opacity: 0;
+    transform: scale(0.4);
+    transition: opacity 0.3s $curva, transform 0.3s $curva;
+  }
+  &:hover { color: $tinta; }
+  &.activo {
+    color: $tinta;
+    &::before { opacity: 1; transform: none; }
+  }
+  &:focus-visible { outline: 3px solid $tinta; outline-offset: 4px; border-radius: 6px; }
+}
+
+.hecho {
+  grid-area: hecho;
+  margin: 0 0 14px;
+  font-family: $fb;
+  font-size: $t-texto;
+  line-height: 1.55;
+  color: $tinta;
+  @include entrada;
+}
+
+// Teléfono: el disco primero, después los nombres en una fila que se desliza
+// de costado y el dato debajo.
+@media (max-width: 900px) {
+  .vitrina {
+    display: block;
+    min-height: 0;
+  }
+  // La pantalla va en el flujo (en el teléfono es más alta que el disco) y el
+  // disco queda detrás de su mitad de arriba: así nunca tapa el titular.
+  .escenario {
+    width: 100%;
+    aspect-ratio: auto;
+    padding-top: 30vw;
+  }
+  .plato {
+    inset: 0 auto auto 50%;
+    width: 86vw;
+    aspect-ratio: 1;
+    transform: translateX(-50%);
+  }
+  .pantallas {
+    position: relative;
+    left: auto;
+    top: auto;
+    width: 100%;
+    transform: none;
+  }
+  .lista { margin-top: 48px; padding: 0; }
+  // Los nombres envuelven en varias líneas: una fila cortada en el borde se lee
+  // como recortada, no como deslizable.
+  .nombres {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0 20px;
+  }
+  .nombre {
+    flex: 0 0 auto;
+    font-size: $t-lista;
+    white-space: nowrap;
+    min-height: 44px;
+    align-items: center;
+    &::before { margin-top: 0; }
+  }
+  .hecho { margin-top: 18px; font-size: $t-texto; }
+}

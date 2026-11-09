@@ -46,27 +46,19 @@ test('firma como el ejemplo de Amazon: listar con parámetros', () => {
 
 // ── Los valores en el SQL ─────────────────────────────────────────────────
 test('literal: nulos, números, textos con comillas y binarios', () => {
-  assert.equal(literal(null, 'varchar'), 'NULL');
-  assert.equal(literal('42', 'int'), '42');
-  assert.equal(literal('-12.50', 'decimal'), '-12.50');
-  assert.equal(literal('9007199254740993', 'bigint'), '9007199254740993', 'un BIGINT no pierde dígitos');
-  assert.equal(literal('42', 'varchar'), "'42'", 'un texto que parece número sigue siendo texto');
-  assert.equal(literal("O'Brien \\ ñ\n", 'varchar'), "'O\\'Brien \\\\ ñ\\n'");
-  assert.equal(literal('2026-10-08 02:30:00', 'datetime'), "'2026-10-08 02:30:00'");
-  assert.equal(literal('{"a": "b\'c"}', 'json'), "'{\\\"a\\\": \\\"b\\'c\\\"}'");
-  assert.equal(literal(Buffer.from([0, 255, 16]), 'mediumblob'), "X'00ff10'");
-  assert.equal(literal(Buffer.alloc(0), 'blob'), "X''");
+  assert.equal(literal(null, 'character varying'), 'NULL');
+  assert.equal(literal('42', 'integer'), '42');
+  assert.equal(literal('-12.50', 'numeric'), '-12.50');
+  assert.equal(literal('9007199254740993', 'bigint'), '9007199254740993', 'un bigint no pierde dígitos');
+  assert.equal(literal('42', 'character varying'), "'42'", 'un texto que parece número sigue siendo texto');
+  assert.equal(literal("O'Brien \\ ñ\n", 'text'), "'O''Brien \\ ñ\n'");
+  assert.equal(literal('2026-10-08 02:30:00+00', 'timestamp with time zone'), "'2026-10-08 02:30:00+00'");
+  assert.equal(literal('\\x00ff10', 'bytea'), "'\\x00ff10'");
 });
 
-test('no se respaldan las columnas generadas, pero sí las de valor por defecto calculado', () => {
-  const cols = [
-    { nombre: 'id', extra: 'auto_increment' },
-    { nombre: 'total', extra: 'STORED GENERATED' },
-    { nombre: 'iniciales', extra: 'VIRTUAL GENERATED' },
-    { nombre: 'created_at', extra: 'DEFAULT_GENERATED' },
-    { nombre: 'updated_at', extra: 'DEFAULT_GENERATED on update CURRENT_TIMESTAMP' },
-  ];
-  assert.deepEqual(columnasRespaldables(cols).map((c) => c.nombre), ['id', 'created_at', 'updated_at']);
+test('no se respaldan las columnas generadas', () => {
+  const cols = [{ nombre: 'id', generada: 'NEVER' }, { nombre: 'placa_norm', generada: 'ALWAYS' }, { nombre: 'created_at', generada: 'NEVER' }];
+  assert.deepEqual(columnasRespaldables(cols).map((c) => c.nombre), ['id', 'created_at']);
 });
 
 // ── El cifrado ────────────────────────────────────────────────────────────
@@ -182,23 +174,22 @@ function almacenFalso() {
 // Una "base" de mentira con dos tablas, que responde lo que pide el volcado.
 function baseFalsa() {
   const tablas = {
-    clientes: { crear: 'CREATE TABLE `clientes` (\n  `id` int NOT NULL,\n  `nombre` varchar(100)\n)', cols: [['id', 'int'], ['nombre', 'varchar']], filas: [['1', "Ñandú O'Brien"], ['2', null]] },
-    web_fotos: { crear: 'CREATE TABLE `web_fotos` (\n  `clave` char(24),\n  `bytes` mediumblob\n)', cols: [['clave', 'char'], ['bytes', 'mediumblob']], filas: [['abc', Buffer.from([1, 2, 255])]] },
+    clientes: { cols: [['id', 'integer', 'YES'], ['nombre', 'character varying', 'NO']], filas: [{ id: '1', nombre: "Ñandú O'Brien" }, { id: '2', nombre: null }] },
+    fotos: { cols: [['clave', 'character', 'NO'], ['bytes', 'bytea', 'NO']], filas: [{ clave: 'abc', bytes: '\\x0102ff' }] },
+    schema_migraciones: { cols: [['archivo', 'text', 'NO']], filas: [{ archivo: '0001' }] },
   };
   const conexion = {
-    destruida: false,
+    liberada: false,
     async query(sql, params = []) {
-      if (/^SET SESSION|^START TRANSACTION|^COMMIT/.test(sql)) return [{}];
-      if (/SELECT DATABASE\(\)/.test(sql)) return [[{ base: 'taller' }]];
-      if (/information_schema\.TABLES/.test(sql)) return [Object.keys(tablas).map((nombre) => ({ nombre }))];
-      if (/^SHOW CREATE TABLE/.test(sql)) { const t = sql.match(/`([^`]+)`/)[1]; return [[{ 'Create Table': tablas[t].crear }]]; }
-      if (/information_schema\.COLUMNS/.test(sql)) return [tablas[params[0]].cols.map(([nombre, tipo]) => ({ nombre, tipo, extra: '' }))];
+      if (/^(BEGIN|ROLLBACK)/.test(sql)) return [[]];
+      if (/current_database\(\)/.test(sql)) return [[{ base: 'taller' }]];
+      if (/information_schema\.tables/.test(sql)) return [Object.keys(tablas).map((nombre) => ({ nombre }))];
+      if (/information_schema\.columns/.test(sql)) return [tablas[params[0]].cols.map(([nombre, tipo, identidad]) => ({ nombre, tipo, generada: 'NEVER', identidad }))];
+      const m = sql.match(/FROM "([^"]+)" ORDER BY ctid LIMIT (\d+) OFFSET (\d+)/);
+      if (m) return [tablas[m[1]].filas.slice(Number(m[3]), Number(m[3]) + Number(m[2]))];
       throw new Error('Consulta no prevista: ' + sql);
     },
-    connection: {
-      query({ sql }) { const t = sql.match(/FROM `([^`]+)`/)[1]; return { stream: () => Readable.from(tablas[t].filas) }; },
-    },
-    destroy() { this.destruida = true; },
+    release() { this.liberada = true; },
   };
   return { conexion, pool: { getConnection: async () => conexion } };
 }
@@ -216,16 +207,17 @@ test('respaldo completo: vuelca, comprime, sube, comprueba y rota', async () => 
 
     assert.equal(r.clave, 'respaldos/taller_2026-10-08T08-30-00Z.sql.gz');
     assert.deepEqual([r.tablas, r.filas, r.borrados, r.cifrado], [2, 3, 1, false]);
-    assert.equal(conexion.destruida, true, 'la conexión del volcado no vuelve al pool');
+    assert.equal(conexion.liberada, true, 'la conexión del volcado vuelve al pool');
     assert.deepEqual([...falso.objetos.keys()].sort(), [
       'respaldos/leeme.txt', 'respaldos/taller_2026-10-02T08-30-00Z.sql.gz', 'respaldos/taller_2026-10-08T08-30-00Z.sql.gz',
     ]);
 
     const sql = zlib.gunzipSync(falso.objetos.get(r.clave)).toString('utf8');
-    assert.match(sql, /SET FOREIGN_KEY_CHECKS = 0;/);
-    assert.match(sql, /DROP TABLE IF EXISTS `clientes`;\nCREATE TABLE `clientes`/);
-    assert.match(sql, /INSERT INTO `clientes` \(`id`, `nombre`\) VALUES\n\(1, 'Ñandú O\\'Brien'\),\n\(2, NULL\);/);
-    assert.match(sql, /INSERT INTO `web_fotos` \(`clave`, `bytes`\) VALUES\n\('abc', X'0102ff'\);/);
+    assert.match(sql, /SET CONSTRAINTS ALL DEFERRED;/);
+    assert.doesNotMatch(sql, /schema_migraciones/, 'la versión del esquema la pone el migrador');
+    assert.match(sql, /INSERT INTO "clientes" \("id", "nombre"\) VALUES\n\(1, 'Ñandú O''Brien'\),\n\(2, NULL\);/);
+    assert.match(sql, /setval\(pg_get_serial_sequence\('"clientes"', 'id'\)/);
+    assert.match(sql, /INSERT INTO "fotos" \("clave", "bytes"\) VALUES\n\('abc', '\\x0102ff'\);/);
     assert.match(sql, /-- Respaldo completo: 2 tablas, 3 filas\.\n$/);
 
     const subida = falso.pedidos.find((p) => p.metodo === 'PUT');
@@ -247,7 +239,7 @@ test('con frase, lo que se sube está cifrado y se puede bajar y abrir', async (
     const bajado = tmp('bajado.enc'); const abierto = tmp('bajado.sql.gz');
     await crearS3(config).bajar(r.clave, bajado);
     await descifrarArchivo(bajado, abierto, 'frase secreta');
-    assert.match(zlib.gunzipSync(fs.readFileSync(abierto)).toString('utf8'), /INSERT INTO `clientes`/);
+    assert.match(zlib.gunzipSync(fs.readFileSync(abierto)).toString('utf8'), /INSERT INTO "clientes"/);
   } finally {
     falso.servidor.close();
   }
@@ -272,8 +264,8 @@ test('una base sin tablas no se respalda (no se sube un archivo vacío)', async 
   const subidas = [];
   const s3 = { subir: async (c) => subidas.push(c), listar: async () => [], borrar: async () => {} };
   const pool = { getConnection: async () => ({
-    async query(sql) { return /information_schema\.TABLES/.test(sql) ? [[]] : /SELECT DATABASE\(\)/.test(sql) ? [[{ base: 'vacia' }]] : [{}]; },
-    destroy() {},
+    async query(sql) { return /current_database\(\)/.test(sql) ? [[{ base: 'vacia' }]] : [[]]; },
+    release() {},
   }) };
   await assert.rejects(respaldar({ pool, config: configRespaldo(ENV), s3 }), /ninguna tabla/);
   assert.equal(subidas.length, 0);

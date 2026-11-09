@@ -14,6 +14,23 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    # Postgres real para test/pg-adaptador.test.js: los errores de dialecto y de tipos
+    # de la migración desde MySQL no se ven contra una base falsa. Misma versión mayor
+    # que en Railway. La base termina en _test porque el test borra el esquema entero
+    # y se niega a correr contra cualquier otra.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: motiq
+          POSTGRES_PASSWORD: motiq_ci
+          POSTGRES_DB: motiq_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U motiq -d motiq_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PG_TEST_URL: postgres://motiq:motiq_ci@localhost:5432/motiq_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -27,18 +44,20 @@ jobs:
   empresas:
     # Con el mismo motor que producción, y con el servidor de verdad: si una empresa llega
     # a ver o tocar algo de otra, esto queda en rojo y no se despliega.
-    name: Backend · dos empresas separadas (MySQL 8)
+    name: Backend · dos empresas separadas (Postgres)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
-      mysql:
-        image: mysql:8.0
+      postgres:
+        image: postgres:18-alpine
         env:
-          MYSQL_ROOT_PASSWORD: prueba
-        ports: ['3306:3306']
+          POSTGRES_USER: motiq
+          POSTGRES_PASSWORD: motiq_ci
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
         options: >-
-          --health-cmd="mysqladmin ping -pprueba"
-          --health-interval=5s --health-timeout=5s --health-retries=20
+          --health-cmd "pg_isready -U motiq"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     defaults:
       run:
         working-directory: backend
@@ -52,8 +71,7 @@ jobs:
       - run: npm ci
       - run: npm run test:empresas
         env:
-          E2E_DB_HOST: 127.0.0.1
-          E2E_DB_PASSWORD: prueba
+          E2E_PG_URL: postgres://motiq:motiq_ci@localhost:5432/postgres
 
   frontend:
     name: Frontend · build

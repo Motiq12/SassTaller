@@ -139,10 +139,10 @@ router.get('/resumen', async (req, res) => {
 
     const [[estado_citas]] = await req.db.query(
       `SELECT
-         COALESCE(SUM(estado='agendado'),0) AS agendadas,
-         COALESCE(SUM(estado IN ('en_revision','en_mantenimiento','listo')),0) AS en_proceso,
-         COALESCE(SUM(estado='entregado'),0) AS completadas,
-         COALESCE(SUM(estado='cancelado'),0) AS canceladas,
+         COUNT(*) FILTER (WHERE estado='agendado') AS agendadas,
+         COUNT(*) FILTER (WHERE estado IN ('en_revision','en_mantenimiento','listo')) AS en_proceso,
+         COUNT(*) FILTER (WHERE estado='entregado') AS completadas,
+         COUNT(*) FILTER (WHERE estado='cancelado') AS canceladas,
          COUNT(*) AS total
        FROM citas WHERE tenant_id = @tenant AND ${enPeriodo('fecha', 'mes', { offset: off })}`
     );
@@ -217,7 +217,7 @@ router.get('/opiniones', async (req, res) => {
     // Resumen con los mismos filtros aplicados.
     const [[agg]] = await req.db.query(
       `SELECT COUNT(*) AS total, COALESCE(AVG(t.calificacion),0) AS promedio,
-              COALESCE(SUM(t.calificacion <= 2),0) AS bajas
+              COUNT(*) FILTER (WHERE t.calificacion <= 2) AS bajas
        FROM (${UNION}) t WHERE 1=1${filtro}`,
       params
     );
@@ -266,8 +266,8 @@ router.get('/reportes', async (req, res) => {
     // KPIs del período.
     const [[k]] = await req.db.query(
       `SELECT COUNT(*) AS total_citas,
-              COALESCE(SUM(estado='entregado'),0) AS entregadas,
-              COALESCE(SUM(estado='cancelado'),0) AS canceladas,
+              COUNT(*) FILTER (WHERE estado='entregado') AS entregadas,
+              COUNT(*) FILTER (WHERE estado='cancelado') AS canceladas,
               COALESCE(AVG(NULLIF(calificacion,0)),0) AS calificacion_promedio
        FROM citas c WHERE c.tenant_id = @tenant AND ${rango('c.fecha')}${empCita}`, pEmp
     );
@@ -293,7 +293,7 @@ router.get('/reportes', async (req, res) => {
     );
 
     // Serie temporal: citas e ingreso por día (mes) o por mes (año), con huecos en cero.
-    const bucket = periodo === 'anio' ? 'MONTH(c.fecha)' : 'DAY(c.fecha)';
+    const bucket = periodo === 'anio' ? 'EXTRACT(MONTH FROM c.fecha)::int' : 'EXTRACT(DAY FROM c.fecha)::int';
     const [serieRows] = await req.db.query(
       `SELECT ${bucket} AS b, COUNT(*) AS citas,
               COALESCE(SUM(CASE WHEN estado='entregado' THEN monto ELSE 0 END),0) AS ingreso
@@ -329,13 +329,13 @@ router.get('/reportes', async (req, res) => {
     const [rendimiento] = await req.db.query(
       `SELECT u.id AS tecnico_id, u.nombre,
               COUNT(*) AS citas,
-              COALESCE(SUM(c.estado='entregado'),0) AS entregadas,
-              COALESCE(SUM(c.estado='cancelado'),0) AS canceladas,
+              COUNT(*) FILTER (WHERE c.estado='entregado') AS entregadas,
+              COUNT(*) FILTER (WHERE c.estado='cancelado') AS canceladas,
               COALESCE(SUM(CASE WHEN c.estado='entregado' THEN c.monto ELSE 0 END),0) AS ingresos,
               AVG(CASE WHEN c.estado='entregado' AND c.fecha_inicio IS NOT NULL AND (c.fecha_listo IS NOT NULL OR c.fecha_fin IS NOT NULL)
-                       THEN TIMESTAMPDIFF(MINUTE, c.fecha_inicio, COALESCE(c.fecha_listo, c.fecha_fin)) END) AS tiempo_prom_min,
+                       THEN TRUNC(EXTRACT(EPOCH FROM (COALESCE(c.fecha_listo, c.fecha_fin)) - (c.fecha_inicio)) / 60) END) AS tiempo_prom_min,
               AVG(CASE WHEN c.estado='entregado' AND c.fecha_listo IS NOT NULL AND c.fecha_fin IS NOT NULL
-                       THEN TIMESTAMPDIFF(MINUTE, c.fecha_listo, c.fecha_fin) END) AS tiempo_entrega_min,
+                       THEN TRUNC(EXTRACT(EPOCH FROM (c.fecha_fin) - (c.fecha_listo)) / 60) END) AS tiempo_entrega_min,
               AVG(NULLIF(c.calificacion,0)) AS calificacion
        FROM citas c JOIN usuarios u ON u.id = c.tecnico_id AND u.tenant_id = @tenant
        WHERE c.tenant_id = @tenant AND ${rango('c.fecha')}${empCita}
@@ -347,8 +347,8 @@ router.get('/reportes', async (req, res) => {
     const [recepcion] = await req.db.query(
       `SELECT u.id, u.nombre,
               COUNT(*) AS ordenes,
-              COALESCE(SUM(o.aprobacion_cliente='aprobado'),0) AS aprobadas,
-              COALESCE(SUM(o.aprobacion_cliente='rechazado'),0) AS rechazadas
+              COUNT(*) FILTER (WHERE o.aprobacion_cliente='aprobado') AS aprobadas,
+              COUNT(*) FILTER (WHERE o.aprobacion_cliente='rechazado') AS rechazadas
        FROM ordenes_trabajo o JOIN usuarios u ON u.id = o.recepcionista_id AND u.tenant_id = @tenant
        WHERE o.tenant_id = @tenant AND ${rango('o.fecha_ingreso')}
        GROUP BY u.id, u.nombre ORDER BY ordenes DESC`
@@ -382,8 +382,8 @@ router.get('/reportes', async (req, res) => {
 // ───────────────────────────────────────────────────────────
 const PRIORIDADES = ['baja', 'normal', 'alta', 'urgente'];
 // Topes de la tabla (titulo VARCHAR(150), detalle VARCHAR(300)). Sin comprobarlos,
-// un texto más largo no se recorta: MySQL en modo estricto corta la petición con un
-// 500 en vez de decir qué pasó.
+// un texto más largo no se recorta: la base rechaza el INSERT y la respuesta es un
+// error genérico en vez de decir qué campo se pasó.
 const MAX_TITULO = 150;
 const MAX_DETALLE = 300;
 
@@ -410,7 +410,7 @@ router.get('/tareas', async (req, res) => {
        WHERE t.tenant_id = @tenant AND t.asignado_por IS NOT NULL`;
     const params = [];
     if (empleado) { sql += ' AND t.tecnico_id = ?'; params.push(empleado); }
-    sql += ` ORDER BY t.hecha ASC, FIELD(t.prioridad,'urgente','alta','normal','baja'),
+    sql += ` ORDER BY t.hecha ASC, array_position(ARRAY['urgente', 'alta', 'normal', 'baja']::text[], t.prioridad::text),
              (t.vence IS NULL), t.vence ASC, t.created_at DESC`;
     const [rows] = await req.db.query(sql, params);
     res.json({ data: rows });
@@ -598,10 +598,10 @@ router.get('/calendario', async (req, res) => {
     const anio = parseInt(req.query.anio, 10) || new Date().getFullYear();
     const mes = Math.min(12, Math.max(1, parseInt(req.query.mes, 10) || (new Date().getMonth() + 1)));
     const [celdas] = await req.db.query(
-      `SELECT DAY(ci.fecha) AS dia, ci.tecnico_id, t.nombre AS tecnico_nombre, COUNT(*) AS n
+      `SELECT EXTRACT(DAY FROM ci.fecha)::int AS dia, ci.tecnico_id, t.nombre AS tecnico_nombre, COUNT(*) AS n
        FROM citas ci
        LEFT JOIN usuarios t ON t.id = ci.tecnico_id AND t.tenant_id = @tenant
-       WHERE ci.tenant_id = @tenant AND YEAR(ci.fecha) = ? AND MONTH(ci.fecha) = ? AND ci.estado != 'cancelado'
+       WHERE ci.tenant_id = @tenant AND EXTRACT(YEAR FROM ci.fecha) = ? AND EXTRACT(MONTH FROM ci.fecha) = ? AND ci.estado != 'cancelado'
        GROUP BY dia, ci.tecnico_id, t.nombre
        ORDER BY dia`,
       [anio, mes]
@@ -1120,7 +1120,7 @@ const HORA_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 // Citas (no canceladas) que caen dentro de un bloqueo.
 async function citasDentroDeBloqueo(db, b, config) {
-  let sql = `SELECT id, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora, duracion_horas
+  let sql = `SELECT id, to_char(fecha, 'YYYY-MM-DD') AS fecha, to_char(hora, 'HH24:MI') AS hora, duracion_horas
              FROM citas WHERE tenant_id = @tenant AND fecha BETWEEN ? AND ? AND estado <> 'cancelado'`;
   const params = [b.fecha_desde, b.fecha_hasta];
   if (b.sucursal_id) { sql += ' AND sucursal_id = ?'; params.push(b.sucursal_id); }
@@ -1134,8 +1134,8 @@ async function citasDentroDeBloqueo(db, b, config) {
 
 const SELECT_BLOQUEOS = `
   SELECT b.id, b.sucursal_id, s.nombre AS sucursal_nombre,
-         DATE_FORMAT(b.fecha_desde, '%Y-%m-%d') AS fecha_desde, DATE_FORMAT(b.fecha_hasta, '%Y-%m-%d') AS fecha_hasta,
-         TIME_FORMAT(b.hora_desde, '%H:%i') AS hora_desde, TIME_FORMAT(b.hora_hasta, '%H:%i') AS hora_hasta,
+         to_char(b.fecha_desde, 'YYYY-MM-DD') AS fecha_desde, to_char(b.fecha_hasta, 'YYYY-MM-DD') AS fecha_hasta,
+         to_char(b.hora_desde, 'HH24:MI') AS hora_desde, to_char(b.hora_hasta, 'HH24:MI') AS hora_hasta,
          b.motivo, u.nombre AS creado_por_nombre, b.created_at
   FROM bloqueos_horario b
   LEFT JOIN sucursales s ON s.id = b.sucursal_id AND s.tenant_id = @tenant

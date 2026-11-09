@@ -1,0 +1,141 @@
+<div class="ui" data-ui [ngSwitch]="tipo">
+
+  <!-- Historial de una placa -->
+  <section *ngSwitchCase="'historial'" class="tarjeta" aria-label="Historial de la placa {{ orden.placa }}">
+    <header class="cabeza">
+      <div>
+        <p class="titulo">Historial de la placa</p>
+        <p class="sub">{{ orden.vehiculo }} · {{ orden.cliente }}</p>
+      </div>
+      <span class="placa">{{ orden.placa }}</span>
+    </header>
+    <ol class="filas">
+      <li *ngFor="let o of historial; let primero = first" [class.actual]="primero">
+        <span class="mono gris">{{ o.fecha }}</span>
+        <span class="trabajo">
+          {{ o.trabajo }}
+          <small class="mono">{{ o.numero }}</small>
+        </span>
+        <span class="pastilla" [class.ambar]="primero" [class.esmeralda]="!primero">{{ o.estado }}</span>
+        <span class="mono monto">{{ crc(o.monto) }}</span>
+      </li>
+    </ol>
+    <footer class="pie">
+      <span>{{ historial.length }} órdenes este año</span>
+      <span class="mono fuerte">{{ crc(totalHistorial) }}</span>
+    </footer>
+  </section>
+
+  <!-- Portal del cliente -->
+  <section *ngSwitchCase="'portal'" class="tarjeta" aria-label="Portal del cliente">
+    <header class="cabeza">
+      <div>
+        <p class="sub">{{ portal.taller }}</p>
+        <p class="titulo">Hola, {{ portal.cliente }}</p>
+      </div>
+      <span class="placa">{{ portal.placa }}</span>
+    </header>
+    <p class="vehiculo">{{ portal.vehiculo }}</p>
+    <ol class="seguimiento">
+      <li *ngFor="let p of portal.pasos; let i = index"
+          [class.hecho]="i < portal.actual" [class.ahora]="i === portal.actual">
+        <span class="nodo" aria-hidden="true"></span>
+        <span>{{ p }}</span>
+      </li>
+    </ol>
+    <p class="mensaje">{{ portal.mensaje }}</p>
+    <footer class="pie">
+      <span>Retiro estimado</span>
+      <span class="fuerte">{{ portal.retiro }}</span>
+    </footer>
+  </section>
+
+  <!-- Agenda del día -->
+  <section *ngSwitchCase="'agenda'" class="tarjeta" aria-label="Agenda del día">
+    <header class="cabeza">
+      <div>
+        <p class="titulo">Agenda</p>
+        <p class="sub">{{ agenda.dia }}</p>
+      </div>
+      <span class="pastilla">4 citas</span>
+    </header>
+    <div class="columnas">
+      <div *ngFor="let m of agenda.mecanicos" class="columna">
+        <p class="mecanico">{{ m.nombre }}</p>
+        <div *ngFor="let c of m.citas" class="cita">
+          <span class="mono hora">{{ c.hora }}</span>
+          <span class="trabajo">{{ c.vehiculo }}<small>{{ c.servicio }}</small></span>
+          <span class="pastilla"
+                [class.esmeralda]="c.estado === 'Confirmada'"
+                [class.indigo]="c.estado === 'Aviso enviado'"
+                [class.ambar]="c.estado === 'Por confirmar'">{{ c.estado }}</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Reportes del mes -->
+  <section *ngSwitchCase="'reportes'" class="tarjeta" aria-label="Reportes del mes">
+    <header class="cabeza">
+      <div>
+        <p class="titulo">Noviembre</p>
+        <p class="sub">{{ entregadas }} órdenes entregadas</p>
+      </div>
+      <span class="pastilla esmeralda">Al día</span>
+    </header>
+    <p class="cifra mono">{{ crc(facturado) }}</p>
+    <p class="sub">Facturado · ticket promedio <span class="mono">{{ crc(ticket) }}</span></p>
+    <div class="barras" role="img"
+         [attr.aria-label]="'Facturado por semana: ' + semanas[0].nombre + ' ' + crc(semanas[0].monto) + ', ' + semanas[1].nombre + ' ' + crc(semanas[1].monto) + ', ' + semanas[2].nombre + ' ' + crc(semanas[2].monto) + ', ' + semanas[3].nombre + ' ' + crc(semanas[3].monto)">
+      <div *ngFor="let s of semanas" class="barra">
+        <span class="mono valor">{{ crc(s.monto) }}</span>
+        <span class="relleno" [style.height.%]="(s.monto / maxSemana) * 100"
+              [class.pico]="s.monto === maxSemana"></span>
+        <span class="etiqueta">{{ s.nombre }}</span>
+      </div>
+    </div>
+    <footer class="pie">
+      <span>Lo que más se repite</span>
+      <span class="fuerte">{{ serviciosTop[0].nombre }} · {{ serviciosTop[0].veces }}</span>
+    </footer>
+  </section>
+
+  <!-- La orden de trabajo, en la etapa que se pida -->
+  <section *ngSwitchDefault class="tarjeta" aria-live="polite" [attr.aria-label]="'Orden ' + orden.numero">
+    <header class="cabeza">
+      <div>
+        <p class="titulo mono">{{ orden.numero }}</p>
+        <p class="sub">{{ orden.vehiculo }} · {{ orden.cliente }}</p>
+      </div>
+      <span class="pastilla" [ngClass]="estado.tono">{{ estado.estado }}</span>
+    </header>
+
+    <dl class="datos" *ngIf="etapa === 0">
+      <div><dt>Placa</dt><dd class="mono">{{ orden.placa }}</dd></div>
+      <div><dt>Kilometraje</dt><dd class="mono">{{ orden.km }}</dd></div>
+      <div><dt>Combustible</dt><dd>{{ orden.combustible }}</dd></div>
+      <div><dt>Recibió</dt><dd>{{ orden.recibio }}</dd></div>
+      <div class="ancho"><dt>Lo que reporta el cliente</dt><dd>“{{ orden.problema }}”</dd></div>
+    </dl>
+
+    <ng-container *ngIf="etapa >= 1">
+      <p class="diagnostico" *ngIf="etapa === 1">{{ orden.diagnostico }}</p>
+      <p class="aviso indigo" *ngIf="etapa === 2">{{ orden.aprobado }}</p>
+      <p class="aviso esmeralda" *ngIf="etapa === 3">Pagado por {{ orden.pago }} · {{ orden.garantia }}</p>
+      <ul class="lineas">
+        <li *ngFor="let l of orden.lineas">
+          <span>{{ l.concepto }}</span>
+          <span class="mono">{{ crc(l.monto) }}</span>
+        </li>
+      </ul>
+      <footer class="pie total">
+        <span>{{ etapa === 1 ? 'Presupuesto enviado al cliente' : 'Total' }}</span>
+        <span class="mono fuerte">{{ crc(totalOrden) }}</span>
+      </footer>
+    </ng-container>
+
+    <p class="mecanico-orden">
+      Mecánico: <strong>{{ orden.mecanico }}</strong>
+    </p>
+  </section>
+</div>

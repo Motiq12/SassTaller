@@ -74,7 +74,8 @@ router.get('/', async (req, res) => {
     // ?sin_orden=1: las citas vigentes que todavía no tienen orden de trabajo.
     if (req.query.sin_orden === '1') sql += " AND ci.orden_id IS NULL AND ci.estado NOT IN ('cancelado','entregado')";
     if (q) {
-      sql += ' AND (c.nombre LIKE ? OR c.apellido LIKE ? OR CONCAT(c.nombre, " ", c.apellido) LIKE ? OR m.placa LIKE ?)';
+      // En Postgres " " es un identificador, no un texto: el espacio va entre comillas simples.
+      sql += " AND (c.nombre ILIKE ? OR c.apellido ILIKE ? OR (c.nombre || ' ' || c.apellido) ILIKE ? OR m.placa ILIKE ?)";
       const like = `%${q}%`;
       params.push(like, like, like, like);
     }
@@ -136,8 +137,8 @@ router.delete('/:id', requireRol('admin'), async (req, res) => {
   try {
     await conn.beginTransaction();
     const [[cita]] = await conn.query(
-      `SELECT ci.id, ci.estado, ci.orden_id, o.numero_orden, DATE_FORMAT(ci.fecha, '%d/%m/%Y') AS fecha,
-              TIME_FORMAT(ci.hora, '%H:%i') AS hora, CONCAT_WS(' ', c.nombre, c.apellido) AS cliente
+      `SELECT ci.id, ci.estado, ci.orden_id, o.numero_orden, to_char(ci.fecha, 'DD/MM/YYYY') AS fecha,
+              to_char(ci.hora, 'HH24:MI') AS hora, CONCAT_WS(' ', c.nombre, c.apellido) AS cliente
        FROM citas ci
        LEFT JOIN clientes c ON c.id = ci.cliente_id AND c.tenant_id = @tenant
        LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id AND o.tenant_id = @tenant
@@ -202,7 +203,7 @@ router.put('/:id', soloRoles(...GESTIONA_AGENDA), exigirPermiso('citas.agendar')
     // Fecha/hora previas: si el taller mueve la cita hay que avisarle al cliente
     // (antes se le cambiaba el día y no se enteraba por ningún lado).
     const [[previa]] = await req.db.query(
-      "SELECT DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora, sucursal_id, duracion_horas, duracion_min FROM citas WHERE tenant_id = @tenant AND id = ?",
+      "SELECT to_char(fecha, 'YYYY-MM-DD') AS fecha, to_char(hora, 'HH24:MI') AS hora, sucursal_id, duracion_horas, duracion_min FROM citas WHERE tenant_id = @tenant AND id = ?",
       [req.params.id]
     );
     // Solo si de verdad cambió el momento de la cita (editar el motivo no molesta al cliente).
@@ -238,7 +239,7 @@ router.patch('/:id/duracion', soloRoles('admin'), async (req, res) => {
     const duracion = Number(req.body.duracion_horas);
     if (!duracionValida(duracion)) return res.status(400).json({ error: 'Duración no válida' });
     const [[cita]] = await req.db.query(
-      "SELECT id, estado, sucursal_id, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora FROM citas WHERE tenant_id = @tenant AND id = ?",
+      "SELECT id, estado, sucursal_id, to_char(fecha, 'YYYY-MM-DD') AS fecha, to_char(hora, 'HH24:MI') AS hora FROM citas WHERE tenant_id = @tenant AND id = ?",
       [req.params.id]
     );
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
@@ -347,7 +348,7 @@ router.patch('/:id/asignar', requireRol('admin'), async (req, res) => {
     const { tecnico_id } = req.body;
     await req.db.query('UPDATE citas SET tecnico_id = ? WHERE tenant_id = @tenant AND id = ?', [tecnico_id || null, req.params.id]);
     if (tecnico_id) {
-      const [[cita]] = await req.db.query("SELECT DATE_FORMAT(fecha,'%Y-%m-%d') AS fecha, TIME_FORMAT(hora,'%H:%i') AS hora, tipo_servicio, servicios, motivo FROM citas WHERE tenant_id = @tenant AND id = ?", [req.params.id]);
+      const [[cita]] = await req.db.query("SELECT to_char(fecha, 'YYYY-MM-DD') AS fecha, to_char(hora, 'HH24:MI') AS hora, tipo_servicio, servicios, motivo FROM citas WHERE tenant_id = @tenant AND id = ?", [req.params.id]);
       if (cita) await notificarMecanico(req.db, tecnico_id, `Te asignaron una cita: ${cita.servicios || cita.tipo_servicio || cita.motivo} el ${cita.fecha} a las ${cita.hora}`, req.usuario.id);
     }
     res.json({ message: tecnico_id ? 'Técnico asignado' : 'Asignación quitada' });

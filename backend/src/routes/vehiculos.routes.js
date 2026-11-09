@@ -21,14 +21,14 @@ router.get('/', async (req, res) => {
     let sql = `SELECT m.id, m.cliente_id, m.marca, m.modelo, m.anio, m.placa, m.color,
                       m.numero_motor, m.numero_chasis, m.kilometraje_actual, m.foto_url,
                       m.activa, m.created_at, m.updated_at,
-                      (m.foto IS NOT NULL) AS tiene_foto,
+                      (m.foto IS NOT NULL)::int AS tiene_foto,
                       c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.telefono AS cliente_telefono
                FROM vehiculos m JOIN clientes c ON m.cliente_id = c.id AND c.tenant_id = @tenant
                WHERE m.activa = 1 AND m.tenant_id = @tenant`;
     const params = [];
     if (cliente_id) { sql += ' AND m.cliente_id = ?'; params.push(cliente_id); }
     if (q) {
-      sql += ' AND (m.marca LIKE ? OR m.modelo LIKE ? OR m.placa LIKE ?)';
+      sql += ' AND (m.marca ILIKE ? OR m.modelo ILIKE ? OR m.placa ILIKE ?)';
       const like = `%${q}%`;
       params.push(like, like, like);
     }

@@ -1,207 +1,25 @@
-<ion-content class="landing" [scrollEvents]="false">
-  <!-- Barra -->
-  <header class="barra">
-    <div class="marca">
-      <img [src]="producto.logo" [alt]="producto.nombre" class="iso" />
+<ion-content class="landing" [class.lp-js]="conScript" [scrollEvents]="false">
+  <!-- Barra plana: la marca, tres enlaces y una acción. Pasa a fondo sólido al bajar. -->
+  <header slot="fixed" class="barra" #barra>
+    <a class="marca" routerLink="/" [attr.aria-label]="producto.nombre + ', inicio'">
+      <img [src]="producto.logo" alt="" class="iso" width="28" height="28" />
       <span>{{ producto.nombre }}</span>
-    </div>
-    <nav>
+    </a>
+    <nav aria-label="Principal">
       <button type="button" class="enlace" (click)="irA('como')">Cómo funciona</button>
       <button type="button" class="enlace" (click)="irA('precios')">Precios</button>
       <a class="enlace" routerLink="/portal/login">Entrar</a>
+      <a class="accion" routerLink="/registro-taller">Probá gratis</a>
     </nav>
   </header>
 
-  <!-- Portada -->
-  <section class="portada">
-    <h1>El taller ordenado, sin cuadernos ni grupos de WhatsApp.</h1>
-    <p class="bajada">
-      {{ producto.nombre }} lleva las órdenes de trabajo, los clientes y la agenda de tu taller
-      en un solo lugar. Para motos, autos o lo que atiendas.
-    </p>
-    <div class="acciones">
-      <ion-button size="large" class="principal" (click)="probarGratis()">
-        Probá gratis
-      </ion-button>
-      <ion-button size="large" fill="outline" class="secundaria" (click)="irA('contacto')">
-        Hablá con nosotros
-      </ion-button>
-    </div>
-    <p class="letra-chica">Sin tarjeta. Se arma en menos de 5 minutos.</p>
-  </section>
-
-  <!-- Qué resuelve -->
-  <section class="bloque" id="como">
-    <h2>Lo que deja de pasar</h2>
-    <div class="rejilla">
-      <article>
-        <ion-icon name="document-text-outline"></ion-icon>
-        <h3>"¿Dónde anoté ese trabajo?"</h3>
-        <p>
-          Cada vehículo que entra queda con su orden: qué se le hizo, qué repuestos llevó,
-          quién lo atendió y cuánto se cobró. Con el historial completo de cada placa.
-        </p>
-      </article>
-      <article>
-        <ion-icon name="call-outline"></ion-icon>
-        <h3>"¿Ya está mi carro?"</h3>
-        <p>
-          Tu cliente entra a su portal y lo ve solo: en qué va, qué se le encontró y cuándo
-          lo retira. Deja de sonar el teléfono cada veinte minutos.
-        </p>
-      </article>
-      <article>
-        <ion-icon name="calendar-outline"></ion-icon>
-        <h3>Citas que nadie olvida</h3>
-        <p>
-          La agenda por mecánico y por sucursal, con recordatorio automático. Menos huecos
-          en el día y menos gente que no aparece.
-        </p>
-      </article>
-      <article>
-        <ion-icon name="trending-up-outline"></ion-icon>
-        <h3>Saber cómo va el mes</h3>
-        <p>
-          Cuánto entró, qué servicios se repiten, qué mecánico rinde y qué clientes no
-          vuelven. Números, no impresiones.
-        </p>
-      </article>
-    </div>
-  </section>
-
-  <!-- Para quién -->
-  <section class="bloque oscuro">
-    <h2>Se adapta a tu taller, no al revés</h2>
-    <p class="centrado">
-      Al registrarte elegís qué vehículos atendés — motos, autos o ambos — y {{ producto.nombre }}
-      arma tu catálogo de servicios y los formularios acorde. Después le ponés el nombre,
-      el logo y los colores de tu empresa: tus clientes ven tu marca, no la nuestra.
-    </p>
-    <div class="dos">
-      <article>
-        <h3>Taller independiente</h3>
-        <p>Uno o dos mecánicos, todo en la cabeza y en un cuaderno. Te registrás y arrancás hoy mismo.</p>
-        <ion-button fill="clear" class="cta-chica" (click)="probarGratis()">
-          Probá gratis <ion-icon slot="end" name="arrow-forward-outline"></ion-icon>
-        </ion-button>
-      </article>
-      <article>
-        <h3>Grupo con varias sucursales</h3>
-        <p>Flota, varios puntos de servicio y facturación propia. Lo armamos con vos, con migración de tus datos.</p>
-        <ion-button fill="clear" class="cta-chica" (click)="irA('contacto')">
-          Agendá una demo <ion-icon slot="end" name="arrow-forward-outline"></ion-icon>
-        </ion-button>
-      </article>
-    </div>
-  </section>
-
-  <!-- Precios -->
-  <section class="bloque" id="precios">
-    <h2>Precios</h2>
-    <!-- Tres columnas y no dos: al terminar la prueba nadie se queda afuera, y eso hay
-         que decirlo acá. Prometer "30 días" sin contar qué pasa el día 31 hace que la
-         pregunta se la haga igual, pero solo. -->
-    <div class="dos tres planes">
-      <article class="plan">
-        <h3>Prueba</h3>
-        <p class="precio">Gratis</p>
-        <p class="plazo">30 días</p>
-        <ul>
-          <li>El sistema completo, sin recortes</li>
-          <li>Sin tarjeta</li>
-          <li>Tus datos quedan cuando termina</li>
-        </ul>
-        <ion-button expand="block" (click)="probarGratis()">Empezar</ion-button>
-      </article>
-      <article class="plan">
-        <h3>Gratis</h3>
-        <p class="precio">₡0</p>
-        <p class="plazo">Para siempre</p>
-        <ul>
-          <li>Órdenes, clientes y vehículos sin límite</li>
-          <li>Portal de clientes incluido</li>
-          <li>Una sucursal y hasta 2 usuarios</li>
-        </ul>
-        <p class="nota">Es donde queda tu taller cuando termina la prueba. No se borra nada.</p>
-      </article>
-      <article class="plan destacado">
-        <h3>Pro</h3>
-        <p class="precio">A convenir</p>
-        <p class="plazo">Por mes</p>
-        <ul>
-          <li>Usuarios sin límite</li>
-          <li>Varias sucursales</li>
-          <li>Tu logo y tus colores en el portal</li>
-          <li>Soporte directo</li>
-        </ul>
-        <ion-button expand="block" fill="outline" (click)="irA('contacto')">Hablemos</ion-button>
-      </article>
-    </div>
-  </section>
-
-  <!-- Contacto -->
-  <section class="bloque oscuro" id="contacto">
-    <h2>Hablá con nosotros</h2>
-
-    <div class="gracias" *ngIf="enviado">
-      <ion-icon name="checkmark-circle-outline"></ion-icon>
-      <h3>Recibimos tu mensaje</h3>
-      <p>Te contactamos en menos de un día hábil. Si es urgente, escribinos y lo vemos antes.</p>
-    </div>
-
-    <form class="formulario" (ngSubmit)="enviar()" *ngIf="!enviado">
-      <p class="centrado ayuda">
-        Contanos de tu taller y te mostramos {{ producto.nombre }} funcionando con tu caso.
-      </p>
-
-      <ion-list lines="none">
-        <ion-item>
-          <ion-input label="Tu nombre *" labelPlacement="stacked" name="nombre"
-                     [(ngModel)]="nombre" required></ion-input>
-        </ion-item>
-        <ion-item>
-          <ion-input label="Correo *" labelPlacement="stacked" type="email" inputmode="email"
-                     name="email" [(ngModel)]="email" required></ion-input>
-        </ion-item>
-        <ion-item>
-          <ion-input label="Teléfono" labelPlacement="stacked" type="tel" inputmode="tel"
-                     name="telefono" [(ngModel)]="telefono"></ion-input>
-        </ion-item>
-        <ion-item>
-          <ion-input label="Empresa" labelPlacement="stacked" name="empresa"
-                     [(ngModel)]="empresa"></ion-input>
-        </ion-item>
-        <ion-item>
-          <ion-select label="Cuántos vehículos atienden" labelPlacement="stacked"
-                      name="volumen" [(ngModel)]="volumen" placeholder="Elegí una opción">
-            <ion-select-option *ngFor="let v of VOLUMENES" [value]="v.valor">{{ v.rotulo }}</ion-select-option>
-          </ion-select>
-        </ion-item>
-        <ion-item>
-          <ion-textarea label="¿Qué necesitás resolver?" labelPlacement="stacked" name="mensaje"
-                        [(ngModel)]="mensaje" [autoGrow]="true" rows="3" maxlength="2000"></ion-textarea>
-        </ion-item>
-      </ion-list>
-
-      <ion-text color="danger" *ngIf="error"><p class="error" role="alert">{{ error }}</p></ion-text>
-
-      <ion-button expand="block" type="submit" [disabled]="!formularioListo || enviando">
-        <ion-spinner *ngIf="enviando" name="crescent"></ion-spinner>
-        <span *ngIf="!enviando">Enviar</span>
-      </ion-button>
-      <p class="letra-chica centrado">Usamos tus datos solo para contactarte. Nada más.</p>
-    </form>
-  </section>
-
-  <footer class="pie">
-    <div class="marca">
-      <img [src]="producto.logo" [alt]="producto.nombre" class="iso" />
-      <span>{{ producto.nombre }}</span>
-    </div>
-    <p>{{ producto.descripcion }}</p>
-    <nav>
-      <a routerLink="/registro-taller">Registrar mi taller</a>
-      <a routerLink="/portal/login">Entrar</a>
-    </nav>
-  </footer>
+  <main>
+    <app-lp-hero (hablar)="irA('contacto')"></app-lp-hero>
+    <app-lp-vitrina id="problemas" class="seccion"></app-lp-vitrina>
+    <app-lp-etapas id="como" class="seccion"></app-lp-etapas>
+    <app-lp-adapta id="adapta"></app-lp-adapta>
+    <app-lp-precios id="precios" (hablar)="irA('contacto')"></app-lp-precios>
+    <app-lp-cupon id="contacto"></app-lp-cupon>
+  </main>
+  <app-lp-pie (ir)="irA($event)"></app-lp-pie>
 </ion-content>

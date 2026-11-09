@@ -19,7 +19,7 @@ router.use(cargarAlcance);
 // Columnas seguras (nunca exponer password_hash); tiene_portal indica si el acceso está activo.
 const COLS = `id, nombre, apellido, telefono, email, cedula, direccion, activo, created_at, updated_at,
               visitas, cortesia_disponible,
-              (password_hash IS NOT NULL OR google_sub IS NOT NULL) AS tiene_portal`;
+              (password_hash IS NOT NULL OR google_sub IS NOT NULL)::int AS tiene_portal`;
 
 // Tope del listado: con miles de clientes, devolverlos todos hace respuestas de varios
 // MB que tardan más en viajar y renderizar que en consultarse. La búsqueda por `q` es
@@ -32,7 +32,7 @@ router.get('/', async (req, res) => {
     let sql = `SELECT ${COLS} FROM clientes WHERE activo = 1 AND tenant_id = @tenant`;
     const params = [];
     if (q) {
-      sql += ' AND (nombre LIKE ? OR apellido LIKE ? OR telefono LIKE ? OR cedula LIKE ?)';
+      sql += ' AND (nombre ILIKE ? OR apellido ILIKE ? OR telefono ILIKE ? OR cedula ILIKE ?)';
       const like = `%${q}%`;
       params.push(like, like, like, like);
     }

@@ -23,7 +23,7 @@ async function enviarRecordatorios() {
     const manana = fechaLocalISO(config.zona_horaria_offset, 1);
 
     const [citas] = await db.query(
-      `SELECT ci.id, ci.cliente_id, TIME_FORMAT(ci.hora, '%H:%i') AS hora,
+      `SELECT ci.id, ci.cliente_id, to_char(ci.hora, 'HH24:MI') AS hora,
               ci.tipo_servicio, ci.servicios, ci.motivo,
               cl.nombre, cl.email, cl.notif_recordatorios,
               m.marca, m.modelo,

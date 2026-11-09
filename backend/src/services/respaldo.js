@@ -91,8 +91,7 @@ async function respaldar({ pool, config = configRespaldo(), ahora = new Date(), 
       gzip.destroy(); // suelta el archivo temporal: el volcado quedó a medias
       throw err;
     } finally {
-      // No vuelve al pool: quedó con otra zona horaria y una transacción propia.
-      conexion.destroy();
+      conexion.release();
     }
     gzip.end();
     await escrito;

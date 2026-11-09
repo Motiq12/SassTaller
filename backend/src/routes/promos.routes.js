@@ -12,7 +12,7 @@ router.use(auth);
 // Se expone `tiene_imagen` y la imagen se pide aparte, por promoción, como ya hacía
 // el portal del cliente. Además así el navegador puede cachearla.
 const COLS_LISTA = `id, titulo, descripcion, descuento, precio_final, activa, created_at,
-                    (imagen IS NOT NULL) AS tiene_imagen`;
+                    (imagen IS NOT NULL)::int AS tiene_imagen`;
 
 // GET /api/promos — todas (para gestión del personal)
 router.get('/', async (req, res) => {
@@ -81,8 +81,9 @@ router.put('/:id', requireRol('admin'), async (req, res) => {
 
 router.patch('/:id/toggle', requireRol('admin'), async (req, res) => {
   try {
-    await req.db.query('UPDATE promos SET activa = NOT activa WHERE id = ? AND tenant_id = @tenant', [req.params.id]);
-    const [[promo]] = await req.db.query('SELECT * FROM promos WHERE id = ? AND tenant_id = @tenant', [req.params.id]);
+    // `activa` es smallint 0/1 (no boolean): se invierte con 1 - activa.
+    await req.db.query('UPDATE promos SET activa = 1 - activa WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
+    const [[promo]] = await req.db.query('SELECT * FROM promos WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     if (!promo) return res.status(404).json({ error: 'Promoción no encontrada' });
     res.json({ data: promo, message: promo.activa ? 'Promoción activada' : 'Promoción desactivada' });
   } catch (err) {

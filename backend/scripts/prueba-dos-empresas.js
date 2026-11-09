@@ -5,26 +5,35 @@
 //
 //   npm run test:empresas
 //
-// BORRA Y RECREA LA BASE sasstaller_e2e: por eso se niega a usar cualquier otro nombre,
-// y por eso ignora el DB_NAME del .env. Nunca toca la base de trabajo ni producción.
-// Conexión: E2E_DB_HOST, E2E_DB_PORT, E2E_DB_USER, E2E_DB_PASSWORD (por defecto, local).
+// BORRA Y RECREA LA BASE sasstaller_e2e: por eso se niega a usar cualquier otro nombre, y
+// por eso ignora la DATABASE_URL del .env. Nunca toca la base de trabajo ni producción.
+// E2E_PG_URL: una conexión a Postgres con permiso de crear bases (por defecto, la local).
 const { spawn, spawnSync } = require('child_process');
 const path = require('path');
 const B = path.join(__dirname, '..');
-const mysql = require('mysql2/promise');
+const { Client, types } = require('pg');
+types.setTypeParser(20, Number); // COUNT(*) como número, para comparar
 const BASE = process.argv[2] || 'sasstaller_e2e';
 if (!/^sasstaller_e2e/.test(BASE)) throw new Error('Esta prueba borra la base: solo acepta nombres sasstaller_e2e*');
-const CONEXION = {
-  host: process.env.E2E_DB_HOST || '127.0.0.1',
-  port: Number(process.env.E2E_DB_PORT) || 3306,
-  user: process.env.E2E_DB_USER || 'root',
-  password: process.env.E2E_DB_PASSWORD || '',
-};
+const URL_ADMIN = new URL(process.env.E2E_PG_URL || 'postgres://postgres@127.0.0.1:5432/postgres');
+if (!['127.0.0.1', 'localhost'].includes(URL_ADMIN.hostname)) throw new Error('Esta prueba solo corre contra un Postgres local');
+const URL_BASE = new URL(URL_ADMIN); URL_BASE.pathname = `/${BASE}`;
 const ENV_BASE = {
-  ...process.env, MYSQL_URL: '', DB_NAME: BASE, DB_HOST: CONEXION.host, DB_PORT: String(CONEXION.port),
-  DB_USER: CONEXION.user, DB_PASSWORD: CONEXION.password, JWT_SECRET: process.env.JWT_SECRET || 'solo-para-esta-prueba',
-  SEED_ADMIN_PASSWORD: '', SEED_RECEP_PASSWORD: '',
+  ...process.env, DATABASE_URL: URL_BASE.href, MIGRACION_DATABASE_URL: '', DATABASE_SSL: '', PGSSLMODE: 'disable',
+  JWT_SECRET: process.env.JWT_SECRET || 'solo-para-esta-prueba',
 };
+// Mismo idioma que el resto del backend: `?` y `const [filas] = ...`.
+async function abrir(url) {
+  const c = new Client({ connectionString: url });
+  await c.connect();
+  return {
+    query: async (sql, params = []) => {
+      let n = 0;
+      return [(await c.query(sql.replace(/\?/g, () => `${++n}`), params)).rows];
+    },
+    end: () => c.end(),
+  };
+}
 Object.assign(process.env, { JWT_SECRET: ENV_BASE.JWT_SECRET });
 const PORT = 3199;
 const url = `http://127.0.0.1:${PORT}/api`;
@@ -42,12 +51,10 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
 }
 
 (async () => {
-  const raiz = await mysql.createConnection(CONEXION);
-  await raiz.query(`DROP DATABASE IF EXISTS \`${BASE}\``);
-  await raiz.query(`CREATE DATABASE \`${BASE}\` CHARACTER SET utf8mb4`);
+  const raiz = await abrir(URL_ADMIN.href);
+  await raiz.query(`DROP DATABASE IF EXISTS "${BASE}" WITH (FORCE)`);
+  await raiz.query(`CREATE DATABASE "${BASE}"`);
   await raiz.end();
-  const migracion = spawnSync('node', ['src/db/migrate.js'], { cwd: B, env: ENV_BASE, encoding: 'utf8' });
-  if (migracion.status !== 0) throw new Error('schema.sql falló: ' + (migracion.stdout + migracion.stderr).slice(-1500));
   const server = spawn('node', ['src/server.js'], {
     cwd: B,
     env: { ...ENV_BASE, PORT: String(PORT), RESEND_API_KEY: '', TURNSTILE_SECRET: '', TURNSTILE_SECRET_KEY: '', MOTIQ_ADMIN_EMAIL: '', MOTIQ_ADMIN_PASSWORD: '', RATE_API_MAX: '1000000', RATE_ADMIN_MAX: '1000000', RATE_AUTH_MAX: '1000000', NODE_ENV: 'development' },
@@ -68,9 +75,9 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     console.log(`arranque: ${lineas.length} avisos`);
     lineas.slice(0, 30).forEach((l) => console.log('   ' + l.slice(0, 170)));
 
-    const db = await mysql.createConnection({ ...CONEXION, database: BASE });
+    const db = await abrir(URL_BASE.href);
     // Filas viejas de antes de la prueba: su usuario pudo borrarse y su id reutilizarse.
-    const [[{ eventoInicial }]] = await db.query('SELECT COALESCE(MAX(id), 0) eventoInicial FROM eventos_seguridad');
+    const [[{ eventoInicial }]] = await db.query('SELECT COALESCE(MAX(id), 0) AS "eventoInicial" FROM eventos_seguridad');
 
     // ── Alta de dos empresas ──
     const alta = (slug, email) => pedir('POST', '/onboarding', { body: { nombre: `Taller ${slug}`, slug, admin: { nombre: `Dueño ${slug}`, email, password: 'ClaveSegura123' }, tipos: ['auto'] } });
@@ -186,11 +193,11 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
 
     // ── B intenta ESCRIBIR sobre todo lo de A, por todas las rutas ──
     const fotoDeA = async () => {
-      const [tablas] = await db.query("SELECT TABLE_NAME t FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME = 'tenant_id'");
+      const [tablas] = await db.query("SELECT TABLE_NAME t FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = current_schema() AND COLUMN_NAME = 'tenant_id'");
       const foto = {};
       for (const { t } of tablas) {
         if (/^motiq_/.test(t)) continue;
-        const [filas] = await db.query(`SELECT * FROM \`${t}\` WHERE tenant_id = ?`, [A.id]);
+        const [filas] = await db.query(`SELECT * FROM "${t}" WHERE tenant_id = ?`, [A.id]);
         foto[t] = JSON.stringify(filas);
       }
       return foto;
@@ -265,11 +272,11 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
 
     // Lo que B escribió nunca apunta a filas de A.
     const padres = { cliente_id: 'clientes', vehiculo_id: 'vehiculos', moto_id: 'vehiculos', cita_id: 'citas', orden_id: 'ordenes_trabajo', sucursal_id: 'sucursales', tecnico_id: 'usuarios', usuario_id: 'usuarios', remitente_id: 'usuarios', asignado_a: 'usuarios', rol_id: 'roles' };
-    const [cols] = await db.query("SELECT c.TABLE_NAME t, c.COLUMN_NAME col FROM information_schema.COLUMNS c JOIN information_schema.COLUMNS tn ON tn.TABLE_SCHEMA = c.TABLE_SCHEMA AND tn.TABLE_NAME = c.TABLE_NAME AND tn.COLUMN_NAME = 'tenant_id' WHERE c.TABLE_SCHEMA = DATABASE()");
+    const [cols] = await db.query("SELECT c.TABLE_NAME t, c.COLUMN_NAME col FROM information_schema.COLUMNS c JOIN information_schema.COLUMNS tn ON tn.TABLE_SCHEMA = c.TABLE_SCHEMA AND tn.TABLE_NAME = c.TABLE_NAME AND tn.COLUMN_NAME = 'tenant_id' WHERE c.TABLE_SCHEMA = current_schema()");
     let revisadas = 0;
     for (const { t, col } of cols) {
       if (!padres[col] || /^motiq_/.test(t)) continue;
-      const [[{ n }]] = await db.query(`SELECT COUNT(*) n FROM \`${t}\` x JOIN \`${padres[col]}\` y ON y.id = x.\`${col}\` WHERE x.tenant_id <> y.tenant_id ${t === 'eventos_seguridad' ? `AND x.id > ${eventoInicial}` : ''}`);
+      const [[{ n }]] = await db.query(`SELECT COUNT(*) n FROM "${t}" x JOIN "${padres[col]}" y ON y.id = x."${col}" WHERE x.tenant_id <> y.tenant_id ${t === 'eventos_seguridad' ? `AND x.id > ${eventoInicial}` : ''}`);
       revisadas++;
       if (n) ok(false, `${t}.${col} apunta a otro taller en ${n} filas`);
     }
@@ -299,12 +306,13 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
       const [[{ n }]] = await db.query(`SELECT COUNT(*) n FROM ${h} x JOIN ${p} y ON y.id = x.${col} WHERE x.tenant_id <> y.tenant_id`);
       ok(n === 0, `cuadre ${h}.${col} -> ${p}: ${n} cruzados`);
     }
-    const [dflt] = await db.query(`SELECT TABLE_NAME t FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME = 'tenant_id' AND COLUMN_DEFAULT IS NOT NULL AND COLUMN_DEFAULT <> 'NULL'`);
+    const [dflt] = await db.query(`SELECT TABLE_NAME t FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = current_schema() AND COLUMN_NAME = 'tenant_id' AND COLUMN_DEFAULT IS NOT NULL AND COLUMN_DEFAULT <> 'NULL'`);
     ok(dflt.length === 0, 'ninguna tabla le pone taller por defecto', dflt.map((x) => x.t));
     await db.end();
 
     const errores = salida.split('\n').filter((l) => /TypeError|ReferenceError|tenant-db:/.test(l));
     ok(errores.length === 0, 'el servidor no registró errores de programación', errores.slice(0, 10).map((l) => l.slice(0, 170)));
+    if (fallos.length) console.log('--- registro del servidor ---\n' + salida.split('\n').filter((l) => /rror|⚠|Falló/.test(l)).slice(-60).join('\n').slice(-6000));
     console.log(fallos.length ? `\n${fallos.length} FALLOS` : '\nTODO BIEN');
     fin(fallos.length ? 1 : 0);
   } catch (e) {

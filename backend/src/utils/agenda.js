@@ -80,7 +80,7 @@ async function agendaRango(desde, hasta, sucursalId, config, opts = {}) {
   // Sin db del taller no se agenda: el pool global contaría citas de todas las empresas.
   const db = opts.db;
   if (!db) throw new Error('agendaRango: falta el db del taller (opts.db)');
-  let sql = `SELECT id, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora, duracion_horas, duracion_min
+  let sql = `SELECT id, to_char(fecha, 'YYYY-MM-DD') AS fecha, to_char(hora, 'HH24:MI') AS hora, duracion_horas, duracion_min
              FROM citas WHERE tenant_id = @tenant AND fecha BETWEEN ? AND ? AND estado <> 'cancelado'`;
   const params = [desde, hasta];
   if (sucursalId) { sql += ' AND sucursal_id = ?'; params.push(sucursalId); }
@@ -88,8 +88,8 @@ async function agendaRango(desde, hasta, sucursalId, config, opts = {}) {
   if (opts.bloquear) sql += ' FOR UPDATE';
   const [citas] = await db.query(sql, params);
 
-  let sqlB = `SELECT id, DATE_FORMAT(fecha_desde, '%Y-%m-%d') AS fecha_desde, DATE_FORMAT(fecha_hasta, '%Y-%m-%d') AS fecha_hasta,
-                     TIME_FORMAT(hora_desde, '%H:%i') AS hora_desde, TIME_FORMAT(hora_hasta, '%H:%i') AS hora_hasta, motivo
+  let sqlB = `SELECT id, to_char(fecha_desde, 'YYYY-MM-DD') AS fecha_desde, to_char(fecha_hasta, 'YYYY-MM-DD') AS fecha_hasta,
+                     to_char(hora_desde, 'HH24:MI') AS hora_desde, to_char(hora_hasta, 'HH24:MI') AS hora_hasta, motivo
               FROM bloqueos_horario WHERE tenant_id = @tenant AND fecha_desde <= ? AND fecha_hasta >= ?`;
   const paramsB = [hasta, desde];
   if (sucursalId) { sqlB += ' AND (sucursal_id IS NULL OR sucursal_id = ?)'; paramsB.push(sucursalId); }

@@ -46,18 +46,13 @@ async function crearCitaDeOrden(conn, o) {
 // El INSERT y el SELECT corren en la MISMA conexión (LAST_INSERT_ID es por conexión).
 async function generarNumeroOrden(db) {
   const year = new Date().getFullYear();
-  const conn = await db.conexion();
-  try {
-    await conn.query(
-      `INSERT INTO orden_contadores (tenant_id, anio, ultimo) VALUES (@tenant, ?, LAST_INSERT_ID(1))
-       ON DUPLICATE KEY UPDATE ultimo = LAST_INSERT_ID(ultimo + 1)`,
-      [year]
-    );
-    const [[{ n }]] = await conn.sinScope('SELECT LAST_INSERT_ID() AS n');
-    return `OT-${year}-${String(n).padStart(4, '0')}`;
-  } finally {
-    conn.release();
-  }
+  const [[{ ultimo }]] = await db.query(
+    `INSERT INTO orden_contadores (tenant_id, anio, ultimo) VALUES (@tenant, ?, 1)
+     ON CONFLICT (tenant_id, anio) DO UPDATE SET ultimo = orden_contadores.ultimo + 1
+     RETURNING ultimo`,
+    [year]
+  );
+  return `OT-${year}-${String(ultimo).padStart(4, '0')}`;
 }
 
 // Refleja el estado de una orden en su cita vinculada (si existe). Nunca lanza:

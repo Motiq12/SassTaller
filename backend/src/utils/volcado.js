@@ -1,131 +1,126 @@
-// Volcado de la base a SQL, sin depender de `mysqldump`.
+// Volcado de los datos a SQL, sin depender de `pg_dump`.
 //
-// En Railway el backend corre en un contenedor sin el cliente de MySQL, así que
-// el respaldo automático no puede llamar a `mysqldump` como hace el script
-// manual. Esto escribe lo mismo que hace falta para restaurar: cada tabla con
-// su CREATE TABLE y sus filas, en un archivo que se carga con el cliente `mysql`
-// de siempre.
+// En Railway el backend corre en un contenedor sin el cliente de Postgres, así que el
+// respaldo automático no puede llamar a `pg_dump` como el script manual
+// (scripts/backup-db.js). Esto escribe los DATOS: el esquema sale de db/migraciones.
+//
+// Para restaurar: una base vacía, `node src/db/migrar.js`, y cargar el archivo con psql.
 //
 // Lo que cuida, y por qué:
-// - Una sola transacción con instantánea (igual que `mysqldump
-//   --single-transaction`): el respaldo es una foto coherente aunque el taller
-//   siga trabajando mientras corre.
-// - Las filas se leen de a una y se escriben de a una: hay tablas con fotos en
-//   base64, y cargar una tabla entera en memoria tumbaría el proceso.
-// - Cada valor sale como texto tal cual lo manda MySQL (sin pasar por números
-//   ni fechas de JavaScript), así no se pierde un decimal, un BIGINT ni una hora.
-// - Las columnas binarias van en hexadecimal.
+// - Una sola transacción REPEATABLE READ: el respaldo es una foto coherente aunque los
+//   talleres sigan trabajando mientras corre.
+// - Las filas se leen por tandas: hay tablas con fotos en base64, y cargar una tabla
+//   entera en memoria tumbaría el proceso.
+// - Cada valor sale como texto de Postgres (::text), sin pasar por números ni fechas de
+//   JavaScript: no se pierde un decimal, un bigint ni una zona horaria.
 
-const mysql = require('mysql2');
-
-const BINARIOS = new Set(['binary', 'varbinary', 'tinyblob', 'blob', 'mediumblob', 'longblob', 'bit',
-  'geometry', 'point', 'linestring', 'polygon', 'multipoint', 'multilinestring', 'multipolygon', 'geomcollection', 'geometrycollection']);
-const NUMERICOS = new Set(['tinyint', 'smallint', 'mediumint', 'int', 'bigint', 'decimal', 'float', 'double', 'year']);
+const NUMERICOS = new Set(['smallint', 'integer', 'bigint', 'numeric', 'real', 'double precision']);
 const ES_NUMERO = /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/;
-
-// Un INSERT se corta al pasar de este tamaño, para que restaurar no dependa de
-// un max_allowed_packet enorme. Una fila sola puede superarlo (una foto): va sola.
+const FILAS_POR_TANDA = 50;
+// Un INSERT se corta al pasar de este tamaño. Una fila sola puede superarlo: va sola.
 const BYTES_POR_INSERT = 512 * 1024;
+// Las escribe el migrador al preparar la base que se va a restaurar.
+const NO_SE_RESPALDAN = new Set(['schema_migraciones']);
 
-const id = (nombre) => mysql.escapeId(nombre);
+const id = (nombre) => `"${String(nombre).replace(/"/g, '""')}"`;
 
-// El valor de una columna, escrito como literal de SQL.
+// El valor de una columna, escrito como literal de SQL. Los bytea llegan como \x0102ff.
 function literal(valor, tipo) {
   if (valor === null || valor === undefined) return 'NULL';
-  if (Buffer.isBuffer(valor)) return `X'${valor.toString('hex')}'`;
   if (NUMERICOS.has(tipo) && ES_NUMERO.test(valor)) return String(valor);
-  return mysql.escape(String(valor));
+  return `'${String(valor).replace(/'/g, "''")}'`;
 }
 
-// Columnas que se respaldan de una tabla. Las generadas (VIRTUAL o STORED) no:
-// MySQL las calcula solo y rechaza que se les inserte un valor. Ojo que
-// "DEFAULT_GENERATED" es otra cosa (un valor por defecto calculado) y sí va.
+// Las columnas generadas no: Postgres las calcula y rechaza que se les inserte un valor.
 function columnasRespaldables(columnas) {
-  return columnas.filter((c) => !/\b(VIRTUAL|STORED) GENERATED\b/i.test(c.extra || ''));
+  return columnas.filter((c) => c.generada !== 'ALWAYS');
 }
 
-// conexion: una conexión de mysql2/promise dedicada a esto (no se reutiliza
-// después: se le cambia la zona horaria de la sesión).
+// conexion: una conexión de pool.getConnection().
 // escribir(texto): función async que recibe el SQL por trozos.
 async function volcarBase(conexion, escribir, { ahora = new Date() } = {}) {
-  // Las columnas TIMESTAMP se muestran en la zona de la sesión: se fija UTC acá y
-  // en el archivo, para que al restaurar caigan en el mismo instante.
-  await conexion.query("SET SESSION time_zone = '+00:00'");
-  await conexion.query('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ');
-  await conexion.query('START TRANSACTION WITH CONSISTENT SNAPSHOT');
-
-  const [[{ base }]] = await conexion.query('SELECT DATABASE() AS base');
-  const [tablas] = await conexion.query(
-    "SELECT TABLE_NAME AS nombre FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME"
-  );
-
-  await escribir([
-    `-- Respaldo de la base \`${base}\``,
-    `-- Hecho el ${ahora.toISOString()} por el sistema (respaldo automático).`,
-    '-- Para restaurar: gunzip -c <archivo>.sql.gz | mysql --default-character-set=utf8mb4 -u <usuario> -p <base>',
-    '',
-    'SET NAMES utf8mb4;',
-    "SET time_zone = '+00:00';",
-    'SET FOREIGN_KEY_CHECKS = 0;',
-    'SET UNIQUE_CHECKS = 0;',
-    "SET SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO';",
-    '',
-  ].join('\n'));
-
-  let totalFilas = 0;
-  for (const { nombre } of tablas) {
-    const [[crear]] = await conexion.query(`SHOW CREATE TABLE ${id(nombre)}`);
+  await conexion.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+  try {
+    const [[{ base }]] = await conexion.query('SELECT current_database() AS base');
     const [todas] = await conexion.query(
-      'SELECT COLUMN_NAME AS nombre, DATA_TYPE AS tipo, EXTRA AS extra FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION',
-      [nombre]
+      "SELECT table_name AS nombre FROM information_schema.tables WHERE table_schema = current_schema() AND table_type = 'BASE TABLE' ORDER BY table_name"
     );
-    const columnas = columnasRespaldables(todas);
-    const tipos = columnas.map((c) => String(c.tipo).toLowerCase());
-    const binarias = new Set(columnas.filter((c, i) => BINARIOS.has(tipos[i])).map((c) => c.nombre));
-    const lista = columnas.map((c) => id(c.nombre)).join(', ');
+    const tablas = todas.filter((t) => !NO_SE_RESPALDAN.has(t.nombre));
 
-    await escribir(`\n--\n-- Tabla ${id(nombre)}\n--\nDROP TABLE IF EXISTS ${id(nombre)};\n${crear['Create Table']};\n\n`);
+    await escribir([
+      `-- Respaldo de los datos de la base ${base}`,
+      `-- Hecho el ${ahora.toISOString()} por el sistema (respaldo automático).`,
+      '-- Para restaurar: base vacía, node src/db/migrar.js, y gunzip -c <archivo>.sql.gz | psql <base>',
+      '',
+      'SET standard_conforming_strings = on;',
+      "SET client_encoding = 'UTF8';",
+      "SET TIME ZONE 'UTC';",
+      'BEGIN;',
+      // Las claves foráneas se revisan al final: así no importa el orden de las tablas.
+      'SET CONSTRAINTS ALL DEFERRED;',
+      '',
+    ].join('\n'));
 
-    const cabecera = `INSERT INTO ${id(nombre)} (${lista}) VALUES\n`;
-    let lote = [];
-    let bytes = 0;
-    let filas = 0;
-    const vaciar = async () => {
-      if (!lote.length) return;
-      await escribir(cabecera + lote.join(',\n') + ';\n');
-      lote = [];
-      bytes = 0;
-    };
+    let totalFilas = 0;
+    for (const { nombre } of tablas) {
+      const [info] = await conexion.query(
+        `SELECT column_name AS nombre, data_type AS tipo, is_generated AS generada, is_identity AS identidad
+           FROM information_schema.columns
+          WHERE table_schema = current_schema() AND table_name = ? ORDER BY ordinal_position`,
+        [nombre]
+      );
+      const columnas = columnasRespaldables(info);
+      const lista = columnas.map((c) => id(c.nombre)).join(', ');
+      const seleccion = columnas.map((c) => `${id(c.nombre)}::text AS ${id(c.nombre)}`).join(', ');
+      const cabecera = `INSERT INTO ${id(nombre)} (${lista}) VALUES\n`;
 
-    // typeCast: el texto tal cual llega de MySQL; las binarias, como Buffer.
-    const consulta = conexion.connection.query({
-      sql: `SELECT ${lista} FROM ${id(nombre)}`,
-      rowsAsArray: true,
-      typeCast: (campo) => (binarias.has(campo.name) ? campo.buffer() : campo.string('utf8')),
-    });
-    for await (const fila of consulta.stream({ highWaterMark: 16 })) {
-      const tupla = '(' + fila.map((v, i) => literal(v, tipos[i])).join(', ') + ')';
-      lote.push(tupla);
-      bytes += tupla.length;
-      filas++;
-      if (bytes >= BYTES_POR_INSERT) await vaciar();
+      let lote = [];
+      let bytes = 0;
+      let filas = 0;
+      const vaciar = async () => {
+        if (!lote.length) return;
+        await escribir(cabecera + lote.join(',\n') + ';\n');
+        lote = [];
+        bytes = 0;
+      };
+
+      await escribir(`\n-- Tabla ${id(nombre)}\n`);
+      for (let desde = 0; ; desde += FILAS_POR_TANDA) {
+        const [tanda] = await conexion.query(
+          `SELECT ${seleccion} FROM ${id(nombre)} ORDER BY ctid LIMIT ${FILAS_POR_TANDA} OFFSET ${desde}`
+        );
+        for (const fila of tanda) {
+          const tupla = '(' + columnas.map((c) => literal(fila[c.nombre], c.tipo)).join(', ') + ')';
+          lote.push(tupla);
+          bytes += tupla.length;
+          filas++;
+          if (bytes >= BYTES_POR_INSERT) await vaciar();
+        }
+        if (tanda.length < FILAS_POR_TANDA) break;
+      }
+      await vaciar();
+      totalFilas += filas;
+
+      // El contador de ids sigue después del último restaurado.
+      const conId = columnas.find((c) => c.identidad === 'YES');
+      if (conId) {
+        const c = id(conId.nombre);
+        await escribir(`SELECT setval(pg_get_serial_sequence('${id(nombre)}', '${conId.nombre}'), COALESCE(MAX(${c}), 1), MAX(${c}) IS NOT NULL) FROM ${id(nombre)};\n`);
+      }
+      await escribir(`-- ${filas} filas en ${id(nombre)}\n`);
     }
-    await vaciar();
-    totalFilas += filas;
-    await escribir(`-- ${filas} filas en ${id(nombre)}\n`);
+
+    await escribir([
+      '',
+      'COMMIT;',
+      // Si esta línea no está, el archivo quedó cortado y no hay que restaurarlo.
+      `-- Respaldo completo: ${tablas.length} tablas, ${totalFilas} filas.`,
+      '',
+    ].join('\n'));
+    return { base, tablas: tablas.length, filas: totalFilas };
+  } finally {
+    await conexion.query('ROLLBACK').catch(() => {});
   }
-
-  await escribir([
-    '',
-    'SET FOREIGN_KEY_CHECKS = 1;',
-    'SET UNIQUE_CHECKS = 1;',
-    // Si esta línea no está, el archivo quedó cortado y no hay que restaurarlo.
-    `-- Respaldo completo: ${tablas.length} tablas, ${totalFilas} filas.`,
-    '',
-  ].join('\n'));
-
-  await conexion.query('COMMIT');
-  return { base, tablas: tablas.length, filas: totalFilas };
 }
 
 module.exports = { volcarBase, literal, columnasRespaldables };

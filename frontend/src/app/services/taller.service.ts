@@ -6,8 +6,10 @@ import { environment } from '../../environments/environment';
 
 const TALLER_KEY = 'tallerms_taller';
 
-// Subdominios que no identifican a un taller (infraestructura o entorno local).
-const NO_SON_TALLER = new Set(['www', 'api', 'app', 'localhost', '127']);
+// Subdominios que no identifican a un taller (infraestructura).
+const NO_SON_TALLER = new Set(['www', 'api', 'app', 'localhost']);
+// Dominios del hosting: su primera parte es un identificador de Railway, no un taller.
+const DOMINIOS_DE_PLATAFORMA = ['.railway.app'];
 
 export interface DisponibilidadSlug {
   slug: string;
@@ -84,12 +86,20 @@ export class TallerService {
   }
 
   // Slug del subdominio, o null si no hay uno utilizable.
+  //
+  // Un subdominio de taller tiene al menos TRES partes (msmotors.motiq12.com). Antes
+  // bastaba con un punto, así que el dominio del producto, motiq12.com, se leía como
+  // el taller "motiq12": la landing pedía la marca de un taller inexistente y a cada
+  // visitante le saltaba "Taller no encontrado o inactivo". La misma regla vive en el
+  // backend (middleware/tenant-publico.js), con tests: si cambia acá, cambia allá.
   private delSubdominio(): string | null {
     if (Capacitor.isNativePlatform()) return null;   // la app nativa no tiene host propio
     const host = (window.location.hostname || '').toLowerCase();
-    if (!host.includes('.')) return null;            // 'localhost' y afines
-    const primero = host.split('.')[0];
-    return NO_SON_TALLER.has(primero) ? null : primero;
+    if (!host || /^[\d.]+$/.test(host) || host.includes(':')) return null;   // IPv4 / IPv6
+    if (DOMINIOS_DE_PLATAFORMA.some((d) => host.endsWith(d))) return null;
+    const partes = host.split('.');
+    if (partes.length < 3) return null;              // localhost, motiq12.com
+    return NO_SON_TALLER.has(partes[0]) ? null : partes[0];
   }
 
   /** El taller actual: primero el subdominio, si no el guardado. null si no hay. */

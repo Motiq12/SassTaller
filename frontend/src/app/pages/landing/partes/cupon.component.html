@@ -1,0 +1,60 @@
+<section class="contacto" aria-labelledby="cupon-titulo">
+  <div class="cupon" appAparece>
+    <div class="talon">
+      <h2 id="cupon-titulo">Hablá con nosotros</h2>
+      <p>
+        Contanos de tu taller y te mostramos {{ producto.nombre }} funcionando con tu caso.
+        Si tenés varias sucursales, lo armamos con vos y migramos tus datos.
+      </p>
+    </div>
+
+    <div class="cuerpo">
+      <!-- Las muescas viven sobre la línea del troquel, sea vertical u horizontal. -->
+      <span class="muesca uno" aria-hidden="true"></span>
+      <span class="muesca dos" aria-hidden="true"></span>
+      <div class="gracias" *ngIf="enviado" role="status">
+        <p class="gracias-titulo">Recibimos tu mensaje.</p>
+        <p>Te contactamos en menos de un día hábil. Si es urgente, escribinos y lo vemos antes.</p>
+      </div>
+
+      <form *ngIf="!enviado" (ngSubmit)="enviar()" novalidate>
+        <div class="fila">
+          <label for="c-nombre">Tu nombre *</label>
+          <input id="c-nombre" name="nombre" autocomplete="name" required [(ngModel)]="nombre" />
+        </div>
+        <div class="fila">
+          <label for="c-email">Correo *</label>
+          <input id="c-email" name="email" type="email" inputmode="email" autocomplete="email" required [(ngModel)]="email" />
+        </div>
+        <div class="par">
+          <div class="fila">
+            <label for="c-tel">Teléfono</label>
+            <input id="c-tel" name="telefono" type="tel" inputmode="tel" autocomplete="tel" [(ngModel)]="telefono" />
+          </div>
+          <div class="fila">
+            <label for="c-empresa">Empresa</label>
+            <input id="c-empresa" name="empresa" autocomplete="organization" [(ngModel)]="empresa" />
+          </div>
+        </div>
+        <div class="fila">
+          <label for="c-volumen">Cuántos vehículos atienden</label>
+          <select id="c-volumen" name="volumen" [(ngModel)]="volumen">
+            <option value="">Elegí una opción</option>
+            <option *ngFor="let v of VOLUMENES" [value]="v.valor">{{ v.rotulo }}</option>
+          </select>
+        </div>
+        <div class="fila">
+          <label for="c-mensaje">¿Qué necesitás resolver?</label>
+          <textarea id="c-mensaje" name="mensaje" rows="3" maxlength="2000" [(ngModel)]="mensaje"></textarea>
+        </div>
+
+        <p class="error" *ngIf="error" role="alert">{{ error }}</p>
+
+        <button type="submit" class="enviar" [disabled]="!formularioListo || enviando">
+          {{ enviando ? 'Enviando…' : 'Enviar' }}
+        </button>
+        <p class="nota">Usamos tus datos solo para contactarte. Nada más.</p>
+      </form>
+    </div>
+  </div>
+</section>

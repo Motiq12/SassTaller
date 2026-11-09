@@ -1,0 +1,34 @@
+<section class="etapas" aria-labelledby="etapas-titulo">
+  <div class="campos">
+    <div class="campo-frase">
+      <h2 id="etapas-titulo" class="frase" aria-live="polite" appAparece>
+        <ng-container *ngFor="let e of etapas; let i = index">
+          <span class="clausula" [class.activa]="i === etapa" [attr.aria-hidden]="i !== etapa">{{ e.frase }}</span>
+        </ng-container>
+      </h2>
+      <p class="ayuda" appAparece [retraso]="80">
+        Arrastrá la orden por sus etapas y mirá lo que queda registrado en cada una.
+      </p>
+    </div>
+
+    <div class="campo-pantalla">
+      <app-lp-pantalla class="pantalla" tipo="orden" [etapa]="etapa" appAparece [retraso]="140"></app-lp-pantalla>
+    </div>
+  </div>
+
+  <div class="control" appAparece [retraso]="200">
+    <div class="pista" aria-hidden="true">
+      <span class="recorrido" [style.width.%]="avance"></span>
+    </div>
+    <label class="oculto" for="etapa-orden">Etapa de la orden de trabajo</label>
+    <input id="etapa-orden" type="range" min="0" max="3" step="1"
+           [value]="etapa" (input)="cambiar($any($event.target).value)"
+           [attr.aria-valuetext]="etapas[etapa].nombre" />
+    <ol class="nombres">
+      <li *ngFor="let e of etapas; let i = index">
+        <button type="button" [class.actual]="i === etapa" [class.pasada]="i < etapa"
+                (click)="cambiar(i)" [attr.aria-pressed]="i === etapa">{{ e.nombre }}</button>
+      </li>
+    </ol>
+  </div>
+</section>

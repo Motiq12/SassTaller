@@ -1,0 +1,110 @@
+@use 'base' as *;
+
+:host { display: block; }
+
+.pie {
+  padding: 0 $margen 32px;
+  background: $suelo;
+}
+
+// La marca de borde a borde. Las letras se reparten el ancho sobre una misma
+// línea de base y suben una tras otra al aparecer; la "o" es el disco carmesí.
+.marca {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 0.12em;          // lugar para la cola de la q
+  font-family: $fd;
+  font-weight: 800;
+  font-size: min(44svh, 30vw);
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  color: $tinta;
+  user-select: none;
+}
+
+.bloque {
+  display: block;
+  :host-context(.lp-js) & {
+    transform: translateY(18%);
+    opacity: 0;
+    transition: transform 0.9s $curva, opacity 0.6s $curva;
+    transition-delay: var(--retraso, 0ms);
+  }
+  :host-context(.lp-js) .visto & { transform: none; opacity: 1; }
+  @media (prefers-reduced-motion: reduce) {
+    :host-context(.lp-js) & { transform: none; opacity: 1; transition: none; }
+  }
+}
+
+// La "o": un círculo carmesí del alto de las minúsculas, con su agujero.
+.bloque.disco {
+  position: relative;
+  width: 0.56em;
+  height: 0.56em;
+  border-radius: 50%;
+  background: $carmesi;
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 33%;
+    border-radius: 50%;
+    background: $suelo;
+  }
+}
+
+.abajo {
+  display: grid;
+  grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
+  gap: 24px;
+  margin-top: 56px;
+}
+
+.enlaces {
+  display: grid;
+  grid-template-columns: repeat(4, max-content);
+  justify-items: start;
+  gap: 12px 40px;
+  a, button {
+    padding: 8px 0;
+    border: 0;
+    background: none;
+    font-family: $fb;
+    font-size: $t-chica;
+    font-weight: 600;
+    color: $tinta;
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 0.2s $curva;
+    &:hover { color: $carmesi-texto; }
+    &:focus-visible { outline: 3px solid $tinta; outline-offset: 3px; border-radius: 4px; }
+  }
+}
+
+.lema {
+  margin: 0;
+  padding: 8px 0;
+  text-align: right;
+  font-family: $fb;
+  font-size: $t-chica;
+  color: $suave;
+}
+
+.ultima {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 40px;
+  p { margin: 0; font-family: $fb; font-size: $t-chica; color: $suave; }
+}
+.accion { @include boton; min-height: 44px; padding: 0 20px; font-size: $t-chica; }
+
+.oculto { @include oculto; }
+
+@media (max-width: 760px) {
+  .marca { font-size: 30vw; }
+  .abajo { grid-template-columns: 1fr; margin-top: 36px; }
+  .enlaces { grid-template-columns: repeat(2, max-content); gap: 4px 32px; }
+  .lema { text-align: left; }
+}

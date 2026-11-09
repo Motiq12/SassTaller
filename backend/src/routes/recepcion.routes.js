@@ -91,7 +91,7 @@ router.get('/resumen', async (req, res) => {
 router.get('/citas-hoy', async (req, res) => {
   try {
     const [rows] = await req.db.query(
-      `SELECT ci.id, ci.fecha, TIME_FORMAT(ci.hora,'%H:%i') AS hora, ci.motivo, ci.tipo_servicio, ci.servicios, ci.estado, ci.monto, ci.vehiculo_id,
+      `SELECT ci.id, ci.fecha, to_char(ci.hora, 'HH24:MI') AS hora, ci.motivo, ci.tipo_servicio, ci.servicios, ci.estado, ci.monto, ci.vehiculo_id,
               ci.confirmada_cliente, ci.hora_llegada, ci.no_show, ci.orden_id, o.numero_orden,
               c.id AS cliente_id, c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.telefono AS cliente_telefono,
               m.marca, m.modelo, m.placa,
@@ -120,7 +120,7 @@ router.get('/agenda', async (req, res) => {
     const { desde, hasta } = req.query;
     if (!desde || !hasta) return res.status(400).json({ error: 'desde y hasta son requeridos' });
     const [rows] = await req.db.query(
-      `SELECT ci.id, DATE_FORMAT(ci.fecha,'%Y-%m-%d') AS fecha, TIME_FORMAT(ci.hora,'%H:%i') AS hora,
+      `SELECT ci.id, to_char(ci.fecha, 'YYYY-MM-DD') AS fecha, to_char(ci.hora, 'HH24:MI') AS hora,
               ci.motivo, ci.tipo_servicio, ci.servicios, ci.estado, ci.confirmada_cliente, ci.hora_llegada,
               ci.no_show, ci.orden_id, o.numero_orden,
               c.id AS cliente_id, c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.telefono AS cliente_telefono,
@@ -274,7 +274,7 @@ router.get('/alertas', async (req, res) => {
        JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
        LEFT JOIN usuarios u ON u.id = o.tecnico_id AND u.tenant_id = @tenant
        WHERE f.tenant_id = @tenant AND o.estado NOT IN ('entregada','cancelada')${soloSucursal(req, 'o.sucursal_id')}
-         AND f.created_at >= NOW() - INTERVAL 24 HOUR
+         AND f.created_at >= NOW() - INTERVAL '24 hours'
        ORDER BY f.created_at DESC LIMIT 10`
     );
     // Órdenes que entraron a "lista_entrega" en las últimas 24 h y siguen ahí
@@ -290,7 +290,7 @@ router.get('/alertas', async (req, res) => {
        JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
        WHERE t.tenant_id = @tenant AND t.etapa = 'lista_entrega' AND t.fin IS NULL
          AND o.estado = 'lista_entrega'${soloSucursal(req, 'o.sucursal_id')}
-         AND t.inicio >= NOW() - INTERVAL 24 HOUR
+         AND t.inicio >= NOW() - INTERVAL '24 hours'
        ORDER BY t.inicio DESC LIMIT 10`
     );
     // Decisión del cliente sobre el presupuesto (fecha_aprobacion se setea en ambas).
@@ -303,36 +303,36 @@ router.get('/alertas', async (req, res) => {
        JOIN clientes c ON c.id = o.cliente_id AND c.tenant_id = @tenant
        JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
        WHERE o.tenant_id = @tenant AND o.aprobacion_cliente IN ('aprobado','rechazado')${soloSucursal(req, 'o.sucursal_id')}
-         AND o.fecha_aprobacion >= NOW() - INTERVAL 24 HOUR
+         AND o.fecha_aprobacion >= NOW() - INTERVAL '24 hours'
        ORDER BY o.fecha_aprobacion DESC LIMIT 10`
     );
     // Citas que el cliente agendó solo desde el portal (sin usuario de mostrador).
     const [citasNuevas] = await req.db.query(
       `SELECT 'cita_nueva' AS tipo, ci.created_at,
-              ci.id AS cita_id, DATE_FORMAT(ci.fecha, '%d/%m') AS fecha_corta,
-              TIME_FORMAT(ci.hora, '%H:%i') AS hora,
+              ci.id AS cita_id, to_char(ci.fecha, 'DD/MM') AS fecha_corta,
+              to_char(ci.hora, 'HH24:MI') AS hora,
               c.nombre AS cliente_nombre, c.apellido AS cliente_apellido,
               m.marca, m.modelo
        FROM citas ci
        JOIN clientes c ON c.id = ci.cliente_id AND c.tenant_id = @tenant
        LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant
        WHERE ci.tenant_id = @tenant AND ci.usuario_id IS NULL AND ci.estado <> 'cancelado'${soloSucursal(req, 'ci.sucursal_id')}
-         AND ci.created_at >= NOW() - INTERVAL 24 HOUR
+         AND ci.created_at >= NOW() - INTERVAL '24 hours'
        ORDER BY ci.created_at DESC LIMIT 10`
     );
     // Citas que el cliente canceló desde el portal: el taller tiene que enterarse
     // para liberar/reasignar el espacio (antes la cita solo desaparecía de la agenda).
     const [citasCanceladas] = await req.db.query(
       `SELECT 'cita_cancelada' AS tipo, ci.fecha_cancelacion AS created_at,
-              ci.id AS cita_id, DATE_FORMAT(ci.fecha, '%d/%m') AS fecha_corta,
-              TIME_FORMAT(ci.hora, '%H:%i') AS hora,
+              ci.id AS cita_id, to_char(ci.fecha, 'DD/MM') AS fecha_corta,
+              to_char(ci.hora, 'HH24:MI') AS hora,
               c.nombre AS cliente_nombre, c.apellido AS cliente_apellido,
               m.marca, m.modelo
        FROM citas ci
        JOIN clientes c ON c.id = ci.cliente_id AND c.tenant_id = @tenant
        LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant
        WHERE ci.tenant_id = @tenant AND ci.estado = 'cancelado' AND ci.fecha_cancelacion IS NOT NULL${soloSucursal(req, 'ci.sucursal_id')}
-         AND ci.fecha_cancelacion >= NOW() - INTERVAL 24 HOUR
+         AND ci.fecha_cancelacion >= NOW() - INTERVAL '24 hours'
        ORDER BY ci.fecha_cancelacion DESC LIMIT 10`
     );
     const [repSolicitados] = await req.db.query(
@@ -346,7 +346,7 @@ router.get('/alertas', async (req, res) => {
        JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
        LEFT JOIN usuarios u ON u.id = o.tecnico_id AND u.tenant_id = @tenant
        WHERE r.tenant_id = @tenant AND r.estado = 'solicitado'${soloSucursal(req, 'o.sucursal_id')}
-         AND r.created_at >= NOW() - INTERVAL 24 HOUR
+         AND r.created_at >= NOW() - INTERVAL '24 hours'
        ORDER BY r.created_at DESC LIMIT 10`
     );
     // Motos listas hace más de 2 días que nadie marcó como entregadas: o el cliente
@@ -354,7 +354,7 @@ router.get('/alertas', async (req, res) => {
     // 24 h como las demás: siguen ahí hasta que se resuelvan.
     const [olvidadasOrdenes] = await req.db.query(
       `SELECT 'sin_entregar' AS tipo, t.inicio AS created_at,
-              DATEDIFF(NOW(), t.inicio) AS dias,
+              (NOW()::date - t.inicio::date) AS dias,
               o.numero_orden, o.id AS orden_id, NULL AS cita_id,
               c.nombre AS cliente_nombre, c.apellido AS cliente_apellido,
               m.marca, m.modelo
@@ -364,12 +364,12 @@ router.get('/alertas', async (req, res) => {
        JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
        WHERE t.tenant_id = @tenant AND t.etapa = 'lista_entrega' AND t.fin IS NULL
          AND o.estado = 'lista_entrega'${soloSucursal(req, 'o.sucursal_id')}
-         AND t.inicio < NOW() - INTERVAL 2 DAY
+         AND t.inicio < NOW() - INTERVAL '2 days'
        ORDER BY t.inicio ASC LIMIT 10`
     );
     const [olvidadasCitas] = await req.db.query(
-      `SELECT 'sin_entregar' AS tipo, COALESCE(ci.fecha_listo, TIMESTAMP(ci.fecha, ci.hora)) AS created_at,
-              DATEDIFF(NOW(), COALESCE(ci.fecha_listo, TIMESTAMP(ci.fecha, ci.hora))) AS dias,
+      `SELECT 'sin_entregar' AS tipo, COALESCE(ci.fecha_listo, (ci.fecha + ci.hora)) AS created_at,
+              (NOW()::date - COALESCE(ci.fecha_listo, (ci.fecha + ci.hora))::date) AS dias,
               NULL AS numero_orden, NULL AS orden_id, ci.id AS cita_id, ci.monto,
               c.nombre AS cliente_nombre, c.apellido AS cliente_apellido,
               m.marca, m.modelo
@@ -377,7 +377,7 @@ router.get('/alertas', async (req, res) => {
        JOIN clientes c ON c.id = ci.cliente_id AND c.tenant_id = @tenant
        LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant
        WHERE ci.tenant_id = @tenant AND ci.estado = 'listo' AND ci.orden_id IS NULL${soloSucursal(req, 'ci.sucursal_id')}
-         AND COALESCE(ci.fecha_listo, TIMESTAMP(ci.fecha, ci.hora)) < NOW() - INTERVAL 2 DAY
+         AND COALESCE(ci.fecha_listo, (ci.fecha + ci.hora)) < NOW() - INTERVAL '2 days'
        ORDER BY created_at ASC LIMIT 10`
     );
     const recientes = [...fotos, ...listas, ...aprob, ...citasNuevas, ...citasCanceladas, ...repSolicitados]
@@ -933,9 +933,9 @@ router.get('/clientes', async (req, res) => {
       WHERE c.tenant_id = @tenant AND c.activo = 1`;
     const params = [];
     if (q) {
-      sql += ` AND (c.nombre LIKE ? OR c.apellido LIKE ? OR c.telefono LIKE ? OR c.email LIKE ? OR c.cedula LIKE ?
-               OR CONCAT(c.nombre, " ", c.apellido) LIKE ?
-               OR EXISTS (SELECT 1 FROM vehiculos mm WHERE mm.cliente_id = c.id AND mm.activa = 1 AND mm.tenant_id = @tenant AND mm.placa LIKE ?))`;
+      sql += ` AND (c.nombre ILIKE ? OR c.apellido ILIKE ? OR c.telefono ILIKE ? OR c.email ILIKE ? OR c.cedula ILIKE ?
+               OR (c.nombre || ' ' || c.apellido) ILIKE ?
+               OR EXISTS (SELECT 1 FROM vehiculos mm WHERE mm.cliente_id = c.id AND mm.activa = 1 AND mm.tenant_id = @tenant AND mm.placa ILIKE ?))`;
       const like = `%${q}%`;
       params.push(like, like, like, like, like, like, like);
     }

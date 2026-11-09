@@ -62,7 +62,7 @@ router.get('/web-vitals', auth, requireRol('admin'), async (req, res) => {
     const dias = Math.min(Math.max(Number(req.query.dias) || 30, 1), 365);
     const [filas] = await req.db.query(
       `SELECT metrica, valor FROM web_vitals
-       WHERE tenant_id = @tenant AND created_at >= NOW() - INTERVAL ? DAY
+       WHERE tenant_id = @tenant AND created_at >= NOW() - ?::int * INTERVAL '1 day'
        ORDER BY metrica, valor`,
       [dias]
     );

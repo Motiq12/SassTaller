@@ -36,7 +36,7 @@ async function avisarPorVencer(hoy) {
   const [talleres] = await pool.query(
     `SELECT id, nombre FROM tenants
       WHERE plan = 'trial' AND estado = 'activo'
-        AND trial_hasta = DATE_ADD(?, INTERVAL ? DAY)`,
+        AND trial_hasta = ?::date + ?::int`,
     [hoy, DIAS_AVISO]
   );
 

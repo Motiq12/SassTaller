@@ -6,9 +6,9 @@ const compression = require('compression');
 const path = require('path');
 const fs = require('fs');
 const { testConnection } = require('./db/pool');
-const { ensureSchema } = require('./db/auto-migrate');
-const { iniciarJobs } = require('./jobs/scheduler');
+const { migrar } = require('./db/migrar');
 const { verificarListaContraEsquema } = require('./db/tenant-db');
+const { iniciarJobs } = require('./jobs/scheduler');
 const { iniciarRefrescoEstados } = require('./utils/estado-tenant');
 const { iniciarRefrescoLimites } = require('./utils/limites');
 const { apiLimiter, authLimiter, adminLimiter } = require('./middleware/rate-limit');
@@ -34,9 +34,11 @@ if (esProduccion) {
   if (!process.env.CORS_ORIGIN && !hasFrontend) {
     console.warn('⚠️  CORS_ORIGIN no definido en producción. Usando default restrictivo.');
   }
-  // Con MYSQL_URL (Railway) DB_HOST y DB_NAME no hacen falta: antes avisaba igual.
-  if (!process.env.MYSQL_URL && (!process.env.DB_HOST || !process.env.DB_NAME)) {
-    console.warn('⚠️  Variables de DB incompletas (DB_HOST, DB_NAME). Verificá la configuración.');
+  // En Railway la conexión viene entera en DATABASE_URL (ver db/pool.js) y las DB_* no
+  // existen. Antes se exigían igual, así que el aviso salía en cada arranque aunque la
+  // base conectara bien, y un aviso que siempre sale deja de leerse.
+  if (!process.env.DATABASE_URL && (!process.env.DB_HOST || !process.env.DB_NAME)) {
+    console.warn('⚠️  Falta la conexión a la base: DATABASE_URL, o DB_HOST y DB_NAME.');
   }
 }
 
@@ -212,8 +214,10 @@ const correrJobs = bajoCluster ? process.env.JOBS === '1' : true;
 // donde la base esté a medio migrar mientras el server ya responde.
 (async () => {
   await testConnection();
-  if (!bajoCluster) await ensureSchema();
-  // Avisa si alguna tabla con tenant_id quedó fuera de la lista del guard.
+  if (!bajoCluster) await migrar();
+  // Después de migrar: avisa si alguna tabla con tenant_id quedó fuera de la lista
+  // del guard (o al revés). Sin esto, una tabla nueva pasaría sin filtro por tenant
+  // y el guard la dejaría entrar sin quejarse.
   await verificarListaContraEsquema();
   // Qué talleres están suspendidos y los límites de cada plan, antes de escuchar: sin
   // esto, tras un reinicio cualquier suspendido vuelve a trabajar y los topes no rigen.
