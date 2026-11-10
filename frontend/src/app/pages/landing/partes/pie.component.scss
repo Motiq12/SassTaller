@@ -104,6 +104,9 @@
   border-top: 1px solid blanco(0.14);
   font-size: max(13px, #{u(0.8)});
   color: blanco(0.55);
+  .credito { flex-basis: 100%; font-size: 12px; color: blanco(0.45); }
+  .credito a { color: inherit; text-underline-offset: 2px; }
+  .credito a:hover { color: #fff; }
 }
 
 // La marca de borde a borde, cortada abajo por el final de la tarjeta.

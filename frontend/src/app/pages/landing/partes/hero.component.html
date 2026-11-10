@@ -1,10 +1,12 @@
 <section class="hero" aria-labelledby="hero-titulo">
-  <!-- El disco es la "foto" de la tarjeta: primero la imagen fija (un cuadro del mismo
-       render) y, cuando está listo, el 3D en vivo encima. -->
+  <!-- La foto del taller de fondo, en negro y carmesí, con un velo encima para que el
+       texto se lea siempre. Una versión ancha y otra alta; es lo primero que se pinta. -->
   <div class="escena" aria-hidden="true">
-    <img class="foto" [class.con3d]="con3d" src="assets/landing/disco-freno.webp" alt=""
-         width="1170" height="1170" decoding="async" />
-    <canvas #lienzo class="lienzo" [class.listo]="con3d"></canvas>
+    <picture>
+      <source media="(max-width: 639px)" srcset="assets/landing/taller-alto.webp" width="1080" height="1618" />
+      <img class="foto" src="assets/landing/taller-ancho.webp" alt="" width="1920" height="1080"
+           fetchpriority="high" decoding="async" />
+    </picture>
     <div class="velo"></div>
   </div>
 
@@ -83,7 +85,7 @@
           <p class="valor-rotulo">días con todo</p>
           <p class="nota">Sin tarjeta. Después sigue gratis y no se borra nada.</p>
         </div>
-        <img class="prueba-foto" src="assets/landing/disco-freno.webp" alt="" width="1170" height="1170" loading="lazy" decoding="async" />
+        <img class="prueba-foto" src="assets/landing/taller-mini.webp" alt="" width="240" height="320" loading="lazy" decoding="async" />
       </article>
     </div>
   </div>

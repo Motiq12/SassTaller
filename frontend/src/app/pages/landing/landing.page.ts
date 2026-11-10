@@ -21,8 +21,8 @@ type Lenis = import('lenis').default;
  *
  * El diseño sigue el sistema de partes/_sistema.scss: la estructura y el movimiento de
  * "Baseline" en los colores de Motiq. Página clara en un marco blanco, secciones
- * oscuras como tarjetas, el carmesí como único acento y el disco de freno en 3D como
- * la foto de la portada.
+ * oscuras como tarjetas, el carmesí como único acento y la foto de un taller (en negro
+ * y carmesí) de fondo en la portada.
  *
  * Es del PRODUCTO, no de ningún taller: acá manda la marca de Motiq (ver producto.ts).
  */

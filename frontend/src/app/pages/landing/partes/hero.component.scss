@@ -22,36 +22,30 @@
 // El foco de teclado, igual para todos los enlaces y botones de la portada.
 .hero :is(a, button):focus-visible { outline: 2px solid $carmesi-claro; outline-offset: 3px; }
 
-// ── El disco ─────────────────────────────────────────────────────────────────────
+// ── La foto ───────────────────────────────────────────────────────────────────────
 .escena { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
 
-// Imagen fija: lo primero que se ve, y lo único sin 3D. Mismo encuadre que el 3D.
+// La foto ocupa toda la tarjeta. En escritorio el gato y el mecánico quedan a la
+// derecha; el texto cae sobre la parte oscura de la izquierda.
 .foto {
-  position: absolute;
-  left: var(--disco-cx, 64%);
-  top: var(--disco-cy, 57%);
-  width: calc(var(--disco-d, 60vh) * 1.3);
-  height: auto;
-  max-width: none;
-  transform: translate(-50%, -50%);
-  transition: opacity 0.3s ease-out;
-  &.con3d { opacity: 0; transition-delay: 0.6s; }
-}
-.lienzo {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  opacity: 0;
-  transition: opacity 0.6s ease-out;
-  &.listo { opacity: 1; }
+  object-fit: cover;
+  object-position: 70% 50%;
+  // Un acercamiento lento al entrar, como una cámara que se asienta.
+  animation: asentar 2.4s $expo both;
 }
-// Un velo de arriba hacia abajo, como el de la foto de Baseline: el titular y el texto
-// de abajo se leen siempre, pase lo que pase detrás.
+@keyframes asentar { from { transform: scale(1.08); } to { transform: none; } }
+// El velo: oscurece arriba (barra y titular) y abajo (texto y acciones), y de
+// izquierda a derecha en escritorio, donde va el texto.
 .velo {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, rgba(10, 10, 10, 0.55), rgba(10, 10, 10, 0) 38%, rgba(10, 10, 10, 0) 58%, rgba(10, 10, 10, 0.8));
+  background:
+    linear-gradient(to bottom, rgba(10, 10, 10, 0.7), rgba(10, 10, 10, 0.1) 34%, rgba(10, 10, 10, 0.25) 60%, rgba(10, 10, 10, 0.92)),
+    linear-gradient(to right, rgba(10, 10, 10, 0.75), rgba(10, 10, 10, 0) 60%);
 }
 
 // ── Barra ────────────────────────────────────────────────────────────────────────
@@ -296,7 +290,9 @@
 // En el teléfono la portada lleva solo titular, una frase y la acción: el lema, la
 // cola de vehículos y las tarjetas de vidrio quedan para pantallas más anchas.
 // Y crece si no le alcanza la pantalla: nunca recorta la acción.
+@media (prefers-reduced-motion: reduce) { .foto { animation: none; } }
 @media (max-width: 639px) {
+  .foto { object-position: 60% 35%; }
   .hero { height: auto; min-height: max(calc(100svh - 1rem), 560px); }
   .lema, .solo-ancho, .racimo { display: none; }
 }
