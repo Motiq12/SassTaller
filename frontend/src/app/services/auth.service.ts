@@ -20,6 +20,7 @@ export interface LoginUnificadoResp {
   cliente?: any;
   requiere_2fa?: boolean;
   token_parcial?: string;
+  taller?: { nombre: string; slug: string } | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -67,8 +68,20 @@ export class AuthService {
   // Login unificado (personal o cliente). No persiste: el llamador decide según `tipo`.
   // Si el usuario tiene verificación en dos pasos, la respuesta NO trae sesión:
   // llega `requiere_2fa` + `token_parcial` para canjear en verificar2FA().
-  loginUnificado(email: string, password: string): Observable<{ data: LoginUnificadoResp }> {
-    return this.http.post<{ data: LoginUnificadoResp }>(`${this.apiUrl}/auth/login`, this.taller.conTaller({ email, password }));
+  // Un solo login para todos. No se acota al taller guardado en el navegador: quien
+  // visitó el enlace de un taller tiene que poder entrar igual a su cuenta de otro. Ese
+  // taller solo se ofrece como `preferido`, por si el correo está en varios.
+  loginUnificado(email: string, password: string, elegido?: string): Observable<{ data: LoginUnificadoResp }> {
+    const taller = elegido || this.taller.deSubdominio();
+    const preferido = taller ? undefined : this.taller.actual();
+    return this.http.post<{ data: LoginUnificadoResp }>(`${this.apiUrl}/auth/login`, {
+      email, password, ...(taller ? { taller } : {}), ...(preferido ? { preferido } : {}),
+    });
+  }
+
+  private conSubdominio<T extends object>(cuerpo: T): T & { taller?: string } {
+    const taller = this.taller.deSubdominio();
+    return taller ? { ...cuerpo, taller } : cuerpo;
   }
 
   // ── Verificación en dos pasos (personal) ──
@@ -106,12 +119,12 @@ export class AuthService {
    * taller (se resuelve por el correo); si hay uno resuelto, se acota a ese.
    */
   solicitarRecuperacion(email: string, antibot: { website?: string; turnstileToken?: string } = {}): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/recuperar/solicitar`, this.taller.conTaller({ email, ...antibot }));
+    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/recuperar/solicitar`, this.conSubdominio({ email, ...antibot }));
   }
 
   /** Canjea el código y fija la contraseña nueva. No abre sesión: se vuelve al login. */
   confirmarRecuperacion(datos: { email: string; codigo: string; password: string }): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/recuperar/confirmar`, this.taller.conTaller(datos));
+    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/recuperar/confirmar`, this.conSubdominio(datos));
   }
 
   // Guarda la sesión del personal (la usa el login unificado cuando tipo === 'staff').

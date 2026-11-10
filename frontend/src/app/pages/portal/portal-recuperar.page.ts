@@ -1,11 +1,10 @@
 import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild, inject } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { MarcaService } from '../../services/marca.service';
 import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { PortalService } from '../../services/portal.service';
 import { emailValido } from '../../utils/validar';
 import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../shared/turnstile.util';
 
@@ -16,18 +15,11 @@ import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../sha
   styleUrls: ['./portal-login.page.scss'],
 })
 export class PortalRecuperarPage implements AfterViewInit, OnDestroy {
-  private portal = inject(PortalService);
   private router = inject(Router);
-  private route = inject(ActivatedRoute);
   private auth = inject(AuthService);
   /** Sin taller, la pantalla se viste de Motiq (theme/acceso-producto.scss). */
   readonly marca = inject(MarcaService);
 
-  /**
-   * ¿Quién recupera? `taller` = el personal (usuarios del taller); si no, un cliente
-   * del portal. Misma pantalla y mismos pasos; cambian los pedidos y a dónde se vuelve.
-   */
-  readonly personal = this.route.snapshot.queryParamMap.get('como') === 'taller';
   private loading = inject(LoadingController);
   private toast = inject(ToastController);
 
@@ -75,10 +67,7 @@ export class PortalRecuperarPage implements AfterViewInit, OnDestroy {
     const l = await this.loading.create({ message: 'Enviando código...', cssClass: 'portal-loading', spinner: 'crescent' });
     await l.present();
     const antibot = { website: this.website, turnstileToken: this.ts?.token() || '' };
-    const pedido = this.personal
-      ? this.auth.solicitarRecuperacion(this.email.trim(), antibot)
-      : this.portal.solicitarCodigo(this.email.trim(), antibot);
-    pedido.pipe(takeUntil(this.destroy$)).subscribe({
+    this.auth.solicitarRecuperacion(this.email.trim(), antibot).pipe(takeUntil(this.destroy$)).subscribe({
       next: async (res) => {
         await l.dismiss();
         this.paso = 2;
@@ -109,26 +98,12 @@ export class PortalRecuperarPage implements AfterViewInit, OnDestroy {
     const l = await this.loading.create({ message: 'Verificando...', cssClass: 'portal-loading', spinner: 'crescent' });
     await l.present();
     const datos = { email: this.email.trim(), codigo: this.codigo.trim(), password: this.password };
-    if (this.personal) {
-      // El personal vuelve al login: si tiene verificación en dos pasos, se le pide ahí.
-      this.auth.confirmarRecuperacion(datos).pipe(takeUntil(this.destroy$)).subscribe({
-        next: async (r) => {
-          await l.dismiss();
-          this.mostrar(r.message || 'Contraseña actualizada');
-          this.router.navigate(['/portal/login'], { replaceUrl: true, queryParams: { como: 'taller' } });
-        },
-        error: async (err) => {
-          await l.dismiss();
-          this.mostrar(err.error?.error || 'No se pudo restablecer la contraseña', 'danger');
-        },
-      });
-      return;
-    }
-    this.portal.confirmarRecuperacion(datos).pipe(takeUntil(this.destroy$)).subscribe({
-      next: async () => {
+    // No abre sesión: se vuelve al login, donde se pide la verificación en dos pasos si la hay.
+    this.auth.confirmarRecuperacion(datos).pipe(takeUntil(this.destroy$)).subscribe({
+      next: async (res) => {
         await l.dismiss();
-        this.mostrar('Contraseña actualizada');
-        this.router.navigate(['/portal'], { replaceUrl: true });
+        this.mostrar(res.message || 'Contraseña actualizada');
+        this.router.navigate(['/portal/login'], { replaceUrl: true });
       },
       error: async (err) => {
         await l.dismiss();
@@ -138,7 +113,7 @@ export class PortalRecuperarPage implements AfterViewInit, OnDestroy {
   }
 
   irLogin() {
-    this.router.navigate(['/portal/login'], this.personal ? { queryParams: { como: 'taller' } } : {});
+    this.router.navigate(['/portal/login']);
   }
 
   private iniciarCooldown() {

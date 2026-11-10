@@ -69,9 +69,15 @@ const DUMMY_HASH = bcrypt.hashSync('timing-equalizer', 10);
 // Login unificado: el mismo formulario sirve para personal y para clientes.
 // Busca primero en usuarios (personal) y, si no, en clientes con acceso al portal.
 // La respuesta incluye `tipo` ('staff' | 'cliente') para que el front sepa a dónde mandar.
+// De qué taller es la sesión: el portal lo necesita para mostrar su marca.
+async function tallerDe(tenantId) {
+  const [[t]] = await pool.query('SELECT nombre, slug FROM tenants WHERE id = ?', [tenantId]);
+  return t && t.slug ? { nombre: t.nombre, slug: t.slug } : null;
+}
+
 router.post('/login', async (req, res) => {
   try {
-    const { email, password, taller } = req.body;
+    const { email, password, taller, preferido } = req.body;
     if (!email || !password) {
       return faltante(res, req.body, [['email', 'el correo'], ['password', 'la contraseña']]);
     }
@@ -116,15 +122,42 @@ router.post('/login', async (req, res) => {
     for (const c of candidatos) {
       if (await bcrypt.compare(password, c.password_hash)) validos.push(c);
     }
-    if (validos.length > 1) {
+
+    // 2) Clientes del portal, con el mismo criterio. Antes se miraba solo la primera
+    // cuenta con ese correo: quien tenía cuenta en dos talleres no podía entrar a la otra.
+    const [clientesCandidatos] = await pool.query(
+      tenantId
+        ? 'SELECT * FROM clientes WHERE email = ? AND activo = 1 AND password_hash IS NOT NULL AND tenant_id = ?'
+        : 'SELECT * FROM clientes WHERE email = ? AND activo = 1 AND password_hash IS NOT NULL',
+      tenantId ? [email, tenantId] : [email]
+    );
+    const clientesValidos = [];
+    for (const c of clientesCandidatos) {
+      if (await bcrypt.compare(password, c.password_hash)) clientesValidos.push(c);
+    }
+
+    // La misma persona puede estar en varios talleres, como personal o como cliente.
+    // `preferido` es el último taller que usó en este navegador: si sigue siendo uno de
+    // los suyos, entra ahí sin preguntar; si no, elige.
+    let enTaller = (x) => x;
+    const idsValidos = [...new Set([...validos, ...clientesValidos].map(v => v.tenant_id))];
+    if (idsValidos.length > 1) {
       // La contraseña ya se validó, así que listar los talleres no filtra nada nuevo.
       const [talleres] = await pool.query(
-        `SELECT id, nombre, slug FROM tenants WHERE id IN (${validos.map(() => '?').join(',')})`,
-        validos.map(v => v.tenant_id)
+        `SELECT id, nombre, slug FROM tenants WHERE estado = 'activo' AND id IN (${idsValidos.map(() => '?').join(',')})`,
+        idsValidos
       );
-      return res.status(409).json({ error: 'Ese correo está en varios talleres. Elegí uno.', talleres });
+      const elegido = preferido && talleres.find(t => t.slug === String(preferido).trim().toLowerCase());
+      if (!elegido) {
+        return res.status(409).json({
+          error: 'Ese correo está en varios talleres. Elegí uno.',
+          talleres: talleres.map(t => ({ nombre: t.nombre, slug: t.slug })),
+        });
+      }
+      enTaller = (lista) => lista.filter(v => v.tenant_id === elegido.id);
     }
-    const usuario = validos[0];
+    const usuario = enTaller(validos)[0];
+    const cliente = enTaller(clientesValidos)[0];
     if (usuario) {
       // Con verificación en dos pasos activa, la contraseña sola no abre sesión:
       // se devuelve un token parcial que solo sirve para canjear el código.
@@ -134,17 +167,10 @@ router.post('/login', async (req, res) => {
       // Los permisos del sitio web van en la respuesta (el panel arma su menú con
       // ellos) pero NO en el token: la API los relee en cada petición.
       const { payload, token } = await sesionStaff(usuario, req);
-      return res.json({ data: { token, tipo: 'staff', usuario: { ...payload, permisos_web: normalizarPermisos(usuario.permisos_web), ...(await casillasDeSesion(usuario.id)), preferencias: await preferenciasDe(usuario.id, usuario.rol), foto: usuario.foto || null } } });
+      return res.json({ data: { token, tipo: 'staff', taller: await tallerDe(usuario.tenant_id), usuario: { ...payload, permisos_web: normalizarPermisos(usuario.permisos_web), ...(await casillasDeSesion(usuario.id)), preferencias: await preferenciasDe(usuario.id, usuario.rol), foto: usuario.foto || null } } });
     }
 
-    // 2) Cliente del portal (clientes con contraseña definida)
-    const [[cliente]] = await pool.query(
-      tenantId
-        ? 'SELECT * FROM clientes WHERE email = ? AND activo = 1 AND password_hash IS NOT NULL AND tenant_id = ?'
-        : 'SELECT * FROM clientes WHERE email = ? AND activo = 1 AND password_hash IS NOT NULL',
-      tenantId ? [email, tenantId] : [email]
-    );
-    if (cliente && (await bcrypt.compare(password, cliente.password_hash))) {
+    if (cliente) {
       // Mismo criterio que /portal/login: la contraseña sola no alcanza mientras el
       // correo no esté confirmado. Sin esto, cualquiera podía "reclamar" en
       // /portal/registro un cliente que el taller cargó sin contraseña, ponerle la
@@ -161,17 +187,17 @@ router.post('/login', async (req, res) => {
         apellido: cliente.apellido, tenant_id: cliente.tenant_id,
       };
       // La foto va en la respuesta (para el header), NO en el token (lo mantiene liviano).
-      return res.json({ data: { token: firmar(payload), tipo: 'cliente', cliente: { ...payload, foto: cliente.foto || null } } });
+      return res.json({ data: { token: firmar(payload), tipo: 'cliente', taller: await tallerDe(cliente.tenant_id), cliente: { ...payload, foto: cliente.foto || null } } });
     }
 
     // Anti-enumeración: si el correo no existía en ninguna tabla, no se ejecutó
     // ningún bcrypt.compare; corré uno señuelo para no delatar la cuenta por timing.
     // Se mira `candidatos` (existencia del correo) y no `usuario` (contraseña válida):
     // con la contraseña equivocada ya se corrió un bcrypt real y no hace falta otro.
-    if (!candidatos.length && !cliente) {
+    if (!candidatos.length && !clientesCandidatos.length) {
       await bcrypt.compare(password, DUMMY_HASH);
     }
-    registrarEvento('login_fallido', { email, ip: req.ip, detalle: usuario ? 'personal' : cliente ? 'cliente' : 'cuenta inexistente' });
+    registrarEvento('login_fallido', { email, ip: req.ip, detalle: candidatos.length ? 'personal' : clientesCandidatos.length ? 'cliente' : 'cuenta inexistente' });
     return res.status(401).json({ error: 'Credenciales incorrectas' });
   } catch (err) {
     fail(res, err);
@@ -584,6 +610,22 @@ async function cuentasDelCorreo(email, taller) {
   return filas;
 }
 
+// Los clientes con ese correo, en cualquier taller. También quien entró solo con Google:
+// así se crea una contraseña.
+async function clientesDelCorreo(email, taller) {
+  const params = [String(email).trim().toLowerCase()];
+  let filtro = '';
+  if (taller) { filtro = ' AND t.slug = ?'; params.push(String(taller).trim().toLowerCase()); }
+  const [filas] = await pool.query(
+    `SELECT c.id, c.tenant_id, c.nombre, t.nombre AS taller_nombre, t.slug AS taller_slug
+       FROM clientes c JOIN tenants t ON t.id = c.tenant_id
+      WHERE LOWER(c.email) = ? AND c.activo = 1 AND (c.password_hash IS NOT NULL OR c.google_sub IS NOT NULL)
+        AND t.estado = 'activo'${filtro}`,
+    params
+  );
+  return filas;
+}
+
 // POST /api/auth/recuperar/solicitar — manda el código (público, con antibot).
 router.post('/recuperar/solicitar', antibot(), async (req, res) => {
   try {
@@ -609,6 +651,18 @@ router.post('/recuperar/solicitar', antibot(), async (req, res) => {
       );
       await db.query(
         `INSERT INTO usuario_reset_codes (tenant_id, usuario_id, code_hash, expires_at)
+         VALUES (@tenant, ?, ?, NOW() + INTERVAL '10 minutes')`,
+        [c.id, codeHash]
+      );
+      await enviarCodigoReset(clave, c.nombre, codigo, { nombre: c.taller_nombre, slug: c.taller_slug });
+    }
+    for (const c of await clientesDelCorreo(email, taller)) {
+      const db = paraTenant(c.tenant_id);
+      const codigo = String(Math.floor(100000 + Math.random() * 900000));
+      const codeHash = await bcrypt.hash(codigo, 10);
+      await db.query('UPDATE password_reset_codes SET used = 1 WHERE tenant_id = @tenant AND cliente_id = ? AND used = 0', [c.id]);
+      await db.query(
+        `INSERT INTO password_reset_codes (tenant_id, cliente_id, code_hash, expires_at)
          VALUES (@tenant, ?, ?, NOW() + INTERVAL '10 minutes')`,
         [c.id, codeHash]
       );
@@ -653,6 +707,26 @@ router.post('/recuperar/confirmar', async (req, res) => {
         [hash, c.id]
       );
       await db.query('UPDATE usuario_reset_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
+      return res.json({ message: 'Listo, tu contraseña quedó cambiada. Ya podés entrar.' });
+    }
+
+    for (const c of await clientesDelCorreo(email, taller)) {
+      const db = paraTenant(c.tenant_id);
+      const [[reg]] = await db.query(
+        `SELECT id, code_hash, attempts FROM password_reset_codes
+          WHERE tenant_id = @tenant AND cliente_id = ? AND used = 0 AND expires_at > NOW()
+          ORDER BY id DESC LIMIT 1`,
+        [c.id]
+      );
+      if (!reg || reg.attempts >= MAX_INTENTOS_RESET) continue;
+      if (!(await bcrypt.compare(String(codigo).trim(), reg.code_hash))) {
+        await db.query('UPDATE password_reset_codes SET attempts = attempts + 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
+        continue;
+      }
+      // Recibir el código prueba que se controla la casilla: de paso queda verificada.
+      const hash = await bcrypt.hash(String(password), 10);
+      await db.query('UPDATE clientes SET password_hash = ?, email_verificado = 1 WHERE id = ? AND tenant_id = @tenant', [hash, c.id]);
+      await db.query('UPDATE password_reset_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
       return res.json({ message: 'Listo, tu contraseña quedó cambiada. Ya podés entrar.' });
     }
 

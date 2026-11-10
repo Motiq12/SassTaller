@@ -21,7 +21,7 @@ export class ErrorInterceptor implements HttpInterceptor {
         if (err.status === 401) return throwError(() => err);
         // No es un error: el backend pide confirmar algo (p. ej. pasar una orden a
         // reparación con repuestos sin llegar) y la pantalla muestra su propio cuadro.
-        if (err.status === 409 && (err.error?.codigo === 'requiere_confirmacion' || err.error?.requiere_confirmacion)) {
+        if (err.status === 409 && (Array.isArray(err.error?.talleres) || err.error?.codigo === 'requiere_confirmacion' || err.error?.requiere_confirmacion)) {
           return throwError(() => err);
         }
         if (err.status === 0) {

@@ -206,3 +206,45 @@ test('mecánico: cambiar el estado de su cita no choca con el guard de tenant', 
   assert.equal(status, 200, JSON.stringify(body));
   assert.ok(escrituras.some(e => /^UPDATE citas SET/.test(e.sql)));
 });
+
+// ── Login unificado: el mismo correo en varios talleres ──────────────────
+const CLAVE_LOGIN = 'ClaveSegura123';
+const HASH_LOGIN = bcrypt.hashSync(CLAVE_LOGIN, 4);
+const talleresDeLogin = { re: /from tenants/i, filas: [{ id: 1, nombre: 'Alfa', slug: 'alfa' }, { id: 2, nombre: 'Beta', slug: 'beta' }] };
+const clienteDe = (id, tenant_id, password_hash = HASH_LOGIN) => cliente({ id, tenant_id, password_hash, email_verificado: 1 });
+
+test('login: la cuenta de cliente del segundo taller también entra', async () => {
+  tablas = [{ re: /from clientes/i, filas: [clienteDe(1, 1, bcrypt.hashSync('OtraClave99', 4)), clienteDe(2, 2)] }, talleresDeLogin];
+  const { status, body } = await pedir('POST', '/api/auth/login', { email: 'lu@x.com', password: CLAVE_LOGIN });
+  assert.equal(status, 200, JSON.stringify(body));
+  assert.equal(body.data.tipo, 'cliente');
+  assert.equal(jwt.decode(body.data.token).tenant_id, 2);
+});
+
+test('login: con la misma contraseña en dos talleres pregunta a cuál entrar', async () => {
+  tablas = [{ re: /from clientes/i, filas: [clienteDe(1, 1), clienteDe(2, 2)] }, talleresDeLogin];
+  const { status, body } = await pedir('POST', '/api/auth/login', { email: 'lu@x.com', password: CLAVE_LOGIN });
+  assert.equal(status, 409);
+  assert.deepEqual(body.talleres.map(t => t.slug), ['alfa', 'beta']);
+  assert.equal(body.token, undefined);
+});
+
+test('login: la contraseña equivocada no revela en qué talleres está el correo', async () => {
+  tablas = [{ re: /from clientes/i, filas: [clienteDe(1, 1), clienteDe(2, 2)] }, talleresDeLogin];
+  const { status, body } = await pedir('POST', '/api/auth/login', { email: 'lu@x.com', password: 'NoEsLaClave1' });
+  assert.equal(status, 401);
+  assert.equal(body.talleres, undefined);
+});
+
+test('login: entra sin preguntar al último taller que usó', async () => {
+  tablas = [{ re: /from clientes/i, filas: [clienteDe(1, 1), clienteDe(2, 2)] }, talleresDeLogin];
+  const { status, body } = await pedir('POST', '/api/auth/login', { email: 'lu@x.com', password: CLAVE_LOGIN, preferido: 'beta' });
+  assert.equal(status, 200, JSON.stringify(body));
+  assert.equal(jwt.decode(body.data.token).tenant_id, 2);
+});
+
+test('login: un preferido ajeno no da acceso: vuelve a preguntar', async () => {
+  tablas = [{ re: /from clientes/i, filas: [clienteDe(1, 1), clienteDe(2, 2)] }, talleresDeLogin];
+  const { status } = await pedir('POST', '/api/auth/login', { email: 'lu@x.com', password: CLAVE_LOGIN, preferido: 'gamma' });
+  assert.equal(status, 409);
+});

@@ -37,40 +37,38 @@
         </ng-container>
 
         <ng-container *ngIf="!paso2fa">
-          <!-- Entrar y Crear cuenta son dos pestañas del mismo panel (antes el cambio
-               era un enlace al final). -->
-          <!-- Dos caminos, una sola autenticación: quien entra sabe a qué está entrando. -->
-          <header class="acceso-head" *ngIf="!camino">
-            <h1>¿Cómo entrás?</h1>
-            <p>Elegí tu caso. Lo recordamos para la próxima vez.</p>
-          </header>
-          <div class="caminos" *ngIf="!camino">
-            <button type="button" class="camino" (click)="elegirCamino('taller')">
-              <strong>Trabajo en un taller</strong>
-              <span>Administración, recepción y mecánicos.</span>
-            </button>
-            <button type="button" class="camino" (click)="elegirCamino('cliente')">
-              <strong>Soy cliente</strong>
-              <span>Seguí tu vehículo en el portal de tu taller.</span>
-            </button>
-          </div>
-
-          <nav class="pits-tabs" aria-label="Tu cuenta" *ngIf="camino === 'cliente' && conTaller">
+          <!-- Un solo login: con el correo y la contraseña el sistema sabe quién entra y lo
+               manda a su panel, sea dueño, recepción, mecánico o cliente. -->
+          <nav class="pits-tabs" aria-label="Tu cuenta" *ngIf="conTaller && !opciones.length">
             <a class="on" routerLink="/portal/login" aria-current="page">Entrar</a>
             <a routerLink="/portal/registro">Crear cuenta</a>
           </nav>
 
-          <header class="acceso-head" *ngIf="camino">
-            <h1>{{ camino === 'taller' ? 'Entrá a tu taller' : 'Entrá a tu portal' }}</h1>
-            <p *ngIf="modo === 'clave'">
-              {{ camino === 'taller' ? 'Con el correo y la contraseña de tu usuario del taller.' : 'Con tu correo y tu contraseña.' }}
-              <button type="button" class="cambiar" (click)="cambiarCamino()">Cambiar</button>
-            </p>
+          <ng-container *ngIf="opciones.length">
+            <header class="acceso-head">
+              <h1>¿A qué taller querés entrar?</h1>
+              <p>Tu correo tiene cuenta en varios.</p>
+            </header>
+            <div class="caminos">
+              <button type="button" class="camino" *ngFor="let t of opciones" (click)="elegirTaller(t.slug)">
+                <strong>{{ t.nombre }}</strong>
+              </button>
+            </div>
+            <div class="acceso-pie">
+              <button type="button" class="enlace" (click)="cancelarOpciones()">
+                <ion-icon name="arrow-back-outline" aria-hidden="true"></ion-icon> Volver
+              </button>
+            </div>
+          </ng-container>
+
+          <header class="acceso-head" *ngIf="!opciones.length">
+            <h1>Entrá a tu cuenta</h1>
+            <p *ngIf="modo === 'clave'">Con tu correo y tu contraseña.</p>
             <p *ngIf="modo === 'codigo' && !codigoEnviado">Te mandamos un código a tu correo para entrar sin contraseña.</p>
-            <p *ngIf="modo === 'codigo' && codigoEnviado">Escribe el código que te llegó a {{ email }}.</p>
+            <p *ngIf="modo === 'codigo' && codigoEnviado">Escribí el código que te llegó a {{ email }}.</p>
           </header>
 
-          <ion-card class="acceso-form" *ngIf="camino">
+          <ion-card class="acceso-form" *ngIf="!opciones.length">
             <ion-card-content>
               <ion-item lines="none">
                 <ion-label position="stacked">Correo</ion-label>
@@ -92,13 +90,8 @@
                 </ion-item>
 
                 <div class="fila-olvido">
-                  <a *ngIf="camino === 'cliente' && conTaller" class="enlace" routerLink="/portal/recuperar">¿Olvidaste tu contraseña?</a>
-                  <a *ngIf="camino === 'taller'" class="enlace" routerLink="/portal/recuperar" [queryParams]="{ como: 'taller' }">¿Olvidaste tu contraseña?</a>
+                  <a class="enlace" routerLink="/portal/recuperar">¿Olvidaste tu contraseña?</a>
                 </div>
-                <p *ngIf="camino === 'cliente' && !conTaller" class="nota-camino">
-                  ¿Primera vez, o no recordás tu contraseña? Abrí el enlace del portal que te compartió tu taller:
-                  ahí podés crear tu cuenta, entrar con un código o recuperarla.
-                </p>
 
                 <ion-button expand="block" class="btn-principal" (click)="ingresar()" [disabled]="!email || !password">
                   Ingresar
@@ -106,7 +99,7 @@
                 </ion-button>
 
                 <!-- Google y el código por correo son de clientes, y necesitan saber de qué taller. -->
-                <ng-container *ngIf="camino === 'cliente' && conTaller">
+                <ng-container *ngIf="conTaller">
                   <div class="separador"><span>o</span></div>
                   <app-google-boton (credencial)="conGoogle($event)"></app-google-boton>
                 </ng-container>
@@ -117,7 +110,7 @@
                   Ingresar con huella / Face ID
                 </ion-button>
 
-                <ion-button *ngIf="camino === 'cliente' && conTaller" expand="block" fill="outline" class="btn-secundario" (click)="usarCodigo()">
+                <ion-button *ngIf="conTaller" expand="block" fill="outline" class="btn-secundario" (click)="usarCodigo()">
                   <ion-icon name="mail-outline" slot="start"></ion-icon>
                   Entrar con un código al correo
                 </ion-button>

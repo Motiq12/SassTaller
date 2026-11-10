@@ -122,6 +122,11 @@ export class TallerService {
     return this.delSubdominio() || this.guardado;
   }
 
+  /** El taller del subdominio, si se entró por uno. Ahí la sesión se acota a ese taller. */
+  deSubdominio(): string | null {
+    return this.delSubdominio();
+  }
+
   /** Fija el taller elegido (login sin subdominio, o al crear uno nuevo). */
   fijar(slug: string): void {
     this.guardado = slug;

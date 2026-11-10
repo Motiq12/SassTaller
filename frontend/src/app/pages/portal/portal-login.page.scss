@@ -573,3 +573,6 @@ ion-item + .ayuda { margin: 0 0 12px; }
   .nota-camino { color: #cbd5e1; a { color: #fff; text-decoration: underline; } }
   .acceso-empresa a { color: #fff; }
 }
+
+/* Elegir taller: solo el nombre, centrado en su botón. */
+.camino { align-content: center; }

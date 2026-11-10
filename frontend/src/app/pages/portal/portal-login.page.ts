@@ -1,6 +1,6 @@
 import { Component, ElementRef, OnInit, OnDestroy, ViewChild, inject } from '@angular/core';
 import { MarcaService } from '../../services/marca.service';
-import { ActivatedRoute, Router } from '@angular/router';
+import { Router } from '@angular/router';
 import { TallerService } from '../../services/taller.service';
 import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -26,15 +26,10 @@ export class PortalLoginPage implements OnInit, OnDestroy {
   private loading = inject(LoadingController);
   private toast = inject(ToastController);
   marca = inject(MarcaService);
-  private route = inject(ActivatedRoute);
   private taller = inject(TallerService);
 
-  /**
-   * Por dónde entra: el personal de un taller o un cliente. Es la misma autenticación
-   * (login unificado); lo que cambia es lo que se le ofrece a cada uno. Se recuerda en
-   * el navegador y se puede fijar con ?como=taller|cliente.
-   */
-  camino: 'taller' | 'cliente' | null = null;
+  /** Si el correo está en varios talleres, a cuál entrar. Solo después de validar la contraseña. */
+  opciones: { nombre: string; slug: string }[] = [];
   /** Hay un taller resuelto (subdominio o ?taller=): las rutas de cliente funcionan. */
   get conTaller(): boolean { return !!this.taller.actual(); }
 
@@ -67,25 +62,10 @@ export class PortalLoginPage implements OnInit, OnDestroy {
     if (el && !this.ts) montarTurnstile(el.nativeElement).then(w => (this.ts = w));
   }
 
-  elegirCamino(c: 'taller' | 'cliente') {
-    this.camino = c;
-    if (c === 'taller') this.modo = 'clave';   // el código por correo es solo de clientes
-    try { localStorage.setItem(CLAVE_CAMINO, c); } catch { /* modo privado */ }
-  }
-
-  cambiarCamino() {
-    this.camino = null;
-    this.modo = 'clave';
-    try { localStorage.removeItem(CLAVE_CAMINO); } catch { /* modo privado */ }
-  }
+  elegirTaller(slug: string) { this.ingresar(slug); }
+  cancelarOpciones() { this.opciones = []; this.password = ''; }
 
   ngOnInit() {
-    const pedido = this.route.snapshot.queryParamMap.get('como');
-    let guardado: string | null = null;
-    try { guardado = localStorage.getItem(CLAVE_CAMINO); } catch { /* modo privado */ }
-    const c = pedido || guardado;
-    if (c === 'taller' || c === 'cliente') this.camino = c;
-
     // Si ya hay una sesión activa, mandamos a la zona que corresponde.
     if (this.portal.isLoggedIn()) this.router.navigate(['/portal'], { replaceUrl: true });
     else if (this.auth.isLoggedIn()) this.irStaff();
@@ -168,7 +148,7 @@ export class PortalLoginPage implements OnInit, OnDestroy {
     });
   }
 
-  async ingresar() {
+  async ingresar(elegido?: string) {
     if (!this.email || !this.password) return;
     if (!emailValido(this.email)) {
       const t = await this.toast.create({ message: 'Ingresa un correo válido', duration: 2500, color: 'warning' });
@@ -176,9 +156,12 @@ export class PortalLoginPage implements OnInit, OnDestroy {
     }
     const l = await this.loading.create({ message: 'Ingresando...', cssClass: 'portal-loading', spinner: 'crescent' });
     await l.present();
-    this.auth.loginUnificado(this.email.trim(), this.password).pipe(takeUntil(this.destroy$)).subscribe({
+    this.auth.loginUnificado(this.email.trim(), this.password, elegido).pipe(takeUntil(this.destroy$)).subscribe({
       next: async (res) => {
         await l.dismiss();
+        this.opciones = [];
+        // Se recuerda de qué taller es: su marca, y a cuál entrar si tiene varios.
+        if (res.data.taller?.slug) this.taller.fijar(res.data.taller.slug);
         const cred = { email: this.email.trim(), password: this.password };
         // Personal con verificación en dos pasos: todavía no hay sesión, falta el código.
         if (res.data.requiere_2fa && res.data.token_parcial) {
@@ -199,6 +182,10 @@ export class PortalLoginPage implements OnInit, OnDestroy {
       },
       error: async (err) => {
         await l.dismiss();
+        if (err.status === 409 && Array.isArray(err.error?.talleres)) {
+          this.opciones = err.error.talleres;
+          return;
+        }
         const t = await this.toast.create({
           message: err.error?.error || 'No se pudo iniciar sesión',
           duration: 2500,
@@ -295,5 +282,3 @@ export class PortalLoginPage implements OnInit, OnDestroy {
 
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); this.ts?.destroy(); }
 }
-
-const CLAVE_CAMINO = 'motiq_acceso_camino';
