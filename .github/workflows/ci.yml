@@ -4,7 +4,7 @@ name: CI
 # que el frontend compile antes de que Railway despliegue.
 on:
   push:
-    branches: [main, traer-msmotos]
+    branches: [main]
   pull_request:
 
 jobs:
