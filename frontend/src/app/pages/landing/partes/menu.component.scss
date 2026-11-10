@@ -74,8 +74,11 @@
     border: 0;
     background: none;
     color: #fff;
+    max-width: 100%;
     font-family: $fd;
-    font-size: max(40px, #{u(4.5)});
+    // Acotado al ancho de la pantalla: la palabra más larga ("Preguntas") tiene que
+    // entrar entera también en una ventana angosta.
+    font-size: clamp(32px, 12vw, #{u(4.5)});
     font-weight: 600;
     line-height: 1.05;
     letter-spacing: -0.03em;
