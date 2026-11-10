@@ -10,6 +10,7 @@ const { getConfig, clearCache } = require('../utils/configuracion');
 const { topeAlcanzado, puedeMarcaPropia } = require('../utils/cuenta');
 const { cargarEjemplo, borrarEjemplo } = require('../utils/ejemplo');
 const { getSucursales, clearCache: clearSucursalesCache } = require('../utils/sucursales');
+const { leerUbicacion } = require('../utils/ubicaciones');
 const { getServiciosFilas, clearCache: clearServicios } = require('../utils/servicios');
 const { fotoValida, textoDentroDeLimite } = require('../utils/validar');
 const { fechaLocalISO } = require('../utils/fecha');
@@ -49,7 +50,10 @@ router.get('/arranque', async (req, res) => {
          (SELECT COUNT(*) FROM ordenes_trabajo WHERE tenant_id = @tenant)                    AS ordenes,
          (SELECT COUNT(*) FROM clientes  WHERE tenant_id = @tenant AND password_hash IS NOT NULL) AS con_portal,
          (SELECT COUNT(*) FROM clientes  WHERE tenant_id = @tenant AND es_ejemplo = 1)       AS ejemplo,
-         (SELECT COALESCE(MAX(arranque_oculto), 0) FROM configuracion WHERE tenant_id = @tenant) AS oculto`
+         (SELECT COALESCE(MAX(arranque_oculto), 0) FROM configuracion WHERE tenant_id = @tenant) AS oculto,
+         (SELECT COALESCE(MAX(visible_buscador), 0) FROM configuracion WHERE tenant_id = @tenant) AS visible,
+         (SELECT COUNT(*) FROM sucursales WHERE tenant_id = @tenant AND activa = 1
+            AND provincia IS NOT NULL AND canton IS NOT NULL) AS ubicadas`
     );
 
     const pasos = {
@@ -57,6 +61,7 @@ router.get('/arranque', async (req, res) => {
       equipo: Number(p.usuarios) > 1,   // el admin que registró el taller ya cuenta como uno
       orden:  Number(p.ordenes) > 0,
       portal: Number(p.con_portal) > 0,
+      buscador: Number(p.visible) === 1 && Number(p.ubicadas) > 0,
     };
     const completo = Object.values(pasos).every(Boolean);
 
@@ -907,12 +912,14 @@ router.post('/sucursales', async (req, res) => {
     if (tope) return res.status(402).json({ error: tope, tope: 'sucursales' });
 
     const [[{ orden }]] = await req.db.query('SELECT COALESCE(MAX(orden), 0) + 1 AS orden FROM sucursales WHERE tenant_id = @tenant');
+    const ubicacion = leerUbicacion(req.body.provincia, req.body.canton);
+    if (ubicacion.error) return invalido(res, 'canton', ubicacion.error);
     const [result] = await req.db.query(
-      'INSERT INTO sucursales (tenant_id, nombre, direccion, telefono, orden) VALUES (@tenant, ?, ?, ?, ?)',
-      [nombre, (req.body.direccion || '').trim() || null, (req.body.telefono || '').trim() || null, orden]
+      'INSERT INTO sucursales (tenant_id, nombre, direccion, telefono, provincia, canton, orden) VALUES (@tenant, ?, ?, ?, ?, ?, ?)',
+      [nombre, (req.body.direccion || '').trim() || null, (req.body.telefono || '').trim() || null, ubicacion.provincia, ubicacion.canton, orden]
     );
     clearSucursalesCache(req.db.tenantId);
-    const [[nueva]] = await req.db.query('SELECT id, nombre, direccion, telefono, activa, orden FROM sucursales WHERE tenant_id = @tenant AND id = ?', [result.insertId]);
+    const [[nueva]] = await req.db.query('SELECT id, nombre, direccion, telefono, provincia, canton, activa, orden FROM sucursales WHERE tenant_id = @tenant AND id = ?', [result.insertId]);
     res.status(201).json({ data: nueva, message: 'Sucursal creada' });
   } catch (err) {
     fail(res, err);
@@ -924,14 +931,37 @@ router.put('/sucursales/:id', async (req, res) => {
   try {
     const nombre = (req.body.nombre || '').trim();
     if (!nombre) return invalido(res, 'nombre', 'Falta el nombre de la sucursal');
+    // La ubicación solo se toca si vino.
+    const tocaUbicacion = req.body.provincia !== undefined || req.body.canton !== undefined;
+    const ubicacion = tocaUbicacion ? leerUbicacion(req.body.provincia, req.body.canton) : {};
+    if (ubicacion.error) return invalido(res, 'canton', ubicacion.error);
     const [result] = await req.db.query(
-      'UPDATE sucursales SET nombre = ?, direccion = ?, telefono = ? WHERE tenant_id = @tenant AND id = ?',
-      [nombre, (req.body.direccion || '').trim() || null, (req.body.telefono || '').trim() || null, req.params.id]
+      `UPDATE sucursales SET nombre = ?, direccion = ?, telefono = ?${tocaUbicacion ? ', provincia = ?, canton = ?' : ''} WHERE tenant_id = @tenant AND id = ?`,
+      [nombre, (req.body.direccion || '').trim() || null, (req.body.telefono || '').trim() || null,
+        ...(tocaUbicacion ? [ubicacion.provincia, ubicacion.canton] : []), req.params.id]
     );
     if (!result.affectedRows) return res.status(404).json({ error: 'Sucursal no encontrada' });
     clearSucursalesCache(req.db.tenantId);
-    const [[actualizada]] = await req.db.query('SELECT id, nombre, direccion, telefono, activa, orden FROM sucursales WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
+    const [[actualizada]] = await req.db.query('SELECT id, nombre, direccion, telefono, provincia, canton, activa, orden FROM sucursales WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     res.json({ data: actualizada, message: 'Sucursal actualizada' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// PATCH /api/admin/buscador — aparecer o no en el buscador público de talleres.
+router.patch('/buscador', async (req, res) => {
+  try {
+    const visible = req.body.visible === true;
+    if (visible) {
+      const [[{ n }]] = await req.db.query(
+        'SELECT COUNT(*) AS n FROM sucursales WHERE tenant_id = @tenant AND activa = 1 AND provincia IS NOT NULL AND canton IS NOT NULL'
+      );
+      if (!Number(n)) return res.status(400).json({ error: 'Primero completá la provincia y el cantón de al menos una sucursal' });
+    }
+    await req.db.query('UPDATE configuracion SET visible_buscador = ? WHERE id = 1 AND tenant_id = @tenant', [visible ? 1 : 0]);
+    clearCache(req.db.tenantId);
+    res.json({ data: { visible }, message: visible ? 'Tu taller ya aparece en el buscador' : 'Tu taller ya no aparece en el buscador' });
   } catch (err) {
     fail(res, err);
   }

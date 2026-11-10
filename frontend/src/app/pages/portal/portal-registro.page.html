@@ -11,6 +11,11 @@
           <a class="on" routerLink="/portal/registro" aria-current="page">Crear cuenta</a>
         </nav>
 
+        <p class="taller-elegido" *ngIf="paso === 1 && parte === 1">
+          Tu cuenta en <strong>{{ marca.rotuloPublico }}</strong>
+          <a *ngIf="puedeCambiarTaller" routerLink="/portal/buscar-taller">Cambiar de taller</a>
+        </p>
+
         <!-- Tres pasos cortos: tus datos, tu acceso y el código del correo. -->
         <header class="acceso-head">
           <div class="pasos" *ngIf="!google" role="img" [attr.aria-label]="'Paso ' + numeroPaso + ' de 3: ' + nombrePaso">
@@ -19,7 +24,7 @@
           </div>
           <h1>{{ google ? 'Termina tu cuenta' : paso === 2 ? 'Confirma tu correo' : parte === 1 ? 'Crea tu cuenta' : 'Elige cómo entrar' }}</h1>
           <p *ngIf="google">Entraste con Google como <strong>{{ google.email }}</strong>. Solo faltan tu teléfono y tu cédula.</p>
-          <p *ngIf="!google && paso === 1 && parte === 1">Con tu cuenta sigues el estado de tu moto y agendas tus citas.</p>
+          <p *ngIf="!google && paso === 1 && parte === 1">Con tu cuenta sigues el estado de tu vehículo y agendas tus citas.</p>
           <p *ngIf="paso === 1 && parte === 2">Con este correo y esta contraseña vas a entrar al portal.</p>
           <p *ngIf="paso === 2">Escribe el código que te llegó a <strong>{{ email }}</strong>.</p>
         </header>

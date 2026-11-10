@@ -238,6 +238,19 @@
 
     <!-- ── Sucursales (locales del taller) ── -->
     <div class="cfg-sedes" *ngIf="seccion === 'sucursales'">
+      <div class="cd cfg-sede cfg-buscador" *ngIf="config">
+        <div class="cfg-sede-cab">
+          <span class="cfg-sede-icono"><ion-icon name="search-outline"></ion-icon></span>
+          <span class="cfg-estado" [class.on]="visibleBuscador">{{ visibleBuscador ? 'Visible' : 'Oculto' }}</span>
+        </div>
+        <strong>Buscador de talleres</strong>
+        <p>Los clientes nuevos te encuentran por provincia, cantón o nombre. Se publican el nombre, el logo, los tipos de vehículo y la dirección y el teléfono de cada sucursal.</p>
+        <p *ngIf="sedesSinUbicacion"><strong>Para aparecer, completá la provincia y el cantón de al menos una sucursal.</strong></p>
+        <div class="cfg-sede-pie">
+          <button class="btn btn-sm" [ngClass]="visibleBuscador ? 'btn-ou' : 'btn-cr'" [disabled]="guardandoBuscador || (!visibleBuscador && sedesSinUbicacion)" (click)="cambiarBuscador()">{{ visibleBuscador ? 'Dejar de aparecer' : 'Aparecer en el buscador' }}</button>
+        </div>
+      </div>
+
       <div class="cd cfg-sede" *ngFor="let s of sucursales" [class.inactiva]="!activa(s)">
         <div class="cfg-sede-cab">
           <span class="cfg-sede-icono"><ion-icon name="location-outline"></ion-icon></span>
@@ -246,6 +259,8 @@
         <div class="fg"><label>Nombre</label><input [(ngModel)]="s.nombre" name="nombre" placeholder="Nombre"></div>
         <div class="fg"><label>Dirección</label><input [(ngModel)]="s.direccion" name="direccion" placeholder="Señas para llegar"></div>
         <div class="fg"><label>Teléfono</label><input [(ngModel)]="s.telefono" name="telefono" placeholder="+506 0000-0000"></div>
+        <div class="fg"><label>Provincia</label><select [(ngModel)]="s.provincia" name="provincia" (ngModelChange)="s.canton = ''"><option [ngValue]="null">Sin indicar</option><option *ngFor="let p of provincias" [ngValue]="p">{{ p }}</option></select></div>
+        <div class="fg"><label>Cantón</label><select [(ngModel)]="s.canton" name="canton" [disabled]="!s.provincia"><option [ngValue]="null">Sin indicar</option><option *ngFor="let c of cantonesDe(s.provincia)" [ngValue]="c">{{ c }}</option></select></div>
         <div class="cfg-sede-pie">
           <button class="btn btn-sm" [ngClass]="activa(s) ? 'btn-ou' : 'btn-cr'" (click)="toggleSucursal(s)">{{ activa(s) ? 'Desactivar' : 'Activar' }}</button>
           <button class="btn btn-cr btn-sm" (click)="guardarSucursal(s)">Guardar</button>
@@ -261,6 +276,8 @@
         <div class="fg"><label>Nombre</label><input [(ngModel)]="nuevaSucursal.nombre" name="nombre" placeholder="Ej.: Liberia"></div>
         <div class="fg"><label>Dirección (opcional)</label><input [(ngModel)]="nuevaSucursal.direccion" name="direccion" placeholder="Señas para llegar"></div>
         <div class="fg"><label>Teléfono (opcional)</label><input [(ngModel)]="nuevaSucursal.telefono" name="telefono" placeholder="+506 0000-0000"></div>
+        <div class="fg"><label>Provincia</label><select [(ngModel)]="nuevaSucursal.provincia" name="provincia" (ngModelChange)="nuevaSucursal.canton = ''"><option [ngValue]="''">Sin indicar</option><option *ngFor="let p of provincias" [ngValue]="p">{{ p }}</option></select></div>
+        <div class="fg"><label>Cantón</label><select [(ngModel)]="nuevaSucursal.canton" name="canton" [disabled]="!nuevaSucursal.provincia"><option [ngValue]="''">Sin indicar</option><option *ngFor="let c of cantonesDe(nuevaSucursal.provincia)" [ngValue]="c">{{ c }}</option></select></div>
         <div class="cfg-sede-pie">
           <button class="btn btn-cr btn-sm" [disabled]="guardandoSucursal" (click)="agregarSucursal()">Agregar sucursal</button>
         </div>

@@ -12,6 +12,7 @@ const { crearTaller, normalizarSlug, motivoSlugInvalido } = require('../utils/on
 const { fijarPlan } = require('../utils/estado-tenant');
 const { finDeTrial, limitesDe, precioDe, DIAS_TRIAL } = require('../utils/limites');
 const { TIPOS } = require('../utils/tipos-vehiculo');
+const { leerUbicacion } = require('../utils/ubicaciones');
 const { paraTenant } = require('../db/tenant-db');
 const { nuevoCodigo, VIGENCIA_MIN } = require('../utils/verificacion-usuario');
 const { enviarCodigoCorreoStaff } = require('../services/mailer');
@@ -113,6 +114,9 @@ router.post('/', antibot(), async (req, res) => {
       return res.status(400).json({ error: 'Elegí qué vehículos atiende el taller' });
     }
 
+    const ubicacion = leerUbicacion(req.body.provincia, req.body.canton);
+    if (ubicacion.error) return res.status(400).json({ error: ubicacion.error });
+
     // El slug se acepta explícito o se deriva del nombre del taller.
     const slug = normalizarSlug(req.body.slug || nombre);
     const motivo = motivoSlugInvalido(slug);
@@ -149,7 +153,8 @@ router.post('/', antibot(), async (req, res) => {
         password: admin.password,
         telefono: admin.telefono,
       },
-      sucursal,
+      sucursal: { ...(sucursal || {}), provincia: ubicacion.provincia, canton: ubicacion.canton },
+      visibleBuscador: req.body.visible_buscador === true,
       tipos: req.body.tipos,
       contacto,
       marca: {

@@ -3,6 +3,7 @@ import { Routes, RouterModule } from '@angular/router';
 import { PortalGuard } from '../../guards/portal.guard';
 import { PortalLoginPage } from './portal-login.page';
 import { PortalRegistroPage } from './portal-registro.page';
+import { PortalBuscarTallerPage } from './portal-buscar-taller.page';
 import { PortalRecuperarPage } from './portal-recuperar.page';
 import { PortalTabsPage } from './portal-tabs.page';
 import { PortalInicioPage } from './portal-inicio.page';
@@ -19,6 +20,7 @@ import { PortalNotificacionesPage } from './portal-notificaciones.page';
 const routes: Routes = [
   { path: 'login', component: PortalLoginPage },
   { path: 'registro', component: PortalRegistroPage },
+  { path: 'buscar-taller', component: PortalBuscarTallerPage },
   { path: 'recuperar', component: PortalRecuperarPage },
   { path: 'legal/:doc', component: PortalLegalPage },
   { path: 'cita/:id', component: PortalCitaDetallePage, canActivate: [PortalGuard] },

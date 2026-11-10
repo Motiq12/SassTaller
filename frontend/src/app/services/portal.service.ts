@@ -42,7 +42,8 @@ export class PortalService {
 
   // Textos que escribió el taller: aviso de bienvenida y condiciones (público).
   getTextos(): Observable<{ data: { bienvenida: { titulo: string; texto: string } } }> {
-    return this.http.get<{ data: any }>(`${environment.apiUrl}/marca/portal`);
+    const slug = this.taller.actual();
+    return this.http.get<{ data: any }>(`${environment.apiUrl}/marca/portal`, slug ? { params: { taller: slug } } : {});
   }
   // En nativo el token vive en el Keychain/Keystore (ver secure-store.util); acá solo
   // se cachea en memoria para lecturas síncronas (interceptor, guards). En web sigue
@@ -108,7 +109,7 @@ export class PortalService {
   // Ya NO abre sesión: crea la cuenta sin verificar y manda un código al correo.
   // El llamador sigue a verificarRegistro() para completar el ingreso.
   registro(data: { nombre: string; apellido: string; telefono: string; email: string; cedula?: string; password: string; website?: string; turnstileToken?: string }): Observable<{ data: { requiere_verificacion: boolean; email: string }; message: string }> {
-    return this.http.post<{ data: { requiere_verificacion: boolean; email: string }; message: string }>(`${this.url}/registro`, data);
+    return this.http.post<{ data: { requiere_verificacion: boolean; email: string }; message: string }>(`${this.url}/registro`, this.taller.conTaller(data));
   }
 
   // Paso 2 del registro: confirma el código de 6 dígitos y recién ahí entra (auto-login).

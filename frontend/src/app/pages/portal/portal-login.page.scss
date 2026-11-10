@@ -576,3 +576,13 @@ ion-item + .ayuda { margin: 0 0 12px; }
 
 /* Elegir taller: solo el nombre, centrado en su botón. */
 .camino { align-content: center; }
+
+/* En Crear cuenta: en qué taller se está registrando. */
+.taller-elegido {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0 0 4px;
+  font-size: 15px;
+  a { color: inherit; text-decoration: underline; font-weight: 600; }
+}

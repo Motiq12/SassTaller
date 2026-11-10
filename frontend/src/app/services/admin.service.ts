@@ -184,14 +184,19 @@ export class AdminService {
     return this.http.put<{ data: { foto: string | null }; message: string }>(`${this.url}/cuenta/foto`, { foto });
   }
 
+  // Aparecer o no en el buscador público de talleres.
+  setBuscador(visible: boolean): Observable<{ data: { visible: boolean }; message: string }> {
+    return this.http.patch<{ data: { visible: boolean }; message: string }>(`${this.url}/buscador`, { visible });
+  }
+
   // Sucursales (locales del taller).
   getSucursales(): Observable<{ data: any[] }> {
     return this.http.get<{ data: any[] }>(`${this.url}/sucursales`);
   }
-  createSucursal(payload: { nombre: string; direccion?: string; telefono?: string }): Observable<{ data: any; message: string }> {
+  createSucursal(payload: { nombre: string; direccion?: string; telefono?: string; provincia?: string; canton?: string }): Observable<{ data: any; message: string }> {
     return this.http.post<{ data: any; message: string }>(`${this.url}/sucursales`, payload);
   }
-  updateSucursal(id: number, payload: { nombre: string; direccion?: string; telefono?: string }): Observable<{ data: any; message: string }> {
+  updateSucursal(id: number, payload: { nombre: string; direccion?: string; telefono?: string; provincia?: string; canton?: string }): Observable<{ data: any; message: string }> {
     return this.http.put<{ data: any; message: string }>(`${this.url}/sucursales/${id}`, payload);
   }
   toggleSucursal(id: number, activa: boolean): Observable<{ message: string }> {

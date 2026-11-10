@@ -1,7 +1,8 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute } from '@angular/router';
 import { environment } from '../../../environments/environment';
+import { TallerService } from '../../services/taller.service';
 import { Documento, copiaDocumento, seccionDeTexto, mesYAnio } from '../../shared/textos-legales';
 import { MarcaService } from '../../services/marca.service';
 
@@ -15,7 +16,15 @@ import { MarcaService } from '../../services/marca.service';
 export class PortalLegalPage implements OnInit {
   doc: Documento | null = null;
 
+  private taller = inject(TallerService);
+
   constructor(private route: ActivatedRoute, private http: HttpClient, private marca: MarcaService) {}
+
+  // Estos textos son de un taller: sin saber cuál, quedan los de fábrica.
+  private get conTaller(): { params: { taller: string } } | null {
+    const slug = this.taller.actual();
+    return slug ? { params: { taller: slug } } : null;
+  }
 
   ngOnInit() {
     const key = this.route.snapshot.paramMap.get('doc') || 'terminos';
@@ -38,7 +47,9 @@ export class PortalLegalPage implements OnInit {
   // Las condiciones que escribió el taller (Configuración → Textos del portal). Sin
   // escribir, quedan las de fábrica.
   private ponerCondiciones() {
-    this.http.get<{ data: { condiciones: { titulo: string; texto: string }[]; condiciones_actualizado: string | null } }>(`${environment.apiUrl}/marca/portal`).subscribe({
+    const opciones = this.conTaller;
+    if (!opciones) return;
+    this.http.get<{ data: { condiciones: { titulo: string; texto: string }[]; condiciones_actualizado: string | null } }>(`${environment.apiUrl}/marca/portal`, opciones).subscribe({
       next: r => {
         const c = r.data?.condiciones || [];
         if (!c.length || !this.doc) return;
@@ -52,7 +63,9 @@ export class PortalLegalPage implements OnInit {
   // El contacto concreto (teléfono y correo) es el que el taller carga en
   // Configuración. Sin cargar, queda el mostrador de las sucursales.
   private ponerContacto() {
-    this.http.get<{ data: { nombre_taller: string; telefono: string; email: string } }>(`${environment.apiUrl}/marca/contacto`).subscribe({
+    const opciones = this.conTaller;
+    if (!opciones) return;
+    this.http.get<{ data: { nombre_taller: string; telefono: string; email: string } }>(`${environment.apiUrl}/marca/contacto`, opciones).subscribe({
       next: r => {
         const c = r.data;
         const canales = [c.telefono ? `al ${c.telefono}` : '', c.email ? `al correo ${c.email}` : ''].filter(Boolean);

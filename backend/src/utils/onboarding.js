@@ -115,8 +115,8 @@ async function crearTaller(conn, datos) {
        (tenant_id, id, nombre_taller, telefono, email, direccion,
         max_citas_hora, dias_anticipacion, duracion_cita_min, cancelacion_horas_min,
         horarios, garantia_dias, metodos_pago, visitas_para_cortesia, zona_horaria_offset,
-        tipos_vehiculo, logo, color_primario, razon_social, cedula_juridica)
-     VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        tipos_vehiculo, logo, color_primario, razon_social, cedula_juridica, visible_buscador)
+     VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       tenantId, nombre, contacto.telefono || '', contacto.email || admin.email, contacto.direccion || '',
       DEFAULTS.max_citas_hora, DEFAULTS.dias_anticipacion, DEFAULTS.duracion_cita_min,
@@ -125,6 +125,7 @@ async function crearTaller(conn, datos) {
       DEFAULTS.visitas_para_cortesia, DEFAULTS.zona_horaria_offset,
       JSON.stringify(tipos),
       marca.logo || null, marca.color || null, marca.razonSocial || null, marca.cedulaJuridica || null,
+      datos.visibleBuscador ? 1 : 0,
     ]
   );
 
@@ -139,8 +140,8 @@ async function crearTaller(conn, datos) {
   // 3) Primera sucursal. El sistema asume que hay al menos una: sin ella el portal
   //    no puede ofrecer dónde agendar.
   await conn.query(
-    'INSERT INTO sucursales (tenant_id, nombre, direccion, telefono, activa, orden) VALUES (?, ?, ?, ?, 1, 1)',
-    [tenantId, sucursal?.nombre || nombre, sucursal?.direccion || contacto.direccion || null, sucursal?.telefono || contacto.telefono || null]
+    'INSERT INTO sucursales (tenant_id, nombre, direccion, telefono, provincia, canton, activa, orden) VALUES (?, ?, ?, ?, ?, ?, 1, 1)',
+    [tenantId, sucursal?.nombre || nombre, sucursal?.direccion || contacto.direccion || null, sucursal?.telefono || contacto.telefono || null, sucursal?.provincia || null, sucursal?.canton || null]
   );
 
   // 4) Catálogo de servicios inicial según lo que atiende, editable desde el panel.

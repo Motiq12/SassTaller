@@ -189,6 +189,9 @@ export class TallerService {
     nombre: string;
     slug?: string;
     tipos: string[];
+    provincia?: string;
+    canton?: string;
+    visible_buscador?: boolean;
     logo?: string | null;
     color_primario?: string | null;
     razon_social?: string;

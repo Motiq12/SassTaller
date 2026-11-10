@@ -234,7 +234,7 @@ label, legend {
 }
 .opcional { font-weight: 500; color: $suave; }
 
-input:not([type='checkbox']) {
+input:not([type='checkbox']), select {
   width: 100%;
   min-height: 54px;
   padding: 12px 16px;

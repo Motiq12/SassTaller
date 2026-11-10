@@ -1,0 +1,81 @@
+<ion-content class="acceso-content" [class.es-producto]="marca.esProducto">
+  <div class="acceso">
+    <app-acceso-marca></app-acceso-marca>
+
+    <main class="acceso-panel">
+      <div class="acceso-caja">
+        <nav class="pits-tabs" aria-label="Tu cuenta">
+          <a routerLink="/portal/login">Entrar</a>
+          <a class="on" routerLink="/portal/buscar-taller" aria-current="page">Crear cuenta</a>
+        </nav>
+
+        <header class="acceso-head">
+          <h1>Buscá tu taller</h1>
+          <p>Elegilo una vez para crear tu cuenta. Después entrás solo con tu correo y tu contraseña.</p>
+        </header>
+
+        <form class="buscador" (ngSubmit)="buscar()" novalidate>
+          <div class="campo">
+            <label for="b-provincia">Provincia</label>
+            <select id="b-provincia" [(ngModel)]="provincia" name="provincia" (ngModelChange)="cambiarProvincia()">
+              <option value="">Todas</option>
+              <option *ngFor="let p of provincias" [value]="p">{{ p }}</option>
+            </select>
+          </div>
+          <div class="campo">
+            <label for="b-canton">Cantón</label>
+            <select id="b-canton" [(ngModel)]="canton" name="canton" [disabled]="!provincia">
+              <option value="">Todos</option>
+              <option *ngFor="let c of cantones" [value]="c">{{ c }}</option>
+            </select>
+          </div>
+          <div class="campo ancho">
+            <label for="b-nombre">Nombre del taller <span class="opcional">(opcional)</span></label>
+            <input id="b-nombre" [(ngModel)]="q" name="q" maxlength="60" autocomplete="off" placeholder="Taller Los Andes" />
+          </div>
+          <button type="submit" class="buscar" [disabled]="!puedeBuscar || buscando">
+            {{ buscando ? 'Buscando…' : 'Buscar' }}
+          </button>
+        </form>
+
+        <p class="aviso-error" *ngIf="error" role="alert">{{ error }}</p>
+
+        <div aria-live="polite">
+          <p class="cuenta" *ngIf="buscado && resultados.length">
+            {{ resultados.length }} {{ resultados.length === 1 ? 'taller' : 'talleres' }}
+          </p>
+
+          <ul class="resultados" *ngIf="resultados.length">
+            <li class="resultado" *ngFor="let t of resultados">
+              <div class="cabeza">
+                <span class="sello" [style.background]="logo(t) ? '#fff' : (t.color || '#27272a')">
+                  <img *ngIf="logo(t) as src; else siglas" [src]="src" alt="" (error)="sinLogo.add(t.slug)" />
+                  <ng-template #siglas>{{ iniciales(t.nombre) }}</ng-template>
+                </span>
+                <div class="datos">
+                  <h2>{{ t.nombre }}</h2>
+                  <p class="tipos">{{ t.tipos.join(' · ') }}</p>
+                </div>
+              </div>
+              <ul class="sedes">
+                <li *ngFor="let s of t.sucursales">
+                  <strong>{{ s.canton }}, {{ s.provincia }}</strong>
+                  <span *ngIf="s.direccion">{{ s.direccion }}</span>
+                  <a *ngIf="s.telefono" [href]="'tel:' + s.telefono">{{ s.telefono }}</a>
+                </li>
+              </ul>
+              <button type="button" class="elegir" (click)="elegir(t)">Elegir este taller</button>
+            </li>
+          </ul>
+
+          <div class="vacio" *ngIf="buscado && !resultados.length && !error">
+            <strong>No encontramos talleres con esa búsqueda</strong>
+            <p>Probá con otro cantón, o pedile a tu taller el enlace de su portal.</p>
+          </div>
+        </div>
+      </div>
+
+      <p class="acceso-empresa">¿Tenés un taller? <a routerLink="/registro-taller">Registrá tu empresa</a></p>
+    </main>
+  </div>
+</ion-content>

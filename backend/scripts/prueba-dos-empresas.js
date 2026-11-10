@@ -297,6 +297,39 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     const sinTaller = await pedir('GET', '/portal/servicios');
     ok(sinTaller.status >= 400, 'el portal sin decir de qué taller no responde datos', sinTaller.status);
 
+    // ── Buscador público ──
+    const conZona = await alta(`delta-${sello}`, `delta-${sello}@prueba.test`, { provincia: 'Guanacaste', canton: 'Liberia', visible_buscador: true, logo: LOGO });
+    ok(conZona.status === 201, 'se registra una empresa con ubicación', conZona.json);
+    // B tiene ubicación pero no pidió aparecer. (El alta admite 3 por minuto: se reusa B.)
+    const zonaB = await pedir('PUT', `/admin/sucursales/${sb.id}`, { token: Bb.token, body: { nombre: 'Sede B', provincia: 'Guanacaste', canton: 'Liberia' } });
+    ok(zonaB.status === 200 && zonaB.json.data.canton === 'Liberia', 'B guarda la ubicación de su sucursal', zonaB.json);
+    const zonaMala = await pedir('PUT', `/admin/sucursales/${sb.id}`, { token: Bb.token, body: { nombre: 'Sede B', provincia: 'Guanacaste', canton: 'Escazú' } });
+    ok(zonaMala.status === 400, 'un cantón de otra provincia se rechaza', zonaMala.json);
+    const halladas = await pedir('GET', '/directorio/talleres?provincia=Guanacaste&canton=Liberia');
+    const slugs = (halladas.json.data || []).map((t) => t.slug);
+    ok(halladas.status === 200 && slugs.includes(`delta-${sello}`), 'la empresa visible aparece en su cantón', halladas.json);
+    ok(!slugs.includes(Bb.slug), 'la que no quiso aparecer no sale, aunque tenga ubicación', slugs);
+    ok(!slugs.includes(A.slug), 'la que no indicó ubicación no sale', slugs);
+    const publico = JSON.stringify(halladas.json);
+    ok(!/prueba\.test|password|tenant_id|base64/.test(publico), 'el buscador solo devuelve datos públicos', publico.slice(0, 200));
+    const otraZona = await pedir('GET', '/directorio/talleres?provincia=Lim%C3%B3n');
+    ok(otraZona.status === 200 && !(otraZona.json.data || []).some((t) => t.slug === `delta-${sello}`), 'no aparece en otra provincia');
+    const sinFiltro = await pedir('GET', '/directorio/talleres');
+    ok(sinFiltro.status === 400, 'no se puede descargar el directorio sin filtrar', sinFiltro.status);
+    const porNombre = await pedir('GET', `/directorio/talleres?q=${encodeURIComponent('delta-' + sello)}`);
+    ok(porNombre.status === 200 && porNombre.json.data.length === 1, 'se encuentra por nombre', porNombre.json);
+    const comodin = await pedir('GET', '/directorio/talleres?q=%25%25');
+    ok(comodin.status === 200 && comodin.json.data.length === 0, 'un % no trae todos los talleres', comodin.json);
+
+    const sinZona = await pedir('PATCH', '/admin/buscador', { token: A.token, body: { visible: true } });
+    ok(sinZona.status === 400, 'sin ubicación no se puede activar', sinZona.json);
+    const activar = await pedir('PATCH', '/admin/buscador', { token: Bb.token, body: { visible: true } });
+    const conB = await pedir('GET', '/directorio/talleres?provincia=Guanacaste&canton=Liberia');
+    ok(activar.status === 200 && conB.json.data.some((t) => t.slug === Bb.slug), 'al activarlo aparece', conB.json);
+    await pedir('PATCH', '/admin/buscador', { token: Bb.token, body: { visible: false } });
+    const sinB = await pedir('GET', '/directorio/talleres?provincia=Guanacaste&canton=Liberia');
+    ok(!sinB.json.data.some((t) => t.slug === Bb.slug), 'al desactivarlo desaparece', sinB.json);
+
     // ── Roles ──
     const rolesA = await pedir('GET', '/admin/roles', { token: A.token });
     const rolesB = await pedir('GET', '/admin/roles', { token: Bb.token });

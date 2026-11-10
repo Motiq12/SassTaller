@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { AdminService } from '../services/admin.service';
 import { ToastService } from '../services/toast.service';
 
-interface Pasos { marca: boolean; equipo: boolean; orden: boolean; portal: boolean; }
+interface Pasos { marca: boolean; equipo: boolean; orden: boolean; portal: boolean; buscador: boolean; }
 
 /**
  * Los primeros pasos de un taller que acaba de registrarse.
@@ -105,6 +105,7 @@ export class ArranqueComponent implements OnInit {
     { clave: 'equipo', titulo: 'Sumá a tu equipo',          ayuda: 'Cada mecánico con su usuario y su agenda.', accion: 'Agregar',    ruta: '/admin/empleados' },
     { clave: 'orden',  titulo: 'Registrá tu primera orden', ayuda: 'El siguiente vehículo que entre al taller.', accion: 'Crear',     ruta: '/nueva-orden' },
     { clave: 'portal', titulo: 'Dale el portal a un cliente', ayuda: 'Que vea el avance sin llamar por teléfono.', accion: 'Ver cómo', ruta: '/admin/portal' },
+    { clave: 'buscador', titulo: 'Aparecé en el buscador', ayuda: 'Completá tu provincia y cantón para que te encuentren.', accion: 'Completar', ruta: '/admin/config/sucursales' },
   ];
 
   ngOnInit(): void { this.cargar(); }

@@ -1,6 +1,7 @@
 import { Component, ElementRef, ViewChild, inject } from '@angular/core';
 import { Subject, debounceTime, switchMap, catchError, of } from 'rxjs';
 import { TallerService, TipoVehiculo } from '../../services/taller.service';
+import { DirectorioService, Ubicaciones } from '../../services/directorio.service';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { PRODUCTO } from '../../shared/producto';
@@ -28,6 +29,7 @@ export class RegistroTallerPage {
   private taller = inject(TallerService);
   private auth = inject(AuthService);
   private toast = inject(ToastService);
+  private directorio = inject(DirectorioService);
 
   /** 1: el taller · 2: la cuenta del dueño · 3: creado. */
   paso: 1 | 2 | 3 = 1;
@@ -55,6 +57,14 @@ export class RegistroTallerPage {
   errorLogo = '';
   color = '#e11d48';
   readonly colores = ['#e11d48', '#c2410c', '#a16207', '#15803d', '#0f766e', '#1d4ed8', '#6d28d9', '#27272a'];
+
+  // Dónde queda, y si quiere salir en el buscador público de talleres.
+  ubicaciones: Ubicaciones = {};
+  provincia = '';
+  canton = '';
+  visibleBuscador = true;
+  get provincias(): string[] { return Object.keys(this.ubicaciones); }
+  get cantones(): string[] { return this.ubicaciones[this.provincia] || []; }
 
   // Para sus facturas. Opcional.
   razonSocial = '';
@@ -118,13 +128,14 @@ export class RegistroTallerPage {
   }
 
   get paso1Listo(): boolean {
-    return !!this.nombre.trim() && this.disponible === true && this.tiposElegidos.length > 0;
+    return !!this.provincia && !!this.canton && !!this.nombre.trim() && this.disponible === true && this.tiposElegidos.length > 0;
   }
 
   /** Qué falta para pasar al paso 2, en una línea. */
   get faltaPaso1(): string {
     if (!this.nombre.trim()) return 'Falta el nombre del taller.';
     if (!this.tiposElegidos.length) return 'Elegí qué vehículos atiende.';
+    if (!this.provincia || !this.canton) return 'Elegí la provincia y el cantón.';
     if (this.verificando) return 'Verificando el identificador…';
     if (this.disponible !== true) return 'Elegí un identificador disponible.';
     return '';
@@ -181,6 +192,7 @@ export class RegistroTallerPage {
    * seguía sin catálogo y el servidor ponía 'moto' en silencio.
    */
   cargarTipos(): void {
+    this.directorio.ubicaciones().subscribe({ next: r => { this.ubicaciones = r.data; }, error: () => {} });
     this.cargandoTipos = true;
     this.taller.tipos().subscribe({
       next: res => {
@@ -299,6 +311,9 @@ export class RegistroTallerPage {
       nombre: this.nombre.trim(),
       slug: this.slug,
       tipos: this.tiposElegidos,
+      provincia: this.provincia,
+      canton: this.canton,
+      visible_buscador: this.visibleBuscador,
       logo: this.logo,
       color_primario: this.color,
       razon_social: this.razonSocial.trim(),

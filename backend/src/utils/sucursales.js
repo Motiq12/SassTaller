@@ -13,7 +13,7 @@ async function getSucursales(db, { soloActivas = false } = {}) {
   if (!guardado || Date.now() - guardado.at >= TTL_MS) {
     try {
       const [rows] = await db.query(
-        `SELECT id, nombre, direccion, telefono, activa, orden FROM sucursales
+        `SELECT id, nombre, direccion, telefono, provincia, canton, activa, orden FROM sucursales
          WHERE tenant_id = @tenant ORDER BY orden, id`
       );
       guardado = { filas: rows, at: Date.now() };

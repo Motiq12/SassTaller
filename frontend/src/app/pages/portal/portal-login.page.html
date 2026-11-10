@@ -39,9 +39,9 @@
         <ng-container *ngIf="!paso2fa">
           <!-- Un solo login: con el correo y la contraseña el sistema sabe quién entra y lo
                manda a su panel, sea dueño, recepción, mecánico o cliente. -->
-          <nav class="pits-tabs" aria-label="Tu cuenta" *ngIf="conTaller && !opciones.length">
+          <nav class="pits-tabs" aria-label="Tu cuenta" *ngIf="!opciones.length">
             <a class="on" routerLink="/portal/login" aria-current="page">Entrar</a>
-            <a routerLink="/portal/registro">Crear cuenta</a>
+            <a [routerLink]="conTaller ? '/portal/registro' : '/portal/buscar-taller'">Crear cuenta</a>
           </nav>
 
           <ng-container *ngIf="opciones.length">

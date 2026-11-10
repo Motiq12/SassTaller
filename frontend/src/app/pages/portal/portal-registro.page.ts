@@ -7,6 +7,7 @@ import { PortalService, RespuestaGoogle } from '../../services/portal.service';
 import { emailValido } from '../../utils/validar';
 import { marcarCampo } from '../../shared/errores';
 import { MarcaService } from '../../services/marca.service';
+import { TallerService } from '../../services/taller.service';
 import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../shared/turnstile.util';
 
 @Component({
@@ -19,6 +20,9 @@ export class PortalRegistroPage implements OnInit, AfterViewInit, OnDestroy {
   private destroy$ = new Subject<void>();
   /** Sin taller, la pantalla se viste de Motiq (theme/acceso-producto.scss). */
   readonly marca = inject(MarcaService);
+  private taller = inject(TallerService);
+  /** Se puede cambiar de taller, salvo en el subdominio de uno. */
+  get puedeCambiarTaller(): boolean { return !this.taller.deSubdominio(); }
   nombre = '';
   apellido = '';
   telefono = '';
@@ -62,6 +66,11 @@ export class PortalRegistroPage implements OnInit, AfterViewInit, OnDestroy {
     if (desdeEntrar?.requiere_datos) this.usarPaseGoogle(desdeEntrar);
 
     const qp = this.route.snapshot.queryParamMap;
+    // Sin taller no se puede crear la cuenta: primero hay que elegirlo.
+    if (!this.taller.actual() && qp.get('verificar') !== '1' && !desdeEntrar?.requiere_datos) {
+      this.router.navigate(['/portal/buscar-taller'], { replaceUrl: true });
+      return;
+    }
     if (qp.get('verificar') === '1' && qp.get('email')) {
       this.email = qp.get('email')!;
       this.paso = 2;

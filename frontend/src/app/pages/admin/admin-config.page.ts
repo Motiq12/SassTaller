@@ -1,9 +1,10 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { AlertController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { AdminService, EstadoCorreo, EstadoRespaldos } from '../../services/admin.service';
+import { DirectorioService, Ubicaciones } from '../../services/directorio.service';
 import { MarcaService } from '../../services/marca.service';
 import { PLANTILLAS_WA, PlantillaWa, NOMBRE_DATO, DatosMensaje, rellenar } from '../../shared/whatsapp.util';
 import { DOCS_LEGALES, mesYAnio } from '../../shared/textos-legales';
@@ -25,7 +26,24 @@ export class AdminConfigPage implements OnInit, OnDestroy {
 
   // Sucursales (locales del taller).
   sucursales: any[] = [];
-  nuevaSucursal = { nombre: '', direccion: '', telefono: '' };
+  nuevaSucursal = { nombre: '', direccion: '', telefono: '', provincia: '', canton: '' };
+  ubicaciones: Ubicaciones = {};
+  private directorio = inject(DirectorioService);
+  guardandoBuscador = false;
+  get provincias(): string[] { return Object.keys(this.ubicaciones); }
+  cantonesDe(provincia: string | null | undefined): string[] { return this.ubicaciones[provincia || ''] || []; }
+  /** Sin ubicación no se puede aparecer: el buscador filtra por zona. */
+  get sedesSinUbicacion(): boolean { return !this.sucursales.some(s => this.activa(s) && s.provincia && s.canton); }
+  get visibleBuscador(): boolean { return Number(this.config?.visible_buscador) === 1; }
+
+  cambiarBuscador() {
+    const visible = !this.visibleBuscador;
+    this.guardandoBuscador = true;
+    this.admin.setBuscador(visible).pipe(takeUntil(this.destroy$)).subscribe({
+      next: r => { this.config.visible_buscador = visible ? 1 : 0; this.guardandoBuscador = false; this.aviso(r.message); },
+      error: () => { this.guardandoBuscador = false; },
+    });
+  }
   guardandoSucursal = false;
 
   // Qué parte de la configuración se muestra (la elige el menú: /admin/config/:seccion).
@@ -152,6 +170,7 @@ export class AdminConfigPage implements OnInit, OnDestroy {
     });
     this.cargar();
     this.cargarSucursales();
+    this.directorio.ubicaciones().pipe(takeUntil(this.destroy$)).subscribe({ next: r => this.ubicaciones = r.data });
     this.cargarBloqueos();
     this.cargarFeriados();
   }
@@ -530,10 +549,12 @@ export class AdminConfigPage implements OnInit, OnDestroy {
       nombre,
       direccion: this.nuevaSucursal.direccion.trim() || undefined,
       telefono: this.nuevaSucursal.telefono.trim() || undefined,
+      provincia: this.nuevaSucursal.provincia,
+      canton: this.nuevaSucursal.canton,
     }).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
         this.guardandoSucursal = false;
-        this.nuevaSucursal = { nombre: '', direccion: '', telefono: '' };
+        this.nuevaSucursal = { nombre: '', direccion: '', telefono: '', provincia: '', canton: '' };
         this.cargarSucursales();
         this.aviso('Sucursal creada');
       },
@@ -543,7 +564,7 @@ export class AdminConfigPage implements OnInit, OnDestroy {
 
   guardarSucursal(s: any) {
     if (!s.nombre?.trim()) { this.aviso('La sucursal necesita un nombre', 'warning'); return; }
-    this.admin.updateSucursal(s.id, { nombre: s.nombre.trim(), direccion: s.direccion?.trim() || undefined, telefono: s.telefono?.trim() || undefined }).pipe(takeUntil(this.destroy$)).subscribe({
+    this.admin.updateSucursal(s.id, { nombre: s.nombre.trim(), direccion: s.direccion?.trim() || undefined, telefono: s.telefono?.trim() || undefined, provincia: s.provincia || '', canton: s.canton || '' }).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => this.aviso('Sucursal actualizada'),
       error: (e) => this.aviso(e.error?.error || 'No se pudo guardar', 'danger'),
     });

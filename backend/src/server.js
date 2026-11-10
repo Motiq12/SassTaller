@@ -148,6 +148,7 @@ app.use('/api/avisos',     require('./routes/avisos.routes'));      // avisos de
 app.use('/api/reportes',   require('./routes/reportes.routes'));    // reportes de falla hacia la plataforma
 app.use('/api/vehiculos',  require('./routes/vehiculos.routes'));   // reemplaza a /api/motos
 app.use('/api/marca',     require('./routes/marca.routes'));
+app.use('/api/directorio', require('./routes/directorio.routes')); // buscador público de talleres
 app.use('/api/clientes',  require('./routes/clientes.routes'));
 app.use('/api/ordenes',   require('./routes/ordenes.routes'));
 app.use('/api/citas',     require('./routes/citas.routes'));

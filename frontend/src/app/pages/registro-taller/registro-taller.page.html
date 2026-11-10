@@ -107,6 +107,31 @@
                 <input id="f-dir" [(ngModel)]="direccion" name="direccion" placeholder="Liberia, Guanacaste" />
               </div>
             </div>
+          
+            <div class="par">
+              <div class="campo">
+                <label for="f-provincia">Provincia</label>
+                <select id="f-provincia" [(ngModel)]="provincia" name="provincia" (ngModelChange)="canton = ''" required>
+                  <option value="">Elegí una</option>
+                  <option *ngFor="let p of provincias" [value]="p">{{ p }}</option>
+                </select>
+              </div>
+              <div class="campo">
+                <label for="f-canton">Cantón</label>
+                <select id="f-canton" [(ngModel)]="canton" name="canton" [disabled]="!provincia" required>
+                  <option value="">Elegí uno</option>
+                  <option *ngFor="let c of cantones" [value]="c">{{ c }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="opciones">
+              <label class="tipo" [class.marcado]="visibleBuscador">
+                <input type="checkbox" [(ngModel)]="visibleBuscador" name="visibleBuscador" />
+                <span>Mostrar mi taller en el buscador</span>
+              </label>
+            </div>
+            <p class="ayuda">Tus clientes te encuentran por zona. Se publican el nombre, el logo, la dirección y el teléfono. Podés cambiarlo cuando quieras.</p>
           </section>
 
           <section class="grupo" aria-labelledby="g-marca">
