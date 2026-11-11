@@ -290,7 +290,8 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     // ── Errores y cuerpos enormes ──
     const malFormada = await fetch(url.slice(0, -4) + '/%E0%A4%A');
     const cuerpoError = await malFormada.text();
-    ok(malFormada.status === 400 && !/node_modules|URIError|\.js:\d/.test(cuerpoError), 'una dirección mal formada no muestra la traza del servidor', cuerpoError.slice(0, 120));
+    // 400 con la app servida desde acá; 404 si este servidor no sirve el frontend (CI).
+    ok([400, 404].includes(malFormada.status) && !/node_modules|URIError|\.js:\d/.test(cuerpoError), 'una dirección mal formada no muestra la traza del servidor', cuerpoError.slice(0, 120));
     const enorme = await pedir('POST', '/auth/login', { body: { email: 'a@b.co', password: 'x'.repeat(300 * 1024) } });
     ok(enorme.status === 413, 'el login rechaza un cuerpo de 300 KB', enorme.status);
 
