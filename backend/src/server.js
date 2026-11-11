@@ -118,6 +118,16 @@ app.use(cors((req, cb) => {
   cb(null, { origin: (origin, cb2) => cb2(null, !origin || ORIGENES_PERMITIDOS.has(origin)) });
 }));
 
+// Las rutas de entrada (login, códigos, recuperación, contacto) no llevan sesión y solo
+// reciben un correo y una clave. Con el tope general de 10 MB, cualquiera podía hacer
+// que el servidor leyera megas por pedido sin haberse identificado.
+const CUERPO_CHICO = [
+  '/api/auth/login', '/api/auth/2fa', '/api/auth/recuperar',
+  '/api/portal/login', '/api/portal/registro', '/api/portal/recuperar', '/api/portal/otp', '/api/portal/google',
+  '/api/motiq/login', '/api/motiq/contacto', '/api/metricas',
+];
+app.use(CUERPO_CHICO, express.json({ limit: '50kb' }));
+// El resto admite fotos en base64 (cada ruta valida tipo y tamaño de la suya).
 app.use(express.json({ limit: '10mb' }));
 
 // Health check exento del rate limiting (lo sondea la plataforma con frecuencia).
@@ -205,6 +215,17 @@ if (hasFrontend) {
 } else {
   console.log('⚡ Modo desarrollo: frontend en http://localhost:8100');
 }
+
+// Lo que falle fuera de /api (una dirección mal formada, un archivo que no se pudo
+// leer). Sin esto respondía Express, que fuera de NODE_ENV=production devuelve la traza
+// con las rutas internas del servidor. Acá nunca sale más que una línea.
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  const estado = err.status >= 400 && err.status < 500 ? err.status : 500;
+  if (estado === 500) console.error('Error fuera de la API:', err.stack || err.message || err);
+  res.status(estado).type('text/plain').send(estado === 500 ? 'Error del servidor' : 'Solicitud no válida');
+});
 
 const PORT = process.env.PORT || 3000;
 
