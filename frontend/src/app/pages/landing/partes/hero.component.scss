@@ -2,9 +2,9 @@
 
 :host { display: block; }
 
-// La portada: una tarjeta negra redondeada dentro del marco blanco de la página. El
-// disco de freno hace de foto; arriba la barra, el titular gigante, y abajo el lema,
-// la acción y dos tarjetas de vidrio.
+// La portada: una tarjeta negra redondeada dentro del marco blanco de la página. Un
+// taller de fondo (fotograma fijo, y video en escritorio); arriba la barra, el titular
+// gigante, y abajo el lema, la acción y dos tarjetas de vidrio.
 .hero {
   position: relative;
   isolation: isolate;
@@ -22,36 +22,33 @@
 // El foco de teclado, igual para todos los enlaces y botones de la portada.
 .hero :is(a, button):focus-visible { outline: 2px solid $carmesi-claro; outline-offset: 3px; }
 
-// ── El disco ─────────────────────────────────────────────────────────────────────
+// ── El fondo ─────────────────────────────────────────────────────────────────────
 .escena { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
 
-// Imagen fija: lo primero que se ve, y lo único sin 3D. Mismo encuadre que el 3D.
-.foto {
-  position: absolute;
-  left: var(--disco-cx, 64%);
-  top: var(--disco-cy, 57%);
-  width: calc(var(--disco-d, 60vh) * 1.3);
-  height: auto;
-  max-width: none;
-  transform: translate(-50%, -50%);
-  transition: opacity 0.3s $quart;
-  &.con3d { opacity: 0; transition-delay: 0.6s; }
-}
-.lienzo {
+// Fotograma y video ocupan toda la tarjeta, con el mismo encuadre: el auto y la moto
+// a la derecha, el texto sobre la parte oscura de la izquierda.
+.foto, .video {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  opacity: 0;
-  transition: opacity 0.6s $quart;
-  &.listo { opacity: 1; }
+  object-fit: cover;
+  object-position: 62% 50%;
 }
-// Un velo de arriba hacia abajo, como el de la foto de Baseline: el titular y el texto
-// de abajo se leen siempre, pase lo que pase detrás.
+// El fotograma se asienta al entrar; cuando el video tiene cuadro, se cruzan en un fundido.
+.foto { animation: asentar 2.4s $expo both; }
+.foto, .video { transition: opacity 0.9s ease; }
+.foto.detras, .video { opacity: 0; }
+.video.listo { opacity: 1; }
+@keyframes asentar { from { transform: scale(1.08); } to { transform: none; } }
+// El velo: oscurece arriba (barra y titular) y abajo (texto y acciones), y de
+// izquierda a derecha en escritorio, donde va el texto.
 .velo {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, rgba(10, 10, 10, 0.55), rgba(10, 10, 10, 0) 38%, rgba(10, 10, 10, 0) 58%, rgba(10, 10, 10, 0.8));
+  background:
+    linear-gradient(#0a0a0ab3, #0a0a0a1a 34%, #0a0a0a40 60%, #0a0a0aeb),
+    linear-gradient(to right, #0a0a0abf, #0a0a0a00 60%);
 }
 
 // ── Barra ────────────────────────────────────────────────────────────────────────
@@ -122,7 +119,6 @@
   border-radius: $r-pildora;
   background: blanco(0.15);
   backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   cursor: pointer;
   transition: background-color 0.2s $quart;
   span { display: block; width: 16px; height: 1.5px; background: #fff; }
@@ -134,7 +130,7 @@
 .titulo {
   margin: 0;
   font-family: $fd;
-  font-size: 15vw;
+  font-size: 13.5vw;
   font-weight: 600;
   line-height: 0.86;
   letter-spacing: -0.03em;
@@ -243,9 +239,8 @@
   padding: u(0.75);
   opacity: 0;
   transform: translateY(u(1)) scale(0.96);
-  transition: opacity 0.5s $quart, transform 0.6s $expo;
+  transition: opacity 0.5s ease, transform 0.6s $expo;
   &.activo { opacity: 1; transform: none; }
-  @media (prefers-reduced-motion: reduce) { transition: none; }
 }
 .sello {
   display: grid;
@@ -265,7 +260,7 @@
 .titulo-m { font-size: max(13px, #{u(0.8)}); color: blanco(0.85); }
 .nota { font-size: max(12px, #{u(0.7)}); color: blanco(0.65); }
 .pie-momentos { display: flex; align-items: center; justify-content: space-between; gap: u(0.5); }
-.ejemplo { font-size: max(11px, #{u(0.65)}); color: blanco(0.6); letter-spacing: 0.04em; }
+.ejemplo { font-size: max(11px, #{u(0.65)}); color: blanco(0.6); }
 .puntos { @include puntos(claro); }
 
 .prueba {
@@ -292,4 +287,13 @@
   object-fit: cover;
   border-radius: $r-xl;
   background: $noche-2;
+}
+
+// En el teléfono la portada lleva solo titular, una frase y la acción: el lema, la
+// cola de vehículos y las tarjetas de vidrio quedan para pantallas más anchas.
+// Y crece si no le alcanza la pantalla: nunca recorta la acción.
+@media (prefers-reduced-motion: reduce) { .foto, .momento { animation: none; transition: none; } }
+@media (max-width: 639px) {
+  .hero { height: auto; min-height: max(calc(100svh - 1rem), 560px); }
+  .lema, .solo-ancho, .racimo { display: none; }
 }
