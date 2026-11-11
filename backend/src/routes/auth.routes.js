@@ -11,7 +11,7 @@ const auth = require('../middleware/auth');
 const { emailValido } = require('../utils/validar');
 const { consumir } = require('../utils/rate-limit');
 const { resumenCuenta } = require('../utils/cuenta');
-const { nuevoCodigo, canjear, VIGENCIA_MIN } = require('../utils/verificacion-usuario');
+const { nuevoCodigo, canjear, codigoDeSeisDigitos, VIGENCIA_MIN } = require('../utils/verificacion-usuario');
 const { enviarCodigoCorreoStaff, enviarCodigoReset } = require('../services/mailer');
 const { antibot } = require('../utils/antibot');
 const totp = require('../utils/totp');
@@ -112,11 +112,16 @@ router.post('/login', async (req, res) => {
     // (mismo correo en talleres distintos), así que se resuelve por contraseña: se
     // compara contra todos y se acepta si coincide en UNO. Desambiguar recién
     // después de validar evita revelar en qué talleres existe un correo.
+    //
+    // El correo se compara sin mayúsculas ni espacios, igual que en la recuperación de
+    // contraseña: quien se registró como "Ana@Correo.com" entra escribiendo
+    // "ana@correo.com", y al revés. Si no, podía cambiar la contraseña y no poder entrar.
+    const correo = String(email).trim().toLowerCase();
     const [candidatos] = await pool.query(
       tenantId
-        ? 'SELECT * FROM usuarios WHERE email = ? AND activo = 1 AND tenant_id = ?'
-        : 'SELECT * FROM usuarios WHERE email = ? AND activo = 1',
-      tenantId ? [email, tenantId] : [email]
+        ? 'SELECT * FROM usuarios WHERE LOWER(email) = ? AND activo = 1 AND tenant_id = ?'
+        : 'SELECT * FROM usuarios WHERE LOWER(email) = ? AND activo = 1',
+      tenantId ? [correo, tenantId] : [correo]
     );
     const validos = [];
     for (const c of candidatos) {
@@ -127,9 +132,9 @@ router.post('/login', async (req, res) => {
     // cuenta con ese correo: quien tenía cuenta en dos talleres no podía entrar a la otra.
     const [clientesCandidatos] = await pool.query(
       tenantId
-        ? 'SELECT * FROM clientes WHERE email = ? AND activo = 1 AND password_hash IS NOT NULL AND tenant_id = ?'
-        : 'SELECT * FROM clientes WHERE email = ? AND activo = 1 AND password_hash IS NOT NULL',
-      tenantId ? [email, tenantId] : [email]
+        ? 'SELECT * FROM clientes WHERE LOWER(email) = ? AND activo = 1 AND password_hash IS NOT NULL AND tenant_id = ?'
+        : 'SELECT * FROM clientes WHERE LOWER(email) = ? AND activo = 1 AND password_hash IS NOT NULL',
+      tenantId ? [correo, tenantId] : [correo]
     );
     const clientesValidos = [];
     for (const c of clientesCandidatos) {
@@ -642,7 +647,7 @@ router.post('/recuperar/solicitar', antibot(), async (req, res) => {
 
     for (const c of await cuentasDelCorreo(email, taller)) {
       const db = paraTenant(c.tenant_id);
-      const codigo = String(Math.floor(100000 + Math.random() * 900000));
+      const codigo = codigoDeSeisDigitos();
       const codeHash = await bcrypt.hash(codigo, 10);
       // Invalida los anteriores: si conviven dos, se prueba el del correo viejo.
       await db.query(
@@ -658,7 +663,7 @@ router.post('/recuperar/solicitar', antibot(), async (req, res) => {
     }
     for (const c of await clientesDelCorreo(email, taller)) {
       const db = paraTenant(c.tenant_id);
-      const codigo = String(Math.floor(100000 + Math.random() * 900000));
+      const codigo = codigoDeSeisDigitos();
       const codeHash = await bcrypt.hash(codigo, 10);
       await db.query('UPDATE password_reset_codes SET used = 1 WHERE tenant_id = @tenant AND cliente_id = ? AND used = 0', [c.id]);
       await db.query(
