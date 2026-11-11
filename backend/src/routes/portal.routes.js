@@ -173,10 +173,24 @@ const ERR_GOOGLE = 'No se pudo comprobar tu cuenta de Google. Intenta de nuevo.'
 
 // Entra con la cuenta que ya existe: la une a la cuenta de Google si todavía no lo
 // estaba y da el correo por verificado (Google ya lo verificó).
+//
+// Si la cuenta todavía no estaba verificada, su contraseña es una PENDIENTE: la pudo
+// poner cualquiera que supiera el correo, en /registro, esperando justo esto. Darla por
+// buena al entrar con Google le dejaría la cuenta a esa persona, así que se borra; el
+// dueño entra con Google y, si quiere una contraseña, la crea desde «¿Olvidaste tu
+// contraseña?». Es el mismo cuidado que tiene el ingreso con código (/otp/verificar).
+async function unirConGoogle(db, cliente, sub) {
+  await db.query(
+    `UPDATE clientes
+        SET google_sub = ?, email_verificado = 1,
+            password_hash = CASE WHEN email_verificado = 0 THEN NULL ELSE password_hash END
+      WHERE tenant_id = @tenant AND id = ?`,
+    [sub, cliente.id]
+  );
+}
+
 async function entrarConGoogle(req, res, cliente, g) {
-  if (!cliente.google_sub) {
-    await req.db.query('UPDATE clientes SET google_sub = ?, email_verificado = 1 WHERE tenant_id = @tenant AND id = ?', [g.sub, cliente.id]);
-  }
+  if (!cliente.google_sub) await unirConGoogle(req.db, cliente, g.sub);
   const { payload, token } = tokenCliente(cliente);
   res.json({ data: { token, cliente: { ...payload, foto: cliente.foto || null } } });
 }
@@ -1698,3 +1712,5 @@ async function actualizarAprobacion(db, ordenId, clienteId, decision, motivo) {
 }
 
 module.exports = router;
+// Para poder probarla sin un token real de Google.
+module.exports.unirConGoogle = unirConGoogle;
