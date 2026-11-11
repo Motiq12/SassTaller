@@ -297,6 +297,15 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     const sinTaller = await pedir('GET', '/portal/servicios');
     ok(sinTaller.status >= 400, 'el portal sin decir de qué taller no responde datos', sinTaller.status);
 
+    // ── El logo: solo imágenes que no pueden llevar código ──
+    const conLogo = (logo) => pedir('PUT', '/admin/configuracion', { token: A.token, body: { nombre_taller: CANARIO, logo } });
+    const svgConCodigo = 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>').toString('base64');
+    ok((await conLogo(svgConCodigo)).status === 400, 'un logo SVG se rechaza');
+    ok((await conLogo('https://ejemplo.com/rastreo.png')).status === 400, 'un logo que es una dirección externa se rechaza');
+    ok((await conLogo(LOGO)).status === 200, 'el mismo logo PNG que ya tenía se puede reenviar');
+    const logoA = await pedir('GET', `/marca/logo?taller=${A.slug}`);
+    ok(logoA.status === 200, 'el logo se sigue sirviendo', logoA.status);
+
     // ── Buscador público ──
     const conZona = await alta(`delta-${sello}`, `delta-${sello}@prueba.test`, { provincia: 'Guanacaste', canton: 'Liberia', visible_buscador: true, logo: LOGO });
     ok(conZona.status === 201, 'se registra una empresa con ubicación', conZona.json);

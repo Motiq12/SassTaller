@@ -17,6 +17,17 @@ function fotoValida(foto) {
   return typeof foto === 'string' && FOTO_RE.test(foto) && foto.length <= FOTO_MAX_LEN;
 }
 
+// Logo del taller: PNG, JPG o WebP en base64, de hasta ~700 KB. SVG no: puede llevar
+// código, y el logo se sirve como archivo desde el dominio de la plataforma
+// (GET /api/marca/logo), así que un SVG sería código de un taller corriendo con la sesión
+// de quien lo abra. Tampoco una dirección externa: sería un rastreador en el portal.
+const LOGO_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
+const LOGO_MAX = 700 * 1024;
+function logoValido(logo) {
+  if (logo === null || logo === undefined || logo === '') return true;
+  return typeof logo === 'string' && logo.length <= LOGO_MAX && LOGO_RE.test(logo);
+}
+
 // Verifica que un texto libre (ya trimeado) no exceda el tope de la app.
 // Tolera null/undefined/'' (la obligatoriedad se revisa aparte, en el llamador).
 function textoDentroDeLimite(str, max) {
@@ -67,6 +78,7 @@ function placaValida(placa) {
 module.exports = {
   emailValido,
   fotoValida,
+  logoValido,
   textoDentroDeLimite,
   cedulaValida,
   telefonoValido,

@@ -16,7 +16,10 @@ const tenantPublico = require('../middleware/tenant-publico');
 // Sin logo cargado NO se cae a un archivo de la app: el que había era el de MS Motos,
 // y servírselo a otro taller sería ponerle la marca de un tercero. Se responde 404 y
 // la interfaz muestra las iniciales del taller, que sirven para cualquier empresa.
-const DATA_URL_RE = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/;
+//
+// Solo formatos de mapa de bits. Un SVG puede llevar <script>, y servido desde acá
+// correría en el dominio de la plataforma con la sesión de quien abra el enlace.
+const DATA_URL_RE = /^data:(image\/(?:png|jpeg|jpg|webp|gif|avif|bmp|x-icon|vnd\.microsoft\.icon));base64,([A-Za-z0-9+/=\s]+)$/i;
 
 // Convierte el logo guardado (data URL) en bytes servibles. Devuelve null si no hay
 // logo o si el valor no es una imagen en base64 que sepamos interpretar — el llamador
@@ -27,7 +30,7 @@ function logoDesdeDataUrl(logo) {
   if (!m) return null;
   const buffer = Buffer.from(m[2].replace(/\s/g, ''), 'base64');
   if (!buffer.length) return null;
-  return { contentType: m[1], buffer };
+  return { contentType: m[1].toLowerCase(), buffer };
 }
 
 // GET /api/marca/logo — imagen del taller. Público a propósito: lo pide el cliente de
@@ -46,6 +49,10 @@ router.get('/logo', tenantPublico, async (req, res) => {
       'Content-Length': buffer.length,
       // Corto a propósito: si cambian el logo, los correos siguientes lo toman enseguida.
       'Cache-Control': 'public, max-age=300',
+      // Es un archivo que subió un taller: que el navegador no lo trate como otra cosa
+      // que una imagen, ni ejecute nada si alguien lo abre directo.
+      'Content-Security-Policy': "default-src 'none'; sandbox",
+      'Content-Disposition': 'inline; filename="logo"',
     });
     res.send(buffer);
   } catch (err) {

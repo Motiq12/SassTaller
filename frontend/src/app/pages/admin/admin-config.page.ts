@@ -609,12 +609,32 @@ export class AdminConfigPage implements OnInit, OnDestroy {
     });
   }
 
-  onLogoFile(ev: any) {
-    const file = ev.target.files?.[0];
+  // Se achica acá a 512 px, igual que en el registro: el servidor solo acepta PNG, JPG
+  // o WebP de tamaño razonable (un SVG puede llevar código).
+  onLogoFile(ev: Event) {
+    const input = ev.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { this.config.logo = reader.result as string; };
-    reader.readAsDataURL(file);
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) { this.aviso('Elegí una imagen PNG, JPG o WebP', 'warning'); return; }
+    if (file.size > 10 * 1024 * 1024) { this.aviso('La imagen pesa más de 10 MB', 'warning'); return; }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const escala = Math.min(1, 512 / Math.max(img.width, img.height));
+      const lienzo = document.createElement('canvas');
+      lienzo.width = Math.max(1, Math.round(img.width * escala));
+      lienzo.height = Math.max(1, Math.round(img.height * escala));
+      lienzo.getContext('2d')?.drawImage(img, 0, 0, lienzo.width, lienzo.height);
+      URL.revokeObjectURL(url);
+      // PNG conserva el fondo transparente; si queda pesado, WebP.
+      let dato = lienzo.toDataURL('image/png');
+      if (dato.length > 650 * 1024) dato = lienzo.toDataURL('image/webp', 0.85);
+      if (dato.length > 650 * 1024 || !dato.startsWith('data:image/')) { this.aviso('No pudimos achicar esa imagen. Probá con otra.', 'warning'); return; }
+      this.config.logo = dato;
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); this.aviso('No pudimos abrir esa imagen', 'warning'); };
+    img.src = url;
   }
   quitarLogo() { this.config.logo = null; }
 

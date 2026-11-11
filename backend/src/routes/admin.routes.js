@@ -12,7 +12,7 @@ const { cargarEjemplo, borrarEjemplo } = require('../utils/ejemplo');
 const { getSucursales, clearCache: clearSucursalesCache } = require('../utils/sucursales');
 const { leerUbicacion } = require('../utils/ubicaciones');
 const { getServiciosFilas, clearCache: clearServicios } = require('../utils/servicios');
-const { fotoValida, textoDentroDeLimite } = require('../utils/validar');
+const { fotoValida, logoValido, textoDentroDeLimite } = require('../utils/validar');
 const { fechaLocalISO } = require('../utils/fecha');
 const { horasDeCita, horasDeBloqueo, fechasEntre } = require('../utils/agenda');
 const { FERIADOS_CR, fechaValida, proximaFecha } = require('../utils/feriados');
@@ -702,7 +702,14 @@ router.put('/configuracion', async (req, res) => {
     const marcaPropia = puedeMarcaPropia(req.db.tenantId);
     // Solo se toca lo que vino: guardar otra pantalla de Configuración no puede borrar el
     // logo ni el color que la empresa eligió al registrarse.
-    const tocaLogo = marcaPropia && b.logo !== undefined;
+    let tocaLogo = marcaPropia && b.logo !== undefined;
+    // El logo se revisa solo si cambió: la pantalla reenvía el que ya estaba en cada
+    // guardado, y uno viejo más pesado no debe trabar el resto de la configuración.
+    if (tocaLogo) {
+      const actual = (await getConfig(req.db)).logo || null;
+      if ((b.logo || null) === actual) tocaLogo = false;
+      else if (!logoValido(b.logo)) return invalido(res, 'logo', 'El logo tiene que ser una imagen PNG, JPG o WebP de menos de 500 KB');
+    }
     const tocaColor = marcaPropia && b.color_primario !== undefined;
 
     await req.db.query(

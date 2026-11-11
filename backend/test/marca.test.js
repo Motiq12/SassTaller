@@ -18,7 +18,9 @@ test('decodifica una data URL a bytes de imagen', () => {
 
 test('acepta otros formatos de imagen', () => {
   assert.equal(logoDesdeDataUrl(`data:image/jpeg;base64,${PNG_1x1}`)?.contentType, 'image/jpeg');
-  assert.equal(logoDesdeDataUrl(`data:image/svg+xml;base64,${PNG_1x1}`)?.contentType, 'image/svg+xml');
+  // SVG no: puede llevar código y este archivo se sirve desde el dominio de la plataforma.
+  assert.equal(logoDesdeDataUrl(`data:image/svg+xml;base64,${PNG_1x1}`), null);
+  assert.equal(logoDesdeDataUrl(`data:text/html;base64,${PNG_1x1}`), null);
   assert.equal(logoDesdeDataUrl(`data:image/webp;base64,${PNG_1x1}`)?.contentType, 'image/webp');
 });
 
@@ -45,4 +47,16 @@ test('rechaza lo que no es una imagen en base64', () => {
   for (const v of invalidos) {
     assert.equal(logoDesdeDataUrl(v), null, `deberia rechazar: ${JSON.stringify(v)}`);
   }
+});
+
+test('logoValido: solo PNG, JPG o WebP en base64 y de tamaño razonable', () => {
+  const { logoValido } = require('../src/utils/validar');
+  for (const bueno of [null, '', undefined, `data:image/png;base64,${PNG_1x1}`, `data:image/jpeg;base64,${PNG_1x1}`, `data:image/webp;base64,${PNG_1x1}`]) {
+    assert.equal(logoValido(bueno), true, `deberia aceptar: ${String(bueno).slice(0, 30)}`);
+  }
+  const malos = [
+    `data:image/svg+xml;base64,${PNG_1x1}`, `data:text/html;base64,${PNG_1x1}`, 'https://ejemplo.com/logo.png',
+    'javascript:alert(1)', `data:image/png;base64,${PNG_1x1}" onerror="alert(1)`, 'data:image/png;base64,' + 'A'.repeat(800 * 1024), 42, {},
+  ];
+  for (const malo of malos) assert.equal(logoValido(malo), false, `deberia rechazar: ${String(malo).slice(0, 40)}`);
 });
