@@ -60,6 +60,26 @@ function delTaller(tabla) {
   };
 }
 
+// El mecánico solo trabaja lo que le asignaron: la orden, o la cita de esa orden. Sin esto
+// la jerarquía de roles lo dejaba ver, editar y cambiarle el estado a la orden de un
+// compañero con solo poner el número. Responde 404, igual que si no existiera.
+async function soloOrdenAsignada(req, res, next, id) {
+  try {
+    if (req.usuario?.rol !== 'tecnico') return next();
+    const [[fila]] = await req.db.query(
+      `SELECT o.id FROM ordenes_trabajo o
+         LEFT JOIN citas c ON c.orden_id = o.id AND c.tenant_id = @tenant
+        WHERE o.tenant_id = @tenant AND o.id = ? AND (o.tecnico_id = ? OR c.tecnico_id = ?)
+        LIMIT 1`,
+      [id, req.usuario.id, req.usuario.id]
+    );
+    if (!fila) return res.status(404).json({ error: 'No encontrado' });
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
 function exigirSucursal(sql, param = 'id') {
   return async (req, res, next) => {
     try {
@@ -81,6 +101,6 @@ const SUCURSAL_DE_CITA = 'SELECT sucursal_id FROM citas WHERE id = ?';
 const SUCURSAL_DE_GARANTIA = 'SELECT o.sucursal_id FROM garantias g JOIN ordenes_trabajo o ON o.id = g.orden_id WHERE g.id = ?';
 
 module.exports = {
-  sucursalDeAlcance, cargarAlcance, soloSucursal, sucursalParaGuardar, exigirSucursal, delTaller,
+  sucursalDeAlcance, cargarAlcance, soloSucursal, sucursalParaGuardar, exigirSucursal, delTaller, soloOrdenAsignada,
   SUCURSAL_DE_ORDEN, SUCURSAL_DE_CITA, SUCURSAL_DE_GARANTIA,
 };

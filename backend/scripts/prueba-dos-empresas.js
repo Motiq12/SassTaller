@@ -330,6 +330,40 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     const sinB = await pedir('GET', '/directorio/talleres?provincia=Guanacaste&canton=Liberia');
     ok(!sinB.json.data.some((t) => t.slug === Bb.slug), 'al desactivarlo desaparece', sinB.json);
 
+    // ── Mecánicos del mismo taller ──
+    const creaMec = async (nombre) => {
+      const r = await pedir('POST', '/usuarios', { token: A.token, body: { nombre, email: `${nombre}-${sello}@prueba.test`, password: 'ClaveSegura123', rol: 'tecnico', sucursal_id: sa.id, telefono: '88880002' } });
+      ok(r.status < 300, `A crea al mecánico ${nombre}`, r.json);
+      return { id: r.json.data.id, token: jwt.sign({ id: r.json.data.id, nombre, email: `${nombre}-${sello}@prueba.test`, rol: 'tecnico', tenant_id: A.id }, process.env.JWT_SECRET, { expiresIn: '2h' }) };
+    };
+    const m1 = await creaMec('mec1');
+    const m2 = await creaMec('mec2');
+    const asignar = await pedir('PATCH', `/ordenes/${ordenA}/tecnico`, { token: A.token, body: { tecnico_id: m1.id } });
+    ok(asignar.status === 200, 'A le asigna la orden al mecánico 1', asignar.json);
+    const suya = await pedir('GET', `/ordenes/${ordenA}`, { token: m1.token });
+    ok(suya.status === 200, 'el mecánico 1 ve su orden', suya.status);
+    const avanceSuyo = await pedir('POST', `/ordenes/${ordenA}/avances`, { token: m1.token, body: { descripcion: 'Revisado' } });
+    ok(avanceSuyo.status < 300, 'el mecánico 1 anota un avance en su orden', avanceSuyo.json);
+    const ajenas = [
+      ['GET', ''], ['PUT', '', { diagnostico: 'AJENO' }], ['PATCH', '/estado', { estado: 'en_reparacion' }],
+      ['POST', '/avances', { descripcion: 'AJENO' }], ['GET', '/avances'], ['GET', '/repuestos'], ['GET', '/tiempos'],
+      ['GET', '/checklist'], ['POST', '/checklist', { lavado: 1 }], ['GET', '/fotos'], ['POST', '/fotos', { url: LOGO }],
+      ['GET', '/mensajes'], ['POST', '/mensajes', { mensaje: 'AJENO' }],
+    ];
+    for (const [met, ruta, body] of ajenas) {
+      const r = await pedir(met, `/ordenes/${ordenA}${ruta}`, { token: m2.token, body });
+      ok(r.status === 404, `el mecánico 2 no puede ${met} /ordenes/:id${ruta}`, r.status);
+    }
+    const [[{ ajeno }]] = await db.query("SELECT COUNT(*) AS ajeno FROM orden_avances WHERE orden_id = ? AND descripcion = 'AJENO'", [ordenA]);
+    ok(ajeno === 0, 'la orden no recibió nada del mecánico 2');
+    const pasar = await pedir('PATCH', `/ordenes/${ordenA}/tecnico`, { token: A.token, body: { tecnico_id: m2.id } });
+    ok(pasar.status === 200, 'A le pasa la orden al mecánico 2', pasar.json);
+    const ahoraM1 = await pedir('GET', `/ordenes/${ordenA}`, { token: m1.token });
+    const ahoraM2 = await pedir('GET', `/ordenes/${ordenA}`, { token: m2.token });
+    ok(ahoraM1.status === 404 && ahoraM2.status === 200, 'al reasignarla cambia quién la ve', [ahoraM1.status, ahoraM2.status]);
+    const recep = await pedir('GET', `/ordenes/${ordenA}`, { token: A.token });
+    ok(recep.status === 200, 'el dueño sigue viendo todas', recep.status);
+
     // ── Roles ──
     const rolesA = await pedir('GET', '/admin/roles', { token: A.token });
     const rolesB = await pedir('GET', '/admin/roles', { token: Bb.token });

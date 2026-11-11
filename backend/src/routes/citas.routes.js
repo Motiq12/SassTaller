@@ -347,6 +347,11 @@ router.patch('/:id/asignar', requireRol('admin'), async (req, res) => {
   try {
     const { tecnico_id } = req.body;
     await req.db.query('UPDATE citas SET tecnico_id = ? WHERE tenant_id = @tenant AND id = ?', [tecnico_id || null, req.params.id]);
+    // La orden de esa cita va con ella: si no, el mecánico anterior seguiría trabajándola.
+    const [[vinculo]] = await req.db.query('SELECT orden_id FROM citas WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
+    if (vinculo?.orden_id) {
+      await req.db.query('UPDATE ordenes_trabajo SET tecnico_id = ? WHERE tenant_id = @tenant AND id = ?', [tecnico_id || null, vinculo.orden_id]);
+    }
     if (tecnico_id) {
       const [[cita]] = await req.db.query("SELECT to_char(fecha, 'YYYY-MM-DD') AS fecha, to_char(hora, 'HH24:MI') AS hora, tipo_servicio, servicios, motivo FROM citas WHERE tenant_id = @tenant AND id = ?", [req.params.id]);
       if (cita) await notificarMecanico(req.db, tecnico_id, `Te asignaron una cita: ${cita.servicios || cita.tipo_servicio || cita.motivo} el ${cita.fecha} a las ${cita.hora}`, req.usuario.id);

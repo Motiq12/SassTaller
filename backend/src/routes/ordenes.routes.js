@@ -3,7 +3,7 @@ const router = require('express').Router();
 const { fail, invalido, faltante } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
-const { cargarAlcance, soloSucursal, sucursalParaGuardar, exigirSucursal, delTaller, SUCURSAL_DE_ORDEN } = require('../utils/alcance');
+const { cargarAlcance, soloSucursal, sucursalParaGuardar, exigirSucursal, delTaller, soloOrdenAsignada, SUCURSAL_DE_ORDEN } = require('../utils/alcance');
 const { soloRoles } = require('../middleware/roles');
 const {
   generarNumeroOrden, sincronizarCitaDesdeOrden, cerrarOrden, totalOrden, esAdicional, revisarAdicional,
@@ -42,6 +42,7 @@ router.use(auth, requireRol('recepcion'));
 // rutas con :id de este archivo son de una orden: una de la otra sucursal da 404.
 router.use(cargarAlcance);
 router.param('id', delTaller('ordenes_trabajo'));
+router.param('id', soloOrdenAsignada);
 router.param('id', exigirSucursal(SUCURSAL_DE_ORDEN));
 
 // GET /api/ordenes
@@ -494,6 +495,8 @@ router.patch('/:id/tecnico', requireRol('admin'), async (req, res) => {
       if (!tec) return res.status(400).json({ error: 'El técnico no existe o está inactivo' });
     }
     await req.db.query('UPDATE ordenes_trabajo SET tecnico_id = ? WHERE tenant_id = @tenant AND id = ?', [tecnico_id || null, req.params.id]);
+    // La cita va con la orden: si no, el mecánico anterior seguiría teniéndola asignada.
+    await req.db.query('UPDATE citas SET tecnico_id = ? WHERE tenant_id = @tenant AND orden_id = ?', [tecnico_id || null, req.params.id]);
     res.json({ message: 'Técnico asignado' });
   } catch (err) {
     fail(res, err);
