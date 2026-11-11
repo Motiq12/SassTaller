@@ -113,7 +113,7 @@ router.post('/', soloRoles('recepcion', 'admin'), exigirPermiso('ordenes.crear')
 
     const problemaReportado = String(problema_reportado || '').trim();
 
-    if (faltante(res, { ...req.body, problema_reportado: problemaReportado }, [['cliente_id', 'el cliente'], ['vehiculo_id', 'la moto'], ['problema_reportado', 'el problema que reporta el cliente']])) return;
+    if (faltante(res, { ...req.body, problema_reportado: problemaReportado }, [['cliente_id', 'el cliente'], ['vehiculo_id', 'el vehículo'], ['problema_reportado', 'el problema que reporta el cliente']])) return;
     if (!textoDentroDeLimite(problemaReportado, MAX_PROBLEMA_REPORTADO)) {
       return invalido(res, 'problema_reportado', `El problema no puede pasar de ${MAX_PROBLEMA_REPORTADO} caracteres`);
     }
@@ -287,7 +287,7 @@ router.patch('/:id/datos', soloRoles('recepcion', 'admin'), exigirPermiso('orden
     if (fechaEst && !/^\d{4}-\d{2}-\d{2}$/.test(fechaEst)) return invalido(res, 'fecha_estimada_entrega', 'Fecha estimada no válida');
     // La moto tiene que ser del mismo cliente (para cambiar de cliente, se elimina y se abre otra).
     const [[moto]] = await req.db.query('SELECT id FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?', [b.vehiculo_id, orden.cliente_id]);
-    if (!moto) return invalido(res, 'vehiculo_id', 'Esa moto no es de este cliente');
+    if (!moto) return invalido(res, 'vehiculo_id', 'Ese vehículo no es de este cliente');
     const sucursal_id = sucursalParaGuardar(req, (await sucursalValida(req.db, b.sucursal_id)) ? Number(b.sucursal_id) : null);
     const categoria = b.categoria || 'diagnostico';
 

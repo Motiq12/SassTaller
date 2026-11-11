@@ -84,7 +84,7 @@ export class PortalNavComponent {
     { id: 'inicio', ruta: '/portal/inicio', icono: 'home-outline', texto: 'Inicio' },
     { id: 'agendar', ruta: '/portal/agendar', icono: 'add-circle-outline', texto: 'Agendar' },
     { id: 'mis-citas', ruta: '/portal/mis-citas', icono: 'clipboard-outline', texto: 'Mis citas' },
-    { id: 'motos', ruta: '/portal/motos', icono: 'bicycle-outline', texto: 'Motos' },
+    { id: 'motos', ruta: '/portal/motos', icono: 'car-outline', texto: 'Vehículos' },
     { id: 'ofertas', ruta: '/portal/ofertas', icono: 'pricetags-outline', texto: 'Ofertas' },
   ];
 

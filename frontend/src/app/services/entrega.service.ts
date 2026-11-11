@@ -74,7 +74,7 @@ export class EntregaService {
       forzar = true;
     }
     const marca = await firstValueFrom(this.marca.get());
-    const metodo = await this.elegirMetodo(marca.metodos_pago, 'Entregar la moto', true);
+    const metodo = await this.elegirMetodo(marca.metodos_pago, 'Entregar el vehículo', true);
     if (metodo === undefined) return false;
     const monto = await this.pedirMonto(c.monto);
     if (monto === undefined) return false;
@@ -83,7 +83,7 @@ export class EntregaService {
     if (monto !== null) body['monto'] = monto;
     const r = await this.enviar(`${this.api}/citas/${c.id}/entregar`, body, 'cita');
     if (!r) return false;
-    await this.aviso('Moto entregada', 'success');
+    await this.aviso('Vehículo entregado', 'success');
     return true;
   }
 

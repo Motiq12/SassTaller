@@ -9,7 +9,7 @@ export const environment = {
   // Site key de Cloudflare Turnstile (captcha anti-bot). Vacío = desactivado.
   turnstileSiteKey: '',
   // El sitio web público, para "Volver al sitio web" (shared/volver-web.component.ts).
-  sitioWebUrl: 'http://localhost:5500/'
+  sitioWebUrl: ''
 };
 
 /*

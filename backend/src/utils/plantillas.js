@@ -4,13 +4,13 @@
 // Los de WhatsApp de fábrica viven en el frontend (shared/whatsapp.util.ts), que es
 // donde se arman; los de correo, acá.
 //
-// Un texto lleva datos entre llaves: {nombre}, {moto}… Lo que va entre corchetes solo
+// Un texto lleva datos entre llaves: {nombre}, {vehiculo}… Lo que va entre corchetes solo
 // sale si todos sus datos tienen valor: "listo[ por {total}]" queda "listo" sin total.
 // La misma regla está en shared/whatsapp.util.ts (rellenar): si se cambia una, la otra.
 
 const CORREO_FABRICA = {
-  listo: { titulo: 'Tu moto está lista', mensaje: '{moto} ya está lista para entrega. Puedes pasar a retirarla.' },
-  entregado: { titulo: 'Servicio entregado', mensaje: '{moto} fue entregada. ¡Gracias por tu visita!' },
+  listo: { titulo: 'Tu vehículo está listo', mensaje: 'Ya puedes pasar a retirar {vehiculo}.' },
+  entregado: { titulo: 'Servicio entregado', mensaje: 'Entregamos {vehiculo}. ¡Gracias por tu visita!' },
 };
 
 const MAX_WHATSAPP = 700;
@@ -20,7 +20,8 @@ const CLAVE = /^[a-z_]{3,30}$/;
 
 function rellenar(texto, datos = {}) {
   const valor = (k) => {
-    const v = datos[k];
+    // {moto} era el nombre anterior de {vehiculo}: hay talleres con textos guardados que lo usan.
+    const v = datos[k === 'vehiculo' ? 'moto' : k];
     return v === undefined || v === null ? '' : String(v).trim();
   };
   return String(texto || '')

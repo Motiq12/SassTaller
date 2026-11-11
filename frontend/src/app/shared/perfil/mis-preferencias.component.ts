@@ -22,7 +22,7 @@ export const INICIOS: Record<Rol, { ruta: string; nombre: string }[]> = {
   recepcion: [
     { ruta: '/recepcion/inicio', nombre: 'Inicio' },
     { ruta: '/recepcion/agenda', nombre: 'Agenda' },
-    { ruta: '/recepcion/recibir', nombre: 'Recibir moto' },
+    { ruta: '/recepcion/recibir', nombre: 'Recibir vehículo' },
     { ruta: '/recepcion/ordenes', nombre: 'Órdenes' },
     { ruta: '/recepcion/clientes', nombre: 'Clientes' },
     { ruta: '/recepcion/mensajes', nombre: 'Mensajes' },
@@ -43,7 +43,7 @@ const NOMBRE_AVISO: Record<string, string> = {
   cita_nueva: 'Citas nuevas',
   cita_cancelada: 'Citas canceladas',
   repuesto: 'Repuestos que pide el mecánico',
-  sin_entregar: 'Motos listas que nadie ha retirado',
+  sin_entregar: 'Vehículos listos que nadie ha retirado',
   mensaje: 'Mensajes del equipo',
   cita_asignada: 'Citas que te asignan',
   orden_estado: 'Cambios en tus órdenes',

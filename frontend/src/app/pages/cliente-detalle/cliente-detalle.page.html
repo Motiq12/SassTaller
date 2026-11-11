@@ -38,7 +38,7 @@
     <!-- Cifras -->
     <section class="cd-cifras">
       <div><strong>{{ c.visitas || 0 }}</strong><span>visita{{ c.visitas === 1 ? '' : 's' }}</span></div>
-      <div><strong>{{ motos.length }}</strong><span>moto{{ motos.length === 1 ? '' : 's' }}</span></div>
+      <div><strong>{{ motos.length }}</strong><span>vehículo{{ motos.length === 1 ? '' : 's' }}</span></div>
       <div><strong>{{ ordenes.length }}</strong><span>{{ ordenes.length === 1 ? 'orden' : 'órdenes' }}</span></div>
       <div *ngIf="verMontos"><strong>₡{{ totalCobrado | number:'1.0-0' }}</strong><span>cobrado en órdenes entregadas</span></div>
     </section>
@@ -73,7 +73,7 @@
           <span class="cd-title"><ion-icon name="phone-portrait-outline"></ion-icon> Portal del cliente</span>
           <div class="cd-portal">
             <span class="cd-estado" [class.on]="c.tiene_portal">{{ c.tiene_portal ? 'Acceso activado' : 'Sin acceso' }}</span>
-            <p>{{ c.tiene_portal ? 'Entra con ' + c.email + ' y ve el avance de sus motos y sus presupuestos.' : (c.email ? 'Con acceso puede ver el avance y aprobar presupuestos desde el celular.' : 'Para darle acceso, primero agregale un correo.') }}</p>
+            <p>{{ c.tiene_portal ? 'Entra con ' + c.email + ' y ve el avance de sus vehículos y sus presupuestos.' : (c.email ? 'Con acceso puede ver el avance y aprobar presupuestos desde el celular.' : 'Para darle acceso, primero agregale un correo.') }}</p>
           </div>
           <div class="cd-portal-acciones">
             <button type="button" class="btn btn-ou btn-sm" (click)="activarPortal()">
@@ -89,12 +89,12 @@
       <div class="cd-col">
         <section class="cd">
           <div class="cd-sec-cab">
-            <span class="cd-title"><ion-icon name="bicycle-outline"></ion-icon> Motos</span>
-            <button type="button" class="btn btn-ou btn-sm" (click)="nuevaMoto()"><ion-icon name="add-outline"></ion-icon> Agregar moto</button>
+            <span class="cd-title"><ion-icon name="car-outline"></ion-icon> Vehículos</span>
+            <button type="button" class="btn btn-ou btn-sm" (click)="nuevaMoto()"><ion-icon name="add-outline"></ion-icon> Agregar vehículo</button>
           </div>
           <div class="cd-motos" *ngIf="motos.length">
             <button type="button" class="cd-moto" *ngFor="let m of motos" (click)="abrirHistorial(m)">
-              <span class="cd-moto-icono"><ion-icon name="bicycle"></ion-icon></span>
+              <span class="cd-moto-icono"><ion-icon name="car"></ion-icon></span>
               <span class="cd-moto-texto">
                 <strong>{{ m.marca }} {{ m.modelo }}</strong>
                 <span>{{ m.anio || 'Año sin cargar' }}<ng-container *ngIf="m.kilometraje_actual"> · {{ m.kilometraje_actual | number }} km</ng-container></span>
@@ -104,8 +104,8 @@
             </button>
           </div>
           <div class="cd-vacio" *ngIf="!motos.length">
-            <ion-icon name="bicycle-outline"></ion-icon>
-            <span>Sin motos registradas.</span>
+            <ion-icon name="car-outline"></ion-icon>
+            <span>Sin vehículos registrados.</span>
           </div>
         </section>
 

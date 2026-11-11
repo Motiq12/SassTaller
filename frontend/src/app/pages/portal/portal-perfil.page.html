@@ -64,7 +64,7 @@
             <section class="cd">
               <div class="pf-sec-cab">
                 <span class="pf-sec-icono"><ion-icon name="person-outline"></ion-icon></span>
-                <div><h2>Datos personales</h2><p>El teléfono es por donde te avisamos que tu moto está lista.</p></div>
+                <div><h2>Datos personales</h2><p>El teléfono es por donde te avisamos que tu vehículo está listo.</p></div>
               </div>
               <div class="fg-row">
                 <div class="fg"><label for="pf-nombre">Nombre</label><input id="pf-nombre" [(ngModel)]="cuenta.nombre" name="nombre" placeholder="Tu nombre" autocomplete="given-name"></div>
@@ -167,7 +167,7 @@
               <div><h2>Avisos</h2><p>Qué te avisamos por correo y en la campanita.</p></div>
             </div>
             <div class="pf-opcion">
-              <div class="pf-opcion-txt"><strong>Avances de tu servicio</strong><span>Cuando tu moto cambia de etapa en el taller</span></div>
+              <div class="pf-opcion-txt"><strong>Avances de tu servicio</strong><span>Cuando tu vehículo cambia de etapa en el taller</span></div>
               <ion-toggle [(ngModel)]="notif.avances" name="avances" (ionChange)="guardarNotif('avances')"
                           [disabled]="guardandoNotif" aria-label="Avances de tu servicio"></ion-toggle>
             </div>

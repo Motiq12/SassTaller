@@ -42,7 +42,7 @@
           <span class="rec-av">{{ (c.nombre || '?').charAt(0) }}{{ (c.apellido || '').charAt(0) }}</span>
           <span class="pg-item-txt">
             <strong>{{ c.nombre }} {{ c.apellido }}</strong>
-            <span>{{ c.telefono }}<ng-container *ngIf="c.total_motos"> · {{ c.total_motos }} moto(s)</ng-container></span>
+            <span>{{ c.telefono }}<ng-container *ngIf="c.total_motos"> · {{ c.total_motos }} vehículo(s)</ng-container></span>
           </span>
           <ion-icon name="chevron-forward"></ion-icon>
         </button>
@@ -153,7 +153,7 @@
                     <span class="bg bg-cr rec-tag" *ngIf="c.id === proximaId && g.key === 'porVenir'">Próxima</span>
                     <span class="bg bg-am rec-tag" *ngIf="esAtrasada(c)">Atrasada</span>
                   </strong>
-                  <span>{{ c.marca || 'Moto' }} {{ c.modelo || '' }}<ng-container *ngIf="c.servicios || c.tipo_servicio"> · {{ c.servicios || c.tipo_servicio }}</ng-container></span>
+                  <span>{{ c.marca || 'Vehículo' }} {{ c.modelo || '' }}<ng-container *ngIf="c.servicios || c.tipo_servicio"> · {{ c.servicios || c.tipo_servicio }}</ng-container></span>
                   <span class="rec-suc" *ngIf="c.sucursal_nombre"><ion-icon name="location-outline"></ion-icon> {{ c.sucursal_nombre }}</span>
                   <!-- En espera: cuánto lleva. Si no, la señal de confirmación de asistencia. -->
                   <span class="rec-senal espera" *ngIf="g.key === 'esperando'" [class.larga]="esperaLarga(c)">

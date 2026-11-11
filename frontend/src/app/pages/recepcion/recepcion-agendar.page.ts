@@ -231,7 +231,7 @@ export class RecepcionAgendarPage implements OnInit, OnDestroy {
         this.modalMoto = false;
         this.motos = [...this.motos, r.data];
         this.form.vehiculo_id = r.data.id!;
-        this.aviso('Moto registrada');
+        this.aviso('Vehículo registrado');
       },
       error: () => { this.guardandoAlta = false; },
     });
@@ -289,7 +289,7 @@ export class RecepcionAgendarPage implements OnInit, OnDestroy {
 
   confirmar() {
     if (!this.valido) {
-      this.aviso(this.modo === 'agendar' ? 'Completá servicio, fecha y hora' : 'Elegí moto y describí el problema', 'warning');
+      this.aviso(this.modo === 'agendar' ? 'Completá servicio, fecha y hora' : 'Elegí el vehículo y describí el problema', 'warning');
       return;
     }
     this.guardando = true;

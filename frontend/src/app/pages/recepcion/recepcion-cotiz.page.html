@@ -91,7 +91,7 @@
     <ng-container *ngIf="!mostrarForm && !cargando && cotizaciones.length">
       <div class="pg-buscar">
         <ion-icon name="search-outline"></ion-icon>
-        <input type="search" [value]="busqueda" (input)="buscar($event)" placeholder="Cliente, orden, moto o mecánico" aria-label="Buscar cotización" />
+        <input type="search" [value]="busqueda" (input)="buscar($event)" placeholder="Cliente, orden, vehículo o mecánico" aria-label="Buscar cotización" />
       </div>
       <div class="pg-filtros" *ngIf="vista === 'enviada'">
         <button type="button" class="chip-filtro" [class.on]="filtroAprob==='todas'" (click)="setFiltro('todas')">Todas</button>

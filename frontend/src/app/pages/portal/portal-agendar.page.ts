@@ -248,7 +248,7 @@ export class PortalAgendarPage implements OnInit, OnDestroy {
   }
 
   async agendar() {
-    if (!this.valido) return this.toastMsg('Completa moto, servicio, fecha y hora', 'warning');
+    if (!this.valido) return this.toastMsg('Completa vehículo, servicio, fecha y hora', 'warning');
     if (this.horaPasada(this.form.hora)) return this.toastMsg('Esa hora ya pasó. Elige un horario más tarde.', 'warning');
     if (this.horaLlena(this.form.hora)) return this.toastMsg('Esa hora ya no está disponible', 'warning');
     const editando = this.editId;

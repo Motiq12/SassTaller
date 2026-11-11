@@ -3,7 +3,7 @@
     <ion-buttons slot="start">
       <ion-back-button [defaultHref]="volverA" text=""></ion-back-button>
     </ion-buttons>
-    <ion-title>{{ moto ? moto.marca + ' ' + moto.modelo : 'Moto' }}</ion-title>
+    <ion-title>{{ moto ? moto.marca + ' ' + moto.modelo : 'Vehículo' }}</ion-title>
   </ion-toolbar>
 </ion-header>
 
@@ -15,7 +15,7 @@
       <div class="mh-heroe-quien">
         <div class="mh-icono">
           <img *ngIf="m.foto_url; else icono" [src]="m.foto_url" [alt]="m.marca + ' ' + m.modelo">
-          <ng-template #icono><ion-icon name="bicycle"></ion-icon></ng-template>
+          <ng-template #icono><ion-icon name="car"></ion-icon></ng-template>
         </div>
         <div class="mh-heroe-texto">
           <h1>{{ m.marca }} {{ m.modelo }}<span *ngIf="m.anio"> {{ m.anio }}</span></h1>
@@ -69,14 +69,14 @@
         </ol>
         <div class="mh-vacio" *ngIf="!historial.length">
           <ion-icon name="document-text-outline"></ion-icon>
-          <span>Esta moto todavía no tiene servicios.</span>
+          <span>Este vehículo todavía no tiene servicios.</span>
           <button type="button" class="btn btn-cr btn-sm" *ngIf="puedeAbrirOrden" (click)="nuevaOrden()"><ion-icon name="add-outline"></ion-icon> Abrir la primera orden</button>
         </div>
       </section>
 
       <!-- Ficha técnica -->
       <section class="cd mh-ficha">
-        <span class="cd-title"><ion-icon name="document-outline"></ion-icon> Datos de la moto</span>
+        <span class="cd-title"><ion-icon name="document-outline"></ion-icon> Datos del vehículo</span>
         <dl>
           <div><dt>Marca y modelo</dt><dd>{{ m.marca }} {{ m.modelo }}</dd></div>
           <div><dt>Año</dt><dd [class.falta]="!m.anio">{{ m.anio || 'Sin cargar' }}</dd></div>

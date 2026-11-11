@@ -86,7 +86,7 @@
       <div class="cli-empty" *ngIf="visibles.length === 0">
         <ion-icon [name]="busqueda ? 'search-outline' : 'people-outline'"></ion-icon>
         <strong>{{ busqueda ? 'Ningún cliente coincide con «' + busqueda + '»' : (filtro !== 'todos' ? 'Ningún cliente con ese filtro' : 'Todavía no hay clientes') }}</strong>
-        <p>{{ busqueda ? 'Probá con el teléfono o la cédula, o crealo.' : 'Los clientes se crean acá o al recibir una moto.' }}</p>
+        <p>{{ busqueda ? 'Probá con el teléfono o la cédula, o crealo.' : 'Los clientes se crean acá o al recibir un vehículo.' }}</p>
         <button type="button" class="btn btn-ou btn-sm" *ngIf="filtro !== 'todos' && !busqueda" (click)="filtro = 'todos'">Ver todos</button>
         <button type="button" class="btn btn-cr btn-sm" *ngIf="filtro === 'todos'" (click)="nuevoCliente()">
           <ion-icon name="person-add-outline"></ion-icon> Nuevo cliente

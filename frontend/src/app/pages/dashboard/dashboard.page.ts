@@ -138,7 +138,7 @@ export class DashboardPage implements OnInit, OnDestroy {
           { key: 'numero_orden', label: 'Orden' },
           { key: 'estado', label: 'Estado' },
           { key: 'cliente', label: 'Cliente' },
-          { key: 'moto', label: 'Moto' },
+          { key: 'moto', label: 'Vehículo' },
           { key: 'placa', label: 'Placa' },
           { key: 'tecnico', label: 'Técnico' },
           { key: 'ingreso', label: 'Ingreso' },
@@ -173,7 +173,7 @@ export class DashboardPage implements OnInit, OnDestroy {
         descargarCSV(`facturacion_${this.hoy()}`, [
           { key: 'numero_orden', label: 'Orden' },
           { key: 'cliente', label: 'Cliente' },
-          { key: 'moto', label: 'Moto' },
+          { key: 'moto', label: 'Vehículo' },
           { key: 'entrega', label: 'Entrega' },
           { key: 'metodo_pago', label: 'Método de pago' },
           { key: 'mano_obra', label: 'Mano de obra' },

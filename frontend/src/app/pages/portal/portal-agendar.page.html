@@ -12,15 +12,15 @@
   <div class="agendar">
     <div class="intro">
       <h2>{{ editId ? 'Edita tu cita' : 'Reserva tu cita' }}</h2>
-      <p>{{ editId ? 'Cambia la moto, el servicio o el horario.' : 'Elige tu moto, el servicio y el horario.' }}</p>
+      <p>{{ editId ? 'Cambia el vehículo, el servicio o el horario.' : 'Elige tu vehículo, el servicio y el horario.' }}</p>
     </div>
 
     <!-- Sin motos: CTA guiado (no se puede agendar sin una moto) -->
     <section class="card sin-motos" *ngIf="motos.length === 0">
-      <ion-icon name="bicycle-outline"></ion-icon>
-      <h3>Primero registra tu moto</h3>
-      <p>Necesitas al menos una moto para poder agendar una cita.</p>
-      <button type="button" class="cta" (click)="irAMotos()"><ion-icon name="add"></ion-icon> Agregar mi moto</button>
+      <ion-icon name="car-outline"></ion-icon>
+      <h3>Primero registra tu vehículo</h3>
+      <p>Necesitas al menos un vehículo para poder agendar una cita.</p>
+      <button type="button" class="cta" (click)="irAMotos()"><ion-icon name="add"></ion-icon> Agregar mi vehículo</button>
     </section>
 
     <section class="card" *ngIf="motos.length > 0">
@@ -35,16 +35,16 @@
       </div>
 
       <div class="fg">
-        <label>Seleccionar moto *</label>
+        <label>Seleccionar vehículo *</label>
         <select [(ngModel)]="form.vehiculo_id" name="vehiculo_id">
-          <option [ngValue]="null" disabled>Elige tu moto</option>
+          <option [ngValue]="null" disabled>Elige tu vehículo</option>
           <option *ngFor="let m of motos" [ngValue]="m.id">{{ m.marca }} {{ m.modelo }}<ng-container *ngIf="m.placa"> — {{ m.placa }}</ng-container></option>
         </select>
         <!-- Preview de la moto elegida con su foto -->
         <div class="moto-sel" *ngIf="motoSel">
           <div class="ms-thumb" [class.empty]="!motoSel.foto">
             <img *ngIf="motoSel.foto; else msIcon" [src]="motoSel.foto" [alt]="motoSel.marca + ' ' + motoSel.modelo">
-            <ng-template #msIcon><ion-icon name="bicycle"></ion-icon></ng-template>
+            <ng-template #msIcon><ion-icon name="car"></ion-icon></ng-template>
           </div>
           <div class="ms-info">
             <strong>{{ motoSel.marca }} {{ motoSel.modelo }}</strong>
@@ -85,7 +85,7 @@
 
       <div class="fg">
         <label>Descripción del problema (opcional)</label>
-        <textarea [(ngModel)]="form.descripcion" name="descripcion" placeholder="Cuéntanos qué le pasa a tu moto…"></textarea>
+        <textarea [(ngModel)]="form.descripcion" name="descripcion" placeholder="Cuéntanos qué le pasa a tu vehículo…"></textarea>
       </div>
 
       <button class="cta" (click)="agendar()" [disabled]="!valido || enviando">

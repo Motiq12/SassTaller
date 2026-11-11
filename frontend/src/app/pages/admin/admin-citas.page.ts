@@ -353,7 +353,7 @@ export class AdminCitasPage implements OnInit, OnDestroy {
 
   exportar() {
     descargarCSV(`citas_${hoyCR()}`, [
-      { key: 'id', label: '#' }, { key: 'moto', label: 'Moto' }, { key: 'placa', label: 'Placa' },
+      { key: 'id', label: '#' }, { key: 'moto', label: 'Vehículo' }, { key: 'placa', label: 'Placa' },
       { key: 'cliente', label: 'Cliente' }, { key: 'servicio', label: 'Servicio' },
       { key: 'fecha', label: 'Fecha' }, { key: 'hora', label: 'Hora' },
       { key: 'tecnico', label: 'Mecánico' }, { key: 'sucursal', label: 'Sucursal' }, { key: 'estado', label: 'Estado' },

@@ -3,7 +3,7 @@
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/portal/motos" text=""></ion-back-button>
     </ion-buttons>
-    <ion-title>Perfil de la moto</ion-title>
+    <ion-title>Perfil del vehículo</ion-title>
   </ion-toolbar>
 </ion-header>
 
@@ -22,10 +22,7 @@
         <div class="ck-moto" [class.has-photo]="moto.foto">
           <img *ngIf="moto.foto; else motoSvg" [src]="moto.foto" [alt]="moto.marca + ' ' + moto.modelo">
           <ng-template #motoSvg>
-            <svg viewBox="0 0 64 40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="13" cy="28" r="9"/><circle cx="51" cy="28" r="9"/>
-              <path d="M13 28l9-13h11l7 9"/><path d="M22 15l-4-5h-7"/><path d="M40 24l5-9h8"/>
-            </svg>
+            <ion-icon name="car-outline" aria-hidden="true"></ion-icon>
           </ng-template>
         </div>
         <div class="ck-id">
@@ -89,7 +86,7 @@
     <!-- Vacío: sin servicios todavía -->
     <div class="empty" *ngIf="!servicios.length">
       <ion-icon name="time-outline"></ion-icon>
-      <p>Esta moto todavía no tiene servicios completados.</p>
+      <p>Este vehículo todavía no tiene servicios completados.</p>
     </div>
 
     <div style="height:40px"></div>
@@ -97,6 +94,6 @@
 
   <div class="hist empty" *ngIf="!cargando && !moto">
     <ion-icon name="alert-circle-outline"></ion-icon>
-    <p>No se encontró la moto.</p>
+    <p>No se encontró el vehículo.</p>
   </div>
 </ion-content>

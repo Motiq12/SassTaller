@@ -5,6 +5,6 @@ export const environment = {
   // Site key de Cloudflare Turnstile (captcha anti-bot). Vacío = desactivado.
   // Pegá acá el site key de tu cuenta de Cloudflare para activarlo en la web.
   turnstileSiteKey: '',
-  // El sitio web público, para "Volver al sitio web" (shared/volver-web.component.ts).
-  sitioWebUrl: 'https://msmotors-web-production.up.railway.app/'
+  // Este producto no tiene sitio público aparte: "Volver al sitio web" no sale.
+  sitioWebUrl: ''
 };

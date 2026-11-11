@@ -169,11 +169,11 @@ router.post('/citas/:id/crear-orden', exigirPermiso('ordenes.crear'), async (req
     let motoId = cita.vehiculo_id;
     if (req.body?.vehiculo_id) {
       const [[moto]] = await req.db.query('SELECT id FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ? AND activa = 1', [req.body.vehiculo_id, cita.cliente_id]);
-      if (!moto) return invalido(res, 'vehiculo_id', 'Esa moto no es de este cliente');
+      if (!moto) return invalido(res, 'vehiculo_id', 'Ese vehículo no es de este cliente');
       motoId = moto.id;
     }
     if (!motoId) {
-      return res.status(400).json({ error: 'La cita no tiene moto: elegí o registrá una para abrir la orden', campo: 'vehiculo_id', codigo: 'sin_moto' });
+      return res.status(400).json({ error: 'La cita no tiene vehículo: elegí o registrá una para abrir la orden', campo: 'vehiculo_id', codigo: 'sin_moto' });
     }
 
     const conn = await req.db.conexion();
@@ -712,7 +712,7 @@ router.post('/cotizaciones/:id/enviar', exigirPermiso('ordenes.costos'), async (
     // Preferencia del taller: avisar al cliente cuando la cotización está lista.
     const config = await getConfig(req.db);
     if (o && config.notif_cotizacion) {
-      const moto = [o.marca, o.modelo].filter(Boolean).join(' ') || 'tu moto';
+      const moto = [o.marca, o.modelo].filter(Boolean).join(' ') || 'tu vehículo';
       await req.db.query(
         "INSERT INTO notificaciones (tenant_id, cliente_id, cita_id, titulo, mensaje, tipo) VALUES (@tenant, ?, ?, ?, ?, 'presupuesto')",
         [o.cliente_id, o.cita_id || null, `Presupuesto listo: ${moto}`, `Tu presupuesto (orden ${o.numero_orden}) está listo. Revísalo y apruébalo desde el portal.`]

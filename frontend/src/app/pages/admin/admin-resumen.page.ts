@@ -187,7 +187,7 @@ export class AdminResumenPage implements OnInit, OnDestroy {
         }));
         descargarCSV(`ordenes_${this.hoy()}`, [
           { key: 'numero_orden', label: 'Orden' }, { key: 'estado', label: 'Estado' },
-          { key: 'cliente', label: 'Cliente' }, { key: 'moto', label: 'Moto' }, { key: 'placa', label: 'Placa' },
+          { key: 'cliente', label: 'Cliente' }, { key: 'moto', label: 'Vehículo' }, { key: 'placa', label: 'Placa' },
           { key: 'tecnico', label: 'Técnico' }, { key: 'ingreso', label: 'Ingreso' }, { key: 'total', label: 'Total' },
         ], filas);
         this.exportando = false; this.aviso(`${filas.length} órdenes exportadas`);
@@ -207,7 +207,7 @@ export class AdminResumenPage implements OnInit, OnDestroy {
           total: Number(o.costo_mano_obra || 0) + Number(o.costo_repuestos || 0) - Number(o.descuento || 0),
         }));
         descargarCSV(`facturacion_${this.hoy()}`, [
-          { key: 'numero_orden', label: 'Orden' }, { key: 'cliente', label: 'Cliente' }, { key: 'moto', label: 'Moto' },
+          { key: 'numero_orden', label: 'Orden' }, { key: 'cliente', label: 'Cliente' }, { key: 'moto', label: 'Vehículo' },
           { key: 'entrega', label: 'Entrega' }, { key: 'metodo_pago', label: 'Método de pago' }, { key: 'total', label: 'Total' },
         ], filas);
         this.exportando = false; this.aviso(`${filas.length} facturas exportadas`);

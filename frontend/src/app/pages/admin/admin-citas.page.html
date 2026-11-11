@@ -23,7 +23,7 @@
       <label class="gc-buscar">
         <ion-icon name="search-outline" aria-hidden="true"></ion-icon>
         <input type="search" [(ngModel)]="q" (ngModelChange)="alEscribir()" (keyup.enter)="vista === 'citas' && cargar()"
-               [placeholder]="vista === 'citas' ? 'Buscar por cliente o placa…' : 'Buscar por orden, cliente, placa o moto…'" aria-label="Buscar">
+               [placeholder]="vista === 'citas' ? 'Buscar por cliente o placa…' : 'Buscar por orden, cliente, placa o vehículo…'" aria-label="Buscar">
         <button type="button" *ngIf="q" (click)="limpiarBusqueda()" aria-label="Limpiar la búsqueda"><ion-icon name="close-circle"></ion-icon></button>
       </label>
     </div>
@@ -50,7 +50,7 @@
               <span class="oc-num mono">{{ o.numero_orden }}</span>
               <span class="bg bg-rd">Eliminada</span>
             </div>
-            <div class="oc-moto" *ngIf="o.moto"><ion-icon name="bicycle-outline"></ion-icon><strong>{{ o.moto }}</strong></div>
+            <div class="oc-moto" *ngIf="o.moto"><ion-icon name="car-outline"></ion-icon><strong>{{ o.moto }}</strong></div>
             <div class="oc-cliente" *ngIf="o.cliente_nombre"><ion-icon name="person-outline"></ion-icon>{{ o.cliente_nombre }}</div>
             <p class="oc-motivo"><strong>Motivo:</strong> {{ o.motivo }}</p>
             <div class="oc-footer">
@@ -71,7 +71,7 @@
               <span class="bg" [ngClass]="ordenBadge[o.estado]">{{ ordenLabel(o.estado) }}</span>
             </div>
             <div class="oc-moto">
-              <ion-icon name="bicycle-outline"></ion-icon>
+              <ion-icon name="car-outline"></ion-icon>
               <strong>{{ o.marca }} {{ o.modelo }}</strong>
               <span class="mono oc-placa" *ngIf="o.placa">{{ o.placa }}</span>
             </div>
@@ -132,7 +132,7 @@
 
               <div class="gc-info">
                 <div class="gc-l1">
-                  <strong>{{ c.marca ? (c.marca + ' ' + (c.modelo || '')) : 'Moto sin registrar' }}</strong>
+                  <strong>{{ c.marca ? (c.marca + ' ' + (c.modelo || '')) : 'Vehículo sin registrar' }}</strong>
                   <span class="mono gc-placa" *ngIf="c.placa">{{ c.placa }}</span>
                 </div>
                 <div class="gc-l2">

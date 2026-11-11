@@ -78,15 +78,15 @@ export class OrdenDesdeCitaService {
     const motos = (await firstValueFrom(this.rec.getMotos(clienteId)).catch(() => ({ data: [] as any[] }))).data || [];
     let elegida: number | 'nueva' | null = null;
     const s = await this.sheet.create({
-      header: 'La cita no tiene moto',
-      subHeader: motos.length ? `Elegí la moto${nombre ? ' de ' + nombre : ''} para la orden` : 'Registrá la moto para abrir la orden',
+      header: 'La cita no tiene vehículo',
+      subHeader: motos.length ? `Elegí el vehículo${nombre ? ' de ' + nombre : ''} para la orden` : 'Registrá el vehículo para abrir la orden',
       buttons: [
         ...motos.map((m: any) => ({
           text: `${m.marca} ${m.modelo}${m.placa ? ' · ' + m.placa : ''}`,
-          icon: 'bicycle-outline',
+          icon: 'car-outline',
           handler: () => { elegida = m.id; },
         })),
-        { text: 'Registrar moto nueva', icon: 'add-circle-outline', handler: () => { elegida = 'nueva'; } },
+        { text: 'Registrar vehículo nuevo', icon: 'add-circle-outline', handler: () => { elegida = 'nueva'; } },
         { text: 'Cancelar', icon: 'close', role: 'cancel' },
       ],
     });
@@ -98,7 +98,7 @@ export class OrdenDesdeCitaService {
 
   private async registrarMoto(clienteId: number): Promise<number | null> {
     const a = await this.alert.create({
-      header: 'Registrar moto',
+      header: 'Registrar vehículo',
       inputs: [
         { name: 'marca', placeholder: 'Marca * (Freedom, Hero, KYMCO…)' },
         { name: 'modelo', placeholder: 'Modelo *' },

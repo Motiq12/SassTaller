@@ -74,7 +74,7 @@
             <span class="ro-num mono">{{ o.numero_orden }}</span>
             <span class="pill" [ngClass]="estadoPill[o.estado]">{{ estadoLabel[o.estado] || o.estado }}</span>
           </span>
-          <span class="ro-moto"><ion-icon name="bicycle-outline"></ion-icon><strong>{{ o.marca }} {{ o.modelo }}</strong></span>
+          <span class="ro-moto"><ion-icon name="car-outline"></ion-icon><strong>{{ o.marca }} {{ o.modelo }}</strong></span>
           <span class="ro-linea"><ion-icon name="person-outline"></ion-icon> {{ o.cliente_nombre }} {{ o.cliente_apellido }}</span>
           <span class="ro-problema" *ngIf="o.problema_reportado">{{ o.problema_reportado }}</span>
           <span class="ro-pie">

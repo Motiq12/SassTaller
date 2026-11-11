@@ -56,7 +56,7 @@ export class RecepcionCotizPage implements OnInit, OnDestroy {
   // Los textos del selector, juntos: son lo único que cambia entre los tres campos.
   private readonly TEXTOS: Record<CampoPicker, { titulo: string; placeholder: string; vacio: string }> = {
     cliente: { titulo: 'Elegí un cliente', placeholder: 'Nombre, teléfono o correo', vacio: 'Ningún cliente coincide con la búsqueda.' },
-    orden:   { titulo: 'Elegí la orden', placeholder: 'Número de orden, moto o placa', vacio: 'Ninguna orden coincide con la búsqueda.' },
+    orden:   { titulo: 'Elegí la orden', placeholder: 'Número de orden, vehículo o placa', vacio: 'Ninguna orden coincide con la búsqueda.' },
     tecnico: { titulo: 'Asignar mecánico', placeholder: 'Nombre del mecánico', vacio: 'Ningún mecánico coincide con la búsqueda.' },
   };
 

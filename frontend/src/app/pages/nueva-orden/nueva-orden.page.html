@@ -12,7 +12,7 @@
     <header class="pg-cab">
       <div>
         <h1>Nueva orden de trabajo</h1>
-        <p>Elegí el cliente y la moto, y anotá cómo llega al taller.</p>
+        <p>Elegí el cliente y el vehículo, y anotá cómo llega al taller.</p>
       </div>
     </header>
 
@@ -22,7 +22,7 @@
         <span class="no-n">1</span> Cliente
       </button>
       <button type="button" role="tab" [class.on]="paso === 2" [attr.aria-selected]="paso === 2" [disabled]="!clienteSeleccionado" (click)="irAPaso(2)">
-        <span class="no-n">2</span> Moto
+        <span class="no-n">2</span> Vehículo
       </button>
       <button type="button" role="tab" [class.on]="paso === 3" [attr.aria-selected]="paso === 3" [disabled]="!motoSeleccionada" (click)="irAPaso(3)">
         <span class="no-n">3</span> Recepción
@@ -68,7 +68,7 @@
     <!-- PASO 2: moto -->
     <section class="cd pg-card" *ngIf="paso === 2">
       <div class="pg-card-cab">
-        <span class="cd-title"><ion-icon name="bicycle-outline"></ion-icon> Moto</span>
+        <span class="cd-title"><ion-icon name="car-outline"></ion-icon> Vehículo</span>
         <span class="pg-cuenta">{{ clienteSeleccionado?.nombre }} {{ clienteSeleccionado?.apellido }}</span>
       </div>
 
@@ -83,13 +83,13 @@
         </button>
       </div>
       <div class="pg-vacio" *ngIf="!motos.length">
-        <ion-icon name="bicycle-outline"></ion-icon> Este cliente no tiene motos registradas.
+        <ion-icon name="car-outline"></ion-icon> Este cliente no tiene vehículos registrados.
       </div>
 
       <div class="no-pie">
         <button type="button" class="btn btn-ou" (click)="pasoAnterior()"><ion-icon name="arrow-back-outline"></ion-icon> Volver</button>
         <a class="btn btn-ou" [routerLink]="[ruta('/moto-form')]" [queryParams]="{ cliente_id: clienteSeleccionado?.id }">
-          <ion-icon name="add-outline"></ion-icon> Registrar moto
+          <ion-icon name="add-outline"></ion-icon> Registrar vehículo
         </a>
       </div>
     </section>
@@ -104,7 +104,7 @@
       <div class="fg">
         <label for="no-problema">Problema reportado *</label>
         <textarea id="no-problema" [(ngModel)]="form.problema_reportado" name="problema_reportado" rows="3"
-                  placeholder="Qué le pasa a la moto, según el cliente"></textarea>
+                  placeholder="Qué le pasa al vehículo, según el cliente"></textarea>
       </div>
 
       <div class="fg-row">

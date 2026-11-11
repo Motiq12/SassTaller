@@ -437,7 +437,7 @@
     <ng-container *ngIf="seccion === 'mensajes'">
       <div class="cd cfg-nota cfg-mensajes-ayuda">
         <span class="cd-title"><ion-icon name="help-circle-outline"></ion-icon> Cómo se escriben</span>
-        <p>Los datos van entre llaves, por ejemplo <code>{{ '{' }}nombre{{ '}' }}</code> o <code>{{ '{' }}moto{{ '}' }}</code>, y se cambian solos por los de cada cliente. Lo que va entre corchetes solo sale si existe ese dato: <code>listo[ por {{ '{' }}total{{ '}' }}]</code> queda «listo» si la orden todavía no tiene total.</p>
+        <p>Los datos van entre llaves, por ejemplo <code>{{ '{' }}nombre{{ '}' }}</code> o <code>{{ '{' }}vehiculo{{ '}' }}</code>, y se cambian solos por los de cada cliente. Lo que va entre corchetes solo sale si existe ese dato: <code>listo[ por {{ '{' }}total{{ '}' }}]</code> queda «listo» si la orden todavía no tiene total.</p>
         <p>Abajo de cada mensaje está cómo le llega a un cliente de ejemplo.</p>
       </div>
 
@@ -463,7 +463,7 @@
 
       <div class="cd cfg-mensajes">
         <span class="cd-title"><ion-icon name="mail-outline"></ion-icon> Correos al cliente</span>
-        <p class="cfg-correo-texto">Salen si está encendido «Correo cuando la moto está lista» en <a routerLink="/admin/config/notificaciones">Notificaciones</a>. Datos: <code>{{ '{' }}nombre{{ '}' }}</code> y <code>{{ '{' }}moto{{ '}' }}</code>.</p>
+        <p class="cfg-correo-texto">Salen si está encendido «Correo cuando el vehículo está listo» en <a routerLink="/admin/config/notificaciones">Notificaciones</a>. Datos: <code>{{ '{' }}nombre{{ '}' }}</code> y <code>{{ '{' }}vehiculo{{ '}' }}</code>.</p>
         <div class="cfg-mensaje" *ngFor="let c of correosHito">
           <ng-container *ngIf="textosCorreo[c.clave] as t">
             <div class="cfg-mensaje-cab">
@@ -513,7 +513,7 @@
         <div class="cfg-lado">
           <div class="cd cfg-nota">
             <span class="cd-title"><ion-icon name="information-circle-outline"></ion-icon> Cómo llegan</span>
-            <p>Los avisos aparecen en el portal del cliente. El recordatorio y el aviso de moto lista también salen por correo, si el cliente dejó uno.</p>
+            <p>Los avisos aparecen en el portal del cliente. El recordatorio y el aviso de vehículo listo también salen por correo, si el cliente dejó uno.</p>
             <p>Cada cliente puede apagar los avisos de avance y los recordatorios desde su perfil en el portal: lo que apague él manda sobre lo de acá.</p>
           </div>
         </div>
@@ -579,7 +579,7 @@
         <div class="cd cfg-nota">
           <span class="cd-title"><ion-icon name="information-circle-outline"></ion-icon> Qué correos salen</span>
           <ul class="cfg-usos">
-            <li class="neutro"><strong>A los clientes</strong><span>Códigos para registrarse, ingresar, recuperar la contraseña y cambiar el correo; recordatorio de la cita; aviso de moto lista y entregada.</span></li>
+            <li class="neutro"><strong>A los clientes</strong><span>Códigos para registrarse, ingresar, recuperar la contraseña y cambiar el correo; recordatorio de la cita; aviso de vehículo listo y entregado.</span></li>
             <li class="neutro"><strong>Al taller</strong><span>Consultas nuevas del sitio web, el seguimiento de las que no tienen a nadie asignado y el aviso si falla un respaldo. Van al correo de <a routerLink="/admin/config/taller">Información del taller</a>.</span></li>
             <li class="neutro"><strong>Al personal</strong><span>El seguimiento del día de las consultas del sitio que cada uno tiene asignadas.</span></li>
           </ul>

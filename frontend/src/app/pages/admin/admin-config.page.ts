@@ -70,9 +70,9 @@ export class AdminConfigPage implements OnInit, OnDestroy {
     bloqueos: 'Horas o días en que no se agenda: un feriado, una capacitación, un trabajo grande. El portal no los ofrece y recepción no puede agendar ahí. Las citas que ya estaban no se cancelan.',
     sucursales: 'Locales donde el cliente puede agendar. El horario es compartido; el cupo se cuenta por sucursal.',
     entrega: 'Lo que llega precargado al cerrar y cobrar una orden.',
-    notificaciones: 'Qué avisos recibe el cliente sobre sus citas y su moto.',
+    notificaciones: 'Qué avisos recibe el cliente sobre sus citas y su vehículo.',
     portal: 'Lo que lee el cliente en el portal: un aviso arriba del inicio y las condiciones del servicio.',
-    mensajes: 'El texto de los WhatsApp que manda recepción y de los correos de moto lista y entregada. Al cliente se le habla de tú.',
+    mensajes: 'El texto de los WhatsApp que manda recepción y de los correos de vehículo listo y entregado. Al cliente se le habla de tú.',
     correo: 'Desde qué dirección salen los correos del sistema y si les llegan a los clientes.',
     respaldos: 'La copia de la base de datos que el sistema guarda sola todas las noches a las 2:30 a. m.',
     seguridad: 'Qué contraseñas acepta el sistema para el personal, y cerrar sesiones si se pierde un celular o se va alguien.',
@@ -98,10 +98,10 @@ export class AdminConfigPage implements OnInit, OnDestroy {
   textosWa: Record<string, string> = {};
   textosCorreo: Record<string, { titulo: string; mensaje: string }> = {};
   correoFabrica: Record<string, { titulo: string; mensaje: string }> = {};
-  readonly correosHito = [{ clave: 'listo', label: 'Moto lista para retirar' }, { clave: 'entregado', label: 'Moto entregada' }];
+  readonly correosHito = [{ clave: 'listo', label: 'Vehículo listo para retirar' }, { clave: 'entregado', label: 'Vehículo entregado' }];
   private readonly ejemplo: DatosMensaje = {
-    nombre: 'Ana', moto: 'Freedom 150', orden: 'OT-2026-00012', total: '₡45 000', portal: 'enlace del portal',
-    hora: '10:00', nota: 'Cambiamos la cadena y el piñón.', usuario: 'ana@correo.com', contrasena: '(contraseña nueva)',
+    nombre: 'Ana', moto: 'Toyota Hilux', orden: 'OT-2026-00012', total: '₡45 000', portal: 'enlace del portal',
+    hora: '10:00', nota: 'Cambiamos las pastillas de freno.', usuario: 'ana@correo.com', contrasena: '(contraseña nueva)',
   };
 
   // Textos del portal (configuracion.portal_textos): el aviso del inicio y las
@@ -129,8 +129,8 @@ export class AdminConfigPage implements OnInit, OnDestroy {
       detalle: 'Un aviso en el portal cuando el presupuesto está listo para aprobar.', necesita: '' },
     { campo: 'notif_recordatorio', icono: 'alarm-outline', titulo: 'Recordatorio de la cita',
       detalle: 'El día antes de la cita, en el portal y por correo.', necesita: '' },
-    { campo: 'notif_email_entrega', icono: 'mail-outline', titulo: 'Correo cuando la moto está lista',
-      detalle: 'Un correo cuando la moto queda lista y cuando se entrega.', necesita: 'notif_estado' },
+    { campo: 'notif_email_entrega', icono: 'mail-outline', titulo: 'Correo cuando el vehículo está listo',
+      detalle: 'Un correo cuando el vehículo queda listo y cuando se entrega.', necesita: 'notif_estado' },
   ];
 
   // Feriados que se repiten (GET /api/admin/feriados): los marcados y los de ley que faltan.

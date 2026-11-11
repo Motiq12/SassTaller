@@ -42,13 +42,13 @@
       </div>
 
       <div class="ig" *ngIf="cliente">
-        <label>Moto{{ modo === 'ahora' ? ' *' : '' }}</label>
+        <label>Vehículo{{ modo === 'ahora' ? ' *' : '' }}</label>
         <select [(ngModel)]="form.vehiculo_id" name="vehiculo_id" *ngIf="motos.length">
-          <option [ngValue]="null">{{ modo === 'ahora' ? 'Elegí la moto' : 'Sin especificar' }}</option>
+          <option [ngValue]="null">{{ modo === 'ahora' ? 'Elegí el vehículo' : 'Sin especificar' }}</option>
           <option *ngFor="let m of motos" [ngValue]="m.id">{{ m.marca }} {{ m.modelo }}{{ m.placa ? ' — ' + m.placa : '' }}</option>
         </select>
         <button type="button" class="link-nuevo" (click)="registrarMoto()">
-          <ion-icon name="add-outline"></ion-icon> {{ motos.length ? 'Registrar otra moto' : 'Este cliente no tiene motos · Registrar' }}
+          <ion-icon name="add-outline"></ion-icon> {{ motos.length ? 'Registrar otro vehículo' : 'Este cliente no tiene vehículos · Registrar' }}
         </button>
       </div>
 
@@ -78,7 +78,7 @@
 
       <div class="ig">
         <label>Problema reportado *</label>
-        <textarea [(ngModel)]="form.problema_reportado" name="problema_reportado" placeholder="Lo que dice el cliente sobre su moto…"></textarea>
+        <textarea [(ngModel)]="form.problema_reportado" name="problema_reportado" placeholder="Lo que dice el cliente sobre su vehículo…"></textarea>
       </div>
 
       <div class="grid2">
@@ -149,7 +149,7 @@
 
       <div class="ig" style="margin-bottom:4px">
         <label>Problema o notas (opcional)</label>
-        <textarea [(ngModel)]="form.motivo" name="motivo" placeholder="Anotá lo que dijo el cliente sobre su moto…"></textarea>
+        <textarea [(ngModel)]="form.motivo" name="motivo" placeholder="Anotá lo que dijo el cliente sobre su vehículo…"></textarea>
       </div>
     </section>
 
@@ -184,7 +184,7 @@
             <div class="fg"><label for="ac-ced">Cédula <b>*</b></label><input id="ac-ced" inputmode="numeric" [(ngModel)]="nuevoCliente.cedula" name="cedula" placeholder="1-2345-6789"></div>
           </div>
           <div class="fg"><label for="ac-mail">Correo</label><input id="ac-mail" type="email" inputmode="email" [(ngModel)]="nuevoCliente.email" name="email" placeholder="cliente@correo.com">
-            <div class="hint">Opcional. Con el correo puede entrar al portal y ver su moto.</div></div>
+            <div class="hint">Opcional. Con el correo puede entrar al portal y ver su vehículo.</div></div>
         </div>
         <div class="amb-foot">
           <span class="amb-tip"><b>*</b> Obligatorio</span>
@@ -197,14 +197,14 @@
     </ng-template>
   </ion-modal>
 
-  <!-- Registrar moto del cliente elegido -->
+  <!-- Registrar vehículo del cliente elegido -->
   <ion-modal class="adm-modal" [isOpen]="modalMoto" (didDismiss)="modalMoto = false" (didPresent)="enfocarVacio($event)">
     <ng-template>
       <form class="admin-dark adm-modal-box alta" (ngSubmit)="guardarMoto()" autocomplete="off">
         <div class="amb-head">
           <div class="alta-tit">
-            <span class="alta-ico"><ion-icon name="bicycle-outline"></ion-icon></span>
-            <div><strong>Registrar moto</strong><span>De {{ cliente?.nombre }} {{ cliente?.apellido }}</span></div>
+            <span class="alta-ico"><ion-icon name="car-outline"></ion-icon></span>
+            <div><strong>Registrar vehículo</strong><span>De {{ cliente?.nombre }} {{ cliente?.apellido }}</span></div>
           </div>
           <button type="button" class="amb-x" (click)="modalMoto = false" aria-label="Cerrar"><ion-icon name="close-outline"></ion-icon></button>
         </div>
@@ -225,7 +225,7 @@
           <span class="amb-tip">La placa y el año se pueden completar después.</span>
           <div class="amb-btns">
             <button type="button" class="btn btn-ou" (click)="modalMoto = false">Ahora no</button>
-            <button type="submit" class="btn btn-cr" [disabled]="guardandoAlta || !motoCompleta">{{ guardandoAlta ? 'Guardando…' : 'Registrar moto' }}</button>
+            <button type="submit" class="btn btn-cr" [disabled]="guardandoAlta || !motoCompleta">{{ guardandoAlta ? 'Guardando…' : 'Registrar vehículo' }}</button>
           </div>
         </div>
       </form>

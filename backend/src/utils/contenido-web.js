@@ -835,7 +835,7 @@ function negocioParaSitio(negocio, sucursales) {
     if (d.direccion) sede.direccion = d.direccion;
     if (d.foto) {
       sede.foto = d.foto;
-      sede.fotoAlt = d.foto_alt || `Sede ${s.nombre} de MS Motos`;
+      sede.fotoAlt = d.foto_alt || `Sede ${s.nombre}`;
     }
     if (Array.isArray(d.horarios)) {
       const filas = horariosAgrupados(d.horarios);

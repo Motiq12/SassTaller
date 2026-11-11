@@ -39,7 +39,7 @@ const CATALOGO = [
     { id: 'ordenes.facturar', nombre: 'Facturar' },
   ] },
   { grupo: 'Clientes', permisos: [
-    { id: 'clientes.ver', nombre: 'Ver clientes y motos' },
+    { id: 'clientes.ver', nombre: 'Ver clientes y vehículos' },
     { id: 'clientes.editar', nombre: 'Crear y editar clientes' },
     { id: 'clientes.eliminar', nombre: 'Eliminar clientes' },
     { id: 'clientes.portal', nombre: 'Dar acceso al portal' },
@@ -78,7 +78,7 @@ const ROLES_FABRICA = [
   },
   {
     clave: 'recepcion', nombre: 'Recepción', base: 'mostrador',
-    descripcion: 'Atiende el mostrador: agenda, recibe motos, arma cotizaciones, entrega y cobra.',
+    descripcion: 'Atiende el mostrador: agenda, recibe vehículos, arma cotizaciones, entrega y cobra.',
     permisos: [
       'citas.ver', 'citas.agendar', 'citas.cancelar',
       'ordenes.crear', 'ordenes.editar', 'ordenes.asignar', 'ordenes.estado', 'ordenes.precios',

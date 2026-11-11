@@ -30,7 +30,7 @@ export function alertaColor(a: any): string {
 
 export function alertaTexto(a: any): string {
   const cliente = `${a?.cliente_nombre || ''} ${a?.cliente_apellido || ''}`.trim();
-  const moto = [a?.marca, a?.modelo].filter(Boolean).join(' ') || 'la moto';
+  const moto = [a?.marca, a?.modelo].filter(Boolean).join(' ') || 'el vehículo';
   switch (a?.tipo) {
     case 'foto':
       return `${a.tecnico_nombre || 'El mecánico'} subió evidencia · ${moto}`;

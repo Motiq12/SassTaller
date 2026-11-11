@@ -87,7 +87,7 @@
         <div class="hero-velo"></div>
         <div class="hero-cuerpo">
           <span class="hero-rotulo">Sin citas por ahora</span>
-          <h2>¿Le toca servicio a tu moto?</h2>
+          <h2>¿Le toca servicio a tu vehículo?</h2>
           <p class="hero-sub">Elige el día y la hora que te queden mejor. Te avisamos cuando esté lista.</p>
           <button type="button" class="hero-cta" (click)="irAgendar()"><ion-icon name="add" aria-hidden="true"></ion-icon> Agendar una cita</button>
         </div>
@@ -163,8 +163,8 @@
         <span>Mis citas</span>
       </a>
       <a routerLink="/portal/motos" class="atajo">
-        <span class="atajo-ico"><ion-icon name="bicycle-outline" aria-hidden="true"></ion-icon></span>
-        <span>Mis motos</span>
+        <span class="atajo-ico"><ion-icon name="car-outline" aria-hidden="true"></ion-icon></span>
+        <span>Mis vehículos</span>
       </a>
       <a routerLink="/portal/ofertas" class="atajo">
         <span class="atajo-ico"><ion-icon name="pricetags-outline" aria-hidden="true"></ion-icon></span>
@@ -213,11 +213,11 @@
         </div>
         <div class="num">
           <strong>{{ resumen.motos_registradas ?? 0 }}</strong>
-          <span>{{ resumen.motos_registradas === 1 ? 'Moto' : 'Motos' }}</span>
+          <span>{{ resumen.motos_registradas === 1 ? 'Vehículo' : 'Vehículos' }}</span>
         </div>
         <div class="num num--plata">
           <strong>{{ (resumen.total_pagado || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</strong>
-          <span>Invertido en tu moto</span>
+          <span>Invertido en tu vehículo</span>
         </div>
       </section>
     </div>
@@ -231,7 +231,7 @@
       <div class="garaje-fila">
         <a class="moto" *ngFor="let m of motos" [routerLink]="['/portal/moto', m.id, 'historial']">
           <div class="moto-foto" [style.background-image]="m.foto ? 'url(' + m.foto + ')' : null">
-            <ion-icon *ngIf="!m.foto" name="bicycle" aria-hidden="true"></ion-icon>
+            <ion-icon *ngIf="!m.foto" name="car" aria-hidden="true"></ion-icon>
             <span class="moto-placa mono" *ngIf="m.placa">{{ m.placa }}</span>
           </div>
           <div class="moto-info">
@@ -241,7 +241,7 @@
         </a>
         <a class="moto moto--nueva" routerLink="/portal/motos">
           <ion-icon name="add" aria-hidden="true"></ion-icon>
-          <span>Agregar moto</span>
+          <span>Agregar vehículo</span>
         </a>
       </div>
     </section>

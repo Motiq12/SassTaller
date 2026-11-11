@@ -37,7 +37,7 @@ function avisosDeCambio({ desde, hacia, repuestos = [], fotosIngreso = 0, aproba
   if (desde === 'recepcion' && !fotosIngreso) {
     avisos.push({
       tipo: 'fotos_ingreso',
-      mensaje: 'La moto no tiene fotos de ingreso.',
+      mensaje: 'El vehículo no tiene fotos de ingreso.',
       detalle: ['Son el respaldo del taller si el cliente reclama un golpe o un rayón que ya traía.'],
     });
   }

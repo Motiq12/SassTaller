@@ -29,7 +29,7 @@
   <div class="ord-buscador">
     <ion-icon name="search-outline"></ion-icon>
     <input type="search" [ngModel]="busqueda" (ngModelChange)="buscar($event)" enterkeyhint="search"
-           placeholder="Buscar por número, cliente, teléfono, placa o moto" aria-label="Buscar órdenes">
+           placeholder="Buscar por número, cliente, teléfono, placa o vehículo" aria-label="Buscar órdenes">
     <button type="button" *ngIf="busqueda" (click)="limpiarBusqueda()" aria-label="Limpiar búsqueda">
       <ion-icon name="close-circle"></ion-icon>
     </button>
@@ -63,7 +63,7 @@
                 </ion-badge>
               </div>
               <div class="orden-moto">
-                <ion-icon name="bicycle-outline"></ion-icon>
+                <ion-icon name="car-outline"></ion-icon>
                 {{ orden.marca }} {{ orden.modelo }}
                 <span class="placa-inline" *ngIf="orden.placa">· {{ orden.placa }}</span>
               </div>

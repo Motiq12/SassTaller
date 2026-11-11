@@ -149,7 +149,7 @@
           <div class="ot-card-cuerpo" *ngIf="editando">
             <div class="fg-row">
               <div class="fg">
-                <label for="ed-moto">Moto</label>
+                <label for="ed-moto">Vehículo</label>
                 <select id="ed-moto" name="vehiculo_id" [(ngModel)]="edicion.vehiculo_id">
                   <option *ngFor="let m of motosCliente" [ngValue]="m.id">{{ m.marca }} {{ m.modelo }}{{ m.placa ? ' · ' + m.placa : '' }}</option>
                 </select>
@@ -194,7 +194,7 @@
               <textarea id="ed-acc" name="accesorios_entregados" rows="2" [(ngModel)]="edicion.accesorios_entregados"></textarea>
             </div>
             <div class="fg">
-              <label for="ed-fisico">Estado físico de la moto</label>
+              <label for="ed-fisico">Estado físico del vehículo</label>
               <textarea id="ed-fisico" name="estado_fisico" rows="2" [(ngModel)]="edicion.estado_fisico"></textarea>
             </div>
             <div class="ot-botones">
@@ -443,7 +443,7 @@
 
         <!-- Cliente y moto -->
         <section class="ot-card">
-          <div class="ot-card-cab"><h2 class="ot-h2">Cliente y moto</h2></div>
+          <div class="ot-card-cab"><h2 class="ot-h2">Cliente y vehículo</h2></div>
           <div class="ot-card-cuerpo">
             <div>
               <div class="ot-nombre">{{ orden.cliente_nombre }} {{ orden.cliente_apellido }}</div>
@@ -465,7 +465,7 @@
             </div>
             <div class="ot-enlaces" *ngIf="!esTecnico">
               <button type="button" class="ot-link" (click)="verCliente()">Ficha del cliente</button>
-              <button type="button" class="ot-link" (click)="verHistorialMoto()">Historial de la moto</button>
+              <button type="button" class="ot-link" (click)="verHistorialMoto()">Historial del vehículo</button>
             </div>
           </div>
         </section>

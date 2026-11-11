@@ -160,7 +160,7 @@ export class ClienteDetallePage implements OnInit, OnDestroy {
   async eliminarCliente() {
     const conf = await this.alert.create({
       header: 'Eliminar cliente',
-      message: `¿Eliminar a ${this.cliente!.nombre} ${this.cliente!.apellido || ''}? Se borran sus datos personales, su acceso al portal y sus motos salen de los listados. Las órdenes y facturas ya registradas se conservan. No se puede deshacer.`,
+      message: `¿Eliminar a ${this.cliente!.nombre} ${this.cliente!.apellido || ''}? Se borran sus datos personales, su acceso al portal y sus vehículos salen de los listados. Las órdenes y facturas ya registradas se conservan. No se puede deshacer.`,
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         {

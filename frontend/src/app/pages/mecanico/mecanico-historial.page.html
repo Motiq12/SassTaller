@@ -48,7 +48,7 @@
     <div class="mc-citas" *ngIf="!cargando">
       <article class="mc-cita mh-cita" *ngFor="let c of citas">
         <div class="mc-cita-top">
-          <strong class="mc-moto">{{ c.marca || 'Moto' }} {{ c.modelo || '' }}<span class="mono" *ngIf="c.placa"> · {{ c.placa }}</span></strong>
+          <strong class="mc-moto">{{ c.marca || 'Vehículo' }} {{ c.modelo || '' }}<span class="mono" *ngIf="c.placa"> · {{ c.placa }}</span></strong>
           <span class="pill gris">Entregado</span>
         </div>
         <div class="pg-item-txt">

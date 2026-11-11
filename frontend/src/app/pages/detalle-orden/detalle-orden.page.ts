@@ -426,7 +426,7 @@ export class DetalleOrdenPage implements OnInit, OnDestroy {
     const a = await this.alert.create({
       header: `Cancelar ${o.numero_orden}`,
       message: 'La orden queda cerrada sin cobrar. ¿Por qué se cancela?',
-      inputs: [{ name: 'motivo', type: 'textarea', placeholder: 'Ej.: el cliente no aprobó y se llevó la moto', attributes: { maxlength: 300 } }],
+      inputs: [{ name: 'motivo', type: 'textarea', placeholder: 'Ej.: el cliente no aprobó y se llevó el vehículo', attributes: { maxlength: 300 } }],
       buttons: [
         { text: 'Volver', role: 'cancel' },
         {
@@ -464,7 +464,7 @@ export class DetalleOrdenPage implements OnInit, OnDestroy {
   abrirMas(ev: Event) {
     const items: ItemMenu[] = [];
     if (this.puedeEditar) items.push({ texto: 'Editar datos de ingreso', icono: 'create-outline', accion: () => this.abrirEdicion() });
-    if (!this.esTecnico) items.push({ texto: 'Historial de la moto', icono: 'time-outline', accion: () => this.verHistorialMoto() });
+    if (!this.esTecnico) items.push({ texto: 'Historial del vehículo', icono: 'time-outline', accion: () => this.verHistorialMoto() });
     if (this.puedeEliminar) items.push({ texto: 'Eliminar orden…', icono: 'trash-outline', peligro: true, accion: () => this.eliminarOrden() });
     this.abrirMenu(ev, items);
   }

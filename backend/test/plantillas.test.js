@@ -32,8 +32,14 @@ test('normalizarPlantillas descarta lo que no sirve', () => {
 test('correoDeHito: lo del taller encima de lo de fábrica, campo por campo', () => {
   const propias = { correo: { listo: { mensaje: '{nombre}, tu {moto} te espera.' } } };
   assert.deepStrictEqual(correoDeHito('listo', propias, { nombre: 'Ana', moto: 'KYMCO Agility' }),
-    { titulo: 'Tu moto está lista', mensaje: 'Ana, tu KYMCO Agility te espera.' });
-  assert.deepStrictEqual(correoDeHito('entregado', {}, { moto: 'tu moto' }),
-    { titulo: 'Servicio entregado', mensaje: 'tu moto fue entregada. ¡Gracias por tu visita!' });
+    { titulo: 'Tu vehículo está listo', mensaje: 'Ana, tu KYMCO Agility te espera.' });
+  assert.deepStrictEqual(correoDeHito('entregado', {}, { moto: 'tu vehículo' }),
+    { titulo: 'Servicio entregado', mensaje: 'Entregamos tu vehículo. ¡Gracias por tu visita!' });
   assert.strictEqual(correoDeHito('en_revision', {}, {}), null);
+});
+
+test('{vehiculo} y {moto} dan lo mismo: hay textos guardados con el nombre anterior', () => {
+  assert.strictEqual(rellenar('Tu {vehiculo}', { moto: 'Toyota Coaster' }), 'Tu Toyota Coaster');
+  assert.strictEqual(rellenar('Tu {moto}', { moto: 'Toyota Coaster' }), 'Tu Toyota Coaster');
+  assert.strictEqual(rellenar('Listo[ {vehiculo}]', {}), 'Listo');
 });

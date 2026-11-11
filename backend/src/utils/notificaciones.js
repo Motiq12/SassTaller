@@ -51,7 +51,7 @@ async function notificarCambioEstado(db, citaId, estado) {
     if (!cita) return;
     // Preferencia del cliente: si desactivó los avisos de avance, no se le notifica.
     if (cita.notif_avances === 0) return;
-    const moto = [cita.marca, cita.modelo].filter(Boolean).join(' ') || 'tu moto';
+    const moto = [cita.marca, cita.modelo].filter(Boolean).join(' ') || 'tu vehículo';
     const legible = ESTADO_LEGIBLE[estado] || estado;
     await crearNotificacion(db, {
       cliente_id: cita.cliente_id,
@@ -125,7 +125,7 @@ async function notificarCitaAgendada(db, citaId, { reprogramada = false } = {}) 
     if (!cita || !cita.cliente_id) return;
     // Preferencia del cliente: si desactivó los avisos, no se le notifica.
     if (cita.notif_avances === 0) return;
-    const moto = [cita.marca, cita.modelo].filter(Boolean).join(' ') || 'tu moto';
+    const moto = [cita.marca, cita.modelo].filter(Boolean).join(' ') || 'tu vehículo';
     const servicio = cita.servicios || cita.tipo_servicio || cita.motivo || 'tu servicio';
     await crearNotificacion(db, {
       cliente_id: cita.cliente_id,
@@ -174,7 +174,7 @@ async function notificarPresupuestoListo(db, ordenId, { adicional = false } = {}
       [ordenId]
     );
     if (!orden || !orden.cliente_id) return;
-    const moto = [orden.marca, orden.modelo].filter(Boolean).join(' ') || 'tu moto';
+    const moto = [orden.marca, orden.modelo].filter(Boolean).join(' ') || 'tu vehículo';
     await crearNotificacion(db, {
       cliente_id: orden.cliente_id,
       cita_id: orden.cita_id || null,

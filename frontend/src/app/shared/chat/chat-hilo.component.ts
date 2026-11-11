@@ -45,8 +45,8 @@ export class ChatHiloComponent implements OnInit, OnChanges, OnDestroy {
     'Listo para entregar',
     'Necesito repuesto',
     'Esperando aprobación del cliente',
-    'Moto lista para prueba',
-    'Necesito ayuda con esta moto',
+    'Vehículo listo para prueba',
+    'Necesito ayuda con este vehículo',
   ];
 
   constructor(

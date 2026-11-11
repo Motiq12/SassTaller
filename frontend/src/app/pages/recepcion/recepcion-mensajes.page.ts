@@ -58,7 +58,7 @@ export class RecepcionMensajesPage implements OnInit, OnDestroy {
   }
 
   get placeholderBusqueda(): string {
-    return this.vista === 'mecanicos' ? 'Mecánico, orden, cliente, moto o texto' : 'Cliente, asunto o texto';
+    return this.vista === 'mecanicos' ? 'Mecánico, orden, cliente, vehículo o texto' : 'Cliente, asunto o texto';
   }
 
   cambiarVista(v: 'mecanicos' | 'clientes' | 'taller') {

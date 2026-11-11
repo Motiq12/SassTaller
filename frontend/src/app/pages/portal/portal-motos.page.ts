@@ -145,17 +145,17 @@ export class PortalMotosPage implements OnInit, OnDestroy {
         if (this.editandoId) {
           const i = this.motos.findIndex(m => m.id === this.editandoId);
           if (i >= 0) this.motos[i] = res.data;
-          this.mostrarToast('Moto actualizada');
+          this.mostrarToast('Vehículo actualizado');
         } else {
           this.motos.unshift(res.data);
-          this.mostrarToast('Moto registrada');
+          this.mostrarToast('Vehículo registrado');
         }
         this.cerrarForm();
         this.enviando = false;
       },
       error: err => {
         this.enviando = false;
-        this.mostrarToast(err.error?.error || 'No se pudo guardar la moto', 'danger');
+        this.mostrarToast(err.error?.error || 'No se pudo guardar el vehículo', 'danger');
       },
     });
   }
@@ -163,7 +163,7 @@ export class PortalMotosPage implements OnInit, OnDestroy {
   async eliminar(m: any) {
     const al = await this.alert.create({
       cssClass: 'portal-alert',
-      header: 'Eliminar moto',
+      header: 'Eliminar vehículo',
       message: `¿Quieres eliminar tu ${m.marca} ${m.modelo} (${m.placa})? Dejará de aparecer en tu lista.`,
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
@@ -178,9 +178,9 @@ export class PortalMotosPage implements OnInit, OnDestroy {
       next: () => {
         this.motos = this.motos.filter(x => x.id !== m.id);
         if (this.editandoId === m.id) this.cerrarForm();
-        this.mostrarToast('Moto eliminada');
+        this.mostrarToast('Vehículo eliminado');
       },
-      error: err => this.mostrarToast(err.error?.error || 'No se pudo eliminar la moto', 'danger'),
+      error: err => this.mostrarToast(err.error?.error || 'No se pudo eliminar el vehículo', 'danger'),
     });
   }
 

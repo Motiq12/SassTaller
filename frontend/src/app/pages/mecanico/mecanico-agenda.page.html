@@ -90,7 +90,7 @@
           <div class="pg-item ma-cita" *ngFor="let c of citasDia">
             <span class="ma-hora mono">{{ c.hora || '—' }}</span>
             <div class="pg-item-txt">
-              <strong>{{ c.marca || 'Moto' }} {{ c.modelo || '' }}<ng-container *ngIf="c.placa"> · {{ c.placa }}</ng-container></strong>
+              <strong>{{ c.marca || 'Vehículo' }} {{ c.modelo || '' }}<ng-container *ngIf="c.placa"> · {{ c.placa }}</ng-container></strong>
               <span *ngIf="c.servicios || c.tipo_servicio">{{ c.servicios || c.tipo_servicio }}</span>
               <span *ngIf="c.cliente_nombre"><ion-icon name="person-outline"></ion-icon> {{ c.cliente_nombre }} {{ c.cliente_apellido }}</span>
               <span class="ma-badges">

@@ -1243,7 +1243,7 @@ router.post('/vehiculos', async (req, res) => {
     if (faltante(res, req.body, [['marca', 'la marca'], ['modelo', 'el modelo'], ['placa', 'la placa']])) return;
     if (!placaValida(placa)) return invalido(res, 'placa', 'La placa no tiene un formato válido');
     if (!anioValido(anio)) return invalido(res, 'anio', 'El año no es válido');
-    if (!fotoValida(foto)) return invalido(res, 'foto', 'La foto de la moto no es válida o es demasiado grande.');
+    if (!fotoValida(foto)) return invalido(res, 'foto', 'La foto del vehículo no es válida o es demasiado grande.');
     // Bloquea placas ya registradas (normaliza espacios y guiones).
     const [[existe]] = await req.db.query(
       `SELECT id FROM vehiculos WHERE tenant_id = @tenant AND activa = 1
@@ -1271,7 +1271,7 @@ router.post('/vehiculos', async (req, res) => {
       'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM vehiculos WHERE id = ? AND tenant_id = @tenant',
       [result.insertId]
     );
-    res.status(201).json({ data: nueva, message: 'Moto registrada' });
+    res.status(201).json({ data: nueva, message: 'Vehículo registrado' });
   } catch (err) {
     fail(res, err);
   }
@@ -1284,10 +1284,10 @@ router.put('/vehiculos/:id', async (req, res) => {
     if (faltante(res, req.body, [['marca', 'la marca'], ['modelo', 'el modelo'], ['placa', 'la placa']])) return;
     if (!placaValida(placa)) return invalido(res, 'placa', 'La placa no tiene un formato válido');
     if (!anioValido(anio)) return invalido(res, 'anio', 'El año no es válido');
-    if (!fotoValida(foto)) return invalido(res, 'foto', 'La foto de la moto no es válida o es demasiado grande.');
+    if (!fotoValida(foto)) return invalido(res, 'foto', 'La foto del vehículo no es válida o es demasiado grande.');
     // La moto debe ser del cliente
     const [[moto]] = await req.db.query('SELECT id FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ? AND activa = 1', [req.params.id, req.cliente.id]);
-    if (!moto) return res.status(404).json({ error: 'Moto no encontrada' });
+    if (!moto) return res.status(404).json({ error: 'Vehículo no encontrado' });
     // Placa duplicada (excluyendo la propia)
     const [[dup]] = await req.db.query(
       `SELECT id FROM vehiculos WHERE tenant_id = @tenant AND activa = 1 AND id <> ?
@@ -1304,7 +1304,7 @@ router.put('/vehiculos/:id', async (req, res) => {
       'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM vehiculos WHERE id = ? AND tenant_id = @tenant',
       [req.params.id]
     );
-    res.json({ data: actualizada, message: 'Moto actualizada' });
+    res.json({ data: actualizada, message: 'Vehículo actualizado' });
   } catch (err) {
     fail(res, err);
   }
@@ -1315,9 +1315,9 @@ router.put('/vehiculos/:id', async (req, res) => {
 router.delete('/vehiculos/:id', async (req, res) => {
   try {
     const [[moto]] = await req.db.query('SELECT id FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ? AND activa = 1', [req.params.id, req.cliente.id]);
-    if (!moto) return res.status(404).json({ error: 'Moto no encontrada' });
+    if (!moto) return res.status(404).json({ error: 'Vehículo no encontrado' });
     await req.db.query('UPDATE vehiculos SET activa = 0 WHERE id = ? AND tenant_id = @tenant', [req.params.id]);
-    res.json({ message: 'Moto eliminada' });
+    res.json({ message: 'Vehículo eliminado' });
   } catch (err) {
     fail(res, err);
   }
@@ -1332,7 +1332,7 @@ router.get('/vehiculos/:id/historial', async (req, res) => {
       'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?',
       [req.params.id, req.cliente.id]
     );
-    if (!moto) return res.status(404).json({ error: 'Moto no encontrada' });
+    if (!moto) return res.status(404).json({ error: 'Vehículo no encontrado' });
 
     const [servicios] = await req.db.query(
       `SELECT ci.id, to_char(COALESCE(ci.fecha_fin, ci.fecha), 'YYYY-MM-DD') AS fecha,
@@ -1414,7 +1414,7 @@ router.put('/citas/:id', async (req, res) => {
     // Uno o varios servicios del catálogo (`tipo_servicio` suelto: la app sin actualizar).
     const servicios = serviciosDelPedido(req.body);
     if (!vehiculo_id || !fecha || !hora || !servicios.length) {
-      return res.status(400).json({ error: 'Moto, servicio, fecha y hora son requeridos' });
+      return res.status(400).json({ error: 'Vehículo, servicio, fecha y hora son requeridos' });
     }
     const problemaServicios = await problemaConServicios(req.db, servicios, { obligatorio: true, delCatalogo: true });
     if (problemaServicios) return invalido(res, 'servicios', problemaServicios);
@@ -1454,7 +1454,7 @@ router.put('/citas/:id', async (req, res) => {
     }
 
     const [[moto]] = await req.db.query('SELECT id FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?', [vehiculo_id, req.cliente.id]);
-    if (!moto) return invalido(res, 'vehiculo_id', 'Moto no válida');
+    if (!moto) return invalido(res, 'vehiculo_id', 'Vehículo no válido');
 
     const motivo = (descripcion || '').trim() || textoServicios(servicios).slice(0, MAX_MOTIVO);
     if (!textoDentroDeLimite(motivo, MAX_MOTIVO)) {
@@ -1503,7 +1503,7 @@ router.post('/citas', async (req, res) => {
     // Uno o varios servicios del catálogo (`tipo_servicio` suelto: la app sin actualizar).
     const servicios = serviciosDelPedido(req.body);
     if (!vehiculo_id || !fecha || !hora || !servicios.length) {
-      return res.status(400).json({ error: 'Moto, servicio, fecha y hora son requeridos' });
+      return res.status(400).json({ error: 'Vehículo, servicio, fecha y hora son requeridos' });
     }
     const problemaServicios = await problemaConServicios(req.db, servicios, { obligatorio: true, delCatalogo: true });
     if (problemaServicios) return invalido(res, 'servicios', problemaServicios);
@@ -1538,7 +1538,7 @@ router.post('/citas', async (req, res) => {
 
     // La moto debe ser del cliente
     const [[moto]] = await req.db.query('SELECT id FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?', [vehiculo_id, req.cliente.id]);
-    if (!moto) return invalido(res, 'vehiculo_id', 'Moto no válida');
+    if (!moto) return invalido(res, 'vehiculo_id', 'Vehículo no válido');
 
     const motivo = (descripcion || '').trim() || textoServicios(servicios).slice(0, MAX_MOTIVO);
     if (!textoDentroDeLimite(motivo, MAX_MOTIVO)) {
