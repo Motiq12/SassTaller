@@ -1,13 +1,14 @@
 import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { LoadingController, ToastController } from '@ionic/angular';
-import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { Subject, of } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, switchMap, takeUntil } from 'rxjs/operators';
 import { PortalService, RespuestaGoogle } from '../../services/portal.service';
 import { emailValido } from '../../utils/validar';
 import { marcarCampo } from '../../shared/errores';
 import { MarcaService } from '../../services/marca.service';
 import { TallerService } from '../../services/taller.service';
+import { DirectorioService, TallerDirectorio } from '../../services/directorio.service';
 import { captchaActivo, montarTurnstile, TurnstileWidget } from '../../shared/turnstile.util';
 
 @Component({
@@ -21,8 +22,39 @@ export class PortalRegistroPage implements OnInit, AfterViewInit, OnDestroy {
   /** Sin taller, la pantalla se viste de Motiq (theme/acceso-producto.scss). */
   readonly marca = inject(MarcaService);
   private taller = inject(TallerService);
+  private directorio = inject(DirectorioService);
   /** Se puede cambiar de taller, salvo en el subdominio de uno. */
   get puedeCambiarTaller(): boolean { return !this.taller.deSubdominio(); }
+  /** La cuenta es de un taller: sin él no se puede crear. */
+  get tieneTaller(): boolean { return !!this.taller.actual(); }
+
+  // ── Elegir el taller acá mismo ──
+  // "Crear cuenta" lleva siempre a este formulario. Si todavía no hay taller (se entró
+  // por motiq12.com y no por el enlace de uno), el primer campo lo pide: se escribe el
+  // nombre y se elige de la lista. El buscador por provincia sigue a un clic.
+  buscarTaller = '';
+  opcionesTaller: TallerDirectorio[] = [];
+  buscandoTaller = false;
+  buscadoTaller = false;
+  private textoTaller$ = new Subject<string>();
+
+  escribirTaller(texto: string) {
+    this.buscarTaller = texto;
+    this.textoTaller$.next(texto.trim());
+  }
+
+  elegirTaller(t: TallerDirectorio) {
+    this.taller.fijar(t.slug);
+    this.marca.cargarPublica().subscribe({ error: () => {} });
+    this.buscarTaller = '';
+    this.opcionesTaller = [];
+    this.buscadoTaller = false;
+  }
+
+  cambiarTaller() {
+    this.taller.limpiar();
+    this.marca.cargarPublica().subscribe({ error: () => {} });
+  }
   nombre = '';
   apellido = '';
   telefono = '';
@@ -71,12 +103,24 @@ export class PortalRegistroPage implements OnInit, AfterViewInit, OnDestroy {
     const desdeEntrar = history.state?.google as RespuestaGoogle | undefined;
     if (desdeEntrar?.requiere_datos) this.usarPaseGoogle(desdeEntrar);
 
+    // Lo que se escribe en "Tu taller": se espera a que deje de escribir, y la última
+    // búsqueda le gana a las anteriores. El buscador pide al menos dos letras.
+    this.textoTaller$.pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(q => {
+        if (q.length < 2) { this.buscandoTaller = false; this.buscadoTaller = false; return of({ data: [] as TallerDirectorio[] }); }
+        this.buscandoTaller = true;
+        return this.directorio.buscar({ q }).pipe(catchError(() => of({ data: [] as TallerDirectorio[] })));
+      }),
+      takeUntil(this.destroy$),
+    ).subscribe(r => {
+      this.opcionesTaller = r.data;
+      this.buscadoTaller = this.buscarTaller.trim().length >= 2;
+      this.buscandoTaller = false;
+    });
+
     const qp = this.route.snapshot.queryParamMap;
-    // Sin taller no se puede crear la cuenta: primero hay que elegirlo.
-    if (!this.taller.actual() && qp.get('verificar') !== '1' && !desdeEntrar?.requiere_datos) {
-      this.router.navigate(['/portal/buscar-taller'], { replaceUrl: true });
-      return;
-    }
     if (qp.get('verificar') === '1' && qp.get('email')) {
       this.email = qp.get('email')!;
       this.paso = 2;
@@ -103,7 +147,7 @@ export class PortalRegistroPage implements OnInit, AfterViewInit, OnDestroy {
   get nombrePaso(): string { return ['Tus datos', 'Tu acceso', 'Tu correo'][this.numeroPaso - 1]; }
 
   get datosOk(): boolean {
-    return !!(this.nombre.trim() && this.apellido.trim() && this.telefono.trim() && this.cedula.trim());
+    return this.tieneTaller && !!(this.nombre.trim() && this.apellido.trim() && this.telefono.trim() && this.cedula.trim());
   }
   get passLarga(): boolean { return this.password.length >= 8; }
   get coinciden(): boolean { return !!this.confirmar && this.password === this.confirmar; }
