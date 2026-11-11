@@ -27,6 +27,7 @@ const { getSucursales, sucursalValida, sucursalPorDefecto } = require('../utils/
 const { avanzarEstadoOrden, registrarAprobacion, registrarRechazoAdicional } = require('../utils/ordenes');
 const { recompensas } = require('../utils/recompensas');
 const { verificarIdToken, googleConfigurado } = require('../utils/google-id');
+const { cerrarSesionesDeCliente, olvidarCliente } = require('../utils/sesiones');
 
 // Fecha de hoy en zona del taller (offset configurable, por defecto UTC-6).
 // Evita rechazar/permitir un día de más cuando el server corre en UTC.
@@ -223,7 +224,7 @@ router.post('/google/completar', async (req, res) => {
     if (!googleConfigurado()) return res.status(404).json({ error: GOOGLE_NO_ACTIVO });
     let pase;
     try {
-      pase = jwt.verify(String(req.body?.pase_google || ''), process.env.JWT_SECRET);
+      pase = jwt.verify(String(req.body?.pase_google || ''), process.env.JWT_SECRET, { algorithms: ['HS256'] });
       if (pase.tipo !== 'google-alta') throw new Error('pase de otro tipo');
     } catch {
       return res.status(401).json({ error: 'Se venció el ingreso con Google. Vuelve a tocar "Continuar con Google".' });
@@ -451,6 +452,8 @@ router.post('/recuperar/confirmar', async (req, res) => {
     const hash = await bcrypt.hash(password, 10);
     await req.db.query('UPDATE clientes SET password_hash = ?, email_verificado = 1 WHERE id = ? AND tenant_id = @tenant', [hash, cliente.id]);
     await req.db.query('UPDATE password_reset_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
+    // Salen todas las sesiones anteriores; la que se abre abajo es posterior y vale.
+    await cerrarSesionesDeCliente(cliente.id);
 
     const { payload, token } = tokenCliente(cliente);
     res.json({ data: { token, cliente: payload } });
@@ -922,6 +925,8 @@ router.put('/perfil/password', async (req, res) => {
     if (!ok) return invalido(res, 'actual', 'La contraseña actual no es correcta');
     const hash = await bcrypt.hash(String(nueva), 10);
     await req.db.query('UPDATE clientes SET password_hash = ? WHERE id = ? AND tenant_id = @tenant', [hash, req.cliente.id]);
+    // Las otras sesiones salen; esta, donde se hizo el cambio, sigue.
+    await cerrarSesionesDeCliente(req.cliente.id, req.cliente.iat);
     res.json({ message: 'Contraseña actualizada' });
   } catch (err) {
     fail(res, err);
@@ -951,6 +956,7 @@ router.put('/perfil/foto', async (req, res) => {
 router.delete('/perfil', async (req, res) => {
   try {
     await req.db.query('UPDATE clientes SET activo = 0, password_hash = NULL WHERE id = ? AND tenant_id = @tenant', [req.cliente.id]);
+    olvidarCliente(req.cliente.id);
     res.json({ message: 'Cuenta eliminada' });
   } catch (err) {
     fail(res, err);

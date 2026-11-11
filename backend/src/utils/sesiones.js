@@ -159,18 +159,63 @@ async function cerrarSesiones(ids) {
   const lista = [...new Set(ids.map(Number).filter(Boolean))];
   if (!lista.length) return 0;
   const desde = Math.floor(Date.now() / 1000) * 1000;
-  const [r] = await pool.query('UPDATE usuarios SET sesiones_desde_ms = ? WHERE id IN (?)', [desde, lista]);
-  await pool.query('UPDATE sesiones_personal SET cerrada = CURRENT_TIMESTAMP WHERE usuario_id IN (?) AND cerrada IS NULL', [lista])
+  // `= ANY(lista)`: en Postgres un `IN (?)` con una lista no funciona (en MySQL sí), y
+  // esta función fallaba siempre: no se podía cerrarle la sesión a nadie.
+  const [r] = await pool.query('UPDATE usuarios SET sesiones_desde_ms = ? WHERE id = ANY(?::int[])', [desde, lista]);
+  await pool.query('UPDATE sesiones_personal SET cerrada = CURRENT_TIMESTAMP WHERE usuario_id = ANY(?::int[]) AND cerrada IS NULL', [lista])
     .catch((e) => console.error('No se pudieron marcar las sesiones:', e.code || e.message));
   for (const id of lista) cache.delete(id);
   cacheSid.clear();
   return r.affectedRows || 0;
 }
 
+// Al cambiar la contraseña: se cierran todas las demás sesiones de esa persona y queda
+// abierta solo la que hizo el cambio. Si alguien más tenía la cuenta abierta, sale.
+// Los tokens anteriores al actual dejan de valer por fecha; las sesiones abiertas
+// después en otro equipo se cierran por su `sid`.
+async function cerrarLasDemas(payload) {
+  const desde = Number(payload.iat) * 1000;
+  await pool.query(
+    'UPDATE usuarios SET sesiones_desde_ms = ? WHERE id = ? AND (sesiones_desde_ms IS NULL OR sesiones_desde_ms < ?)',
+    [desde, payload.id, desde]
+  );
+  cache.delete(Number(payload.id));
+  await cerrarOtrasSesiones(payload.id, payload.sid);
+}
+
+// ── Clientes del portal ──
+// Su token no lleva `sid`: se cierran por fecha, y una cuenta eliminada deja de entrar.
+const cacheClientes = new Map();
+
+async function estadoDeCliente(id) {
+  const guardado = cacheClientes.get(Number(id));
+  if (guardado && Date.now() - guardado.t < TTL_MS) return guardado.estado;
+  try {
+    const [[c]] = await pool.query('SELECT activo, sesiones_desde_ms FROM clientes WHERE id = ?', [id]);
+    const estado = c ? { activo: Number(c.activo) === 1, sesiones_desde_ms: c.sesiones_desde_ms == null ? null : Number(c.sesiones_desde_ms) } : null;
+    cacheClientes.set(Number(id), { estado, t: Date.now() });
+    return estado;
+  } catch (err) {
+    console.error('⚠️  No se pudo revisar la sesión del cliente:', err.code || err.message);
+    return undefined;
+  }
+}
+
+// Sin `iat`: todas (recuperó la contraseña). Con el `iat` del token actual: todas las
+// anteriores a esa (cambió la contraseña y sigue en su sesión).
+async function cerrarSesionesDeCliente(id, iat) {
+  const desde = iat ? Number(iat) * 1000 : Math.floor(Date.now() / 1000) * 1000;
+  await pool.query('UPDATE clientes SET sesiones_desde_ms = ? WHERE id = ?', [desde, id]);
+  cacheClientes.delete(Number(id));
+}
+
+function olvidarCliente(id) { cacheClientes.delete(Number(id)); }
+
 // Después de activar o desactivar a alguien: que se note en el próximo pedido.
 function olvidar(id) { cache.delete(Number(id)); }
 
 module.exports = {
   estadoDeSesion, sidAbierto, sesionVigente, cerrarSesiones, olvidar,
+  cerrarLasDemas, estadoDeCliente, cerrarSesionesDeCliente, olvidarCliente,
   describirAgente, nuevoSid, abrirSesion, sesionesAbiertas, cerrarSesionPropia, cerrarOtrasSesiones, cerrarSid,
 };

@@ -23,7 +23,7 @@ module.exports = function authMiddleware(req, res, next) {
   }
   const token = header.slice(7);
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
     // El token debe ser de PERSONAL: los del portal de clientes se firman con el
     // mismo secreto pero llevan tipo:'cliente' y no tienen rol. Sin este chequeo,
     // un cliente autenticado podría usar su token en las rutas de staff.

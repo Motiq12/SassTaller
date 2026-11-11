@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const { anotar } = require('../utils/actividad');
 const { filtrarAvisos } = require('../utils/preferencias');
 const { fail, invalido } = require('../utils/responder');
+const { cerrarLasDemas } = require('../utils/sesiones');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { soloRoles } = require('../middleware/roles');
@@ -850,6 +851,7 @@ router.put('/perfil/password', async (req, res) => {
     if (!ok) return res.status(400).json({ error: 'La contraseña actual no es correcta' });
     const hash = await bcrypt.hash(String(nueva), 10);
     await req.db.query('UPDATE usuarios SET password_hash = ? WHERE tenant_id = @tenant AND id = ?', [hash, req.usuario.id]);
+    await cerrarLasDemas(req.usuario);
     anotar(req.usuario.id, 'contrasena');
     res.json({ message: 'Contraseña actualizada' });
   } catch (err) {
