@@ -4,6 +4,7 @@ import { AlertController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PortalService } from '../../services/portal.service';
+import { TipoVehiculo } from '../../services/taller.service';
 import { MARCAS_MOTO, modelosDeMarca } from '../../utils/motos-catalogo';
 import { comprimirImagen } from '../../utils/imagen';
 import { mesesDesde } from '../../utils/mantenimiento';
@@ -23,7 +24,17 @@ export class PortalMotosPage implements OnInit, OnDestroy {
   enviando = false;
   procesandoFoto = false;
   editandoId: number | null = null;
-  nueva = { marca: '', modelo: '', placa: '', anio: null as number | null, color: '', kilometraje: null as number | null, foto: null as string | null };
+  nueva = { tipo: '', marca: '', modelo: '', placa: '', anio: null as number | null, color: '', kilometraje: null as number | null, foto: null as string | null };
+
+  // Los tipos que atiende el taller. Con uno solo no se pregunta nada.
+  private atendidos: TipoVehiculo[] = [];
+  private otros: TipoVehiculo[] = [];
+  atributos: Record<string, string | number | null> = {};
+  // Más el de este vehículo, si es de un tipo que el taller dejó de atender.
+  get tipos(): TipoVehiculo[] { return [...this.atendidos, ...this.otros.filter(t => t.clave === this.nueva.tipo)]; }
+  get tipoActual(): TipoVehiculo | undefined { return this.tipos.find(t => t.clave === this.nueva.tipo); }
+  // Al cambiar de tipo, los datos del anterior ya no aplican, y las sugerencias son de motos.
+  cambiarTipo() { this.atributos = {}; this.marcasSugeridas = []; this.modelosSugeridos = []; }
 
   // Autocompletado de marca/modelo (catálogo local, no restrictivo).
   marcasSugeridas: string[] = [];
@@ -48,6 +59,9 @@ export class PortalMotosPage implements OnInit, OnDestroy {
 
   cargar() {
     this.cargando = true;
+    this.portal.getTiposVehiculo().pipe(takeUntil(this.destroy$)).subscribe({
+      next: res => { this.atendidos = res.data; this.otros = res.otros || []; },
+    });
     this.portal.getMotos().pipe(takeUntil(this.destroy$)).subscribe({
       next: res => { this.motos = res.data; this.cargando = false; },
       error: () => { this.cargando = false; },
@@ -56,7 +70,8 @@ export class PortalMotosPage implements OnInit, OnDestroy {
 
   abrirForm() {
     this.editandoId = null;
-    this.nueva = { marca: '', modelo: '', placa: '', anio: null, color: '', kilometraje: null, foto: null };
+    this.nueva = { tipo: this.atendidos[0]?.clave || '', marca: '', modelo: '', placa: '', anio: null, color: '', kilometraje: null, foto: null };
+    this.atributos = {};
     this.marcasSugeridas = [];
     this.modelosSugeridos = [];
     this.mostrarForm = true;
@@ -64,8 +79,9 @@ export class PortalMotosPage implements OnInit, OnDestroy {
 
   editar(m: any) {
     this.editandoId = m.id;
+    this.atributos = { ...(m.atributos || {}) };
     this.nueva = {
-      marca: m.marca, modelo: m.modelo, placa: m.placa,
+      tipo: m.tipo || '', marca: m.marca, modelo: m.modelo, placa: m.placa,
       anio: m.anio || null, color: m.color || '', kilometraje: m.kilometraje_actual || null,
       foto: m.foto || null,
     };
@@ -95,6 +111,7 @@ export class PortalMotosPage implements OnInit, OnDestroy {
 
   // —— Autocompletado de marca ——
   onMarcaInput() {
+    if (this.nueva.tipo !== 'moto') { this.marcasSugeridas = []; return; }
     const q = this.nueva.marca.trim().toLowerCase();
     this.marcasSugeridas = q ? MARCAS_MOTO.filter(m => m.toLowerCase().includes(q)).slice(0, 8) : [];
   }
@@ -108,9 +125,10 @@ export class PortalMotosPage implements OnInit, OnDestroy {
 
   // —— Autocompletado de modelo, filtrado por la marca elegida ——
   onModeloFocus() {
-    if (!this.nueva.modelo.trim()) this.modelosSugeridos = modelosDeMarca(this.nueva.marca).slice(0, 8);
+    if (this.nueva.tipo === 'moto' && !this.nueva.modelo.trim()) this.modelosSugeridos = modelosDeMarca(this.nueva.marca).slice(0, 8);
   }
   onModeloInput() {
+    if (this.nueva.tipo !== 'moto') { this.modelosSugeridos = []; return; }
     const q = this.nueva.modelo.trim().toLowerCase();
     const modelos = modelosDeMarca(this.nueva.marca);
     this.modelosSugeridos = (q ? modelos.filter(m => m.toLowerCase().includes(q)) : modelos).slice(0, 8);
@@ -136,6 +154,8 @@ export class PortalMotosPage implements OnInit, OnDestroy {
       color: this.nueva.color.trim() || undefined,
       kilometraje_actual: this.nueva.kilometraje || 0,
       foto: this.nueva.foto || null,
+      // Sin tipo (no cargó la lista) no se manda: el servidor deja el que había.
+      ...(this.nueva.tipo ? { tipo: this.nueva.tipo, atributos: this.atributos } : {}),
     };
     const op = this.editandoId
       ? this.portal.editarMoto(this.editandoId, datos)

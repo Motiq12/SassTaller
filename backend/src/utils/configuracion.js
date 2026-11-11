@@ -6,6 +6,7 @@
 // preferencias de notificación. El portal lee de aquí los cupos/horas agendables.
 const { normalizarPlantillas } = require('./plantillas');
 const { normalizarTextosPortal } = require('./textos-portal');
+const { normalizarTipos } = require('./tipos-vehiculo');
 
 // Valores por defecto: idénticos a los antes hardcodeados (utils/servicios.js),
 // así el comportamiento inicial no cambia aunque la fila aún no exista.
@@ -95,6 +96,7 @@ async function getConfig(db) {
     metodos_pago: listaJson(row.metodos_pago, DEFAULTS.metodos_pago),
     plantillas: normalizarPlantillas(row.plantillas),
     portal_textos: normalizarTextosPortal(row.portal_textos),
+    tipos_vehiculo: normalizarTipos(row.tipos_vehiculo),
   };
   cache.set(db.tenantId, { config, at: Date.now() });
   return config;

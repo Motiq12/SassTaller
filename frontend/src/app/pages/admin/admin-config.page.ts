@@ -6,6 +6,7 @@ import { takeUntil } from 'rxjs/operators';
 import { AdminService, EstadoCorreo, EstadoRespaldos } from '../../services/admin.service';
 import { DirectorioService, Ubicaciones } from '../../services/directorio.service';
 import { MarcaService } from '../../services/marca.service';
+import { TallerService, TipoVehiculo } from '../../services/taller.service';
 import { PLANTILLAS_WA, PlantillaWa, NOMBRE_DATO, DatosMensaje, rellenar } from '../../shared/whatsapp.util';
 import { DOCS_LEGALES, mesYAnio } from '../../shared/textos-legales';
 
@@ -15,7 +16,7 @@ interface HorarioVista { dia: number; label: string; abre: string; cierra: strin
   standalone: false,
   selector: 'app-admin-config',
   templateUrl: './admin-config.page.html',
-  styleUrls: ['./admin-config.page.scss'],
+  styleUrls: ['./admin-config.page.scss', './admin-config-marca.scss'],
 })
 export class AdminConfigPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
@@ -30,6 +31,19 @@ export class AdminConfigPage implements OnInit, OnDestroy {
   ubicaciones: Ubicaciones = {};
   private directorio = inject(DirectorioService);
   guardandoBuscador = false;
+
+  // Color de la marca y vehículos que atiende (Información del taller).
+  private tallerSvc = inject(TallerService);
+  readonly colores = ['#e11d48', '#c2410c', '#a16207', '#15803d', '#0f766e', '#1d4ed8', '#6d28d9', '#27272a'];
+  tiposCatalogo: TipoVehiculo[] = [];
+  tipoMarcado(clave: string): boolean { return (this.config?.tipos_vehiculo || []).includes(clave); }
+  /** El último no se puede desmarcar: sin ningún tipo no se registrarían vehículos. */
+  tipoTrabado(clave: string): boolean { return this.tipoMarcado(clave) && this.config.tipos_vehiculo.length === 1; }
+  alternarTipo(clave: string) {
+    if (this.tipoTrabado(clave)) return;
+    const lista: string[] = this.config.tipos_vehiculo || [];
+    this.config.tipos_vehiculo = this.tipoMarcado(clave) ? lista.filter(t => t !== clave) : [...lista, clave];
+  }
   get provincias(): string[] { return Object.keys(this.ubicaciones); }
   cantonesDe(provincia: string | null | undefined): string[] { return this.ubicaciones[provincia || ''] || []; }
   /** Sin ubicación no se puede aparecer: el buscador filtra por zona. */
@@ -171,6 +185,7 @@ export class AdminConfigPage implements OnInit, OnDestroy {
     this.cargar();
     this.cargarSucursales();
     this.directorio.ubicaciones().pipe(takeUntil(this.destroy$)).subscribe({ next: r => this.ubicaciones = r.data });
+    this.tallerSvc.tipos().pipe(takeUntil(this.destroy$)).subscribe({ next: r => this.tiposCatalogo = r.data });
     this.cargarBloqueos();
     this.cargarFeriados();
   }
@@ -619,9 +634,12 @@ export class AdminConfigPage implements OnInit, OnDestroy {
         this.prepararPortal();
         // El logo y el nombre viajan a la factura y al PDF por MarcaService, que cachea:
         // sin esto habria que recargar la app para ver el cambio.
+        // Y se vuelve a leer ya, para que el color nuevo se vea sin recargar.
         this.marcaSvc.invalidar();
+        this.marcaSvc.get().pipe(takeUntil(this.destroy$)).subscribe();
         this.guardando = false;
-        this.aviso('Configuración guardada');
+        // Si el plan no incluye logo y color, el servidor lo dice: decir solo "guardado" engañaría.
+        this.aviso(r.aviso || 'Configuración guardada', r.aviso ? 'warning' : 'success');
       },
       error: (e) => { this.guardando = false; this.aviso(e.error?.error || 'No se pudo guardar', 'danger'); },
     });

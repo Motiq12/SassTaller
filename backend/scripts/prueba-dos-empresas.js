@@ -364,6 +364,36 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     const recep = await pedir('GET', `/ordenes/${ordenA}`, { token: A.token });
     ok(recep.status === 200, 'el dueño sigue viendo todas', recep.status);
 
+    // ── Tipos de vehículo y color desde Configuración ──
+    const conf = (token, extra) => pedir('PUT', '/admin/configuracion', { token, body: { nombre_taller: CANARIO, ...extra } });
+    ok((await conf(A.token, { tipos_vehiculo: [] })).status === 400, 'sin ningún tipo no se guarda');
+    ok((await conf(A.token, { tipos_vehiculo: ['avion'] })).status === 400, 'un tipo inventado no se guarda');
+    const claves = async (token) => (await pedir('GET', '/vehiculos/tipos', { token })).json.data.map((t) => t.clave).join();
+    ok(await claves(A.token) === 'auto', 'una lista rechazada no cambió nada', await claves(A.token));
+    const ponerTipos = await conf(A.token, { tipos_vehiculo: ['auto', 'bus'], color_primario: '#123456' });
+    ok(ponerTipos.status === 200 && ponerTipos.json.data.color_primario === '#123456', 'A cambia su color', ponerTipos.json.data && ponerTipos.json.data.color_primario);
+    ok(await claves(A.token) === 'auto,bus', 'A agrega buses', await claves(A.token));
+    ok(await claves(Bb.token) === 'auto', 'los tipos de B no cambian', await claves(Bb.token));
+    const colorB = await pedir('GET', '/admin/configuracion', { token: Bb.token });
+    ok(colorB.json.data.color_primario !== '#123456', 'el color de A no le llega a B', colorB.json.data.color_primario);
+    const clienteTok = jwt.sign({ id: clienteA, tipo: 'cliente', nombre: 'Ana', apellido: 'Mora', tenant_id: A.id }, process.env.JWT_SECRET, { expiresIn: '2h' });
+    const portalTipos = await pedir('GET', '/portal/vehiculos/tipos', { token: clienteTok });
+    ok(portalTipos.status === 200 && portalTipos.json.data.map((t) => t.clave).join() === 'auto,bus', 'el cliente ve los tipos de su taller', portalTipos.json);
+    const placaBus = 'BUS' + Math.floor(1000 + Math.random() * 9000);
+    const delCliente = { marca: 'Hino', modelo: 'AK', placa: placaBus };
+    const busCliente = await pedir('POST', '/portal/vehiculos', { token: clienteTok, body: { ...delCliente, tipo: 'bus', atributos: { pasajeros: 40, inventado: 'x' } } });
+    ok(busCliente.status === 201 && busCliente.json.data.tipo === 'bus', 'el cliente registra un bus', busCliente.json);
+    ok(busCliente.json.data.atributos.pasajeros === 40 && busCliente.json.data.atributos.inventado === undefined, 'guarda solo los datos propios del tipo', busCliente.json.data.atributos);
+    const noAtiende = await pedir('POST', '/portal/vehiculos', { token: clienteTok, body: { ...delCliente, placa: placaBus + 'X', tipo: 'camion' } });
+    ok(noAtiende.status === 400, 'un tipo que el taller no atiende se rechaza', noAtiende.json);
+    ok((await conf(A.token, { tipos_vehiculo: ['auto'] })).status === 200, 'A deja de atender buses');
+    const rutaBus = `/portal/vehiculos/${busCliente.json.data.id}`;
+    const sigueBus = await pedir('PUT', rutaBus, { token: clienteTok, body: { ...delCliente, color: 'Azul', tipo: 'bus', atributos: { pasajeros: 30 } } });
+    ok(sigueBus.status === 200 && sigueBus.json.data.tipo === 'bus' && sigueBus.json.data.atributos.pasajeros === 30, 'el bus viejo se sigue pudiendo editar', sigueBus.json);
+    const aCamion = await pedir('PUT', rutaBus, { token: clienteTok, body: { ...delCliente, color: 'NO', tipo: 'camion' } });
+    const [[sinCambio]] = await db.query('SELECT tipo, color FROM vehiculos WHERE id = ?', [busCliente.json.data.id]);
+    ok(aCamion.status === 400 && sinCambio.tipo === 'bus' && sinCambio.color === 'Azul', 'un cambio rechazado no guarda nada', [aCamion.status, sinCambio]);
+
     // ── Roles ──
     const rolesA = await pedir('GET', '/admin/roles', { token: A.token });
     const rolesB = await pedir('GET', '/admin/roles', { token: Bb.token });

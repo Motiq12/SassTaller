@@ -33,7 +33,7 @@ export class VehiculosService {
   }
 
   // Los tipos que atiende este taller, con los campos propios de cada uno.
-  getTipos(): Observable<{ data: TipoVehiculo[] }> {
-    return this.http.get<{ data: TipoVehiculo[] }>(`${this.url}/tipos`);
+  getTipos(): Observable<{ data: TipoVehiculo[]; otros?: TipoVehiculo[] }> {
+    return this.http.get<{ data: TipoVehiculo[]; otros?: TipoVehiculo[] }>(`${this.url}/tipos`);
   }
 }

@@ -2,7 +2,7 @@ const router = require('express').Router();
 // Sin `pool`: todo pasa por req.db, scopeado al taller (ver clientes.routes.js).
 const { fail } = require('../utils/responder');
 const { getConfig } = require('../utils/configuracion');
-const { TIPOS, normalizarTipos, limpiarAtributos, mensaje, etiquetaPara } = require('../utils/tipos-vehiculo');
+const { normalizarTipos, puedeUsarTipo, catalogoDelTaller, limpiarAtributos, mensaje, etiquetaPara } = require('../utils/tipos-vehiculo');
 const auth = require('../middleware/auth');
 const { anioValido, placaValida } = require('../utils/validar');
 
@@ -45,12 +45,7 @@ router.get('/', async (req, res) => {
 router.get('/tipos', async (req, res) => {
   try {
     const { tipos_vehiculo: tipos } = await getConfig(req.db);
-    res.json({
-      data: normalizarTipos(tipos).map((clave) => ({
-        clave, etiqueta: TIPOS[clave].etiqueta, plural: TIPOS[clave].plural,
-        unidadUso: TIPOS[clave].unidadUso, campos: TIPOS[clave].campos,
-      })),
-    });
+    res.json(catalogoDelTaller(tipos));
   } catch (err) {
     fail(res, err);
   }
@@ -135,6 +130,15 @@ router.put('/:id', async (req, res) => {
     const { marca, modelo, anio, placa, color, numero_motor, numero_chasis, kilometraje_actual, foto_url } = req.body;
     if (!placaValida(placa)) return res.status(400).json({ error: 'La placa no tiene un formato válido' });
     if (!anioValido(anio)) return res.status(400).json({ error: 'El año no es válido' });
+    // Se revisa antes de guardar nada, para no dejar la edición a medias.
+    const tipo = req.body.tipo === undefined ? undefined : String(req.body.tipo).toLowerCase();
+    if (tipo !== undefined) {
+      const { tipos_vehiculo: atendidos } = await getConfig(req.db);
+      const [[previo]] = await req.db.query('SELECT tipo FROM vehiculos WHERE id = ? AND tenant_id = @tenant', [req.params.id]);
+      if (!puedeUsarTipo(tipo, atendidos, previo?.tipo)) {
+        return res.status(400).json({ error: 'Este taller no atiende ese tipo de vehículo' });
+      }
+    }
     await req.db.query(
       `UPDATE vehiculos SET marca=?, modelo=?, anio=?, placa=?, color=?, numero_motor=?, numero_chasis=?, kilometraje_actual=?, foto_url=?
        WHERE id=? AND tenant_id = @tenant`,
@@ -142,12 +146,7 @@ router.put('/:id', async (req, res) => {
     );
     // El tipo y sus datos propios, solo si vinieron: otra pantalla que guarda este
     // vehículo sin conocerlos no los borra.
-    if (req.body.tipo !== undefined) {
-      const tipo = String(req.body.tipo).toLowerCase();
-      const { tipos_vehiculo: atendidos } = await getConfig(req.db);
-      if (!normalizarTipos(atendidos).includes(tipo)) {
-        return res.status(400).json({ error: 'Este taller no atiende ese tipo de vehículo' });
-      }
+    if (tipo !== undefined) {
       const propios = limpiarAtributos(tipo, req.body.atributos);
       await req.db.query(
         'UPDATE vehiculos SET tipo = ?, atributos = ? WHERE id = ? AND tenant_id = @tenant',

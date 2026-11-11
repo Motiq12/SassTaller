@@ -74,11 +74,18 @@
         <input #fotoInput type="file" accept="image/*" hidden (change)="onFoto($event)">
       </div>
 
-      <div class="fg"><label>Placa *</label><input class="upper" [(ngModel)]="nueva.placa" name="placa" placeholder="MOT-123"></div>
+      <div class="fg" *ngIf="tipos.length > 1">
+        <label for="tipo-vehiculo">Tipo de vehículo *</label>
+        <select id="tipo-vehiculo" [(ngModel)]="nueva.tipo" name="tipo" (ngModelChange)="cambiarTipo()">
+          <option *ngFor="let t of tipos" [ngValue]="t.clave">{{ t.etiqueta }}</option>
+        </select>
+      </div>
+
+      <div class="fg"><label>Placa *</label><input class="upper" [(ngModel)]="nueva.placa" name="placa" placeholder="ABC-123"></div>
 
       <div class="fg ac-field">
         <label>Marca *</label>
-        <input [(ngModel)]="nueva.marca" name="marca" (ngModelChange)="onMarcaInput()" placeholder="Ej: Honda" autocomplete="off">
+        <input [(ngModel)]="nueva.marca" name="marca" (ngModelChange)="onMarcaInput()" placeholder="Ej: Toyota" autocomplete="off">
         <div class="ac-results" *ngIf="marcasSugeridas.length">
           <button type="button" class="ac-item" *ngFor="let m of marcasSugeridas" (click)="seleccionarMarca(m)">{{ m }}</button>
         </div>
@@ -86,7 +93,7 @@
 
       <div class="fg ac-field">
         <label>Modelo *</label>
-        <input [(ngModel)]="nueva.modelo" name="modelo" (ngModelChange)="onModeloInput()" (focus)="onModeloFocus()" placeholder="Ej: CB500F" autocomplete="off">
+        <input [(ngModel)]="nueva.modelo" name="modelo" (ngModelChange)="onModeloInput()" (focus)="onModeloFocus()" placeholder="Ej: Hilux" autocomplete="off">
         <div class="ac-results" *ngIf="modelosSugeridos.length">
           <button type="button" class="ac-item" *ngFor="let m of modelosSugeridos" (click)="seleccionarModelo(m)">{{ m }}</button>
         </div>
@@ -94,6 +101,21 @@
       <div class="fg"><label>Año (opcional)</label><input type="number" inputmode="numeric" [(ngModel)]="nueva.anio" name="anio" placeholder="2024"></div>
       <div class="fg"><label>Color (opcional)</label><input [(ngModel)]="nueva.color" name="color" placeholder="Ej: Rojo"></div>
       <div class="fg"><label>Kilometraje (opcional)</label><input type="number" inputmode="numeric" [(ngModel)]="nueva.kilometraje" name="kilometraje" placeholder="15000"></div>
+
+      <!-- Los datos propios de cada tipo: pasajeros de un bus, ejes de un camión… -->
+      <ng-container *ngIf="tipoActual as t">
+        <div class="fg" *ngFor="let c of t.campos">
+          <label [attr.for]="'campo-' + c.clave">{{ c.etiqueta }} (opcional)</label>
+          <select *ngIf="c.tipo === 'opcion'" [id]="'campo-' + c.clave" [(ngModel)]="atributos[c.clave]" [name]="'attr_' + c.clave">
+            <option [ngValue]="undefined">Sin indicar</option>
+            <option *ngFor="let o of c.opciones" [ngValue]="o">{{ o }}</option>
+          </select>
+          <input *ngIf="c.tipo === 'numero'" type="number" inputmode="numeric" [id]="'campo-' + c.clave"
+                 [attr.min]="c.min" [attr.max]="c.max" [(ngModel)]="atributos[c.clave]" [name]="'attr_' + c.clave">
+          <input *ngIf="c.tipo !== 'opcion' && c.tipo !== 'numero'" [id]="'campo-' + c.clave"
+                 maxlength="120" [(ngModel)]="atributos[c.clave]" [name]="'attr_' + c.clave">
+        </div>
+      </ng-container>
 
       <button class="cta" (click)="guardar()" [disabled]="!valido || enviando">
         <ion-spinner *ngIf="enviando" name="crescent"></ion-spinner>

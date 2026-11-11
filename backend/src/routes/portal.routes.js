@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { normalizarTipos, limpiarAtributos } = require('../utils/tipos-vehiculo');
+const { normalizarTipos, puedeUsarTipo, catalogoDelTaller, limpiarAtributos } = require('../utils/tipos-vehiculo');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const crypto = require('node:crypto');
@@ -1223,13 +1223,22 @@ router.get('/promos/:id/imagen', async (req, res) => {
 router.get('/vehiculos', async (req, res) => {
   try {
     const [rows] = await req.db.query(
-      `SELECT m.id, m.marca, m.modelo, m.placa, m.anio, m.color, m.kilometraje_actual, m.foto,
+      `SELECT m.id, m.tipo, m.atributos, m.marca, m.modelo, m.placa, m.anio, m.color, m.kilometraje_actual, m.foto,
               (SELECT to_char(MAX(COALESCE(c.fecha_fin, c.fecha)), 'YYYY-MM-DD')
                FROM citas c WHERE c.tenant_id = @tenant AND c.vehiculo_id = m.id AND c.estado = 'entregado') AS ultimo_servicio
        FROM vehiculos m WHERE m.tenant_id = @tenant AND m.cliente_id = ? AND m.activa = 1 ORDER BY m.created_at DESC`,
       [req.cliente.id]
     );
     res.json({ data: rows });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// GET /api/portal/vehiculos/tipos — los que atiende su taller, con sus campos.
+router.get('/vehiculos/tipos', async (req, res) => {
+  try {
+    res.json(catalogoDelTaller((await getConfig(req.db)).tipos_vehiculo));
   } catch (err) {
     fail(res, err);
   }
@@ -1268,7 +1277,7 @@ router.post('/vehiculos', async (req, res) => {
       [req.cliente.id, tipoPedido, marca, modelo, placa, anio || null, color || null, kilometraje_actual || 0, fotoParaGuardar(foto), atributos ? JSON.stringify(atributos) : null]
     );
     const [[nueva]] = await req.db.query(
-      'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM vehiculos WHERE id = ? AND tenant_id = @tenant',
+      'SELECT id, tipo, atributos, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM vehiculos WHERE id = ? AND tenant_id = @tenant',
       [result.insertId]
     );
     res.status(201).json({ data: nueva, message: 'Vehículo registrado' });
@@ -1286,8 +1295,13 @@ router.put('/vehiculos/:id', async (req, res) => {
     if (!anioValido(anio)) return invalido(res, 'anio', 'El año no es válido');
     if (!fotoValida(foto)) return invalido(res, 'foto', 'La foto del vehículo no es válida o es demasiado grande.');
     // La moto debe ser del cliente
-    const [[moto]] = await req.db.query('SELECT id FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ? AND activa = 1', [req.params.id, req.cliente.id]);
+    const [[moto]] = await req.db.query('SELECT id, tipo FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ? AND activa = 1', [req.params.id, req.cliente.id]);
     if (!moto) return res.status(404).json({ error: 'Vehículo no encontrado' });
+    // El tipo solo si vino, y se revisa antes de guardar nada.
+    const tipo = req.body.tipo === undefined ? undefined : String(req.body.tipo).toLowerCase();
+    if (tipo !== undefined && !puedeUsarTipo(tipo, (await getConfig(req.db)).tipos_vehiculo, moto.tipo)) {
+      return res.status(400).json({ error: 'El taller no atiende ese tipo de vehículo' });
+    }
     // Placa duplicada (excluyendo la propia)
     const [[dup]] = await req.db.query(
       `SELECT id FROM vehiculos WHERE tenant_id = @tenant AND activa = 1 AND id <> ?
@@ -1300,8 +1314,15 @@ router.put('/vehiculos/:id', async (req, res) => {
       'UPDATE vehiculos SET marca = ?, modelo = ?, placa = ?, anio = ?, color = ?, kilometraje_actual = ?, foto = ? WHERE id = ? AND tenant_id = @tenant',
       [marca, modelo, placa, anio || null, color || null, kilometraje_actual || 0, fotoParaGuardar(foto), req.params.id]
     );
+    if (tipo !== undefined) {
+      const propios = limpiarAtributos(tipo, req.body.atributos);
+      await req.db.query(
+        'UPDATE vehiculos SET tipo = ?, atributos = ? WHERE id = ? AND tenant_id = @tenant',
+        [tipo, propios ? JSON.stringify(propios) : null, req.params.id]
+      );
+    }
     const [[actualizada]] = await req.db.query(
-      'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM vehiculos WHERE id = ? AND tenant_id = @tenant',
+      'SELECT id, tipo, atributos, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM vehiculos WHERE id = ? AND tenant_id = @tenant',
       [req.params.id]
     );
     res.json({ data: actualizada, message: 'Vehículo actualizado' });
@@ -1329,7 +1350,7 @@ router.delete('/vehiculos/:id', async (req, res) => {
 router.get('/vehiculos/:id/historial', async (req, res) => {
   try {
     const [[moto]] = await req.db.query(
-      'SELECT id, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?',
+      'SELECT id, tipo, atributos, marca, modelo, placa, anio, color, kilometraje_actual, foto FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?',
       [req.params.id, req.cliente.id]
     );
     if (!moto) return res.status(404).json({ error: 'Vehículo no encontrado' });

@@ -19,6 +19,7 @@ const { FERIADOS_CR, fechaValida, proximaFecha } = require('../utils/feriados');
 const { politica, problemaDeContrasena } = require('../utils/contrasena');
 const { cerrarSesiones } = require('../utils/sesiones');
 const { CORREO_FABRICA, normalizarPlantillas } = require('../utils/plantillas');
+const { tiposParaGuardar } = require('../utils/tipos-vehiculo');
 const { textosParaGuardar } = require('../utils/textos-portal');
 const { horasDisponibles } = require('../utils/configuracion');
 const { estadoCorreo, enviarCorreoPrueba } = require('../services/mailer');
@@ -689,6 +690,13 @@ router.put('/configuracion', async (req, res) => {
       portalJson = JSON.stringify(textosParaGuardar(b.portal_textos, previa.portal_textos, fechaLocalISO(previa.zona_horaria_offset)));
     }
 
+    // Los tipos que atiende, solo si vinieron. Una lista que no sirve se rechaza: sin
+    // ningún tipo el taller no podría registrar vehículos.
+    const tiposNuevos = b.tipos_vehiculo === undefined || b.tipos_vehiculo === null ? null : tiposParaGuardar(b.tipos_vehiculo);
+    if (b.tipos_vehiculo !== undefined && b.tipos_vehiculo !== null && !tiposNuevos) {
+      return res.status(400).json({ error: 'Elegí al menos un tipo de vehículo', campo: 'tipos_vehiculo' });
+    }
+
     // Marca propia según el plan. Si no le toca, logo y color quedan fuera del UPDATE en
     // vez de borrarse: quien los puso en la prueba no los pierde al pasar a gratis.
     const marcaPropia = puedeMarcaPropia(req.db.tenantId);
@@ -709,6 +717,7 @@ router.put('/configuracion', async (req, res) => {
          ${metodosJson ? 'metodos_pago = ?,' : ''}
          ${plantillasJson ? 'plantillas = ?,' : ''}
          ${portalJson ? 'portal_textos = ?,' : ''}
+         ${tiposNuevos ? 'tipos_vehiculo = ?,' : ''}
          notif_estado = ?, notif_recordatorio = ?, notif_cotizacion = ?, notif_email_entrega = ?
        WHERE id = 1 AND tenant_id = @tenant`,
       [
@@ -734,6 +743,7 @@ router.put('/configuracion', async (req, res) => {
         ...(metodosJson ? [metodosJson] : []),
         ...(plantillasJson ? [plantillasJson] : []),
         ...(portalJson ? [portalJson] : []),
+        ...(tiposNuevos ? [JSON.stringify(tiposNuevos)] : []),
         bit(b.notif_estado),
         bit(b.notif_recordatorio),
         bit(b.notif_cotizacion),

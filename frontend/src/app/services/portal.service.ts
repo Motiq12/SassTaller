@@ -5,6 +5,7 @@ import { BehaviorSubject, Observable, of, tap, catchError, throwError, map, shar
 import { environment } from '../../environments/environment';
 import { secureGet, secureSet, secureRemove } from '../shared/secure-store.util';
 import { TallerService } from './taller.service';
+import { TipoVehiculo } from './taller.service';
 
 export interface ClientePortal {
   id: number;
@@ -209,11 +210,15 @@ export class PortalService {
     return this.conCache('motos', this.http.get<{ data: any[] }>(`${this.url}/vehiculos`));
   }
 
-  crearMoto(data: { marca: string; modelo: string; placa: string; anio?: number | null; color?: string; kilometraje_actual?: number | null; foto?: string | null }): Observable<{ data: any }> {
+  getTiposVehiculo(): Observable<{ data: TipoVehiculo[]; otros?: TipoVehiculo[] }> {
+    return this.http.get<{ data: TipoVehiculo[]; otros?: TipoVehiculo[] }>(`${this.url}/vehiculos/tipos`);
+  }
+
+  crearMoto(data: { marca: string; modelo: string; placa: string; anio?: number | null; color?: string; kilometraje_actual?: number | null; foto?: string | null; tipo?: string; atributos?: Record<string, string | number | null> }): Observable<{ data: any }> {
     return this.http.post<{ data: any }>(`${this.url}/vehiculos`, data);
   }
 
-  editarMoto(id: number, data: { marca: string; modelo: string; placa: string; anio?: number | null; color?: string; kilometraje_actual?: number | null; foto?: string | null }): Observable<{ data: any }> {
+  editarMoto(id: number, data: { marca: string; modelo: string; placa: string; anio?: number | null; color?: string; kilometraje_actual?: number | null; foto?: string | null; tipo?: string; atributos?: Record<string, string | number | null> }): Observable<{ data: any }> {
     return this.http.put<{ data: any }>(`${this.url}/vehiculos/${id}`, data);
   }
 

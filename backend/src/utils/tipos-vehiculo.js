@@ -109,6 +109,33 @@ function normalizarTipos(valor) {
   return limpios.length ? limpios : ['moto'];
 }
 
+// La lista que manda el panel. A diferencia de normalizarTipos no cae a 'moto': si
+// una lista vacía o con basura se guardara así, un taller de buses amanecería como
+// taller de motos. Devuelve null y quien llama la rechaza.
+function tiposParaGuardar(valor) {
+  if (!Array.isArray(valor) || !valor.length) return null;
+  const pedidos = valor.map((t) => String(t).toLowerCase());
+  return pedidos.every(tipoValido) ? [...new Set(pedidos)] : null;
+}
+
+// Un taller puede dejar de atender un tipo sin que sus vehículos de ese tipo queden
+// trabados: conservar el que ya tiene siempre vale; cambiar, solo a uno que atienda.
+function puedeUsarTipo(tipo, atendidos, actual) {
+  return tipo === actual || normalizarTipos(atendidos).includes(tipo);
+}
+
+const vistaTipo = (clave) => ({
+  clave, etiqueta: TIPOS[clave].etiqueta, plural: TIPOS[clave].plural,
+  unidadUso: TIPOS[clave].unidadUso, campos: TIPOS[clave].campos,
+});
+
+// `data`: lo que el taller atiende. `otros`: el resto, para poder mostrar el tipo y
+// los campos de un vehículo viejo de un tipo que el taller ya no atiende.
+function catalogoDelTaller(tipos) {
+  const atendidos = normalizarTipos(tipos);
+  return { data: atendidos.map(vistaTipo), otros: CLAVES.filter((c) => !atendidos.includes(c)).map(vistaTipo) };
+}
+
 // Deja solo los atributos que el tipo declara, con el formato correcto. Lo que no
 // esté en la definición se descarta: sin esto, `atributos` sería un JSON abierto
 // donde cualquiera podría guardar lo que quisiera desde el cliente.
@@ -153,4 +180,4 @@ function mensaje(tipos, participio) {
   return `${e.singular} ${participio}${e.genero === 'f' ? 'a' : 'o'}`;
 }
 
-module.exports = { TIPOS, CLAVES, mensaje, tipoValido, normalizarTipos, limpiarAtributos, etiquetaPara };
+module.exports = { TIPOS, CLAVES, mensaje, tipoValido, normalizarTipos, tiposParaGuardar, puedeUsarTipo, catalogoDelTaller, limpiarAtributos, etiquetaPara };

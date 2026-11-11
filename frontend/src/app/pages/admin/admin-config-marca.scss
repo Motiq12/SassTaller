@@ -1,0 +1,21 @@
+// Color de la marca
+.cfg-muestras { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+.cfg-muestra {
+  width: 44px; height: 44px; padding: 0; border: 0; border-radius: 2px; cursor: pointer;
+  &.elegida { outline: 3px solid var(--tx); outline-offset: 2px; }
+  &:focus-visible { outline: 2px solid var(--tx); outline-offset: 2px; }
+}
+input.cfg-muestra-libre {
+  width: 44px; height: 44px; padding: 2px; cursor: pointer;
+  border: 1px solid var(--bd); border-radius: 2px; background: var(--sur);
+}
+.cfg-color-quitar { margin-bottom: 10px; }
+
+// Vehículos que atiende
+.cfg-tipos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.cfg-tipo {
+  display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px;
+  border: 1px solid var(--bd); border-radius: 2px; font-size: 14px; color: var(--tx2); cursor: pointer;
+  input { width: 18px; height: 18px; margin: 0; accent-color: var(--ion-color-primary); }
+  &.marcado { border-color: var(--ion-color-primary); color: var(--tx); font-weight: 600; }
+}

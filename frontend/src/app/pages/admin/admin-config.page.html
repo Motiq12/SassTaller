@@ -31,6 +31,17 @@
           </div>
 
           <div class="cd">
+            <span class="cd-title"><ion-icon name="car-outline"></ion-icon> Vehículos que atiende</span>
+            <div class="cfg-tipos">
+              <label *ngFor="let t of tiposCatalogo" class="cfg-tipo" [class.marcado]="tipoMarcado(t.clave)">
+                <input type="checkbox" [checked]="tipoMarcado(t.clave)" [disabled]="tipoTrabado(t.clave)" (change)="alternarTipo(t.clave)">
+                <span>{{ t.plural }}</span>
+              </label>
+            </div>
+            <div class="hint">Debe quedar al menos uno. Si desmarcás un tipo, ya no se pueden registrar nuevos, pero los que ya tenés siguen igual.</div>
+          </div>
+
+          <div class="cd">
             <span class="cd-title"><ion-icon name="receipt-outline"></ion-icon> Datos de facturación</span>
             <div class="fg-row">
               <div class="fg"><label>Razón social</label><input [(ngModel)]="config.razon_social" name="razon_social" maxlength="150" placeholder="El nombre legal de la empresa"></div>
@@ -60,6 +71,20 @@
               <button *ngIf="config.logo" type="button" class="btn btn-rd btn-sm" (click)="quitarLogo()">Quitar</button>
             </div>
             <div class="hint">PNG o JPG con fondo transparente o blanco. Sin logo, los documentos salen sin logo y en la app se muestran las iniciales del taller.</div>
+          </div>
+
+          <div class="cd">
+            <span class="cd-title"><ion-icon name="color-palette-outline"></ion-icon> Color de la marca</span>
+            <div class="cfg-muestras">
+              <button type="button" class="cfg-muestra" *ngFor="let c of colores"
+                      [style.background]="c" [class.elegida]="config.color_primario === c"
+                      [attr.aria-label]="'Color ' + c" [attr.aria-pressed]="config.color_primario === c"
+                      (click)="config.color_primario = c"></button>
+              <input type="color" class="cfg-muestra-libre" [ngModel]="config.color_primario || '#e11d48'"
+                     (ngModelChange)="config.color_primario = $event" name="color_primario" aria-label="Elegir otro color">
+            </div>
+            <button *ngIf="config.color_primario" type="button" class="btn btn-ou btn-sm cfg-color-quitar" (click)="config.color_primario = null">Usar el color del sistema</button>
+            <div class="hint">Se usa en los botones y detalles del panel y del portal de tus clientes.</div>
           </div>
 
           <!-- Dónde aparece cada dato: logo y nombre en la factura y los PDF (MarcaService);

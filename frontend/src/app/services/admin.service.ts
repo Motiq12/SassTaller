@@ -149,8 +149,8 @@ export class AdminService {
   getConfig(): Observable<{ data: any }> {
     return this.http.get<{ data: any }>(`${this.url}/configuracion`);
   }
-  updateConfig(payload: any): Observable<{ data: any; message: string }> {
-    return this.http.put<{ data: any; message: string }>(`${this.url}/configuracion`, payload);
+  updateConfig(payload: any): Observable<{ data: any; message: string; aviso?: string | null }> {
+    return this.http.put<{ data: any; message: string; aviso?: string | null }>(`${this.url}/configuracion`, payload);
   }
   // Correo de envío: remitente y dominio en Resend, y un correo de prueba a uno mismo.
   getCorreo(): Observable<{ data: EstadoCorreo }> {

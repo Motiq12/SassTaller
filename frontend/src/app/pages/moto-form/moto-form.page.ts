@@ -26,7 +26,10 @@ export class MotoFormPage implements OnInit, OnDestroy {
   };
 
   // Los tipos que atiende este taller. Con uno solo no se pregunta nada.
-  tipos: TipoVehiculo[] = [];
+  atendidos: TipoVehiculo[] = [];
+  private otros: TipoVehiculo[] = [];
+  // Más el de este vehículo, si es de un tipo que el taller dejó de atender.
+  get tipos(): TipoVehiculo[] { return [...this.atendidos, ...this.otros.filter(t => t.clave === this.form.tipo)]; }
   atributos: Record<string, string | number | null> = {};
 
   get tipoActual(): TipoVehiculo | undefined {
@@ -35,7 +38,7 @@ export class MotoFormPage implements OnInit, OnDestroy {
 
   // "moto" cuando el taller solo atiende motos; "vehículo" en cualquier otro caso.
   get nombre(): string {
-    return this.tipos.length === 1 ? this.tipos[0].etiqueta.toLowerCase() : 'vehículo';
+    return this.atendidos.length === 1 ? this.atendidos[0].etiqueta.toLowerCase() : 'vehículo';
   }
 
   // Al cambiar de tipo, los datos del anterior ya no aplican.
@@ -60,10 +63,11 @@ export class MotoFormPage implements OnInit, OnDestroy {
   ngOnInit() {
     this.motoSvc.getTipos().pipe(takeUntil(this.destroy$)).subscribe({
       next: res => {
-        this.tipos = res.data;
-        if (!this.form.tipo) this.form.tipo = this.tipos[0]?.clave;
+        this.atendidos = res.data;
+        this.otros = res.otros || [];
+        if (!this.form.tipo) this.form.tipo = this.atendidos[0]?.clave;
       },
-      error: () => { this.tipos = []; },
+      error: () => { this.atendidos = []; },
     });
 
     const id = this.route.snapshot.paramMap.get('id');
