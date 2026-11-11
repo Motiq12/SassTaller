@@ -832,6 +832,7 @@ router.patch('/admins/:id', async (req, res) => {
     params.push(id);
     const [r] = await pool.query(`UPDATE plataforma_admins SET ${sets.join(', ')} WHERE id = ?`, params);
     if (!r.affectedRows) return res.status(404).json({ error: 'Cuenta no encontrada' });
+    authPlataforma.olvidar(id);
     anotar(req.plataforma, 'edito_cuenta', { detalle: `${id === req.plataforma?.id ? 'su perfil' : 'cuenta #' + id}: ${detalles.join(', ')}` });
     res.json({ message: 'Cuenta actualizada' });
   } catch (err) {

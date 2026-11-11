@@ -330,6 +330,13 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     const sinB = await pedir('GET', '/directorio/talleres?provincia=Guanacaste&canton=Liberia');
     ok(!sinB.json.data.some((t) => t.slug === Bb.slug), 'al desactivarlo desaparece', sinB.json);
 
+    // ── Cerrarle la sesión a un empleado ──
+    const paraCerrar = await pedir('POST', '/usuarios', { token: A.token, body: { nombre: 'Cierre', email: `cierre-${sello}@prueba.test`, password: 'ClaveSegura123', rol: 'recepcion', sucursal_id: sa.id, telefono: '88880003' } });
+    const cierre = await pedir('POST', '/admin/seguridad/cerrar', { token: A.token, body: { usuario_id: paraCerrar.json.data.id } });
+    ok(cierre.status === 200 && cierre.json.data.cerradas === 1, 'A le cierra la sesión a un empleado', cierre.json);
+    const cierreAjeno = await pedir('POST', '/admin/seguridad/cerrar', { token: Bb.token, body: { usuario_id: paraCerrar.json.data.id } });
+    ok(cierreAjeno.status === 404, 'B no puede cerrar la sesión de un empleado de A', cierreAjeno.json);
+
     // ── Mecánicos del mismo taller ──
     const creaMec = async (nombre) => {
       const r = await pedir('POST', '/usuarios', { token: A.token, body: { nombre, email: `${nombre}-${sello}@prueba.test`, password: 'ClaveSegura123', rol: 'tecnico', sucursal_id: sa.id, telefono: '88880002' } });

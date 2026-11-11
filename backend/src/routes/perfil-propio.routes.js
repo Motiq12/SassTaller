@@ -17,6 +17,7 @@
 const router = require('express').Router();
 const bcrypt = require('bcrypt');
 const { fail } = require('../utils/responder');
+const { cerrarLasDemas } = require('../utils/sesiones');
 const { fotoValida } = require('../utils/validar');
 
 const MIN_PASSWORD = 8;
@@ -56,6 +57,7 @@ router.put('/perfil/password', async (req, res) => {
       'UPDATE usuarios SET password_hash = ? WHERE id = ? AND tenant_id = @tenant',
       [hash, req.usuario.id]
     );
+    await cerrarLasDemas(req.usuario);
     res.json({ message: 'Contraseña actualizada' });
   } catch (err) {
     fail(res, err);

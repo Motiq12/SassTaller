@@ -40,7 +40,7 @@ module.exports = async function tenantPublico(req, res, next) {
       const bearer = /^Bearer\s+(.+)$/i.exec(String(req.headers.authorization || ''));
       if (bearer) {
         try {
-          const { tenant_id: id } = jwt.verify(bearer[1], process.env.JWT_SECRET);
+          const { tenant_id: id } = jwt.verify(bearer[1], process.env.JWT_SECRET, { algorithms: ['HS256'] });
           if (id) { req.tenantId = id; req.db = paraTenant(id); }
         } catch { /* token malo: lo rechaza el middleware de sesión de la ruta */ }
         return next();

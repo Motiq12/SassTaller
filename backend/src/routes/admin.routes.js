@@ -17,7 +17,7 @@ const { fechaLocalISO } = require('../utils/fecha');
 const { horasDeCita, horasDeBloqueo, fechasEntre } = require('../utils/agenda');
 const { FERIADOS_CR, fechaValida, proximaFecha } = require('../utils/feriados');
 const { politica, problemaDeContrasena } = require('../utils/contrasena');
-const { cerrarSesiones } = require('../utils/sesiones');
+const { cerrarLasDemas, cerrarSesiones } = require('../utils/sesiones');
 const { CORREO_FABRICA, normalizarPlantillas } = require('../utils/plantillas');
 const { tiposParaGuardar } = require('../utils/tipos-vehiculo');
 const { textosParaGuardar } = require('../utils/textos-portal');
@@ -879,6 +879,7 @@ router.put('/cuenta/password', async (req, res) => {
     if (!ok) return invalido(res, 'actual', 'La contraseña actual no es correcta');
     const hash = await bcrypt.hash(String(nueva), 10);
     await req.db.query('UPDATE usuarios SET password_hash = ? WHERE tenant_id = @tenant AND id = ?', [hash, req.usuario.id]);
+    await cerrarLasDemas(req.usuario);
     anotar(req.usuario.id, 'contrasena');
     res.json({ message: 'Contraseña actualizada' });
   } catch (err) {

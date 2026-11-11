@@ -20,6 +20,7 @@ const { normalizarPermisos } = require('../utils/permisos-web');
 const { permisosDeUsuario } = require('../middleware/permisos');
 const {
   nuevoSid, abrirSesion, describirAgente, sesionesAbiertas, cerrarSesionPropia, cerrarOtrasSesiones, cerrarSid,
+  cerrarSesiones, cerrarSesionesDeCliente,
 } = require('../utils/sesiones');
 const { anotar, actividadDe } = require('../utils/actividad');
 const { registrarEvento } = require('../utils/eventos-seguridad');
@@ -304,7 +305,7 @@ router.post('/2fa/verificar', async (req, res) => {
 
     let datos;
     try {
-      datos = jwt.verify(token_parcial, process.env.JWT_SECRET);
+      datos = jwt.verify(token_parcial, process.env.JWT_SECRET, { algorithms: ['HS256'] });
     } catch {
       return res.status(401).json({ error: 'La sesión de ingreso venció. Iniciá sesión de nuevo.' });
     }
@@ -722,6 +723,8 @@ router.post('/recuperar/confirmar', async (req, res) => {
         [hash, c.id]
       );
       await db.query('UPDATE usuario_reset_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
+      // Quien recupera la contraseña puede estar echando a un intruso: salen todas.
+      await cerrarSesiones([c.id]);
       return res.json({ message: 'Listo, tu contraseña quedó cambiada. Ya podés entrar.' });
     }
 
@@ -742,6 +745,7 @@ router.post('/recuperar/confirmar', async (req, res) => {
       const hash = await bcrypt.hash(String(password), 10);
       await db.query('UPDATE clientes SET password_hash = ?, email_verificado = 1 WHERE id = ? AND tenant_id = @tenant', [hash, c.id]);
       await db.query('UPDATE password_reset_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
+      await cerrarSesionesDeCliente(c.id);
       return res.json({ message: 'Listo, tu contraseña quedó cambiada. Ya podés entrar.' });
     }
 
