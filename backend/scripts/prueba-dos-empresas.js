@@ -287,6 +287,13 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     const propio = await pedir('GET', `/clientes/${clienteA}`, { token: A.token });
     ok(propio.status === 200 && propio.texto.includes(CANARIO), 'A sí ve su propio dato (la prueba es válida)', propio.status);
 
+    // ── Errores y cuerpos enormes ──
+    const malFormada = await fetch(url.slice(0, -4) + '/%E0%A4%A');
+    const cuerpoError = await malFormada.text();
+    ok(malFormada.status === 400 && !/node_modules|URIError|\.js:\d/.test(cuerpoError), 'una dirección mal formada no muestra la traza del servidor', cuerpoError.slice(0, 120));
+    const enorme = await pedir('POST', '/auth/login', { body: { email: 'a@b.co', password: 'x'.repeat(300 * 1024) } });
+    ok(enorme.status === 413, 'el login rechaza un cuerpo de 300 KB', enorme.status);
+
     // ── Portal público de cada una ──
     const pa = await pedir('GET', `/marca/publica?taller=${A.slug}`);
     const pb = await pedir('GET', `/marca/publica?taller=${Bb.slug}`);
