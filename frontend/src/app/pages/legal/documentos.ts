@@ -35,6 +35,11 @@ export const DOCUMENTOS: Record<'terminos' | 'privacidad', Documento> = {
         'Gratis: al terminar la prueba, el taller pasa solo a este plan. No se borra nada y no hay que hacer ningún trámite. Incluye órdenes, clientes, vehículos y citas sin límite, y el portal de clientes. Tiene una sucursal, hasta dos usuarios, reportes de los últimos 30 días y no permite aplicar la marca propia del taller.',
         'Pro: usuarios sin límite, varias sucursales, la marca propia del taller en el portal y soporte directo. Su precio y condiciones se acuerdan por escrito con cada taller.',
         'Motiq no hace cobros automáticos: ningún plan se cobra sin un acuerdo previo con el taller.',
+        'Los límites de cada plan pueden cambiar. Los vigentes están siempre en motiq12.com, y si un cambio reduce lo que el taller ya tiene, se lo avisaremos antes.',
+      ] },
+      { titulo: 'El buscador de talleres', parrafos: [
+        'Motiq tiene un buscador público para que un cliente encuentre su taller por provincia, cantón o nombre y cree su cuenta en él.',
+        'Aparecer es decisión de cada taller: se activa o se desactiva en su configuración, y solo puede activarse si al menos una sucursal tiene provincia y cantón. Mientras esté activo, el buscador muestra el nombre del taller, su logo y su color, los tipos de vehículo que atiende y, de cada sucursal con ubicación, su nombre, dirección, teléfono, provincia y cantón. Nunca muestra clientes, órdenes, correos ni cifras del taller.',
       ] },
       { titulo: 'Uso aceptable', parrafos: [
         'El taller se compromete a usar Motiq para administrar su negocio de forma lícita. No se permite intentar acceder a datos de otros talleres, interferir con el funcionamiento del servicio, automatizar el uso de forma abusiva ni cargar contenido ilegal o datos de personas sin una base legal para tratarlos.',
@@ -52,6 +57,7 @@ export const DOCUMENTOS: Record<'terminos' | 'privacidad', Documento> = {
       { titulo: 'Baja y suspensión', parrafos: [
         'El taller puede dejar de usar Motiq cuando quiera y pedir que se eliminen su cuenta y sus datos.',
         'Motiq puede suspender o cerrar una cuenta que incumpla estos términos, avisando antes al taller salvo que el incumplimiento ponga en riesgo a otros talleres o al servicio.',
+        'Mientras una cuenta está suspendida, ni el personal del taller ni sus clientes pueden entrar, y el taller deja de aparecer en el buscador. Los datos se conservan: si la cuenta se reactiva, todo sigue como estaba.',
       ] },
       { titulo: 'Cambios en estos términos', parrafos: [
         'Si cambiamos estos términos, publicaremos la versión nueva en esta página con su fecha. Si el cambio es importante, se lo avisaremos a los administradores de los talleres antes de que entre en vigencia.',
@@ -77,21 +83,23 @@ export const DOCUMENTOS: Record<'terminos' | 'privacidad', Documento> = {
       ] },
       { titulo: 'Qué datos tratamos', parrafos: [
         'De la cuenta: nombre, correo y contraseña de cada usuario. La contraseña se guarda cifrada y nadie, ni siquiera Motiq, puede leerla.',
-        'Del taller: nombre, identificador, teléfono, dirección, tipos de vehículo que atiende y la configuración que elija.',
+        'Del taller: nombre, identificador, teléfono, dirección, razón social y cédula jurídica si las da, logo y color, tipos de vehículo que atiende, la provincia y el cantón de cada sucursal, y la configuración que elija.',
         'De la operación: lo que el taller registra al trabajar, como clientes, vehículos, órdenes, presupuestos, citas y fotos de garantía.',
         'Del formulario de contacto: nombre, correo, teléfono, empresa y el mensaje que nos escribís.',
-        'Técnicos: tiempos de carga de las páginas (por ejemplo, cuánto tarda en aparecer la portada), con la dirección de la página y si es un teléfono. No incluyen tu nombre, tu correo ni datos de tu cuenta. Para frenar abusos, la dirección IP se usa de forma temporal en memoria y no se guarda.',
+        'Técnicos: tiempos de carga de las páginas (por ejemplo, cuánto tarda en aparecer la portada), con la dirección de la página y si es un teléfono. No incluyen tu nombre, tu correo ni datos de tu cuenta.',
+        'De seguridad: para frenar abusos, la dirección IP se usa de forma temporal en memoria. Además, ciertos eventos quedan anotados para detectar ataques: los ingresos fallidos o bloqueados y los cambios en usuarios y permisos. Cada anotación guarda el tipo de evento, el correo usado, la dirección IP y la fecha, y se borra a los 90 días.',
+        'Si entrás con Google: tu nombre, tu correo y el identificador que Google le da a tu cuenta. Nunca recibimos tu contraseña de Google.',
       ] },
       { titulo: 'Para qué los usamos', parrafos: [
-        'Para crear y mantener las cuentas, prestar el servicio, enviar los correos que el sistema necesita (códigos de verificación y de recuperación de contraseña, recordatorios de citas y avisos del estado de las órdenes a los clientes del taller, y avisos sobre el plan del taller), responder consultas, proteger el servicio contra abusos y medir su velocidad para mejorarla.',
+        'Para crear y mantener las cuentas, prestar el servicio, mostrar en el buscador a los talleres que lo activaron, enviar los correos que el sistema necesita (códigos de verificación y de recuperación de contraseña, recordatorios de citas y avisos del estado de las órdenes a los clientes del taller, y avisos sobre el plan del taller), responder consultas, proteger el servicio contra abusos y medir su velocidad para mejorarla.',
         'No vendemos datos, no los usamos para publicidad y no los compartimos con anunciantes.',
       ] },
       { titulo: 'Con quién los compartimos', parrafos: [
         'Solo con los proveedores que hacen falta para que Motiq funcione:',
         'Railway: alojamiento de la aplicación y de la base de datos.',
         'Resend: envío de correos.',
-        'Cloudflare: gestión del dominio y verificación de que quien pide un código es una persona.',
-        'Google Fonts: las tipografías de la interfaz. Al cargarlas, tu navegador se conecta con Google.',
+        'Cloudflare: gestión del dominio y verificación de que quien se registra o pide un código es una persona.',
+        'Google: el ingreso con Google, solo si elegís esa opción, y una de las tipografías de la interfaz (Google Fonts). Al cargarla, tu navegador se conecta con Google.',
         'Además, podemos entregar datos cuando una autoridad competente lo exija conforme a la ley.',
       ] },
       { titulo: 'Dónde se guardan', parrafos: [
@@ -112,7 +120,7 @@ export const DOCUMENTOS: Record<'terminos' | 'privacidad', Documento> = {
         'También podés presentar un reclamo ante la Agencia de Protección de Datos de los Habitantes (PRODHAB).',
       ] },
       { titulo: 'Almacenamiento en tu navegador', parrafos: [
-        'Motiq guarda en tu navegador la sesión iniciada y el taller al que pertenecés, para no pedirte que entres cada vez. No usamos cookies de publicidad ni de seguimiento. La verificación de Cloudflare puede usar sus propias cookies técnicas.',
+        'Motiq guarda en tu navegador la sesión iniciada y el último taller que usaste, para no pedirte que entres ni que lo elijas cada vez. No usamos cookies de publicidad ni de seguimiento. La verificación de Cloudflare y el ingreso con Google pueden usar sus propias cookies técnicas.',
       ] },
       { titulo: 'Menores de edad', parrafos: [
         'Motiq es un servicio para negocios y no está dirigido a menores de edad.',
