@@ -2,7 +2,6 @@ const router = require('express').Router();
 const { normalizarTipos, puedeUsarTipo, catalogoDelTaller, limpiarAtributos } = require('../utils/tipos-vehiculo');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
-const crypto = require('node:crypto');
 // Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
 const { fail, invalido, faltante } = require('../utils/responder');
 const { registrarEvento } = require('../utils/eventos-seguridad');
@@ -53,10 +52,8 @@ function horasHastaCita(fecha, hora) {
   return (inicio.getTime() - Date.now()) / 3600000;
 }
 
-// Código de 6 dígitos para verificar el correo, recuperar la contraseña o entrar
-// sin ella. Abre una sesión, así que sale del generador criptográfico del sistema
-// y no de Math.random.
-const codigoDeSeisDigitos = () => String(crypto.randomInt(100000, 1000000));
+// Código de 6 dígitos: el mismo generador criptográfico para todos los flujos.
+const { codigoDeSeisDigitos } = require('../utils/verificacion-usuario');
 
 // Firma el JWT del cliente y arma el payload estándar.
 // El SELECT que trae a `cliente` TIENE que incluir tenant_id: sin él el token sale sin
@@ -98,9 +95,10 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     if (faltante(res, req.body, [['email', 'el correo'], ['password', 'la contraseña']])) return;
     if (!emailValido(email)) return invalido(res, 'email', 'El correo no tiene un formato válido');
+    // Sin mayúsculas ni espacios, igual que el login principal y la recuperación.
     const [[cliente]] = await req.db.query(
-      'SELECT * FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1',
-      [email]
+      'SELECT * FROM clientes WHERE tenant_id = @tenant AND LOWER(email) = ? AND activo = 1 ORDER BY id LIMIT 1',
+      [String(email).trim().toLowerCase()]
     );
     if (!cliente || !cliente.password_hash) {
       registrarEvento('portal_login_fallido', { email, ip: req.ip, detalle: cliente ? 'sin contraseña' : 'cuenta inexistente' });

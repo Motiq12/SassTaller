@@ -8,7 +8,7 @@ import { emailValido } from '../../utils/validar';
 import { marcarCampo } from '../../shared/errores';
 import { MarcaService } from '../../services/marca.service';
 import { TallerService } from '../../services/taller.service';
-import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../shared/turnstile.util';
+import { captchaActivo, montarTurnstile, TurnstileWidget } from '../../shared/turnstile.util';
 
 @Component({
   standalone: false,
@@ -35,9 +35,15 @@ export class PortalRegistroPage implements OnInit, AfterViewInit, OnDestroy {
 
   // Anti-bot: honeypot (debe quedar vacío) + captcha Turnstile.
   website = '';
-  mostrarCaptcha = turnstileHabilitado();
-  @ViewChild('tsBox') tsBox?: ElementRef<HTMLElement>;
+  // Empieza en false y se enciende cuando el servidor dice que el captcha está activo.
+  // El cuadro aparece después, así que se monta con un setter, cuando existe en el DOM.
+  mostrarCaptcha = false;
+  private readonly pedirCaptcha = captchaActivo().then(v => (this.mostrarCaptcha = v));
   private ts?: TurnstileWidget;
+  @ViewChild('tsBox') set tsBox(el: ElementRef<HTMLElement> | undefined) {
+    if (!el) { this.ts?.destroy(); this.ts = undefined; return; }
+    if (!this.ts) montarTurnstile(el.nativeElement).then(w => (this.ts = w));
+  }
 
   // Paso 2: confirmar el correo con el código de 6 dígitos que se manda al crear la cuenta.
   paso: 1 | 2 = 1;
@@ -82,8 +88,15 @@ export class PortalRegistroPage implements OnInit, AfterViewInit, OnDestroy {
   private reenviarAlMontar = false;
 
   async ngAfterViewInit() {
-    if (this.tsBox) this.ts = await montarTurnstile(this.tsBox.nativeElement);
-    if (this.reenviarAlMontar) { this.reenviarAlMontar = false; this.reenviar(); }
+    if (!this.reenviarAlMontar) return;
+    this.reenviarAlMontar = false;
+    // Con captcha, reenviar() espera el token con ts.listo(): primero hay que saber si
+    // lo hay y dejar que el cuadro se monte.
+    if (await this.pedirCaptcha) {
+      const limite = Date.now() + 4000;
+      while (!this.ts && Date.now() < limite) await new Promise(r => setTimeout(r, 100));
+    }
+    this.reenviar();
   }
 
   get numeroPaso(): number { return this.paso === 2 ? 3 : this.parte; }

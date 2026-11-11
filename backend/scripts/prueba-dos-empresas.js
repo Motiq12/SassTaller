@@ -451,6 +451,14 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     ok(sinOrden.status < 300, 'A borra una orden', sinOrden.json);
     const [[{ quedan }]] = await db.query('SELECT COUNT(*) AS quedan FROM ordenes_trabajo WHERE id = ?', [paraBorrar.json.data.id]);
     ok(quedan === 0, 'la orden ya no está');
+    // ── Correo sin mayúsculas: el login lo compara igual que la recuperación ──
+    const correoA = `alfa-${sello}@prueba.test`;
+    const enMayus = await pedir('POST', '/auth/login', { body: { email: correoA.toUpperCase(), password: 'ClaveSegura123' } });
+    ok(enMayus.status === 200 && enMayus.json.data.tipo === 'staff', 'entra con el correo escrito en mayúsculas', enMayus.json);
+    await db.query('UPDATE usuarios SET email = ? WHERE tenant_id = ? AND LOWER(email) = ?', [`Alfa-${sello}@Prueba.Test`, A.id, correoA]);
+    const guardadoMayus = await pedir('POST', '/auth/login', { body: { email: correoA, password: 'ClaveSegura123' } });
+    ok(guardadoMayus.status === 200, 'entra aunque el correo se haya guardado con mayúsculas', guardadoMayus.json);
+    await db.query('UPDATE usuarios SET email = ? WHERE tenant_id = ? AND LOWER(email) = ?', [correoA, A.id, correoA]);
 
     // ── Roles ──
     const rolesA = await pedir('GET', '/admin/roles', { token: A.token });

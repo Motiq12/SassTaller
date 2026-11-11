@@ -11,14 +11,21 @@
 // El mecanismo es el mismo del portal de clientes (código de 6 dígitos, hash con bcrypt,
 // 10 minutos, un solo uso, tope de intentos), sobre su propia tabla.
 const bcrypt = require('bcrypt');
+const crypto = require('node:crypto');
 
 const VIGENCIA_MIN = 10;
 const MAX_INTENTOS = 5;
 
+// Código de 6 dígitos para verificar un correo, recuperar una contraseña o entrar sin
+// ella. Abre una cuenta, así que sale del generador criptográfico del sistema y no de
+// Math.random, cuya secuencia se puede deducir. Es la única copia: todos los flujos
+// (personal y clientes) la usan.
+const codigoDeSeisDigitos = () => String(crypto.randomInt(100000, 1000000));
+
 // Genera y guarda un código nuevo, invalidando los anteriores: si conviven dos, el
 // usuario prueba el del correo viejo y no entiende por qué le dice que está mal.
 async function nuevoCodigo(db, usuarioId) {
-  const codigo = String(Math.floor(100000 + Math.random() * 900000));
+  const codigo = codigoDeSeisDigitos();
   const codeHash = await bcrypt.hash(codigo, 10);
   await db.query(
     'UPDATE usuario_verify_codes SET used = 1 WHERE tenant_id = @tenant AND usuario_id = ? AND used = 0',
@@ -62,4 +69,4 @@ async function canjear(db, usuarioId, codigo) {
   return null;
 }
 
-module.exports = { nuevoCodigo, canjear, VIGENCIA_MIN };
+module.exports = { codigoDeSeisDigitos, nuevoCodigo, canjear, VIGENCIA_MIN };
