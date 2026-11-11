@@ -2,6 +2,7 @@ const router = require('express').Router();
 const bcrypt = require('bcrypt');
 // Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
 const { fail, invalido, faltante } = require('../utils/responder');
+const { problemaDeContrasena, PISO } = require('../utils/contrasena');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { soloRoles } = require('../middleware/roles');
@@ -15,6 +16,13 @@ const { exigirPermiso } = require('../middleware/permisos');
 router.use(auth, soloRoles('recepcion', 'admin'));
 // Los clientes se comparten entre sucursales; sus órdenes se filtran (utils/alcance.js).
 router.use(cargarAlcance);
+
+// El hash de la contraseña del portal no sale del servidor: la pantalla solo necesita
+// saber si el cliente tiene acceso.
+function sinSecretos(cliente) {
+  const { password_hash: hash, google_sub: google, sesiones_desde_ms: _s, ...resto } = cliente;
+  return { ...resto, tiene_portal: hash || google ? 1 : 0 };
+}
 
 // Columnas seguras (nunca exponer password_hash); tiene_portal indica si el acceso está activo.
 const COLS = `id, nombre, apellido, telefono, email, cedula, direccion, activo, created_at, updated_at,
@@ -57,7 +65,7 @@ router.post('/', exigirPermiso('clientes.editar'), async (req, res) => {
     const [[nuevo]] = await req.db.query(
       'SELECT * FROM clientes WHERE id = ? AND tenant_id = @tenant', [result.insertId]
     );
-    res.status(201).json({ data: nuevo, message: 'Cliente creado' });
+    res.status(201).json({ data: sinSecretos(nuevo), message: 'Cliente creado' });
   } catch (err) {
     fail(res, err);
   }
@@ -130,9 +138,8 @@ router.patch('/:id/portal', requireRol('admin'), async (req, res) => {
       return res.json({ message: 'Acceso al portal desactivado' });
     }
     if (!cliente.email) return res.status(400).json({ error: 'El cliente necesita un email para acceder al portal' });
-    if (!password || password.length < 6) {
-      return invalido(res, 'password', 'La contraseña debe tener al menos 6 caracteres');
-    }
+    const malaClave = problemaDeContrasena(password, PISO, cliente);
+    if (malaClave) return invalido(res, 'password', malaClave);
     const hash = await bcrypt.hash(password, 10);
     await req.db.query(
       'UPDATE clientes SET password_hash = ? WHERE id = ? AND tenant_id = @tenant',
@@ -160,7 +167,8 @@ router.put('/:id', exigirPermiso('clientes.editar'), async (req, res) => {
     const [[actualizado]] = await req.db.query(
       'SELECT * FROM clientes WHERE id = ? AND tenant_id = @tenant', [req.params.id]
     );
-    res.json({ data: actualizado, message: 'Cliente actualizado' });
+    if (!actualizado) return res.status(404).json({ error: 'Cliente no encontrado' });
+    res.json({ data: sinSecretos(actualizado), message: 'Cliente actualizado' });
   } catch (err) {
     fail(res, err);
   }

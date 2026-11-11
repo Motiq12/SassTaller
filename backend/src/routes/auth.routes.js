@@ -26,7 +26,7 @@ const { anotar, actividadDe } = require('../utils/actividad');
 const { registrarEvento } = require('../utils/eventos-seguridad');
 const { AVISOS, normalizarPreferencias, preferenciasDe } = require('../utils/preferencias');
 const { getConfig } = require('../utils/configuracion');
-const { politica } = require('../utils/contrasena');
+const { politica, problemaDeContrasena, PISO } = require('../utils/contrasena');
 
 function firmar(payload) {
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '8h' });
@@ -698,7 +698,8 @@ router.post('/recuperar/confirmar', async (req, res) => {
     const { email, codigo, password, taller } = req.body || {};
     if (!emailValido(email)) return res.status(400).json({ error: 'El correo no tiene un formato válido' });
     if (!codigo || !password) return res.status(400).json({ error: 'Código y nueva contraseña son requeridos' });
-    if (String(password).length < 8) return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+    const malaClave = problemaDeContrasena(password, PISO, { email });
+    if (malaClave) return invalido(res, 'password', malaClave);
 
     const limite = consumir(`reset-staff-conf:${String(email).trim().toLowerCase()}`, { porMinuto: 10, porHora: 30 });
     if (!limite.ok) return res.status(429).json({ error: `Demasiados intentos. Esperá ${limite.retryAfter}s.` });

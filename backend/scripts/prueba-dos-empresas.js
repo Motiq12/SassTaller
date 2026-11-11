@@ -380,6 +380,14 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     const recep = await pedir('GET', `/ordenes/${ordenA}`, { token: A.token });
     ok(recep.status === 200, 'el dueño sigue viendo todas', recep.status);
 
+    // ── Contraseñas: ni débiles ni de vuelta al navegador ──
+    const clienteEditado = await pedir('PUT', `/clientes/${clienteA}`, { token: A.token, body: { nombre: 'Ana', apellido: 'Mora', telefono: '88881111', cedula: '112340567' } });
+    ok(clienteEditado.status === 200 && !('password_hash' in clienteEditado.json.data), 'editar un cliente no devuelve el hash de su contraseña', Object.keys(clienteEditado.json.data || {}));
+    const claveDebil = await pedir('PATCH', `/clientes/${clienteA}/portal`, { token: A.token, body: { password: '123456' } });
+    ok(claveDebil.status === 400, 'no se le puede fijar a un cliente una contraseña débil', claveDebil.json);
+    const claveComun = await pedir('POST', '/portal/registro', { taller: A.slug, body: { nombre: 'Eva', apellido: 'Paz', telefono: '88884444', email: `eva-${sello}@prueba.test`, cedula: '109990888', password: 'password', taller: A.slug } });
+    ok(claveComun.status === 400 && claveComun.json.campo === 'password', 'el registro del portal no acepta «password»', claveComun.json);
+
     // ── Tipos de vehículo y color desde Configuración ──
     const conf = (token, extra) => pedir('PUT', '/admin/configuracion', { token, body: { nombre_taller: CANARIO, ...extra } });
     ok((await conf(A.token, { tipos_vehiculo: [] })).status === 400, 'sin ningún tipo no se guarda');

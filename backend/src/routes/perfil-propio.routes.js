@@ -19,8 +19,8 @@ const bcrypt = require('bcrypt');
 const { fail } = require('../utils/responder');
 const { cerrarLasDemas } = require('../utils/sesiones');
 const { fotoValida } = require('../utils/validar');
-
-const MIN_PASSWORD = 8;
+const { getConfig } = require('../utils/configuracion');
+const { politica, problemaDeContrasena } = require('../utils/contrasena');
 
 router.put('/perfil/foto', async (req, res) => {
   try {
@@ -40,14 +40,15 @@ router.put('/perfil/password', async (req, res) => {
   try {
     const { actual, nueva } = req.body;
     if (!actual || !nueva) return res.status(400).json({ error: 'Contraseña actual y nueva son requeridas' });
-    if (String(nueva).length < MIN_PASSWORD) {
-      return res.status(400).json({ error: `La nueva contraseña debe tener al menos ${MIN_PASSWORD} caracteres` });
-    }
     const [[u]] = await req.db.query(
-      'SELECT password_hash FROM usuarios WHERE id = ? AND tenant_id = @tenant',
+      'SELECT password_hash, email, nombre FROM usuarios WHERE id = ? AND tenant_id = @tenant',
       [req.usuario.id]
     );
     if (!u) return res.status(404).json({ error: 'Usuario no encontrado' });
+    // La política de Configuración → Seguridad. Este tramo responde antes que la ruta
+    // propia del panel del mecánico, y sin esto se la saltaba: aceptaba «12345678».
+    const malaClave = problemaDeContrasena(nueva, politica(await getConfig(req.db)), u);
+    if (malaClave) return res.status(400).json({ error: malaClave, campo: 'nueva' });
     // Se exige la contraseña actual: sin esto, una sesión robada o un equipo que
     // quedó abierto alcanzan para quedarse con la cuenta.
     const ok = await bcrypt.compare(String(actual), u.password_hash);

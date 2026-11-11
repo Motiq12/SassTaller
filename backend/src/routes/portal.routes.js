@@ -26,6 +26,7 @@ const { agendaDia, agendaRango, conflictosDeCita, horasPasadas } = require('../u
 const { getSucursales, sucursalValida, sucursalPorDefecto } = require('../utils/sucursales');
 const { avanzarEstadoOrden, registrarAprobacion, registrarRechazoAdicional } = require('../utils/ordenes');
 const { recompensas } = require('../utils/recompensas');
+const { problemaDeContrasena, PISO } = require('../utils/contrasena');
 const { verificarIdToken, googleConfigurado } = require('../utils/google-id');
 const { cerrarSesionesDeCliente, olvidarCliente } = require('../utils/sesiones');
 
@@ -264,7 +265,8 @@ router.post('/registro', antibot(), async (req, res) => {
     const { nombre, apellido, telefono, email, cedula, password } = req.body;
     if (faltante(res, req.body, [['nombre', 'el nombre'], ['apellido', 'el apellido'], ['telefono', 'el teléfono'], ['email', 'el correo'], ['cedula', 'la cédula'], ['password', 'la contraseña']])) return;
     if (!emailValido(email)) return invalido(res, 'email', 'El correo no tiene un formato válido');
-    if (password.length < 8) return invalido(res, 'password', 'La contraseña debe tener al menos 8 caracteres');
+    const malaClave = problemaDeContrasena(password, PISO, { email, nombre });
+    if (malaClave) return invalido(res, 'password', malaClave);
     if (!telefonoValido(telefono)) return invalido(res, 'telefono', 'El teléfono no tiene un formato válido');
     if (!cedulaValida(cedula)) return invalido(res, 'cedula', 'La cédula no tiene un formato válido');
 
@@ -424,7 +426,8 @@ router.post('/recuperar/confirmar', async (req, res) => {
     const { email, codigo, password } = req.body;
     if (!emailValido(email)) return invalido(res, 'email', 'El correo no tiene un formato válido');
     if (faltante(res, req.body, [['codigo', 'el código'], ['password', 'la nueva contraseña']])) return;
-    if (password.length < 8) return invalido(res, 'password', 'La contraseña debe tener al menos 8 caracteres');
+    const malaClave = problemaDeContrasena(password, PISO, { email });
+    if (malaClave) return invalido(res, 'password', malaClave);
 
     const [[cliente]] = await req.db.query(
       'SELECT id, tenant_id, nombre, apellido FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND (password_hash IS NOT NULL OR google_sub IS NOT NULL)',
@@ -918,7 +921,8 @@ router.put('/perfil/password', async (req, res) => {
   try {
     const { actual, nueva } = req.body;
     if (faltante(res, req.body, [['actual', 'la contraseña actual'], ['nueva', 'la nueva contraseña']])) return;
-    if (String(nueva).length < 8) return invalido(res, 'nueva', 'La nueva contraseña debe tener al menos 8 caracteres');
+    const malaClave = problemaDeContrasena(nueva, PISO);
+    if (malaClave) return invalido(res, 'nueva', malaClave);
     const [[c]] = await req.db.query('SELECT password_hash FROM clientes WHERE tenant_id = @tenant AND id = ? AND activo = 1', [req.cliente.id]);
     if (!c || !c.password_hash) return res.status(404).json({ error: 'Cuenta no encontrada' });
     const ok = await bcrypt.compare(String(actual), c.password_hash);
