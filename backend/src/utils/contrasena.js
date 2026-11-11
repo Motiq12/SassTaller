@@ -40,4 +40,8 @@ function problemaDeContrasena(clave, pol, quien = {}) {
   return null;
 }
 
-module.exports = { politica, problemaDeContrasena, MIN_ABSOLUTO };
+// El piso para donde no hay un taller del que leer la política (recuperación sin
+// sesión) y para los clientes del portal: 8 caracteres y que no sea de las más usadas.
+const PISO = { minimo: MIN_ABSOLUTO, variedad: false };
+
+module.exports = { politica, problemaDeContrasena, MIN_ABSOLUTO, PISO };
