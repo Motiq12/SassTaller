@@ -142,7 +142,7 @@ router.delete('/:id', requireRol('admin'), async (req, res) => {
        FROM citas ci
        LEFT JOIN clientes c ON c.id = ci.cliente_id AND c.tenant_id = @tenant
        LEFT JOIN ordenes_trabajo o ON o.id = ci.orden_id AND o.tenant_id = @tenant
-       WHERE ci.tenant_id = @tenant AND ci.id = ? FOR UPDATE`,
+       WHERE ci.tenant_id = @tenant AND ci.id = ? FOR UPDATE OF ci`,
       [req.params.id]
     );
     if (!cita) { await conn.rollback(); return res.status(404).json({ error: 'Cita no encontrada' }); }

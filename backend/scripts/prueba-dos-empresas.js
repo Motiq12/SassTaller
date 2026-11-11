@@ -410,6 +410,47 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     const [[citaLista]] = await db.query('SELECT orden_id, vehiculo_id FROM citas WHERE id = ?', [idSinVeh]);
     ok(citaLista.orden_id === desdeCita.json.data.orden_id && citaLista.vehiculo_id === vehA, 'la cita queda ligada a la orden y al vehículo', citaLista);
 
+    // ── Recorrido de una orden: repuestos, checklist y entrega ──
+    const flujo = desdeCita.json.data.orden_id;
+    const rutaCotiz = `/recepcion/cotizaciones/${flujo}`;
+    const repuesto = await pedir('POST', `${rutaCotiz}/repuestos`, { token: A.token, body: { nombre: 'Pastillas', cantidad: 2, costo_unitario: 1000, estado: 'disponible' } });
+    ok(repuesto.status < 300, 'recepción agrega un repuesto', repuesto.json);
+    const editado = await pedir('PUT', `${rutaCotiz}/repuestos/${repuesto.json.data.id}`, { token: A.token, body: { nombre: 'Pastillas', cantidad: 1, costo_unitario: 3000, estado: 'disponible' } });
+    ok(editado.status < 300, 'recepción edita el repuesto', editado.json);
+    const [[conCostos]] = await db.query('SELECT costo_repuestos::float AS c FROM ordenes_trabajo WHERE id = ?', [flujo]);
+    ok(conCostos.c === 3000, 'el total de repuestos se recalcula', conCostos);
+    const lista1 = await pedir('POST', `/ordenes/${flujo}/checklist`, { token: A.token, body: { lavado: 1, calidad_revisada: 1 } });
+    const lista2 = await pedir('POST', `/ordenes/${flujo}/checklist`, { token: A.token, body: { lavado: 0, calidad_revisada: 1 } });
+    ok(lista1.status < 300 && lista2.status < 300, 'el checklist se guarda dos veces', [lista1.json, lista2.json]);
+    const [[marcado]] = await db.query('SELECT lavado FROM orden_checklist WHERE orden_id = ?', [flujo]);
+    ok(Number(marcado.lavado) === 0, 'la segunda vez actualiza la misma fila', marcado);
+    await pedir('POST', `${rutaCotiz}/enviar`, { token: A.token, body: {} });
+    const aprobada = await pedir('POST', `${rutaCotiz}/aprobar`, { token: A.token, body: {} });
+    ok(aprobada.status < 300, 'recepción aprueba la cotización', aprobada.json);
+    const paraEntrega = await pedir('PATCH', `/ordenes/${flujo}/estado`, { token: A.token, body: { estado: 'lista_entrega', confirmar: true } });
+    ok(paraEntrega.status < 300, 'la orden queda lista', paraEntrega.json);
+    const entrega = await pedir('POST', `/recepcion/ordenes/${flujo}/entregar`, { token: A.token, body: { metodo_pago: 'sinpe', garantia_dias: 45 } });
+    ok(entrega.status < 300, 'recepción entrega la orden', entrega.json);
+    const [[entregada]] = await db.query('SELECT estado, metodo_pago FROM ordenes_trabajo WHERE id = ?', [flujo]);
+    ok(entregada.estado === 'entregada' && entregada.metodo_pago === 'sinpe', 'la entrega guarda estado y pago', entregada);
+
+    // ── Reprogramar desde el portal, y borrar citas y órdenes ──
+    const catalogo = await pedir('GET', '/portal/servicios', { token: clienteTok });
+    const servicio = catalogo.json.data[0].nombre || catalogo.json.data[0];
+    const delPortal = { vehiculo_id: vehA, sucursal_id: sa.id, fecha, servicios: [servicio] };
+    const agendada = await pedir('POST', '/portal/citas', { token: clienteTok, body: { ...delPortal, hora: '09:00' } });
+    ok(agendada.status < 300, 'el cliente agenda', agendada.json);
+    const movida = await pedir('PUT', `/portal/citas/${agendada.json.data.id}`, { token: clienteTok, body: { ...delPortal, hora: '12:00' } });
+    ok(movida.status < 300, 'el cliente reprograma', movida.json);
+    const borrable = await pedir('POST', '/citas', { token: A.token, body: { ...datosCita(clienteA, vehA, sa.id), hora: '08:00', descripcion: 'x', motivo: 'Para borrar' } });
+    const idBorrable = borrable.json.data.id || borrable.json.data.citaId;
+    const sinCita = await pedir('DELETE', `/citas/${idBorrable}`, { token: A.token, body: { motivo: 'Prueba' } });
+    ok(sinCita.status < 300, 'A borra una cita', sinCita.json);
+    const paraBorrar = await pedir('POST', '/ordenes', { token: A.token, body: datosOrden(clienteA, vehA, sa.id) });
+    const sinOrden = await pedir('DELETE', `/ordenes/${paraBorrar.json.data.id}`, { token: A.token, body: { motivo: 'Prueba' } });
+    ok(sinOrden.status < 300, 'A borra una orden', sinOrden.json);
+    const [[{ quedan }]] = await db.query('SELECT COUNT(*) AS quedan FROM ordenes_trabajo WHERE id = ?', [paraBorrar.json.data.id]);
+    ok(quedan === 0, 'la orden ya no está');
     // ── Correo sin mayúsculas: el login lo compara igual que la recuperación ──
     const correoA = `alfa-${sello}@prueba.test`;
     const enMayus = await pedir('POST', '/auth/login', { body: { email: correoA.toUpperCase(), password: 'ClaveSegura123' } });

@@ -1461,7 +1461,7 @@ router.put('/citas/:id', async (req, res) => {
     if (!horas.includes(hora)) {
       return invalido(res, 'hora', 'Ese día/hora no está disponible para agendar');
     }
-    const hoy = await hoyCR();
+    const hoy = await hoyCR(req.db);
     if (fecha < hoy) return invalido(res, 'fecha', 'La fecha no puede ser en el pasado');
     if (fecha === hoy && horasHastaCita(fecha, hora) <= 0) {
       return invalido(res, 'hora', 'Esa hora ya pasó. Elige un horario más tarde.');
