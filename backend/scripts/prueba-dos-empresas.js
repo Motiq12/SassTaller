@@ -467,6 +467,19 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     const idsA = new Set([].concat(lista(rolesA)).map((x) => x.id));
     ok([].concat(lista(rolesB)).every((x) => !idsA.has(x.id)) && idsA.size > 0, `cada una ve solo sus roles (A=${idsA.size})`, rolesA.status);
 
+    // ── Un taller suspendido no abre sesión ──
+    const correoMotiq = `motiq-${sello}@prueba.test`;
+    const [[plataforma]] = await db.query("INSERT INTO plataforma_admins (nombre, email, password_hash, activo) VALUES ('Prueba', ?, 'x', 1) RETURNING id", [correoMotiq]);
+    const tokenMotiq = jwt.sign({ id: plataforma.id, tipo: 'plataforma', nombre: 'Prueba', email: correoMotiq }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const entrarB = () => pedir('POST', '/auth/login', { body: { email: `beta-${sello}@prueba.test`, password: 'ClaveSegura123' } });
+    ok((await entrarB()).status === 200, 'B entra mientras está activa');
+    const suspender = await pedir('PATCH', `/motiq/talleres/${Bb.id}/estado`, { token: tokenMotiq, body: { estado: 'suspendido', motivo: 'Prueba' } });
+    ok(suspender.status === 200, 'Motiq suspende a B', suspender.json);
+    const negado = await entrarB();
+    ok(negado.status === 403 && !negado.json.data, 'suspendida no abre sesión', negado.json);
+    const reactivar = await pedir('PATCH', `/motiq/talleres/${Bb.id}/estado`, { token: tokenMotiq, body: { estado: 'activo' } });
+    ok(reactivar.status === 200 && (await entrarB()).status === 200, 'reactivada vuelve a entrar', reactivar.json);
+
     // ── Cuadre de la base ──
     const hijos = [['vehiculos', 'cliente_id', 'clientes'], ['citas', 'cliente_id', 'clientes'], ['citas', 'sucursal_id', 'sucursales'], ['ordenes_trabajo', 'cliente_id', 'clientes'], ['ordenes_trabajo', 'sucursal_id', 'sucursales'], ['cita_servicios', 'cita_id', 'citas'], ['usuarios', 'sucursal_id', 'sucursales'], ['sesiones_personal', 'usuario_id', 'usuarios'], ['actividad_personal', 'usuario_id', 'usuarios']];
     for (const [h, col, p] of hijos) {
