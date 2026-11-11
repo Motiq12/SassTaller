@@ -14,7 +14,7 @@
           <p>Elegilo una vez para crear tu cuenta. Después entrás solo con tu correo y tu contraseña.</p>
         </header>
 
-        <form class="buscador" (ngSubmit)="buscar()" novalidate>
+        <form class="buscador acceso-form" (ngSubmit)="buscar()" novalidate>
           <div class="campo">
             <label for="b-provincia">Provincia</label>
             <select id="b-provincia" [(ngModel)]="provincia" name="provincia" (ngModelChange)="cambiarProvincia()">
@@ -33,9 +33,10 @@
             <label for="b-nombre">Nombre del taller <span class="opcional">(opcional)</span></label>
             <input id="b-nombre" [(ngModel)]="q" name="q" maxlength="60" autocomplete="off" placeholder="Taller Los Andes" />
           </div>
-          <button type="submit" class="buscar" [disabled]="!puedeBuscar || buscando">
+          <ion-button type="submit" expand="block" class="btn-principal buscar" [disabled]="!puedeBuscar || buscando">
             {{ buscando ? 'Buscando…' : 'Buscar' }}
-          </button>
+            <ion-icon *ngIf="!buscando" name="arrow-forward-outline" slot="end" aria-hidden="true"></ion-icon>
+          </ion-button>
         </form>
 
         <p class="aviso-error" *ngIf="error" role="alert">{{ error }}</p>
@@ -64,7 +65,9 @@
                   <a *ngIf="s.telefono" [href]="'tel:' + s.telefono">{{ s.telefono }}</a>
                 </li>
               </ul>
-              <button type="button" class="elegir" (click)="elegir(t)">Elegir este taller</button>
+              <button type="button" class="elegir" (click)="elegir(t)">
+                Elegir este taller <ion-icon name="arrow-forward-outline" aria-hidden="true"></ion-icon>
+              </button>
             </li>
           </ul>
 

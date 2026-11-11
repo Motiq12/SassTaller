@@ -152,6 +152,17 @@ $raiz: 'ion-content.acceso-content.es-producto.es-producto.es-producto';
   .aviso-legal a { color: s.$carmesi-hondo; }
   .pass-reglas { color: s.$tinta-suave; li.ok { color: #15803d; } li.mal { color: s.$carmesi-hondo; } }
 
+  // El buscador de talleres: sus campos nativos con los colores claros del login.
+  .buscador {
+    .campo { border-bottom-color: s.$linea; &:hover { border-bottom-color: #b8b8c0; } }
+    .campo:focus-within { border-bottom-color: s.$carmesi; box-shadow: 0 1px 0 0 s.$carmesi; label { color: s.$carmesi; } }
+    label { color: s.$tinta-suave; font-family: s.$fb; letter-spacing: 0.14em; }
+    select, input { color: s.$tinta; &::placeholder { color: #9b9ba3; } }
+  }
+  .resultado { border-color: s.$linea; border-radius: 24px; }
+  .elegir { border-color: s.$linea; border-radius: 999px; color: s.$tinta; &:hover { border-color: s.$tinta; } ion-icon { color: s.$carmesi; } }
+  .vacio { background: s.$superficie; }
+
   .acceso-empresa { color: s.$tinta-suave; a { color: s.$tinta; text-decoration-color: s.$carmesi; text-underline-offset: 3px; } }
   .acceso-legal { color: s.$tinta-suave; a { color: s.$tinta-suave; &:hover { color: s.$tinta; } } }
 

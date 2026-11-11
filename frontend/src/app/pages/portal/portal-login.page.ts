@@ -10,7 +10,7 @@ import { AuthService } from '../../services/auth.service';
 import { BiometriaService } from '../../services/biometria.service';
 import { emailValido } from '../../utils/validar';
 import { sitioWeb } from '../../sitio-web-activo';
-import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../shared/turnstile.util';
+import { captchaActivo, montarTurnstile, TurnstileWidget } from '../../shared/turnstile.util';
 
 @Component({
   standalone: false,
@@ -54,7 +54,9 @@ export class PortalLoginPage implements OnInit, OnDestroy {
 
   // Anti-bot para el pedido de código OTP: honeypot + captcha Turnstile.
   website = '';
-  mostrarCaptcha = turnstileHabilitado();
+  // Empieza en false y se enciende cuando el servidor dice que el captcha está activo.
+  mostrarCaptcha = false;
+  private readonly pedirCaptcha = captchaActivo().then(v => (this.mostrarCaptcha = v));
   private ts?: TurnstileWidget;
   // El contenedor aparece recién al entrar al modo "código", así que lo montamos
   // vía setter cuando el elemento existe en el DOM (no en ngAfterViewInit).
