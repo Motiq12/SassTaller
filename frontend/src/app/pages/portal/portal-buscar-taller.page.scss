@@ -1,39 +1,79 @@
+// Los campos se ven como los del login: la etiqueta chica en mayúsculas arriba y una
+// raya abajo que se pone roja al escribir. Son <select> e <input> nativos (la lista de
+// cantones es larga y el selector del sistema es el más cómodo en el teléfono), así que
+// se pintan acá. Estos colores son los del panel oscuro de un taller; los del panel
+// claro de Motiq están en theme/acceso-producto.scss.
 .buscador {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  column-gap: 18px;
   margin-top: 8px;
 }
-.campo { display: grid; gap: 6px; min-width: 0; }
+.campo {
+  display: grid;
+  min-width: 0;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #3a404b;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  &:hover { border-bottom-color: #5b6472; }
+  &:focus-within {
+    border-bottom-color: var(--ion-color-primary);
+    box-shadow: 0 1px 0 0 var(--ion-color-primary);
+    label { color: var(--ion-color-primary-tint); }
+  }
+}
 .ancho, .buscar { grid-column: 1 / -1; }
-label { font-size: 14px; font-weight: 600; }
-.opcional { font-weight: 500; opacity: 0.65; }
+label {
+  margin-top: 8px;
+  color: #94a3b8;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: color 0.2s ease;
+}
+.opcional { font-weight: 500; text-transform: none; letter-spacing: 0; opacity: 0.8; }
 
 select, input {
   width: 100%;
-  min-height: 48px;
-  padding: 0 12px;
-  border: 1px solid #d4d4d8;
-  border-radius: 12px;
-  background: #fff;
-  color: #18181b;
+  min-height: 44px;
+  padding: 6px 0 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #f1f5f9;
   font: inherit;
   font-size: 16px;   // 16 px o más: iOS no hace zoom al enfocar
-  &:focus-visible { outline: 2px solid var(--ion-color-primary); outline-offset: 1px; }
-  &:disabled { background: #f4f4f5; color: #a1a1aa; }
+  font-weight: 500;
+  outline: none;     // el foco lo marca la raya roja de .campo
+  &::placeholder { color: #5f6b7d; opacity: 1; }
+  &:disabled { opacity: 0.45; cursor: default; }
 }
+select { cursor: pointer; }
+// La lista que despliega el sistema va siempre sobre claro.
+option { color: #18181b; }
 
-.buscar, .elegir {
+// "Elegir este taller": secundario, con el borde y la flecha del login.
+.elegir {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
   min-height: 48px;
   padding: 0 20px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--ion-color-primary);
-  color: var(--ion-color-primary-contrast, #fff);
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  background: transparent;
+  color: inherit;
   font: inherit;
+  font-size: 14px;
   font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   cursor: pointer;
-  &:disabled { opacity: 0.45; cursor: default; }
+  ion-icon { font-size: 18px; transition: transform 0.2s ease; }
+  &:hover ion-icon { transform: translateX(4px); }
   &:focus-visible { outline: 2px solid var(--ion-color-primary); outline-offset: 2px; }
 }
 
@@ -46,7 +86,7 @@ select, input {
   display: grid;
   gap: 12px;
   padding: 16px;
-  border: 1px solid #e4e4e7;
+  border: 1px solid #3a404b;
   border-radius: 16px;
 }
 .cabeza { display: flex; align-items: center; gap: 12px; }
@@ -68,13 +108,12 @@ h2 { margin: 0; font-size: 18px; font-weight: 700; overflow-wrap: anywhere; }
 .sedes { display: grid; gap: 8px; }
 .sedes li { display: grid; gap: 1px; font-size: 14px; }
 .sedes a { width: fit-content; min-height: 24px; color: inherit; text-decoration: underline; }
-.elegir { width: 100%; }
 
 .vacio {
   margin-top: 20px;
   padding: 18px;
   border-radius: 16px;
-  background: #f4f4f5;
+  background: rgba(255, 255, 255, 0.06);
   p { margin: 4px 0 0; font-size: 15px; }
 }
 

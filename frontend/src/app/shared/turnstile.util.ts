@@ -7,27 +7,35 @@ import { Capacitor } from '@capacitor/core';
 import { environment } from '../../environments/environment';
 
 let SITE_KEY = '';
+let clavePromise: Promise<string> | null = null;
 
-// La clave la da el servidor al arrancar, para poder activar el captcha desde Railway.
+// La clave la da el servidor, para poder activar el captcha desde Railway sin recompilar.
+// Se pide recién cuando un formulario la necesita, y una sola vez: antes se esperaba al
+// arrancar la app, y eso frenaba el primer pintado de todas las páginas, la landing
+// incluida, aunque no tuvieran captcha.
 // Va con fetch y no con HttpClient: un fallo acá no debe mostrarle un aviso rojo a nadie.
-export function cargarClaveTurnstile(): () => Promise<void> {
-  return async () => {
-    if (Capacitor.isNativePlatform()) return;
+function claveCaptcha(): Promise<string> {
+  if (clavePromise) return clavePromise;
+  clavePromise = (async () => {
+    if (Capacitor.isNativePlatform()) return '';
     const control = new AbortController();
-    const corte = setTimeout(() => control.abort(), 2000);
+    const corte = setTimeout(() => control.abort(), 4000);
     try {
       const r = await fetch(`${environment.apiUrl}/onboarding/captcha`, { signal: control.signal });
       if (r.ok) SITE_KEY = (await r.json())?.data?.siteKey || '';
     } catch { /* sin clave: los formularios siguen sin captcha */ }
     clearTimeout(corte);
-  };
+    return SITE_KEY;
+  })();
+  return clavePromise;
 }
 const SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
 
 // Turnstile es web-first; en el WebView nativo es poco fiable, así que solo se activa
 // en la web y cuando hay site key. Los demás casos quedan cubiertos por honeypot + rate limit.
-export function turnstileHabilitado(): boolean {
-  return !!SITE_KEY && !Capacitor.isNativePlatform();
+// Cada formulario lo pregunta al crearse y muestra el cuadro del captcha cuando responde.
+export async function captchaActivo(): Promise<boolean> {
+  return !!(await claveCaptcha()) && !Capacitor.isNativePlatform();
 }
 
 let scriptPromise: Promise<void> | null = null;
@@ -59,7 +67,7 @@ export interface TurnstileWidget {
 // token() es '' (el flujo sigue igual). Nunca lanza.
 export async function montarTurnstile(container: HTMLElement): Promise<TurnstileWidget> {
   const vacio: TurnstileWidget = { token: () => '', listo: async () => '', reset: () => {}, destroy: () => {} };
-  if (!turnstileHabilitado() || !container) return vacio;
+  if (!container || !(await captchaActivo())) return vacio;
   try {
     await cargarScript();
     const ts = (window as any).turnstile;

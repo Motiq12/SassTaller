@@ -5,7 +5,7 @@ import { DirectorioService, Ubicaciones } from '../../services/directorio.servic
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { PRODUCTO } from '../../shared/producto';
-import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../shared/turnstile.util';
+import { captchaActivo, montarTurnstile, TurnstileWidget } from '../../shared/turnstile.util';
 
 /**
  * Alta de un taller nuevo en el SaaS. Es la puerta de entrada del producto: antes de
@@ -43,7 +43,9 @@ export class RegistroTallerPage {
 
   // Anti-bot del alta: honeypot + captcha. El cuadro aparece y desaparece con el paso 2.
   website = '';
-  mostrarCaptcha = turnstileHabilitado();
+  // Empieza en false y se enciende cuando el servidor dice que el captcha está activo.
+  mostrarCaptcha = false;
+  private readonly pedirCaptcha = captchaActivo().then(v => (this.mostrarCaptcha = v));
   private ts?: TurnstileWidget;
   @ViewChild('tsBox') set tsBox(el: ElementRef<HTMLElement> | undefined) {
     if (!el) { this.ts?.destroy(); this.ts = undefined; return; }

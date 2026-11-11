@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild, inject } from '@angular/core';
+import { Component, ElementRef, OnDestroy, ViewChild, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { MarcaService } from '../../services/marca.service';
@@ -6,7 +6,7 @@ import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { emailValido } from '../../utils/validar';
-import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../shared/turnstile.util';
+import { captchaActivo, montarTurnstile, TurnstileWidget } from '../../shared/turnstile.util';
 
 @Component({
   standalone: false,
@@ -14,7 +14,7 @@ import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../sha
   templateUrl: './portal-recuperar.page.html',
   styleUrls: ['./portal-login.page.scss'],
 })
-export class PortalRecuperarPage implements AfterViewInit, OnDestroy {
+export class PortalRecuperarPage implements OnDestroy {
   private router = inject(Router);
   private auth = inject(AuthService);
   /** Sin taller, la pantalla se viste de Motiq (theme/acceso-producto.scss). */
@@ -38,12 +38,14 @@ export class PortalRecuperarPage implements AfterViewInit, OnDestroy {
 
   // Anti-bot para el pedido de código: honeypot + captcha Turnstile.
   website = '';
-  mostrarCaptcha = turnstileHabilitado();
-  @ViewChild('tsBox') tsBox?: ElementRef<HTMLElement>;
+  // Empieza en false y se enciende cuando el servidor dice que el captcha está activo.
+  // El cuadro aparece después, así que se monta con un setter, cuando existe en el DOM.
+  mostrarCaptcha = false;
+  private readonly pedirCaptcha = captchaActivo().then(v => (this.mostrarCaptcha = v));
   private ts?: TurnstileWidget;
-
-  async ngAfterViewInit() {
-    if (this.tsBox) this.ts = await montarTurnstile(this.tsBox.nativeElement);
+  @ViewChild('tsBox') set tsBox(el: ElementRef<HTMLElement> | undefined) {
+    if (!el) { this.ts?.destroy(); this.ts = undefined; return; }
+    if (!this.ts) montarTurnstile(el.nativeElement).then(w => (this.ts = w));
   }
 
   ngOnDestroy() {
