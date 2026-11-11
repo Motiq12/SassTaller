@@ -18,8 +18,9 @@
     <section class="card">
       <span class="section-label">Identificación</span>
       <div class="ig" *ngIf="tipos.length > 1">
-        <label for="tipo-vehiculo">Tipo de vehículo</label>
+        <label for="tipo-vehiculo">Tipo de vehículo *</label>
         <select id="tipo-vehiculo" [(ngModel)]="form.tipo" name="tipo" (ngModelChange)="cambiarTipo()">
+          <option [ngValue]="undefined" disabled>Elegí el tipo</option>
           <option *ngFor="let t of tipos" [ngValue]="t.clave">{{ t.etiqueta }}</option>
         </select>
       </div>

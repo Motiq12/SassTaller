@@ -209,9 +209,16 @@
           <button type="button" class="amb-x" (click)="modalMoto = false" aria-label="Cerrar"><ion-icon name="close-outline"></ion-icon></button>
         </div>
         <div class="amb-body">
+          <div class="fg" *ngIf="tiposVehiculo.length > 1">
+            <label for="am-tipo">Tipo de vehículo <b>*</b></label>
+            <select id="am-tipo" [(ngModel)]="nuevaMoto.tipo" name="tipo">
+              <option value="" disabled>Elegí el tipo</option>
+              <option *ngFor="let t of tiposVehiculo" [value]="t.clave">{{ t.etiqueta }}</option>
+            </select>
+          </div>
           <div class="fg-row">
-            <div class="fg"><label for="am-marca">Marca <b>*</b></label><input id="am-marca" [(ngModel)]="nuevaMoto.marca" name="marca" list="am-marcas" placeholder="Freedom, Hero, KYMCO…" autocapitalize="words"></div>
-            <div class="fg"><label for="am-modelo">Modelo <b>*</b></label><input id="am-modelo" [(ngModel)]="nuevaMoto.modelo" name="modelo" placeholder="Ej.: Hunk 150"></div>
+            <div class="fg"><label for="am-marca">Marca <b>*</b></label><input id="am-marca" [(ngModel)]="nuevaMoto.marca" name="marca" [attr.list]="nuevaMoto.tipo === 'moto' ? 'am-marcas' : null" placeholder="Toyota, Hino, Honda…" autocapitalize="words"></div>
+            <div class="fg"><label for="am-modelo">Modelo <b>*</b></label><input id="am-modelo" [(ngModel)]="nuevaMoto.modelo" name="modelo" placeholder="Ej.: Hilux"></div>
           </div>
           <div class="fg-row">
             <div class="fg"><label for="am-placa">Placa</label><input id="am-placa" class="alta-placa" [(ngModel)]="nuevaMoto.placa" name="placa" placeholder="ABC123" autocapitalize="characters" maxlength="12"></div>

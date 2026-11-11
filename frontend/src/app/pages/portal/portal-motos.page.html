@@ -77,6 +77,7 @@
       <div class="fg" *ngIf="tipos.length > 1">
         <label for="tipo-vehiculo">Tipo de vehículo *</label>
         <select id="tipo-vehiculo" [(ngModel)]="nueva.tipo" name="tipo" (ngModelChange)="cambiarTipo()">
+          <option value="" disabled>Elige el tipo</option>
           <option *ngFor="let t of tipos" [ngValue]="t.clave">{{ t.etiqueta }}</option>
         </select>
       </div>

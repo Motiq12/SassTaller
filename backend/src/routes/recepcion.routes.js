@@ -188,7 +188,7 @@ router.post('/citas/:id/crear-orden', exigirPermiso('ordenes.crear'), async (req
         const [[o]] = await req.db.query('SELECT id, numero_orden FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ?', [actual.orden_id]);
         return res.json({ data: { orden_id: o.id, numero_orden: o.numero_orden }, message: 'La cita ya tiene una orden' });
       }
-      const numero_orden = await generarNumeroOrden();
+      const numero_orden = await generarNumeroOrden(conn);
       const [result] = await conn.query(
         `INSERT INTO ordenes_trabajo
           (tenant_id, numero_orden, vehiculo_id, cliente_id, sucursal_id, recepcionista_id, tecnico_id, problema_reportado, estado)

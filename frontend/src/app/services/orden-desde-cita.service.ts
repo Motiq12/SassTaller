@@ -3,6 +3,7 @@ import { ActionSheetController, AlertController, ToastController } from '@ionic/
 import { firstValueFrom } from 'rxjs';
 import { RecepcionService } from './recepcion.service';
 import { VehiculosService } from './vehiculos.service';
+import { TipoVehiculo } from './taller.service';
 
 // Abrir la orden de trabajo de una cita, con el mismo paso a paso en recepción
 // (Inicio → citas de hoy) y en administración (Gestión de citas → Citas):
@@ -96,11 +97,31 @@ export class OrdenDesdeCitaService {
     return elegida;
   }
 
+  // Con varios tipos hay que elegir; con uno se usa ese. '' = no se pudo saber y decide
+  // el servidor. null = canceló.
+  private async elegirTipo(): Promise<string | null> {
+    const tipos = (await firstValueFrom(this.motos.getTipos()).catch(() => ({ data: [] as TipoVehiculo[] }))).data || [];
+    if (tipos.length <= 1) return tipos[0]?.clave || '';
+    let elegido: string | null = null;
+    const s = await this.sheet.create({
+      header: '¿Qué tipo de vehículo es?',
+      buttons: [
+        ...tipos.map(t => ({ text: t.etiqueta, icon: 'car-outline', handler: () => { elegido = t.clave; } })),
+        { text: 'Cancelar', icon: 'close', role: 'cancel' },
+      ],
+    });
+    await s.present();
+    await s.onDidDismiss();
+    return elegido;
+  }
+
   private async registrarMoto(clienteId: number): Promise<number | null> {
+    const tipo = await this.elegirTipo();
+    if (tipo === null) return null;
     const a = await this.alert.create({
       header: 'Registrar vehículo',
       inputs: [
-        { name: 'marca', placeholder: 'Marca * (Freedom, Hero, KYMCO…)' },
+        { name: 'marca', placeholder: 'Marca *' },
         { name: 'modelo', placeholder: 'Modelo *' },
         { name: 'placa', placeholder: 'Placa (opcional)' },
       ],
@@ -127,6 +148,7 @@ export class OrdenDesdeCitaService {
       const r = await firstValueFrom(this.motos.create({
         cliente_id: clienteId, marca: String(v.marca).trim(), modelo: String(v.modelo).trim(),
         placa: String(v.placa || '').trim() || null,
+        ...(tipo ? { tipo } : {}),
       }));
       return r.data.id ?? null;
     } catch {

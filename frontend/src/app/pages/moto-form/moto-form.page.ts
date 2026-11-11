@@ -33,7 +33,7 @@ export class MotoFormPage implements OnInit, OnDestroy {
   atributos: Record<string, string | number | null> = {};
 
   get tipoActual(): TipoVehiculo | undefined {
-    return this.tipos.find(t => t.clave === this.form.tipo) || this.tipos[0];
+    return this.tipos.find(t => t.clave === this.form.tipo);
   }
 
   // "moto" cuando el taller solo atiende motos; "vehículo" en cualquier otro caso.
@@ -46,9 +46,9 @@ export class MotoFormPage implements OnInit, OnDestroy {
     this.atributos = {};
   }
 
-  // Requeridos: marca y modelo.
+  // Requeridos: marca, modelo y, si el taller atiende varios, el tipo.
   get valido(): boolean {
-    return !!(this.form.marca?.trim() && this.form.modelo?.trim());
+    return !!(this.form.marca?.trim() && this.form.modelo?.trim()) && (this.tipos.length <= 1 || !!this.form.tipo);
   }
 
   constructor(
@@ -65,7 +65,8 @@ export class MotoFormPage implements OnInit, OnDestroy {
       next: res => {
         this.atendidos = res.data;
         this.otros = res.otros || [];
-        if (!this.form.tipo) this.form.tipo = this.atendidos[0]?.clave;
+        // Con varios hay que elegir: uno puesto por defecto pasaría sin que nadie lo note.
+        if (!this.form.tipo && this.atendidos.length === 1) this.form.tipo = this.atendidos[0].clave;
       },
       error: () => { this.atendidos = []; },
     });

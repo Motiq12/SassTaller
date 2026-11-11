@@ -394,6 +394,22 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     const [[sinCambio]] = await db.query('SELECT tipo, color FROM vehiculos WHERE id = ?', [busCliente.json.data.id]);
     ok(aCamion.status === 400 && sinCambio.tipo === 'bus' && sinCambio.color === 'Azul', 'un cambio rechazado no guarda nada', [aCamion.status, sinCambio]);
 
+    // ── Abrir la orden desde una cita sin vehículo ──
+    const citaSinVeh = await pedir('POST', '/citas', { token: A.token, body: { ...datosCita(clienteA, null, sa.id), hora: '11:00', descripcion: 'x', motivo: 'Sin vehículo' } });
+    ok(citaSinVeh.status < 300, 'A agenda una cita sin vehículo', citaSinVeh.json);
+    const idSinVeh = citaSinVeh.json.data.id || citaSinVeh.json.data.citaId;
+    const rutaOrden = `/recepcion/citas/${idSinVeh}/crear-orden`;
+    const sinElegir = await pedir('POST', rutaOrden, { token: A.token, body: {} });
+    ok(sinElegir.status === 400, 'sin vehículo pide uno', sinElegir.json);
+    const ajena = await pedir('POST', rutaOrden, { token: Bb.token, body: { vehiculo_id: vehB } });
+    ok(ajena.status === 404, 'B no puede abrir la orden de una cita de A', ajena.json);
+    const desdeCita = await pedir('POST', rutaOrden, { token: A.token, body: { vehiculo_id: vehA } });
+    ok(desdeCita.status === 201 && /^OT-/.test(desdeCita.json.data.numero_orden), 'A abre la orden desde la cita', desdeCita.json);
+    const otraVez = await pedir('POST', rutaOrden, { token: A.token, body: { vehiculo_id: vehA } });
+    ok(otraVez.status === 200 && otraVez.json.data.orden_id === desdeCita.json.data.orden_id, 'el segundo clic devuelve la misma orden', otraVez.json);
+    const [[citaLista]] = await db.query('SELECT orden_id, vehiculo_id FROM citas WHERE id = ?', [idSinVeh]);
+    ok(citaLista.orden_id === desdeCita.json.data.orden_id && citaLista.vehiculo_id === vehA, 'la cita queda ligada a la orden y al vehículo', citaLista);
+
     // ── Roles ──
     const rolesA = await pedir('GET', '/admin/roles', { token: A.token });
     const rolesB = await pedir('GET', '/admin/roles', { token: Bb.token });

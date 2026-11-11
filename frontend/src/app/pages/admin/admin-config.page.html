@@ -176,7 +176,7 @@
           <div class="fg"><label>De</label><input type="time" [(ngModel)]="nuevoBloqueo.hora_desde" name="hora_desde"></div>
           <div class="fg"><label>A</label><input type="time" [(ngModel)]="nuevoBloqueo.hora_hasta" name="hora_hasta"></div>
         </div>
-        <div class="fg"><label>Motivo</label><input [(ngModel)]="nuevoBloqueo.motivo" name="motivo" maxlength="150" placeholder="Ej.: feriado, capacitación de Freedom…"></div>
+        <div class="fg"><label>Motivo</label><input [(ngModel)]="nuevoBloqueo.motivo" name="motivo" maxlength="150" placeholder="Ej.: feriado, capacitación del personal…"></div>
         <button class="btn btn-cr config-btn-full" [disabled]="guardandoBloqueo" (click)="crearBloqueo()">Bloquear</button>
       </div>
 

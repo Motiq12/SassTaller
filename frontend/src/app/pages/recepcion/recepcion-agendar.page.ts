@@ -6,6 +6,7 @@ import { takeUntil } from 'rxjs/operators';
 import { RecepcionService } from '../../services/recepcion.service';
 import { ClientesService } from '../../services/clientes.service';
 import { VehiculosService } from '../../services/vehiculos.service';
+import { TipoVehiculo } from '../../services/taller.service';
 import { AuthService } from '../../services/auth.service';
 import { DURACIONES_CITA, OPCIONES_TIEMPO } from '../../shared/duraciones';
 import { enPanel, rutaPanel } from '../../shared/ruta-panel';
@@ -44,10 +45,12 @@ export class RecepcionAgendarPage implements OnInit, OnDestroy {
   modalMoto = false;
   guardandoAlta = false;
   nuevoCliente = { nombre: '', apellido: '', telefono: '', cedula: '', email: '' };
-  nuevaMoto = { marca: '', modelo: '', placa: '', anio: null as number | null, color: '' };
-  // Sugerencias al escribir (se puede poner cualquier otra): primero las marcas que
-  // distribuye el taller.
-  readonly marcasSugeridas = ['Freedom', 'Hero', 'KYMCO', 'Honda', 'Yamaha', 'Suzuki', 'Bajaj', 'TVS', 'Kawasaki', 'KTM'];
+  nuevaMoto = { tipo: '', marca: '', modelo: '', placa: '', anio: null as number | null, color: '' };
+  // Los tipos que atiende el taller. Con varios hay que elegir: uno puesto por defecto
+  // dejaría un bus guardado como automóvil sin que nadie lo note.
+  tiposVehiculo: TipoVehiculo[] = [];
+  // Sugerencias de marcas de moto al escribir (se puede poner cualquier otra).
+  readonly marcasSugeridas = ['Bajaj', 'Freedom', 'Hero', 'Honda', 'Kawasaki', 'KTM', 'KYMCO', 'Suzuki', 'TVS', 'Yamaha'];
   readonly coloresSugeridos = ['Negro', 'Blanco', 'Rojo', 'Azul', 'Gris', 'Plata', 'Verde', 'Amarillo', 'Naranja'];
   readonly anioActual = new Date().getFullYear();
 
@@ -97,6 +100,7 @@ export class RecepcionAgendarPage implements OnInit, OnDestroy {
     if (f && /^\d{4}-\d{2}-\d{2}$/.test(f)) this.form.fecha = f;
 
     this.rec.getServicios().pipe(takeUntil(this.destroy$)).subscribe({ next: r => this.servicios = r.data, error: () => {} });
+    this.cargarTiposVehiculo();
     // Las sucursales definen qué mecánicos y qué cupos aplican: se cargan al resolverlas.
     this.rec.getSucursales().pipe(takeUntil(this.destroy$)).subscribe({
       next: r => {
@@ -179,7 +183,9 @@ export class RecepcionAgendarPage implements OnInit, OnDestroy {
     const c = this.nuevoCliente;
     return !!(c.nombre.trim() && c.apellido.trim() && c.telefono.trim() && c.cedula.trim());
   }
-  get motoCompleta(): boolean { return !!(this.nuevaMoto.marca.trim() && this.nuevaMoto.modelo.trim()); }
+  get motoCompleta(): boolean {
+    return !!(this.nuevaMoto.marca.trim() && this.nuevaMoto.modelo.trim()) && (this.tiposVehiculo.length <= 1 || !!this.nuevaMoto.tipo);
+  }
 
   // Al abrir un cuadro, el cursor va al primer campo vacío (lo del buscador ya viene puesto).
   enfocarVacio(ev: Event) {
@@ -214,8 +220,18 @@ export class RecepcionAgendarPage implements OnInit, OnDestroy {
 
   registrarMoto() {
     if (!this.cliente) return;
-    this.nuevaMoto = { marca: '', modelo: '', placa: '', anio: null, color: '' };
+    this.nuevaMoto = { tipo: '', marca: '', modelo: '', placa: '', anio: null, color: '' };
     this.modalMoto = true;
+    this.cargarTiposVehiculo();
+  }
+
+  private cargarTiposVehiculo() {
+    this.motosSvc.getTipos().pipe(takeUntil(this.destroy$)).subscribe({
+      next: r => {
+        this.tiposVehiculo = r.data;
+        if (r.data.length === 1) this.nuevaMoto.tipo = r.data[0].clave;
+      },
+    });
   }
 
   guardarMoto() {
@@ -225,6 +241,7 @@ export class RecepcionAgendarPage implements OnInit, OnDestroy {
     this.motosSvc.create({
       cliente_id: this.cliente.id, marca: m.marca.trim(), modelo: m.modelo.trim(),
       placa: m.placa.trim().toUpperCase() || null, anio: m.anio || null, color: m.color.trim() || null,
+      ...(m.tipo ? { tipo: m.tipo } : {}),
     }).pipe(takeUntil(this.destroy$)).subscribe({
       next: r => {
         this.guardandoAlta = false;

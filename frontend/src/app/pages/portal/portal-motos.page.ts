@@ -70,7 +70,8 @@ export class PortalMotosPage implements OnInit, OnDestroy {
 
   abrirForm() {
     this.editandoId = null;
-    this.nueva = { tipo: this.atendidos[0]?.clave || '', marca: '', modelo: '', placa: '', anio: null, color: '', kilometraje: null, foto: null };
+    // Con varios tipos hay que elegir: uno puesto por defecto pasaría sin que nadie lo note.
+    this.nueva = { tipo: this.atendidos.length === 1 ? this.atendidos[0].clave : '', marca: '', modelo: '', placa: '', anio: null, color: '', kilometraje: null, foto: null };
     this.atributos = {};
     this.marcasSugeridas = [];
     this.modelosSugeridos = [];
@@ -140,11 +141,11 @@ export class PortalMotosPage implements OnInit, OnDestroy {
 
   // Marca, modelo y placa son obligatorios.
   get valido(): boolean {
-    return !!(this.nueva.marca.trim() && this.nueva.modelo.trim() && this.nueva.placa.trim());
+    return !!(this.nueva.marca.trim() && this.nueva.modelo.trim() && this.nueva.placa.trim()) && (this.tipos.length <= 1 || !!this.nueva.tipo);
   }
 
   guardar() {
-    if (!this.valido) { this.mostrarToast('Marca, modelo y placa son obligatorios', 'warning'); return; }
+    if (!this.valido) { this.mostrarToast('Tipo, marca, modelo y placa son obligatorios', 'warning'); return; }
     this.enviando = true;
     const datos = {
       marca: this.nueva.marca.trim(),
