@@ -1,28 +1,37 @@
-// Entrar, crear cuenta y recuperar el acceso cuando la pantalla NO pertenece a ningún
-// taller: la puerta de Motiq en motiq12.com. Ahí se visten con el sistema de la web
-// pública (landing/partes/_sistema.scss): página clara con marco blanco, la marca en
-// una tarjeta negra con el carmesí como único acento, y el formulario sobre claro.
+// Entrar, crear cuenta, buscar el taller y recuperar el acceso: el diseño de la web
+// pública (landing/partes/_sistema.scss) para TODAS estas pantallas. Página clara con
+// marco blanco, la marca en una tarjeta negra y el formulario sobre claro.
 //
-// Con un taller resuelto (subdominio o ?taller=) no aplica nada de esto: la pantalla
-// sigue oscura, con el color, el logo y el nombre de ESE taller (portal-login.page.scss
-// y acceso-marca.component.scss). La clase la pone cada pantalla con marca.esProducto.
+// Hay un solo acento, y depende de quién es la pantalla:
+//  · sin taller (motiq12.com, clase .es-producto): el carmesí de Motiq;
+//  · con un taller resuelto: el color de ESE taller, que MarcaService ya dejó en
+//    --ion-color-primary. Su logo y su nombre van en la tarjeta (acceso-marca). El
+//    portal de un taller nunca se pinta de carmesí.
+// El texto de color sobre la tarjeta negra usa --marca-tx-oscuro y el de sobre claro
+// --marca-tx-claro: MarcaService los calcula para que el color del taller se lea.
+//
+// La clase .acceso-claro la ponen todas las pantallas; .es-producto, marca.esProducto.
 //
 // Va en un archivo global (sin tope de tamaño). Los estilos del componente suman un
 // atributo de alcance por cada parte del selector, así que la raíz repite la clase
 // para ganarles sin !important.
 @use '../app/pages/landing/partes/sistema' as s;
 
-$raiz: 'ion-content.acceso-content.es-producto.es-producto.es-producto';
+$raiz: 'ion-content.acceso-content.acceso-claro.acceso-claro.acceso-claro';
 
 #{$raiz} {
-  // El tema del producto, solo dentro de esta pantalla: Ionic y los estilos de la
-  // pantalla leen estas variables, así el foco, las rayas y los acentos toman el
-  // carmesí sin tocar el resto de la app.
-  --ion-color-primary: #{s.$carmesi};
-  --ion-color-primary-rgb: 225, 29, 72;
-  --ion-color-primary-contrast: #fff;
-  --ion-color-primary-shade: #{s.$carmesi-hondo};
-  --ion-color-primary-tint: #{s.$carmesi-claro};
+  // Sin taller, el acento es el carmesí de Motiq, solo dentro de esta pantalla: Ionic y
+  // los estilos de la pantalla leen estas variables, así el foco, las rayas y los
+  // acentos lo toman sin tocar el resto de la app. Con un taller quedan las suyas.
+  &.es-producto {
+    --ion-color-primary: #{s.$carmesi};
+    --ion-color-primary-rgb: 225, 29, 72;
+    --ion-color-primary-contrast: #fff;
+    --ion-color-primary-shade: #{s.$carmesi-hondo};
+    --ion-color-primary-tint: #{s.$carmesi-claro};
+    --marca-tx-oscuro: #{s.$carmesi-claro};
+    --marca-tx-claro: #{s.$carmesi-hondo};
+  }
   --ion-text-color: #{s.$tinta};
   --font-display: #{s.$fd};
   --ion-font-family: #{s.$fb};
@@ -39,7 +48,7 @@ $raiz: 'ion-content.acceso-content.es-producto.es-producto.es-producto';
   .marca {
     border-radius: 24px;
     background:
-      radial-gradient(ellipse 70% 60% at 62% 26%, rgba(225, 29, 72, 0.26), transparent 72%),
+      radial-gradient(ellipse 70% 60% at 62% 26%, rgba(var(--ion-color-primary-rgb), 0.26), transparent 72%),
       s.$noche;
     color: #fff;
   }
@@ -53,21 +62,21 @@ $raiz: 'ion-content.acceso-content.es-producto.es-producto.es-producto';
     font-weight: 600;
     letter-spacing: 0.2em;
     color: s.blanco(0.75);
-    &::before { background: s.$carmesi-claro; }
+    &::before { background: var(--marca-tx-oscuro, var(--ion-color-primary-tint)); }
   }
   .marca-titulo {
     font-family: s.$fd;
     font-weight: 600;
     letter-spacing: -0.02em;
     text-shadow: none;
-    span { color: s.$carmesi-claro; }
+    span { color: var(--marca-tx-oscuro, var(--ion-color-primary-tint)); }
   }
   .marca-lista {
     border-top-color: s.blanco(0.16);
     strong { font-family: s.$fd; font-size: 16px; font-weight: 600; }
     li > span:last-child { color: s.blanco(0.7); }
   }
-  .marca-n { font-family: s.$fd; font-weight: 600; letter-spacing: 0.04em; color: s.$carmesi-claro; }
+  .marca-n { font-family: s.$fd; font-weight: 600; letter-spacing: 0.04em; color: var(--marca-tx-oscuro, var(--ion-color-primary-tint)); }
 
   // ── El panel del formulario, sobre claro ───────────────────────────────────────
   .acceso-panel {
@@ -91,8 +100,8 @@ $raiz: 'ion-content.acceso-content.es-producto.es-producto.es-producto';
     h1 { font-family: s.$fd; font-weight: 600; letter-spacing: -0.02em; text-transform: uppercase; line-height: 1; color: s.$tinta; }
     p { color: s.$tinta-suave; strong { color: s.$tinta; } }
   }
-  .acceso-ico { border-color: s.$linea; border-radius: s.$r-pildora; background: s.$superficie; ion-icon { color: s.$carmesi; } }
-  .pasos { span { background: s.$linea; &.on { background: s.$carmesi; } } em { font-family: s.$fb; color: s.$tinta-suave; } }
+  .acceso-ico { border-color: s.$linea; border-radius: s.$r-pildora; background: s.$superficie; ion-icon { color: var(--ion-color-primary); } }
+  .pasos { span { background: s.$linea; &.on { background: var(--ion-color-primary); } } em { font-family: s.$fb; color: s.$tinta-suave; } }
 
   // Los dos caminos: tarjetas grises que se levantan, como las garantías de la landing.
   .acceso-panel .camino {
@@ -104,10 +113,10 @@ $raiz: 'ion-content.acceso-content.es-producto.es-producto.es-producto';
     strong { font-family: s.$fd; font-weight: 600; }
     span { color: s.$tinta-suave; }
     &:hover { border-color: s.$linea; background: s.$papel; transform: translateY(-3px); box-shadow: 0 16px 40px rgba(10, 10, 10, 0.08); }
-    &:focus-visible { outline: 2px solid s.$carmesi; outline-offset: 3px; }
+    &:focus-visible { outline: 2px solid var(--ion-color-primary); outline-offset: 3px; }
   }
-  .acceso-panel .cambiar { color: s.$tinta; text-decoration-color: s.$carmesi; }
-  .acceso-panel .nota-camino { color: s.$tinta-suave; a { color: s.$tinta; text-decoration-color: s.$carmesi; } }
+  .acceso-panel .cambiar { color: s.$tinta; text-decoration-color: var(--ion-color-primary); }
+  .acceso-panel .nota-camino { color: s.$tinta-suave; a { color: s.$tinta; text-decoration-color: var(--ion-color-primary); } }
 
   // Campos: la misma raya de abajo, en gris claro; carmesí al escribir.
   .acceso-form {
@@ -117,7 +126,7 @@ $raiz: 'ion-content.acceso-content.es-producto.es-producto.es-producto';
       border-bottom-color: s.$linea;
       &:hover { border-bottom-color: #b8b8c0; }
       ion-label { color: s.$tinta-suave !important; font-family: s.$fb; letter-spacing: 0.14em; }
-      &:focus-within ion-label { color: s.$carmesi !important; }
+      &:focus-within ion-label { color: var(--ion-color-primary) !important; }
       ion-input { --color: #{s.$tinta}; --placeholder-color: #9b9ba3; }
       .ver-pass { color: s.$tinta-suave; &:hover { color: s.$tinta; } }
     }
@@ -131,6 +140,7 @@ $raiz: 'ion-content.acceso-content.es-producto.es-producto.es-producto';
     font-size: 15px;
     font-weight: 600;
     letter-spacing: 0.04em;
+    --color: var(--ion-color-primary-contrast);
     &.button-disabled { --background: #{s.$superficie}; --color: #9b9ba3; }
   }
   .acceso-form ion-button.btn-secundario {
@@ -145,25 +155,70 @@ $raiz: 'ion-content.acceso-content.es-producto.es-producto.es-producto';
   .separador { color: s.$tinta-suave; &::before, &::after { background: s.$linea; } }
   .enlace {
     color: s.$tinta-suave;
-    text-decoration-color: s.$carmesi;
+    text-decoration-color: var(--ion-color-primary);
     &:hover { color: s.$tinta; }
   }
   .ayuda, .aviso-legal { color: s.$tinta-suave; }
-  .aviso-legal a { color: s.$carmesi-hondo; }
-  .pass-reglas { color: s.$tinta-suave; li.ok { color: #15803d; } li.mal { color: s.$carmesi-hondo; } }
+  .aviso-legal a { color: var(--marca-tx-claro, var(--ion-color-primary-shade)); }
+  .pass-reglas { color: s.$tinta-suave; li.ok { color: #15803d; } li.mal { color: var(--marca-tx-claro, var(--ion-color-primary-shade)); } }
+
+  // Crear cuenta sin taller: el campo "Tu taller" y la lista de los que coinciden.
+  .taller-elegido {
+    margin-bottom: 16px;
+    color: s.$tinta-suave;
+    strong { color: s.$tinta; }
+    button {
+      padding: 0;
+      border: 0;
+      background: none;
+      color: s.$tinta;
+      font: inherit;
+      font-weight: 600;
+      text-decoration: underline;
+      text-decoration-color: var(--ion-color-primary);
+      text-underline-offset: 3px;
+      cursor: pointer;
+    }
+  }
+  .elegir-taller { margin-bottom: 14px; .ayuda { margin: 6px 0 0; } a { color: s.$tinta; text-decoration-color: var(--ion-color-primary); } }
+  .opciones-taller {
+    display: grid;
+    gap: 6px;
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+    button {
+      display: grid;
+      gap: 2px;
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid s.$linea;
+      border-radius: 16px;
+      background: s.$papel;
+      color: s.$tinta;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 0.2s ease, background-color 0.2s ease;
+      strong { font-family: s.$fd; font-weight: 600; }
+      span { font-size: 14px; color: s.$tinta-suave; }
+      &:hover { border-color: s.$tinta; background: s.$superficie; }
+      &:focus-visible { outline: 2px solid var(--ion-color-primary); outline-offset: 2px; }
+    }
+  }
 
   // El buscador de talleres: sus campos nativos con los colores claros del login.
   .buscador {
     .campo { border-bottom-color: s.$linea; &:hover { border-bottom-color: #b8b8c0; } }
-    .campo:focus-within { border-bottom-color: s.$carmesi; box-shadow: 0 1px 0 0 s.$carmesi; label { color: s.$carmesi; } }
+    .campo:focus-within { border-bottom-color: var(--ion-color-primary); box-shadow: 0 1px 0 0 var(--ion-color-primary); label { color: var(--ion-color-primary); } }
     label { color: s.$tinta-suave; font-family: s.$fb; letter-spacing: 0.14em; }
     select, input { color: s.$tinta; &::placeholder { color: #9b9ba3; } }
   }
   .resultado { border-color: s.$linea; border-radius: 24px; }
-  .elegir { border-color: s.$linea; border-radius: 999px; color: s.$tinta; &:hover { border-color: s.$tinta; } ion-icon { color: s.$carmesi; } }
+  .elegir { border-color: s.$linea; border-radius: 999px; color: s.$tinta; &:hover { border-color: s.$tinta; } ion-icon { color: var(--ion-color-primary); } }
   .vacio { background: s.$superficie; }
 
-  .acceso-empresa { color: s.$tinta-suave; a { color: s.$tinta; text-decoration-color: s.$carmesi; text-underline-offset: 3px; } }
+  .acceso-empresa { color: s.$tinta-suave; a { color: s.$tinta; text-decoration-color: var(--ion-color-primary); text-underline-offset: 3px; } }
   .acceso-legal { color: s.$tinta-suave; a { color: s.$tinta-suave; &:hover { color: s.$tinta; } } }
 
   // ── Escritorio: la tarjeta de la marca a la izquierda, el formulario a la derecha ──
@@ -176,7 +231,7 @@ $raiz: 'ion-content.acceso-content.es-producto.es-producto.es-producto';
       min-height: 596px;
       border-radius: 32px;
       background:
-        radial-gradient(ellipse 62% 52% at 54% 34%, rgba(225, 29, 72, 0.28), transparent 74%),
+        radial-gradient(ellipse 62% 52% at 54% 34%, rgba(var(--ion-color-primary-rgb), 0.28), transparent 74%),
         s.$noche;
     }
     .acceso-panel { min-height: calc(100dvh - 24px); padding: 48px 56px 24px; }

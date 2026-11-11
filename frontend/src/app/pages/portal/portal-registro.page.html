@@ -1,4 +1,4 @@
-<ion-content class="acceso-content" [class.es-producto]="marca.esProducto">
+<ion-content class="acceso-content acceso-claro" [class.es-producto]="marca.esProducto">
   <div class="acceso">
     <app-acceso-marca></app-acceso-marca>
 
@@ -11,9 +11,9 @@
           <a class="on" routerLink="/portal/registro" aria-current="page">Crear cuenta</a>
         </nav>
 
-        <p class="taller-elegido" *ngIf="paso === 1 && parte === 1">
+        <p class="taller-elegido" *ngIf="paso === 1 && parte === 1 && tieneTaller">
           Tu cuenta en <strong>{{ marca.rotuloPublico }}</strong>
-          <a *ngIf="puedeCambiarTaller" routerLink="/portal/buscar-taller">Cambiar de taller</a>
+          <button type="button" *ngIf="puedeCambiarTaller" (click)="cambiarTaller()">Cambiar de taller</button>
         </p>
 
         <!-- Tres pasos cortos: tus datos, tu acceso y el código del correo. -->
@@ -32,6 +32,31 @@
         <!-- Paso 1, parte 1: tus datos -->
         <ion-card *ngIf="paso === 1 && parte === 1" class="acceso-form">
           <ion-card-content>
+            <!-- Sin taller todavía: el primer dato es de qué taller es la cuenta. -->
+            <div class="elegir-taller" *ngIf="!tieneTaller && !google">
+              <ion-item lines="none">
+                <ion-label position="stacked">Tu taller</ion-label>
+                <ion-input [ngModel]="buscarTaller" (ngModelChange)="escribirTaller($event)" name="buscarTaller"
+                           autocomplete="off" placeholder="Escribí el nombre del taller" aria-label="Tu taller"></ion-input>
+              </ion-item>
+              <ul class="opciones-taller" *ngIf="opcionesTaller.length" aria-label="Talleres encontrados">
+                <li *ngFor="let t of opcionesTaller">
+                  <button type="button" (click)="elegirTaller(t)">
+                    <strong>{{ t.nombre }}</strong>
+                    <span>{{ t.sucursales[0]?.canton }}, {{ t.sucursales[0]?.provincia }}</span>
+                  </button>
+                </li>
+              </ul>
+              <p class="ayuda" *ngIf="buscandoTaller">Buscando…</p>
+              <p class="ayuda" *ngIf="buscadoTaller && !buscandoTaller && !opcionesTaller.length">
+                No encontramos ese taller. Pedile el enlace de su portal o
+                <a routerLink="/portal/buscar-taller">buscalo por provincia</a>.
+              </p>
+              <p class="ayuda" *ngIf="!buscadoTaller && !buscandoTaller">
+                ¿No sabés el nombre? <a routerLink="/portal/buscar-taller">Buscalo por provincia</a>.
+              </p>
+            </div>
+
             <div class="campos">
               <ion-item lines="none" class="campo-par">
                 <ion-label position="stacked">Nombre</ion-label>
@@ -58,10 +83,10 @@
               {{ google ? 'Crear cuenta' : 'Siguiente' }}
               <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
             </ion-button>
-            <p class="ayuda falta" *ngIf="!datosOk">Los cuatro datos son obligatorios.</p>
+            <p class="ayuda falta" *ngIf="!datosOk">{{ tieneTaller || google ? 'Los cuatro datos son obligatorios.' : 'Elegí tu taller y completá los cuatro datos.' }}</p>
 
             <!-- Registrarse con Google: después solo se piden teléfono y cédula. -->
-            <app-google-boton *ngIf="!google" [separador]="true" (credencial)="conGoogle($event)"></app-google-boton>
+            <app-google-boton *ngIf="!google && tieneTaller" [separador]="true" (credencial)="conGoogle($event)"></app-google-boton>
             <div class="fila-centro" *ngIf="google">
               <button type="button" class="enlace" (click)="dejarGoogle()">Usar correo y contraseña en vez de Google</button>
             </div>

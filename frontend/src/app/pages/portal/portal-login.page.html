@@ -1,4 +1,4 @@
-<ion-content class="acceso-content" [class.es-producto]="marca.esProducto">
+<ion-content class="acceso-content acceso-claro" [class.es-producto]="marca.esProducto">
   <div class="acceso">
     <app-acceso-marca></app-acceso-marca>
 
@@ -41,7 +41,7 @@
                manda a su panel, sea dueño, recepción, mecánico o cliente. -->
           <nav class="pits-tabs" aria-label="Tu cuenta" *ngIf="!opciones.length">
             <a class="on" routerLink="/portal/login" aria-current="page">Entrar</a>
-            <a [routerLink]="conTaller ? '/portal/registro' : '/portal/buscar-taller'">Crear cuenta</a>
+            <a routerLink="/portal/registro">Crear cuenta</a>
           </nav>
 
           <ng-container *ngIf="opciones.length">
