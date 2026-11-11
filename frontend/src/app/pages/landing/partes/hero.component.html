@@ -1,12 +1,17 @@
 <section class="hero" aria-labelledby="hero-titulo">
-  <!-- La foto del taller de fondo, en negro y carmesí, con un velo encima para que el
-       texto se lea siempre. Una versión ancha y otra alta; es lo primero que se pinta. -->
+  <!-- El taller de fondo: primero un fotograma fijo (ancho o alto según la pantalla),
+       y en escritorio el video en bucle encima cuando ya cargó. El velo mantiene el
+       texto legible pase lo que pase detrás. -->
   <div class="escena" aria-hidden="true">
     <picture>
       <source media="(max-width: 639px)" srcset="assets/landing/taller-alto.webp" width="1080" height="1618" />
-      <img class="foto" src="assets/landing/taller-ancho.webp" alt="" width="1920" height="1080"
+      <img class="foto" [class.detras]="videoListo" src="assets/landing/taller-ancho.webp" alt="" width="1920" height="1080"
            fetchpriority="high" decoding="async" />
     </picture>
+    <!-- preload="none": no se baja nada hasta que el componente lo pide (tras la carga). -->
+    <video *ngIf="conVideo" #video class="video" [class.listo]="videoListo"
+           src="assets/landing/taller.mp4" muted loop playsinline preload="none" disablepictureinpicture
+           width="1280" height="720" tabindex="-1"></video>
     <div class="velo"></div>
   </div>
 

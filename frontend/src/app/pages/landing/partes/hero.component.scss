@@ -2,9 +2,9 @@
 
 :host { display: block; }
 
-// La portada: una tarjeta negra redondeada dentro del marco blanco de la página. El
-// disco de freno hace de foto; arriba la barra, el titular gigante, y abajo el lema,
-// la acción y dos tarjetas de vidrio.
+// La portada: una tarjeta negra redondeada dentro del marco blanco de la página. Un
+// taller de fondo (fotograma fijo, y video en escritorio); arriba la barra, el titular
+// gigante, y abajo el lema, la acción y dos tarjetas de vidrio.
 .hero {
   position: relative;
   isolation: isolate;
@@ -22,21 +22,24 @@
 // El foco de teclado, igual para todos los enlaces y botones de la portada.
 .hero :is(a, button):focus-visible { outline: 2px solid $carmesi-claro; outline-offset: 3px; }
 
-// ── La foto ───────────────────────────────────────────────────────────────────────
+// ── El fondo ─────────────────────────────────────────────────────────────────────
 .escena { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
 
-// La foto ocupa toda la tarjeta. En escritorio el gato y el mecánico quedan a la
-// derecha; el texto cae sobre la parte oscura de la izquierda.
-.foto {
+// Fotograma y video ocupan toda la tarjeta, con el mismo encuadre: el auto y la moto
+// a la derecha, el texto sobre la parte oscura de la izquierda.
+.foto, .video {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 70% 50%;
-  // Un acercamiento lento al entrar, como una cámara que se asienta.
-  animation: asentar 2.4s $expo both;
+  object-position: 62% 50%;
 }
+// El fotograma se asienta al entrar; cuando el video tiene cuadro, se cruzan en un fundido.
+.foto { animation: asentar 2.4s $expo both; }
+.foto, .video { transition: opacity 0.9s ease; }
+.foto.detras, .video { opacity: 0; }
+.video.listo { opacity: 1; }
 @keyframes asentar { from { transform: scale(1.08); } to { transform: none; } }
 // El velo: oscurece arriba (barra y titular) y abajo (texto y acciones), y de
 // izquierda a derecha en escritorio, donde va el texto.
@@ -44,8 +47,8 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(to bottom, rgba(10, 10, 10, 0.7), rgba(10, 10, 10, 0.1) 34%, rgba(10, 10, 10, 0.25) 60%, rgba(10, 10, 10, 0.92)),
-    linear-gradient(to right, rgba(10, 10, 10, 0.75), rgba(10, 10, 10, 0) 60%);
+    linear-gradient(#0a0a0ab3, #0a0a0a1a 34%, #0a0a0a40 60%, #0a0a0aeb),
+    linear-gradient(to right, #0a0a0abf, #0a0a0a00 60%);
 }
 
 // ── Barra ────────────────────────────────────────────────────────────────────────
@@ -236,9 +239,8 @@
   padding: u(0.75);
   opacity: 0;
   transform: translateY(u(1)) scale(0.96);
-  transition: opacity 0.5s $quart, transform 0.6s $expo;
+  transition: opacity 0.5s ease, transform 0.6s $expo;
   &.activo { opacity: 1; transform: none; }
-  @media (prefers-reduced-motion: reduce) { transition: none; }
 }
 .sello {
   display: grid;
@@ -290,9 +292,8 @@
 // En el teléfono la portada lleva solo titular, una frase y la acción: el lema, la
 // cola de vehículos y las tarjetas de vidrio quedan para pantallas más anchas.
 // Y crece si no le alcanza la pantalla: nunca recorta la acción.
-@media (prefers-reduced-motion: reduce) { .foto { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .foto, .momento { animation: none; transition: none; } }
 @media (max-width: 639px) {
-  .foto { object-position: 60% 35%; }
   .hero { height: auto; min-height: max(calc(100svh - 1rem), 560px); }
   .lema, .solo-ancho, .racimo { display: none; }
 }
