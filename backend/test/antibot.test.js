@@ -1,6 +1,9 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { honeypotLleno, turnstileOk } = require('../src/utils/antibot');
+const { honeypotLleno, turnstileOk, claveCaptcha } = require('../src/utils/antibot');
+
+// El captcha solo actúa con las dos llaves; estas pruebas varían la secreta.
+process.env.TURNSTILE_SITE_KEY = 'clave-publica-de-prueba';
 
 test('honeypot: campo lleno = bot; vacío o ausente = humano', () => {
   assert.equal(honeypotLleno({ website: 'http://spam' }), true);
@@ -85,5 +88,25 @@ test('turnstile: error de red = falla-abierto (no bloquea)', async () => {
     global.fetch = fetchOriginal;
     console.error = origErr;
     if (prev !== undefined) process.env.TURNSTILE_SECRET = prev; else delete process.env.TURNSTILE_SECRET;
+  }
+});
+
+test('turnstile: con una sola llave no bloquea a nadie y el formulario no muestra captcha', async () => {
+  const secreta = process.env.TURNSTILE_SECRET;
+  const publica = process.env.TURNSTILE_SITE_KEY;
+  try {
+    process.env.TURNSTILE_SECRET = 'test-secret';
+    delete process.env.TURNSTILE_SITE_KEY;
+    assert.equal(await turnstileOk(''), true, 'solo la secreta');
+    assert.equal(claveCaptcha(), '');
+    delete process.env.TURNSTILE_SECRET;
+    process.env.TURNSTILE_SITE_KEY = 'clave-publica-de-prueba';
+    assert.equal(await turnstileOk(''), true, 'solo la pública');
+    assert.equal(claveCaptcha(), '');
+    process.env.TURNSTILE_SECRET = 'test-secret';
+    assert.equal(claveCaptcha(), 'clave-publica-de-prueba', 'con las dos');
+  } finally {
+    if (secreta !== undefined) process.env.TURNSTILE_SECRET = secreta; else delete process.env.TURNSTILE_SECRET;
+    process.env.TURNSTILE_SITE_KEY = publica;
   }
 });

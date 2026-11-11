@@ -66,7 +66,7 @@ export class PortalRecuperarPage implements AfterViewInit, OnDestroy {
     if (!this.emailOk) return this.mostrar('Ingresa un correo válido', 'warning');
     const l = await this.loading.create({ message: 'Enviando código...', cssClass: 'portal-loading', spinner: 'crescent' });
     await l.present();
-    const antibot = { website: this.website, turnstileToken: this.ts?.token() || '' };
+    const antibot = { website: this.website, turnstileToken: this.ts ? await this.ts.listo() : '' };
     this.auth.solicitarRecuperacion(this.email.trim(), antibot).pipe(takeUntil(this.destroy$)).subscribe({
       next: async (res) => {
         await l.dismiss();

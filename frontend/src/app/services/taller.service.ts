@@ -199,6 +199,8 @@ export class TallerService {
     admin: { nombre: string; email: string; password: string; telefono?: string };
     contacto?: { telefono?: string; direccion?: string };
     sucursal?: { nombre?: string };
+    website?: string;
+    turnstileToken?: string;
   }): Observable<{ data: { token: string; usuario: any; taller: { id: number; nombre: string; slug: string; tipos: string[] } } }> {
     return this.http.post<{ data: { token: string; usuario: any; taller: { id: number; nombre: string; slug: string; tipos: string[] } } }>(
       `${this.apiUrl}/onboarding`, datos

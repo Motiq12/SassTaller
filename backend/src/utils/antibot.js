@@ -1,7 +1,8 @@
 // Defensas anti-bot para endpoints públicos (registro, OTP, recuperación).
 // Dos capas: honeypot (campo oculto) + Cloudflare Turnstile (captcha invisible).
-// Degradación segura: sin TURNSTILE_SECRET, la verificación se OMITE (no rompe dev
-// ni producción hasta que se configuren las llaves). El honeypot siempre aplica.
+// Degradación segura: sin las DOS llaves (TURNSTILE_SECRET y TURNSTILE_SITE_KEY) la
+// verificación se OMITE. Con una sola, exigir el captcha dejaría a todo el mundo afuera:
+// el formulario no tendría cómo resolverlo. El honeypot siempre aplica.
 
 const TURNSTILE_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 
@@ -12,14 +13,23 @@ function honeypotLleno(body) {
   return typeof v === 'string' ? v.trim().length > 0 : !!v;
 }
 
+function captchaActivo() {
+  return !!(process.env.TURNSTILE_SECRET && process.env.TURNSTILE_SITE_KEY);
+}
+
+// La clave pública para el formulario. Vacía si el captcha no está activo.
+function claveCaptcha() {
+  return captchaActivo() ? process.env.TURNSTILE_SITE_KEY : '';
+}
+
 // Verifica el token de Cloudflare Turnstile contra el endpoint oficial.
-// - Sin TURNSTILE_SECRET → devuelve true (función desactivada, degradación segura).
+// - Sin las dos llaves → devuelve true (función desactivada, degradación segura).
 // - Con secret pero sin token → false (bloquea: falta el captcha).
 // - Rechazo explícito de Cloudflare → false. Error de red/servicio → true
 //   (falla-abierto: no dejamos afuera a usuarios legítimos si Cloudflare no responde).
 async function turnstileOk(token, ip) {
+  if (!captchaActivo()) return true;
   const secret = process.env.TURNSTILE_SECRET;
-  if (!secret) return true;
   if (!token) return false;
   try {
     const params = new URLSearchParams({ secret, response: String(token) });
@@ -58,4 +68,4 @@ function antibot() {
   };
 }
 
-module.exports = { antibot, honeypotLleno, turnstileOk };
+module.exports = { antibot, honeypotLleno, turnstileOk, claveCaptcha };

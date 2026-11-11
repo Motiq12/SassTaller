@@ -127,7 +127,7 @@
                 <!-- Anti-bot al pedir el código: honeypot + captcha invisible. -->
                 <input *ngIf="!codigoEnviado" type="text" [(ngModel)]="website" name="website" tabindex="-1"
                        autocomplete="off" aria-hidden="true" class="hp-field">
-                <div #tsBox *ngIf="!codigoEnviado && mostrarCaptcha" class="turnstile-box"></div>
+                <div #tsBox *ngIf="mostrarCaptcha" class="turnstile-box"></div>
 
                 <ion-button *ngIf="!codigoEnviado" expand="block" class="btn-principal" (click)="enviarCodigo()" [disabled]="!email || procesandoCodigo">
                   Enviarme un código

@@ -5,6 +5,7 @@ import { DirectorioService, Ubicaciones } from '../../services/directorio.servic
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { PRODUCTO } from '../../shared/producto';
+import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../shared/turnstile.util';
 
 /**
  * Alta de un taller nuevo en el SaaS. Es la puerta de entrada del producto: antes de
@@ -39,6 +40,15 @@ export class RegistroTallerPage {
     if (el && this.moverFoco) { this.moverFoco = false; setTimeout(() => el.nativeElement.focus()); }
   }
   private moverFoco = false;
+
+  // Anti-bot del alta: honeypot + captcha. El cuadro aparece y desaparece con el paso 2.
+  website = '';
+  mostrarCaptcha = turnstileHabilitado();
+  private ts?: TurnstileWidget;
+  @ViewChild('tsBox') set tsBox(el: ElementRef<HTMLElement> | undefined) {
+    if (!el) { this.ts?.destroy(); this.ts = undefined; return; }
+    if (!this.ts) montarTurnstile(el.nativeElement).then(w => (this.ts = w));
+  }
 
   // Esta pantalla identifica al PRODUCTO, no a un taller: quien la abre todavía no
   // pertenece a ninguno.
@@ -303,9 +313,10 @@ export class RegistroTallerPage {
       && !this.enviando;
   }
 
-  crear(): void {
+  async crear(): Promise<void> {
     if (!this.puedeEnviar) return;
     this.enviando = true;
+    const turnstileToken = this.ts ? await this.ts.listo() : '';
 
     this.taller.registrarTaller({
       nombre: this.nombre.trim(),
@@ -324,6 +335,8 @@ export class RegistroTallerPage {
         password: this.adminPassword,
       },
       contacto: { telefono: this.telefono.trim(), direccion: this.direccion.trim() },
+      website: this.website,
+      turnstileToken,
     }).subscribe({
       next: res => {
         // El taller queda fijado para que los próximos logins y el portal sepan
@@ -337,6 +350,7 @@ export class RegistroTallerPage {
       },
       error: err => {
         this.enviando = false;
+        this.ts?.reset();   // token de un solo uso: pedir uno nuevo para el próximo intento
         const msg = err?.error?.error || 'No se pudo crear el taller';
         this.toast.error(msg);
         // 409 = el identificador se ocupó entre la validación y el envío: se vuelve

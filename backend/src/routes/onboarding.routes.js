@@ -7,7 +7,7 @@ const { pool } = require('../db/pool');
 const { fail } = require('../utils/responder');
 const { emailValido } = require('../utils/validar');
 const { consumir } = require('../utils/rate-limit');
-const { antibot } = require('../utils/antibot');
+const { antibot, claveCaptcha } = require('../utils/antibot');
 const { crearTaller, normalizarSlug, motivoSlugInvalido } = require('../utils/onboarding');
 const { fijarPlan } = require('../utils/estado-tenant');
 const { finDeTrial, limitesDe, precioDe, DIAS_TRIAL } = require('../utils/limites');
@@ -64,6 +64,13 @@ router.get('/tipos', (req, res) => {
       clave, etiqueta: t.etiqueta, plural: t.plural, unidadUso: t.unidadUso, campos: t.campos,
     })),
   });
+});
+
+// GET /api/onboarding/captcha — la clave PÚBLICA del captcha, para los formularios. Sale
+// de acá y no del código para poder activarlo desde Railway sin recompilar nada.
+router.get('/captcha', (req, res) => {
+  res.set('Cache-Control', 'public, max-age=300');
+  res.json({ data: { siteKey: claveCaptcha() } });
 });
 
 // GET /api/onboarding/planes — los planes tal como rigen hoy, para la landing.

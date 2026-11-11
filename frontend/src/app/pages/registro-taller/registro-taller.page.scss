@@ -528,3 +528,6 @@ input.muestra-libre {
   border-radius: 12px;
   cursor: pointer;
 }
+
+.hp-field { position: absolute !important; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.turnstile-box { display: flex; justify-content: center; margin: 12px 0; }

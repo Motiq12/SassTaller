@@ -74,12 +74,16 @@ export class PortalRegistroPage implements OnInit, AfterViewInit, OnDestroy {
     if (qp.get('verificar') === '1' && qp.get('email')) {
       this.email = qp.get('email')!;
       this.paso = 2;
-      this.reenviar();
+      this.reenviarAlMontar = true;
     }
   }
 
+  // El reenvío automático necesita el captcha ya montado.
+  private reenviarAlMontar = false;
+
   async ngAfterViewInit() {
     if (this.tsBox) this.ts = await montarTurnstile(this.tsBox.nativeElement);
+    if (this.reenviarAlMontar) { this.reenviarAlMontar = false; this.reenviar(); }
   }
 
   get numeroPaso(): number { return this.paso === 2 ? 3 : this.parte; }
@@ -175,6 +179,7 @@ export class PortalRegistroPage implements OnInit, AfterViewInit, OnDestroy {
       next: async () => {
         await l.dismiss();
         this.paso = 2;
+        this.ts?.reset();   // deja un token fresco listo para "Reenviar código"
         this.iniciarCooldown();
         this.mostrar('Te enviamos un código para confirmar tu correo');
       },
@@ -211,12 +216,13 @@ export class PortalRegistroPage implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  reenviar() {
+  async reenviar() {
     if (this.cooldown > 0 || this.reenviando) return;
     this.reenviando = true;
-    this.portal.reenviarVerificacion(this.email.trim()).pipe(takeUntil(this.destroy$)).subscribe({
-      next: async () => { this.reenviando = false; this.iniciarCooldown(); this.mostrar('Te enviamos un código nuevo'); },
-      error: async (err) => { this.reenviando = false; this.mostrar(err.error?.error || 'No se pudo reenviar', 'danger'); },
+    const turnstileToken = this.ts ? await this.ts.listo() : '';
+    this.portal.reenviarVerificacion(this.email.trim(), { website: this.website, turnstileToken }).pipe(takeUntil(this.destroy$)).subscribe({
+      next: async () => { this.reenviando = false; this.ts?.reset(); this.iniciarCooldown(); this.mostrar('Te enviamos un código nuevo'); },
+      error: async (err) => { this.reenviando = false; this.ts?.reset(); this.mostrar(err.error?.error || 'No se pudo reenviar', 'danger'); },
     });
   }
 

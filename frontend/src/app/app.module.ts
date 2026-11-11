@@ -16,6 +16,7 @@ import { ToastSinRepetir, AlertaSinRepetir } from './shared/avisos-sin-repetir';
 import { AuthService } from './services/auth.service';
 import { PortalService } from './services/portal.service';
 import { cargarEstadoSitioWeb } from './sitio-web-activo';
+import { cargarClaveTurnstile } from './shared/turnstile.util';
 
 // En nativo, hidrata las sesiones (staff + cliente) desde el Keychain/Keystore ANTES
 // de que Angular termine de arrancar — así los guards de ruta ya ven el token real
@@ -33,6 +34,8 @@ function initSesiones(auth: AuthService, portal: PortalService) {
     { provide: APP_INITIALIZER, useFactory: initSesiones, deps: [AuthService, PortalService], multi: true },
     // ¿Está encendido el sitio web? Antes de las guardias y los menús (ver sitio-web-activo.ts).
     { provide: APP_INITIALIZER, useFactory: cargarEstadoSitioWeb, deps: [HttpClient], multi: true },
+    // La clave pública del captcha, antes de que se armen los formularios.
+    { provide: APP_INITIALIZER, useFactory: cargarClaveTurnstile, multi: true },
     // El de URL primero (reescribe a absoluta en nativo) y luego el de auth (token).
     { provide: HTTP_INTERCEPTORS, useClass: ApiUrlInterceptor, multi: true },
     { provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true },

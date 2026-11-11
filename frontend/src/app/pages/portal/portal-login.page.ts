@@ -59,7 +59,8 @@ export class PortalLoginPage implements OnInit, OnDestroy {
   // El contenedor aparece recién al entrar al modo "código", así que lo montamos
   // vía setter cuando el elemento existe en el DOM (no en ngAfterViewInit).
   @ViewChild('tsBox') set tsBox(el: ElementRef<HTMLElement> | undefined) {
-    if (el && !this.ts) montarTurnstile(el.nativeElement).then(w => (this.ts = w));
+    if (!el) { this.ts?.destroy(); this.ts = undefined; return; }
+    if (!this.ts) montarTurnstile(el.nativeElement).then(w => (this.ts = w));
   }
 
   elegirTaller(slug: string) { this.ingresar(slug); }
@@ -245,11 +246,13 @@ export class PortalLoginPage implements OnInit, OnDestroy {
       return await t.present();
     }
     this.procesandoCodigo = true;
-    this.portal.solicitarCodigoLogin(this.email.trim(), { website: this.website, turnstileToken: this.ts?.token() || '' })
+    const turnstileToken = this.ts ? await this.ts.listo() : '';
+    this.portal.solicitarCodigoLogin(this.email.trim(), { website: this.website, turnstileToken })
       .pipe(takeUntil(this.destroy$)).subscribe({
       next: async () => {
         this.procesandoCodigo = false;
         this.codigoEnviado = true;
+        this.ts?.reset();   // token de un solo uso: otro listo para "Reenviar código"
         const t = await this.toast.create({ message: 'Si tu correo está registrado, te enviamos un código', duration: 3000, color: 'success' });
         await t.present();
       },

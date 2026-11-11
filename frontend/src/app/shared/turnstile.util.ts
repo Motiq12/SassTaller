@@ -1,12 +1,27 @@
 // Cloudflare Turnstile (captcha anti-bot invisible) para los formularios públicos.
-// Degradación segura: si no hay site key configurado (environment.turnstileSiteKey)
+// Degradación segura: si el servidor no entrega clave pública (/onboarding/captcha)
 // o estamos en la app nativa, NO se carga nada y los formularios funcionan igual que
 // siempre — el token viaja vacío y el backend (que también degrada sin secret) lo omite.
 
 import { Capacitor } from '@capacitor/core';
 import { environment } from '../../environments/environment';
 
-const SITE_KEY: string = (environment as any).turnstileSiteKey || '';
+let SITE_KEY = '';
+
+// La clave la da el servidor al arrancar, para poder activar el captcha desde Railway.
+// Va con fetch y no con HttpClient: un fallo acá no debe mostrarle un aviso rojo a nadie.
+export function cargarClaveTurnstile(): () => Promise<void> {
+  return async () => {
+    if (Capacitor.isNativePlatform()) return;
+    const control = new AbortController();
+    const corte = setTimeout(() => control.abort(), 2000);
+    try {
+      const r = await fetch(`${environment.apiUrl}/onboarding/captcha`, { signal: control.signal });
+      if (r.ok) SITE_KEY = (await r.json())?.data?.siteKey || '';
+    } catch { /* sin clave: los formularios siguen sin captcha */ }
+    clearTimeout(corte);
+  };
+}
 const SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
 
 // Turnstile es web-first; en el WebView nativo es poco fiable, así que solo se activa
@@ -33,6 +48,8 @@ function cargarScript(): Promise<void> {
 
 export interface TurnstileWidget {
   token(): string;
+  /** Espera a que haya token: tras un reset, o si el formulario se envía muy rápido. */
+  listo(ms?: number): Promise<string>;
   reset(): void;
   destroy(): void;
 }
@@ -41,7 +58,7 @@ export interface TurnstileWidget {
 // Si Turnstile no está habilitado o falla la carga, devuelve un widget "vacío" cuyo
 // token() es '' (el flujo sigue igual). Nunca lanza.
 export async function montarTurnstile(container: HTMLElement): Promise<TurnstileWidget> {
-  const vacio: TurnstileWidget = { token: () => '', reset: () => {}, destroy: () => {} };
+  const vacio: TurnstileWidget = { token: () => '', listo: async () => '', reset: () => {}, destroy: () => {} };
   if (!turnstileHabilitado() || !container) return vacio;
   try {
     await cargarScript();
@@ -56,6 +73,11 @@ export async function montarTurnstile(container: HTMLElement): Promise<Turnstile
     });
     return {
       token: () => tokenActual,
+      listo: async (ms = 8000) => {
+        const limite = Date.now() + ms;
+        while (!tokenActual && Date.now() < limite) await new Promise(r => setTimeout(r, 150));
+        return tokenActual;
+      },
       reset: () => { try { ts.reset(id); tokenActual = ''; } catch { /* noop */ } },
       destroy: () => { try { ts.remove(id); } catch { /* noop */ } },
     };
