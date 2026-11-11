@@ -475,6 +475,7 @@ router.post('/ordenes/:id/entregar', soloRoles('recepcion', 'admin'), exigirPerm
       return res.status(409).json({ error: 'La orden todavía no está lista para entrega', requiere_confirmacion: true, estado_actual: actual.estado });
     }
     const r = await cerrarOrden(
+      req.db,
       req.params.id,
       { metodo_pago, garantia_dias, observaciones_finales },
       { soloDesdeListaEntrega: forzar !== true }
@@ -556,7 +557,7 @@ router.post('/cotizaciones/:id/repuestos', exigirPermiso('ordenes.costos'), asyn
       'INSERT INTO orden_repuestos (tenant_id, orden_id, nombre, cantidad, costo_unitario, estado, adicional) VALUES (@tenant, ?, ?, ?, ?, ?, ?)',
       [req.params.id, nombre, cantidad || 1, costo_unitario || 0, estado || 'pendiente', await esAdicional(req.db, req.params.id)]
     );
-    await recalcularRepuestos(req.params.id);
+    await recalcularRepuestos(req.db, req.params.id);
     const reaprobacion = await revisarAdicional(req.db, req.params.id, totalAntes);
     const [[nuevo]] = await req.db.query('SELECT * FROM orden_repuestos WHERE tenant_id = @tenant AND id = ?', [result.insertId]);
     res.status(201).json({ data: nuevo, reaprobacion, message: reaprobacion ? MSG_REAPROBACION : 'Repuesto agregado' });
@@ -577,7 +578,7 @@ router.put('/cotizaciones/:id/repuestos/:rid', exigirPermiso('ordenes.costos'), 
       'UPDATE orden_repuestos SET nombre=?, cantidad=?, costo_unitario=?, estado=? WHERE tenant_id = @tenant AND id=? AND orden_id=?',
       [nombre, cantidad || 1, costo_unitario || 0, estadoAlEditarRepuesto(existe.estado, estado, costo_unitario), req.params.rid, req.params.id]
     );
-    await recalcularRepuestos(req.params.id);
+    await recalcularRepuestos(req.db, req.params.id);
     const reaprobacion = await revisarAdicional(req.db, req.params.id, totalAntes);
     const [[actualizado]] = await req.db.query('SELECT * FROM orden_repuestos WHERE tenant_id = @tenant AND id = ?', [req.params.rid]);
     res.json({ data: actualizado, reaprobacion, message: reaprobacion ? MSG_REAPROBACION : 'Repuesto actualizado' });

@@ -340,7 +340,7 @@ router.delete('/:id', requireRol('admin'), async (req, res) => {
        FROM ordenes_trabajo ot
        LEFT JOIN clientes c ON c.id = ot.cliente_id AND c.tenant_id = @tenant
        LEFT JOIN vehiculos m ON m.id = ot.vehiculo_id AND m.tenant_id = @tenant
-       WHERE ot.tenant_id = @tenant AND ot.id = ? FOR UPDATE`,
+       WHERE ot.tenant_id = @tenant AND ot.id = ? FOR UPDATE OF ot`,
       [req.params.id]
     );
     if (!o) { await conn.rollback(); return res.status(404).json({ error: 'Orden no encontrada' }); }
@@ -389,7 +389,7 @@ router.delete('/:id', requireRol('admin'), async (req, res) => {
     // Los mensajes del equipo sobre la orden se quedan en el chat de cada quien.
     await conn.query('UPDATE mensajes_internos SET orden_id = NULL WHERE tenant_id = @tenant AND orden_id = ?', [o.id]);
     for (const tabla of ['orden_avances', 'orden_repuestos', 'orden_fotos', 'orden_checklist', 'orden_tiempos']) {
-      await conn.query(`DELETE FROM ${tabla} WHERE orden_id = ?`, [o.id]);
+      await conn.query(`DELETE FROM ${tabla} WHERE tenant_id = @tenant AND orden_id = ?`, [o.id]);
     }
     await conn.query('DELETE FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ?', [o.id]);
     await conn.commit();
@@ -641,7 +641,7 @@ router.post('/:id/checklist', exigirPermiso('ordenes.entregar'), async (req, res
     await req.db.query(
       `INSERT INTO orden_checklist (tenant_id,orden_id, prueba_realizada, lavado, calidad_revisada, facturacion_lista, cliente_notificado, observaciones)
        VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT (orden_id) DO UPDATE SET prueba_realizada = EXCLUDED.prueba_realizada, lavado = EXCLUDED.lavado,
+       ON CONFLICT (tenant_id, orden_id) DO UPDATE SET prueba_realizada = EXCLUDED.prueba_realizada, lavado = EXCLUDED.lavado,
          calidad_revisada = EXCLUDED.calidad_revisada, facturacion_lista = EXCLUDED.facturacion_lista,
          cliente_notificado = EXCLUDED.cliente_notificado, observaciones = EXCLUDED.observaciones
        WHERE orden_checklist.tenant_id = EXCLUDED.tenant_id`,
