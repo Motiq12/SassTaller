@@ -10,6 +10,7 @@ const { fail, invalido, faltante } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const { emailValido } = require('../utils/validar');
 const { consumir } = require('../utils/rate-limit');
+const { estadoDe } = require('../utils/estado-tenant');
 const { resumenCuenta } = require('../utils/cuenta');
 const { nuevoCodigo, canjear, codigoDeSeisDigitos, VIGENCIA_MIN } = require('../utils/verificacion-usuario');
 const { enviarCodigoCorreoStaff, enviarCodigoReset } = require('../services/mailer');
@@ -141,11 +142,20 @@ router.post('/login', async (req, res) => {
       if (await bcrypt.compare(password, c.password_hash)) clientesValidos.push(c);
     }
 
+    // Una cuenta de un taller suspendido no abre sesión: entraría y cada pantalla le
+    // daría error. Si es la única que tiene, se le dice por qué.
+    const activa = (v) => estadoDe(v.tenant_id) === 'activo';
+    if ([...validos, ...clientesValidos].length && ![...validos, ...clientesValidos].some(activa)) {
+      return res.status(403).json({ error: 'La cuenta del taller está suspendida. Contactá a soporte.' });
+    }
+    const personalActivo = validos.filter(activa);
+    const clientesActivos = clientesValidos.filter(activa);
+
     // La misma persona puede estar en varios talleres, como personal o como cliente.
     // `preferido` es el último taller que usó en este navegador: si sigue siendo uno de
     // los suyos, entra ahí sin preguntar; si no, elige.
     let enTaller = (x) => x;
-    const idsValidos = [...new Set([...validos, ...clientesValidos].map(v => v.tenant_id))];
+    const idsValidos = [...new Set([...personalActivo, ...clientesActivos].map(v => v.tenant_id))];
     if (idsValidos.length > 1) {
       // La contraseña ya se validó, así que listar los talleres no filtra nada nuevo.
       const [talleres] = await pool.query(
@@ -161,8 +171,8 @@ router.post('/login', async (req, res) => {
       }
       enTaller = (lista) => lista.filter(v => v.tenant_id === elegido.id);
     }
-    const usuario = enTaller(validos)[0];
-    const cliente = enTaller(clientesValidos)[0];
+    const usuario = enTaller(personalActivo)[0];
+    const cliente = enTaller(clientesActivos)[0];
     if (usuario) {
       // Con verificación en dos pasos activa, la contraseña sola no abre sesión:
       // se devuelve un token parcial que solo sirve para canjear el código.
