@@ -4,17 +4,12 @@ import { Subject, interval } from 'rxjs';
 import { filter, takeUntil } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { MensajeriaService } from '../../services/mensajeria.service';
-import { SitioWebService } from '../../services/sitio-web.service';
-import { veSitioWeb } from '../../guards/panel-admin.guard';
-import { SITIO_WEB_URL } from '../../shared/volver-web.component';
-import { sitioWeb } from '../../sitio-web-activo';
 
 // Carpetas del menú y qué rutas viven en cada una: la carpeta de la pantalla en la
 // que se está se abre sola (al entrar por un enlace, o al abrir una orden desde
 // Gestión de citas, se ve dónde está uno). El orden importa: config/bloqueos va en
 // Agenda, el resto de config/ en Configuración.
 const CARPETA_DE_RUTA: [string, string][] = [
-  ['/admin/web/', 'web'],
   ['/admin/recibir', 'agenda'], ['/admin/citas', 'agenda'], ['/admin/cita-form', 'agenda'], ['/admin/calendario', 'agenda'], ['/admin/config/bloqueos', 'agenda'],
   ['/admin/empleados', 'equipo'], ['/admin/roles', 'equipo'], ['/admin/tareas', 'equipo'], ['/admin/mensajes', 'equipo'],
   ['/admin/reportes', 'analisis'], ['/admin/opiniones', 'analisis'], ['/admin/promos', 'analisis'],
@@ -32,30 +27,20 @@ const KEY_CARPETAS = 'tallerms_menu_carpetas';
   templateUrl: './admin-shell.page.html',
 })
 export class AdminShellPage implements OnInit, OnDestroy {
-  // El sitio web público, para el enlace del final del menú.
-  sitioWeb = SITIO_WEB_URL;
-  get sitioWebActivo(): boolean { return sitioWeb.activo; }
+  // El sitio web público se apagó de forma definitiva: su sección del panel, su
+  // menú y sus contadores se quitaron (F-02). El panel es todo del admin.
   private destroy$ = new Subject<void>();
   noLeidos = 0;
-  pendientesWeb = 0;
-  consultasWeb = 0;
-  resenasWeb = 0;
   // Carpetas abiertas del menú. La primera vez, Agenda (lo que más se usa).
   private abiertas = new Set<string>(this.leerAbiertas());
 
   constructor(
     private auth: AuthService,
     private msj: MensajeriaService,
-    private web: SitioWebService,
     private router: Router,
   ) {}
 
   get esAdmin(): boolean { return this.auth.getUsuario()?.rol === 'admin'; }
-  get veWeb(): boolean { return veSitioWeb(this.auth.getUsuario()); }
-  get veConsultas(): boolean { return this.esAdmin || !!this.auth.getUsuario()?.permisos_web?.['consultas']; }
-  get veResenas(): boolean { return this.esAdmin || !!this.auth.getUsuario()?.permisos_web?.['resenas']; }
-  get vePaginas(): boolean { return this.esAdmin || !!this.auth.getUsuario()?.permisos_web?.['paginas']; }
-  get veNegocio(): boolean { return this.esAdmin || !!this.auth.getUsuario()?.permisos_web?.['negocio']; }
   get nombre(): string { return this.auth.getUsuario()?.nombre || 'Administrador'; }
   get foto(): string | null { return (this.auth.getUsuario() as any)?.foto || null; }
   get rolLabel(): string {
@@ -95,7 +80,7 @@ export class AdminShellPage implements OnInit, OnDestroy {
       const v = JSON.parse(localStorage.getItem(KEY_CARPETAS) || 'null');
       if (Array.isArray(v)) return v;
     } catch {}
-    return ['agenda', 'web'];
+    return ['agenda'];
   }
   private guardarAbiertas() {
     try { localStorage.setItem(KEY_CARPETAS, JSON.stringify([...this.abiertas])); } catch {}
@@ -105,25 +90,7 @@ export class AdminShellPage implements OnInit, OnDestroy {
     this.abrirCarpetaDe(this.router.url);
     this.router.events.pipe(filter(e => e instanceof NavigationEnd), takeUntil(this.destroy$))
       .subscribe(e => this.abrirCarpetaDe((e as NavigationEnd).urlAfterRedirects));
-    // Los permisos pudieron cambiar desde que inició sesión (el admin se los da o
-    // se los quita): se releen para que el menú muestre lo que corresponde.
-    this.auth.refrescarUsuario().pipe(takeUntil(this.destroy$)).subscribe({
-      next: () => {
-        // Si le quitaron todos los permisos, la guardia lo devuelve a su pantalla.
-        if (!this.veWeb && !this.esAdmin) this.router.navigateByUrl('/admin/web', { replaceUrl: true });
-        else if (this.veWeb) this.web.refrescarPendientes();
-      },
-      error: () => {},
-    });
-    this.web.pendientes$.pipe(takeUntil(this.destroy$)).subscribe(n => this.pendientesWeb = n);
-    this.web.consultas$.pipe(takeUntil(this.destroy$)).subscribe(n => this.consultasWeb = n);
-    this.web.resenas$.pipe(takeUntil(this.destroy$)).subscribe(n => this.resenasWeb = n);
-    // Las consultas y las reseñas del sitio llegan solas, sin que nadie toque nada
-    // en el panel: cada minuto se vuelve a mirar, para que el globo aparezca sin recargar.
-    if (this.veWeb) {
-      interval(60000).pipe(takeUntil(this.destroy$)).subscribe(() => this.web.refrescarPendientes());
-    }
-    // La mensajería interna es del taller: quien entra solo por la web no la usa.
+    // La mensajería interna es del taller: la consulta y el globo son solo del admin.
     if (!this.esAdmin) return;
     this.consultarNoLeidos();
     interval(30000).pipe(takeUntil(this.destroy$)).subscribe(() => this.consultarNoLeidos());

@@ -5,7 +5,7 @@
         <!-- El logo del taller. Eran dos <img> fijos al de MS Motos, así que todo
              taller abría su panel con el logotipo de otra empresa. -->
         <app-marca-logo class="sb-brand" [tamano]="34"></app-marca-logo>
-        <span class="sb-rotulo">{{ esAdmin ? 'Panel administrativo' : 'Sitio web' }}</span>
+        <span class="sb-rotulo">Panel administrativo</span>
       </div>
 
       <!-- El menú va en carpetas que se abren y cierran (cuáles quedan abiertas se
@@ -13,58 +13,6 @@
            stopPropagation: si no, ion-menu-toggle cerraría el menú en el celular. -->
       <ion-menu-toggle auto-hide="false">
         <nav class="sb-nav">
-          <!-- Quien entra solo por la web (rol Contenido, o un empleado con permisos
-               web) ve únicamente esta sección; el admin la ve junto a todo lo demás. -->
-          <ng-container *ngIf="veWeb">
-            <button type="button" class="sb-carpeta" [class.actual]="actual('web')" (click)="alternar('web', $event)" [attr.aria-expanded]="abierta('web')">
-              <ion-icon name="globe-outline"></ion-icon>
-              <span class="sb-carpeta-txt">Sitio web</span>
-              <span class="nav-badge" *ngIf="!abierta('web') && (consultasWeb + resenasWeb + pendientesWeb) > 0">{{ consultasWeb + resenasWeb + pendientesWeb }}</span>
-              <ion-icon class="sb-chev" [class.abierta]="abierta('web')" name="chevron-forward"></ion-icon>
-            </button>
-            <div class="sb-carpeta-items" *ngIf="abierta('web')">
-              <a class="nav-item" routerLink="/admin/web/inicio" routerLinkActive="on">
-                <ion-icon name="globe-outline"></ion-icon> Inicio del sitio
-              </a>
-              <a class="nav-item" routerLink="/admin/web/catalogo" routerLinkActive="on">
-                <ion-icon name="bicycle-outline"></ion-icon> Catálogo de motos
-              </a>
-              <a class="nav-item" routerLink="/admin/web/promo" routerLinkActive="on">
-                <ion-icon name="megaphone-outline"></ion-icon> Promociones del inicio
-              </a>
-              <a class="nav-item" routerLink="/admin/web/ofertas" routerLinkActive="on">
-                <ion-icon name="pricetag-outline"></ion-icon> Ofertas
-              </a>
-              <a class="nav-item" routerLink="/admin/web/galeria" routerLinkActive="on" *ngIf="vePaginas">
-                <ion-icon name="images-outline"></ion-icon> Galería
-              </a>
-              <a class="nav-item" routerLink="/admin/web/preguntas" routerLinkActive="on" *ngIf="vePaginas">
-                <ion-icon name="help-circle-outline"></ion-icon> Preguntas frecuentes
-              </a>
-              <a class="nav-item" routerLink="/admin/web/nosotros" routerLinkActive="on" *ngIf="vePaginas">
-                <ion-icon name="people-outline"></ion-icon> Nosotros
-              </a>
-              <a class="nav-item" routerLink="/admin/web/servicios" routerLinkActive="on" *ngIf="veNegocio">
-                <ion-icon name="construct-outline"></ion-icon> Servicios en el sitio
-              </a>
-              <a class="nav-item" routerLink="/admin/web/negocio" routerLinkActive="on">
-                <ion-icon name="business-outline"></ion-icon> Datos del negocio
-              </a>
-              <a class="nav-item" routerLink="/admin/web/consultas" routerLinkActive="on" *ngIf="veConsultas">
-                <ion-icon name="mail-unread-outline"></ion-icon> Consultas del sitio
-                <span class="nav-badge" *ngIf="consultasWeb > 0" [attr.aria-label]="consultasWeb + ' consultas sin atender'">{{ consultasWeb }}</span>
-              </a>
-              <a class="nav-item" routerLink="/admin/web/resenas" routerLinkActive="on" *ngIf="veResenas">
-                <ion-icon name="star-outline"></ion-icon> Reseñas de clientes
-                <span class="nav-badge" *ngIf="resenasWeb > 0" [attr.aria-label]="resenasWeb + ' reseñas por revisar'">{{ resenasWeb }}</span>
-              </a>
-              <a class="nav-item" routerLink="/admin/web/publicar" routerLinkActive="on">
-                <ion-icon name="cloud-upload-outline"></ion-icon> Publicar cambios
-                <span class="nav-badge" *ngIf="pendientesWeb > 0" [attr.aria-label]="pendientesWeb + ' cambios sin publicar'">{{ pendientesWeb }}</span>
-              </a>
-            </div>
-          </ng-container>
-
           <ng-container *ngIf="esAdmin">
             <a class="nav-item sb-suelto" routerLink="/admin/resumen" routerLinkActive="on">
               <ion-icon name="grid-outline"></ion-icon> Resumen ejecutivo
@@ -183,10 +131,6 @@
             </div>
 
           </ng-container>
-          <!-- Para todos los que entran al panel, tengan el rol que tengan. -->
-          <a class="nav-item nav-item--web" *ngIf="sitioWebActivo" [href]="sitioWeb">
-            <ion-icon name="globe-outline"></ion-icon> Volver al sitio web
-          </a>
         </nav>
       </ion-menu-toggle>
     </ion-content>

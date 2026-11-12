@@ -60,8 +60,8 @@ const routes: Routes = [
       { path: 'moto-form/:id', loadChildren: () => import('../moto-form/moto-form.module').then(m => m.MotoFormPageModule) },
       { path: 'moto-historial/:id', loadChildren: () => import('../moto-historial/moto-historial.module').then(m => m.MotoHistorialPageModule) },
       { path: 'garantias', loadChildren: () => import('../garantias/garantias.module').then(m => m.GarantiasPageModule) },
-      // Sitio web (msmotors-web): catálogo, promoción y publicar.
-      { path: 'web', redirectTo: 'web/inicio', pathMatch: 'full' },
+      // La sección "Sitio web" (/admin/web/...) no existe en este SaaS: sus pantallas
+      // no se trajeron desde MS Motos y el menú se quitó (F-02). El panel es todo del admin.
     ],
   },
 ];

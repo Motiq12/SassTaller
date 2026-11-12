@@ -131,7 +131,8 @@ export class PortalLoginPage implements OnInit, OnDestroy {
     if (rol === 'tecnico') return inicio.startsWith('/mecanico/') ? inicio : '/mecanico';
     if (rol === 'recepcion') return inicio.startsWith('/recepcion/') ? inicio : '/recepcion';
     if (rol === 'admin' && inicio.startsWith('/admin/')) return inicio;
-    if (rol === 'contenido') return '/admin/web';
+    // Contenido solo administraba el sitio web, hoy apagado; irStaff lo saca antes.
+    if (rol === 'contenido') return '/admin';
     return '/tabs';
   }
 

@@ -5,10 +5,12 @@
       <ion-button [routerLink]="['/admin']" title="Panel admin" aria-label="Panel admin">
         <ion-icon slot="icon-only" name="grid-outline"></ion-icon>
       </ion-button>
-      <ion-button [routerLink]="['/garantias']" title="Garantías" aria-label="Garantías">
+      <!-- Las garantías y las promociones son del admin: /garantias exige ese rol y
+           sin el filtro un recepcionista rebota a /recepcion (F-13). -->
+      <ion-button [routerLink]="['/admin/garantias']" title="Garantías" aria-label="Garantías" *ngIf="auth.tieneRol('admin')">
         <ion-icon slot="icon-only" name="shield-checkmark-outline"></ion-icon>
       </ion-button>
-      <ion-button [routerLink]="['/promociones']" title="Promociones" *ngIf="auth.tieneRol('admin')" aria-label="Promociones">
+      <ion-button [routerLink]="['/admin/promos']" title="Promociones" *ngIf="auth.tieneRol('admin')" aria-label="Promociones">
         <ion-icon slot="icon-only" name="pricetags-outline"></ion-icon>
       </ion-button>
       <ion-button (click)="logout()">
