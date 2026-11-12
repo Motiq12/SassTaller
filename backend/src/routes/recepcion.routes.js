@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const { anotar } = require('../utils/actividad');
 const { filtrarAvisos } = require('../utils/preferencias');
 const { fail, invalido } = require('../utils/responder');
+const { referenciaAjena } = require('../utils/referencias');
 const { cerrarLasDemas } = require('../utils/sesiones');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
@@ -1002,6 +1003,8 @@ router.post('/notificar', async (req, res) => {
     if (!cliente_id || !titulo || !mensaje) {
       return res.status(400).json({ error: 'cliente_id, titulo y mensaje son requeridos' });
     }
+    const ajena = await referenciaAjena(req.db, { cliente_id, cita_id });
+    if (ajena) return invalido(res, ajena.campo, ajena.error);
     const [result] = await req.db.query(
       "INSERT INTO notificaciones (tenant_id, cliente_id, cita_id, titulo, mensaje, tipo) VALUES (@tenant, ?, ?, ?, ?, 'mensaje')",
       [cliente_id, cita_id || null, titulo, mensaje]
@@ -1090,6 +1093,8 @@ router.post('/mensajes-internos', exigirPermiso('equipo.mensajes'), async (req, 
     if (!destino_id || ((!mensaje || !mensaje.trim()) && !foto)) {
       return res.status(400).json({ error: 'Destinatario y mensaje (o foto) son requeridos' });
     }
+    const ajena = await referenciaAjena(req.db, { destino_id, orden_id });
+    if (ajena) return invalido(res, ajena.campo, ajena.error);
     if (!fotoValida(foto)) return res.status(400).json({ error: 'Imagen inválida' });
     // La sede del mensaje = la del mecánico destinatario (para el filtro por sucursal).
     const [r] = await req.db.query(

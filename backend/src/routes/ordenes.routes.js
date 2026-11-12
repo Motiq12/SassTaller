@@ -1,6 +1,7 @@
 const router = require('express').Router();
 // Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
 const { fail, invalido, faltante } = require('../utils/responder');
+const { referenciaAjena } = require('../utils/referencias');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { cargarAlcance, soloSucursal, sucursalParaGuardar, exigirSucursal, delTaller, soloOrdenAsignada, SUCURSAL_DE_ORDEN } = require('../utils/alcance');
@@ -127,6 +128,8 @@ router.post('/', soloRoles('recepcion', 'admin'), exigirPermiso('ordenes.crear')
     if (nivel_combustible && !COMBUSTIBLE_VALIDO.includes(nivel_combustible)) {
       return invalido(res, 'nivel_combustible', 'Nivel de combustible no válido');
     }
+    const ajena = await referenciaAjena(req.db, { cliente_id, vehiculo_id });
+    if (ajena) return invalido(res, ajena.campo, ajena.error);
 
     const sucursal_id = sucursalParaGuardar(req, (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null);
 

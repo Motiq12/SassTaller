@@ -511,7 +511,7 @@ router.put('/perfil/preferencias', auth, async (req, res) => {
   try {
     const prefs = normalizarPreferencias(req.body || {}, req.usuario.rol);
     if (prefs.sede_id) {
-      const [[s]] = await pool.query('SELECT id FROM sucursales WHERE id = ?', [prefs.sede_id]);
+      const [[s]] = await req.db.query('SELECT id FROM sucursales WHERE id = ? AND tenant_id = @tenant', [prefs.sede_id]);
       if (!s) prefs.sede_id = null;
     }
     await pool.query('UPDATE usuarios SET preferencias = ? WHERE id = ?', [JSON.stringify(prefs), req.usuario.id]);

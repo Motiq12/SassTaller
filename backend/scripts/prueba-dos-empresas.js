@@ -492,6 +492,33 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     ok(guardadoMayus.status === 200, 'entra aunque el correo se haya guardado con mayúsculas', guardadoMayus.json);
     await db.query('UPDATE usuarios SET email = ? WHERE tenant_id = ? AND LOWER(email) = ?', [correoA, A.id, correoA]);
 
+    // ── B manda en el cuerpo ids de A: nada se cuelga de A ──
+    const dia = fecha;
+    const conIdsDeA = [
+      ['POST', '/citas', { cliente_id: clienteA, vehiculo_id: vehA, sucursal_id: sb.id, fecha: dia, hora: '15:00', motivo: 'Cruce' }],
+      ['POST', '/citas', { cliente_id: clienteB, vehiculo_id: vehA, sucursal_id: sb.id, fecha: dia, hora: '15:00', motivo: 'Cruce' }],
+      ['POST', '/ordenes', { cliente_id: clienteA, vehiculo_id: vehA, sucursal_id: sb.id, problema_reportado: 'Cruce' }],
+      ['POST', '/ordenes', { cliente_id: clienteB, vehiculo_id: vehA, sucursal_id: sb.id, problema_reportado: 'Cruce' }],
+      ['POST', '/recepcion/notificar', { cliente_id: clienteA, titulo: 'Cruce', mensaje: 'Cruce' }],
+      ['POST', '/recepcion/mensajes-internos', { destino_id: m1.id, mensaje: 'Cruce' }],
+    ];
+    for (const [met, ruta, body] of conIdsDeA) {
+      const r = await pedir(met, ruta, { token: Bb.token, body });
+      ok(r.status === 400, `B no puede ${met} ${ruta} con un id de A (${Object.keys(body).filter((k) => /_id$/.test(k)).join(', ')})`, [r.status, r.json && r.json.error]);
+    }
+    const citaDeB = (await pedir('GET', '/citas', { token: Bb.token })).json.data[0];
+    const asignarAjeno = await pedir('PATCH', `/citas/${citaDeB.id}/asignar`, { token: Bb.token, body: { tecnico_id: m1.id } });
+    ok(asignarAjeno.status === 400, 'B no puede asignarle su cita a un mecánico de A', asignarAjeno.json);
+    const [[{ cruzadas }]] = await db.query(
+      `SELECT (SELECT COUNT(*) FROM citas c JOIN clientes x ON x.id = c.cliente_id WHERE c.tenant_id = ? AND x.tenant_id <> c.tenant_id)
+            + (SELECT COUNT(*) FROM ordenes_trabajo o JOIN vehiculos v ON v.id = o.vehiculo_id WHERE o.tenant_id = ? AND v.tenant_id <> o.tenant_id)
+            + (SELECT COUNT(*) FROM notificaciones n JOIN clientes x ON x.id = n.cliente_id WHERE n.tenant_id = ? AND x.tenant_id <> n.tenant_id) AS cruzadas`,
+      [Bb.id, Bb.id, Bb.id]
+    );
+    ok(cruzadas === 0, 'ninguna fila de B apunta a algo de A', cruzadas);
+    const propia = await pedir('POST', '/citas', { token: Bb.token, body: { cliente_id: clienteB, vehiculo_id: vehB, sucursal_id: sb.id, fecha: dia, hora: '16:00', motivo: 'Propia' } });
+    ok(propia.status < 300, 'B sí agenda con su propio cliente y vehículo', propia.json);
+
     // ── Roles ──
     const rolesA = await pedir('GET', '/admin/roles', { token: A.token });
     const rolesB = await pedir('GET', '/admin/roles', { token: Bb.token });

@@ -1,6 +1,7 @@
 const router = require('express').Router();
 // Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
 const { fail, invalido, faltante } = require('../utils/responder');
+const { referenciaAjena } = require('../utils/referencias');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { soloRoles } = require('../middleware/roles');
@@ -96,6 +97,8 @@ router.post('/', soloRoles(...GESTIONA_AGENDA), exigirPermiso('citas.agendar'), 
     const { cliente_id, vehiculo_id, fecha, hora, tecnico_id } = req.body;
     const motivo = String(req.body.motivo || '').trim();
     if (faltante(res, { ...req.body, motivo }, [['cliente_id', 'el cliente'], ['fecha', 'la fecha'], ['hora', 'la hora'], ['motivo', 'el motivo']])) return;
+    const ajena = await referenciaAjena(req.db, { cliente_id, vehiculo_id, tecnico_id });
+    if (ajena) return invalido(res, ajena.campo, ajena.error);
     if (!textoDentroDeLimite(motivo, MAX_MOTIVO)) {
       return invalido(res, 'motivo', `El motivo no puede pasar de ${MAX_MOTIVO} caracteres`);
     }
@@ -193,6 +196,8 @@ router.put('/:id', soloRoles(...GESTIONA_AGENDA), exigirPermiso('citas.agendar')
     if (!textoDentroDeLimite(motivo, MAX_MOTIVO)) {
       return invalido(res, 'motivo', `El motivo no puede pasar de ${MAX_MOTIVO} caracteres`);
     }
+    const ajena = await referenciaAjena(req.db, { cliente_id, vehiculo_id, tecnico_id });
+    if (ajena) return invalido(res, ajena.campo, ajena.error);
     // Servicios: si la pantalla los manda, reemplazan a los que tenía; si no, se conservan.
     const cambiaServicios = pedidoTraeServicios(req.body);
     const servicios = serviciosDelPedido(req.body);
@@ -346,6 +351,8 @@ router.post('/:id/entregar', soloRoles(...GESTIONA_AGENDA), exigirPermiso('orden
 router.patch('/:id/asignar', requireRol('admin'), async (req, res) => {
   try {
     const { tecnico_id } = req.body;
+    const ajena = await referenciaAjena(req.db, { tecnico_id });
+    if (ajena) return invalido(res, ajena.campo, ajena.error);
     await req.db.query('UPDATE citas SET tecnico_id = ? WHERE tenant_id = @tenant AND id = ?', [tecnico_id || null, req.params.id]);
     // La orden de esa cita va con ella: si no, el mecánico anterior seguiría trabajándola.
     const [[vinculo]] = await req.db.query('SELECT orden_id FROM citas WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
