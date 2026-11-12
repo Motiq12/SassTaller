@@ -184,10 +184,14 @@ router.post('/ordenes/:id/repuestos', exigirPermiso('taller.repuestos'), async (
       return res.status(400).json({ error: `Máximo ${MAX_PIEZAS_SOLICITUD} repuestos por solicitud` });
     }
     const [[orden]] = await req.db.query(
-      'SELECT id, numero_orden, total_aprobado FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ? AND tecnico_id = ?',
+      'SELECT id, numero_orden, estado, total_aprobado FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ? AND tecnico_id = ?',
       [req.params.id, req.usuario.id]
     );
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada o no asignada a vos' });
+    // Q-03: una orden entregada o cancelada ya no suma repuestos.
+    if (['entregada', 'cancelada'].includes(orden.estado)) {
+      return res.status(409).json({ error: 'Esta orden ya está cerrada: no se le pueden pedir repuestos' });
+    }
     // Sin precio todavía: recepción lo cotiza. Si el cliente ya había aprobado, queda
     // marcado como adicional y al ponerle precio se le pide aprobación otra vez.
     const adicional = orden.total_aprobado !== null ? 1 : 0;

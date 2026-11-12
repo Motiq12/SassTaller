@@ -513,6 +513,18 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     const reactivar = await pedir('PATCH', `/motiq/talleres/${Bb.id}/estado`, { token: tokenMotiq, body: { estado: 'activo' } });
     ok(reactivar.status === 200 && (await entrarB()).status === 200, 'reactivada vuelve a entrar', reactivar.json);
 
+    // ── Dinero en órdenes (Q-03 a Q-08): los mismos casos que npm test, ahora con el
+    // servidor completo y las dos empresas. B intenta tocar las órdenes de A. ──
+    const { casosDinero } = require('./lib/casos-dinero');
+    const ctxDinero = {
+      db, tenantId: A.id, usuarioId: adminA.id, clienteId: clienteA, vehiculoId: vehA,
+      token: A.token, otroToken: Bb.token, clienteToken: clienteTok,
+      pedir: (met, ruta, opciones) => pedir(met, ruta, opciones),
+    };
+    for (const [nombre, ejecutar] of casosDinero(ctxDinero)) {
+      try { await ejecutar(); ok(true, `dinero: ${nombre}`); } catch (e) { ok(false, `dinero: ${nombre}`, e.message); }
+    }
+
     // ── Cuadre de la base ──
     const hijos = [['vehiculos', 'cliente_id', 'clientes'], ['citas', 'cliente_id', 'clientes'], ['citas', 'sucursal_id', 'sucursales'], ['ordenes_trabajo', 'cliente_id', 'clientes'], ['ordenes_trabajo', 'sucursal_id', 'sucursales'], ['cita_servicios', 'cita_id', 'citas'], ['usuarios', 'sucursal_id', 'sucursales'], ['sesiones_personal', 'usuario_id', 'usuarios'], ['actividad_personal', 'usuario_id', 'usuarios']];
     for (const [h, col, p] of hijos) {
