@@ -572,14 +572,24 @@
             </div>
 
             <ul class="ot-reclamos" *ngIf="garantias.length">
+              <!-- Cada reclamo abre la lista de garantías: esa pantalla es del admin
+                   (/garantias exige ese rol y sin el filtro un recepcionista rebotaba
+                   a /recepcion, F-13). Para el resto queda el dato, sin el rebote. -->
               <li *ngFor="let g of garantias">
-                <button type="button" (click)="irAGarantias()">
+                <button type="button" (click)="irAGarantias()" *ngIf="auth.tieneRol('admin')">
                   <span class="ot-reclamo-txt">
                     <strong>{{ g.descripcion_problema }}</strong>
                     <span>{{ g.created_at | date:'dd/MM/yy' }}<ng-container *ngIf="g.cubre_repuestos"> · repuestos</ng-container><ng-container *ngIf="g.cubre_mano_obra"> · mano de obra</ng-container></span>
                   </span>
                   <span class="bg" [ngClass]="claseGarantia(g.estado)">{{ estadoGarantiaLabel(g.estado!) }}</span>
                 </button>
+                <div class="ot-reclamo-fijo" *ngIf="!auth.tieneRol('admin')">
+                  <span class="ot-reclamo-txt">
+                    <strong>{{ g.descripcion_problema }}</strong>
+                    <span>{{ g.created_at | date:'dd/MM/yy' }}<ng-container *ngIf="g.cubre_repuestos"> · repuestos</ng-container><ng-container *ngIf="g.cubre_mano_obra"> · mano de obra</ng-container></span>
+                  </span>
+                  <span class="bg" [ngClass]="claseGarantia(g.estado)">{{ estadoGarantiaLabel(g.estado!) }}</span>
+                </div>
               </li>
             </ul>
           </div>

@@ -24,10 +24,6 @@ export class AdminServiciosPage implements OnInit, OnDestroy {
   editandoId: number | null = null;
   nombre = '';
 
-  // Llegó desde «Servicios en el sitio» con «Renombrar o eliminar»: se muestra
-  // ya filtrado en ese servicio, con un enlace para volver.
-  desdeSitio = false;
-
   constructor(
     private admin: AdminService,
     private toast: ToastController,
@@ -39,9 +35,9 @@ export class AdminServiciosPage implements OnInit, OnDestroy {
   ionViewWillEnter() { this.leerParametros(); this.cargar(); }
 
   private leerParametros() {
-    const q = this.route.snapshot.queryParamMap;
-    this.desdeSitio = q.get('desde') === 'sitio';
-    const buscar = q.get('buscar');
+    // «desde=sitio» era del sitio web, hoy apagado de forma definitiva; solo queda
+    // el filtro de búsqueda por query param.
+    const buscar = this.route.snapshot.queryParamMap.get('buscar');
     if (buscar) this.busqueda = buscar;
   }
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }

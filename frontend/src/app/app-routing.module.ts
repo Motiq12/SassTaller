@@ -134,10 +134,11 @@ const routes: Routes = [
     loadChildren: () => import('./pages/factura/factura.module').then(m => m.FacturaPageModule),
   },
   {
+    // Las promociones viven en el panel (/admin/promos, F-11): la dirección vieja
+    // lleva ahí. /admin ya está protegido por PanelAdminGuard.
     path: 'promociones',
-    canActivate: [AuthGuard, RolGuard],
-    data: { roles: ['admin'] },
-    loadChildren: () => import('./pages/promos/promos.module').then(m => m.PromosPageModule),
+    redirectTo: '/admin/promos',
+    pathMatch: 'full',
   },
 ];
 

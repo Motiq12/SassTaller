@@ -19,7 +19,9 @@ export class RolGuard implements CanActivate {
   private home(rol?: string): string {
     if (rol === 'tecnico') return '/mecanico';
     if (rol === 'recepcion') return '/recepcion';
-    if (rol === 'contenido') return '/admin/web';
+    // Contenido solo administraba el sitio web, que está apagado de forma definitiva:
+    // /admin ya no tiene sección web, así que PanelAdminGuard lo manda a su lugar.
+    if (rol === 'contenido') return '/admin';
     return '/tabs';
   }
 }

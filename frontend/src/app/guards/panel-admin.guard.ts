@@ -7,20 +7,19 @@ import { sitioWeb } from '../sitio-web-activo';
 // ¿Puede entrar a la sección "Sitio web" del panel? El admin siempre; el resto,
 // si el admin le marcó al menos un permiso. Es solo para la navegación: la API
 // revisa los permisos de nuevo en cada petición.
+//
+// El sitio web público de este SaaS no existe (no se trajo desde MS Motos) y su
+// sección del panel se quitó (F-02): la bandera queda apagada de forma definitiva
+// (ver sitio-web-activo.ts) y la función devuelve falso siempre. Se conserva como
+// interruptor único: si el sitio vuelve, vuelve el menú y la guardia con él.
 export function veSitioWeb(u: Usuario | null): boolean {
-  // Con el sitio web en pausa no lo ve nadie, ni el admin (ver sitio-web-activo.ts).
   if (!sitioWeb.activo) return false;
   if (!u) return false;
   if (u.rol === 'admin') return true;
   return Object.values(u.permisos_web || {}).some(Boolean);
 }
 
-// Guardia del panel de administración (/admin).
-//
-// El panel entero es del admin, salvo la sección "Sitio web" (/admin/web/...),
-// que también la usan el rol `contenido` y cualquier empleado al que el admin
-// le dio permisos sobre la web. Quien entra solo por la web ve el mismo panel,
-// pero con únicamente esa sección.
+// Guardia del panel de administración (/admin). El panel entero es del admin.
 @Injectable({ providedIn: 'root' })
 export class PanelAdminGuard implements CanActivate, CanActivateChild {
   constructor(private auth: AuthService, private router: Router) {}
@@ -36,10 +35,11 @@ export class PanelAdminGuard implements CanActivate, CanActivateChild {
   private decidir(url: string): boolean | UrlTree {
     const u = this.auth.getUsuario();
     const ruta = url.split('?')[0];
-    // Sitio web apagado: el admin que escriba la dirección vuelve a su resumen.
+    // El admin pasa a todo el panel; si la dirección era de la sección web que se
+    // quitó (/admin/web/...), su resumen (ya no hay pantallas del sitio a donde ir).
     if (u?.rol === 'admin') return sitioWeb.activo || !ruta.startsWith('/admin/web') ? true : this.router.parseUrl('/admin');
+    // Con el sitio activo, quien administra solo la web vería únicamente esa sección.
     if (veSitioWeb(u) && (ruta === '/admin/web' || ruta.startsWith('/admin/web/'))) return true;
-    // Entró a /admin (o a otra sección) sin ser admin: si tiene la web, a la web.
     if (veSitioWeb(u)) return this.router.parseUrl('/admin/web');
     return this.router.parseUrl(this.home(u?.rol));
   }
