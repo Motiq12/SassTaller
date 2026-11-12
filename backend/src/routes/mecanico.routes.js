@@ -3,7 +3,8 @@ const bcrypt = require('bcrypt');
 // Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
 const { anotar } = require('../utils/actividad');
 const { filtrarAvisos } = require('../utils/preferencias');
-const { fail } = require('../utils/responder');
+const { fail, invalido } = require('../utils/responder');
+const { referenciaAjena } = require('../utils/referencias');
 const { cerrarLasDemas } = require('../utils/sesiones');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
@@ -333,6 +334,8 @@ router.post('/mensajes', exigirPermiso('equipo.mensajes'), async (req, res) => {
   try {
     const { mensaje, foto, orden_id, destino } = req.body;
     if ((!mensaje || !mensaje.trim()) && !foto) return res.status(400).json({ error: 'El mensaje o una foto es requerido' });
+    const ajena = await referenciaAjena(req.db, { orden_id });
+    if (ajena) return invalido(res, ajena.campo, ajena.error);
     // El mecánico elige a quién escribe: recepción (default) o admin.
     const destino_rol = destino === 'admin' ? 'admin' : 'recepcion';
     const [[me]] = await req.db.query('SELECT sucursal_id FROM usuarios WHERE tenant_id = @tenant AND id = ?', [req.usuario.id]);
