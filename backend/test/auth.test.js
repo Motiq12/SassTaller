@@ -10,6 +10,8 @@ process.env.JWT_SECRET = 'test-secret';
 const usuarios = new Map();
 const pool = {
   async query(sql, params) {
+    if (/FROM sesiones_personal/.test(sql)) return [[{ id: 1, cerrada: null }]];
+    if (/UPDATE sesiones_personal/.test(sql)) return [{ affectedRows: 1 }];
     if (/FROM usuarios WHERE id = \?/.test(sql)) return [[usuarios.get(params[0])].filter(Boolean)];
     throw new Error('Consulta no prevista en la prueba: ' + sql);
   },
@@ -71,7 +73,7 @@ test('rechaza (403) un token parcial de 2FA aunque traiga rol', async () => {
 });
 
 test('acepta un token de staff y expone req.usuario', async () => {
-  const token = jwt.sign({ id: 5, rol: 'recepcion', nombre: 'Ana', tenant_id: 1 }, process.env.JWT_SECRET);
+  const token = jwt.sign({ id: 5, rol: 'recepcion', nombre: 'Ana', tenant_id: 1, sid: 'sesion-test' }, process.env.JWT_SECRET);
   const req = reqCon(token); const res = fakeRes(); let llamado = false;
   await auth(req, res, () => { llamado = true; });
   assert.equal(llamado, true);
@@ -83,7 +85,7 @@ test('acepta un token de staff y expone req.usuario', async () => {
 // Rol `contenido` (solo administra el sitio web): lista blanca de rutas en el
 // propio middleware, para que una ruta protegida solo con `auth` no le quede abierta.
 function reqContenido(url) {
-  const token = jwt.sign({ id: 7, nombre: 'Colaboradora', rol: 'contenido', tenant_id: 1 }, process.env.JWT_SECRET);
+  const token = jwt.sign({ id: 7, nombre: 'Colaboradora', rol: 'contenido', tenant_id: 1, sid: 'sesion-test' }, process.env.JWT_SECRET);
   return { headers: { authorization: `Bearer ${token}` }, originalUrl: url };
 }
 
@@ -109,7 +111,7 @@ const { cerrarSesiones } = require('../src/utils/sesiones');
 
 test('una sesión cerrada por administración deja de valer aunque el token no venza', async () => {
   usuarios.set(20, { activo: 1, sesiones_desde_ms: null });
-  const viejo = jwt.sign({ id: 20, rol: 'recepcion', tenant_id: 1, iat: Math.floor(Date.now() / 1000) - 60 }, process.env.JWT_SECRET);
+  const viejo = jwt.sign({ id: 20, rol: 'recepcion', tenant_id: 1, sid: 'sesion-test', iat: Math.floor(Date.now() / 1000) - 60 }, process.env.JWT_SECRET);
   let res = fakeRes(); let llamado = false;
   await auth(reqCon(viejo), res, () => { llamado = true; });
   assert.equal(llamado, true, 'antes de cerrar, pasa');
@@ -124,7 +126,7 @@ test('una sesión cerrada por administración deja de valer aunque el token no v
   assert.equal(llamado, false);
 
   // Volver a entrar da un token nuevo, que sí vale.
-  const nuevo = jwt.sign({ id: 20, rol: 'recepcion', tenant_id: 1 }, process.env.JWT_SECRET);
+  const nuevo = jwt.sign({ id: 20, rol: 'recepcion', tenant_id: 1, sid: 'sesion-test' }, process.env.JWT_SECRET);
   res = fakeRes(); llamado = false;
   await auth(reqCon(nuevo), res, () => { llamado = true; });
   assert.equal(llamado, true);
@@ -133,7 +135,7 @@ test('una sesión cerrada por administración deja de valer aunque el token no v
 test('un empleado desactivado o borrado no entra, aunque su token sea válido', async () => {
   usuarios.set(21, { activo: 0, sesiones_desde_ms: null });
   for (const id of [21, 999]) {
-    const token = jwt.sign({ id, rol: 'tecnico', tenant_id: 1 }, process.env.JWT_SECRET);
+    const token = jwt.sign({ id, rol: 'tecnico', tenant_id: 1, sid: 'sesion-test' }, process.env.JWT_SECRET);
     const res = fakeRes(); let llamado = false;
     await auth(reqCon(token), res, () => { llamado = true; });
     assert.equal(res._status, 401, `id ${id}`);
@@ -141,15 +143,16 @@ test('un empleado desactivado o borrado no entra, aunque su token sea válido', 
   }
 });
 
-test('si la base no responde, vale la firma (no se cae todo el sistema)', async () => {
+test('si la base no responde, devuelve 503 y no autoriza', async () => {
   const original = pool.query; const err = console.error;
   pool.query = async () => { throw new Error('ECONNREFUSED'); };
   console.error = () => {};
   try {
-    const token = jwt.sign({ id: 22, rol: 'admin', tenant_id: 1 }, process.env.JWT_SECRET);
+    const token = jwt.sign({ id: 22, rol: 'admin', tenant_id: 1, sid: 'sesion-test' }, process.env.JWT_SECRET);
     const res = fakeRes(); let llamado = false;
     await auth(reqCon(token), res, () => { llamado = true; });
-    assert.equal(llamado, true);
+    assert.equal(llamado, false);
+    assert.equal(res._status, 503);
   } finally {
     pool.query = original; console.error = err;
   }
@@ -157,4 +160,28 @@ test('si la base no responde, vale la firma (no se cae todo el sistema)', async 
 
 test('cerrarSesiones no hace nada con una lista vacía', async () => {
   assert.equal(await cerrarSesiones([]), 0);
+});
+
+// Los tokens anteriores a las sesiones persistidas deben volver a iniciar sesión.
+test('rechaza 401 un token de personal sin sid', async () => {
+  const token = jwt.sign({ id: 5, rol: 'admin', tenant_id: 1 }, process.env.JWT_SECRET);
+  const res = fakeRes(); let llamado = false;
+  await auth(reqCon(token), res, () => { llamado = true; });
+  assert.equal(res._status, 401);
+  assert.equal(llamado, false);
+});
+
+test('si falla solamente la consulta del sid, devuelve 503', async () => {
+  const original = pool.query;
+  pool.query = async (sql, params) => {
+    if (/FROM sesiones_personal/.test(sql)) throw new Error('ECONNREFUSED');
+    return original(sql, params);
+  };
+  try {
+    const token = jwt.sign({ id: 5, rol: 'admin', tenant_id: 1, sid: 'caida-sid' }, process.env.JWT_SECRET);
+    const res = fakeRes(); let llamado = false;
+    await auth(reqCon(token), res, () => { llamado = true; });
+    assert.equal(res._status, 503);
+    assert.equal(llamado, false);
+  } finally { pool.query = original; }
 });

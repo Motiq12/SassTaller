@@ -39,7 +39,7 @@ function anotarIngreso(usuarioId) {
 }
 
 // Abre la sesión del personal: la anota con su dispositivo (Mi perfil → Sesiones) y
-// firma el token con ese `sid`. Si no se pudo anotar, firma sin sid y entra igual.
+// firma el token con ese `sid`. Si no se pudo anotar, el ingreso responde 503.
 async function sesionStaff(usuario, req) {
   // tenant_id va en el token: es de donde lo saca middleware/tenant para acotar
   // req.db. Sin él, auth encadena a tenant y tenant rechaza TODO con 401.
@@ -47,9 +47,10 @@ async function sesionStaff(usuario, req) {
   const sid = nuevoSid();
   const token = firmar({ ...payload, sid });
   const ok = await abrirSesion(usuario.id, req, jwt.decode(token).exp, sid);
+  if (!ok) throw Object.assign(new Error('No se pudo abrir la sesión'), { code: 'SESION_NO_DISPONIBLE' });
   anotarIngreso(usuario.id);
   anotar(usuario.id, 'ingreso', describirAgente(req.headers['user-agent']));
-  return { payload, token: ok ? token : firmar(payload) };
+  return { payload, token };
 }
 
 // Token PARCIAL de 2FA: se emite cuando la contraseña fue correcta pero falta el
@@ -134,8 +135,8 @@ router.post('/login', async (req, res) => {
     // cuenta con ese correo: quien tenía cuenta en dos talleres no podía entrar a la otra.
     const [clientesCandidatos] = await pool.query(
       tenantId
-        ? 'SELECT * FROM clientes WHERE LOWER(email) = ? AND activo = 1 AND password_hash IS NOT NULL AND tenant_id = ?'
-        : 'SELECT * FROM clientes WHERE LOWER(email) = ? AND activo = 1 AND password_hash IS NOT NULL',
+        ? 'SELECT * FROM clientes WHERE LOWER(email) = ? AND activo = 1 AND portal_habilitado = 1 AND password_hash IS NOT NULL AND tenant_id = ?'
+        : 'SELECT * FROM clientes WHERE LOWER(email) = ? AND activo = 1 AND portal_habilitado = 1 AND password_hash IS NOT NULL',
       tenantId ? [correo, tenantId] : [correo]
     );
     const clientesValidos = [];
@@ -200,7 +201,7 @@ router.post('/login', async (req, res) => {
       }
       const payload = {
         id: cliente.id, tipo: 'cliente', nombre: cliente.nombre,
-        apellido: cliente.apellido, tenant_id: cliente.tenant_id,
+        apellido: cliente.apellido, tenant_id: cliente.tenant_id, pv: Number(cliente.portal_version || 0),
       };
       // La foto va en la respuesta (para el header), NO en el token (lo mantiene liviano).
       return res.json({ data: { token: firmar(payload), tipo: 'cliente', taller: await tallerDe(cliente.tenant_id), cliente: { ...payload, foto: cliente.foto || null } } });
@@ -216,6 +217,7 @@ router.post('/login', async (req, res) => {
     registrarEvento('login_fallido', { email, ip: req.ip, detalle: candidatos.length ? 'personal' : clientesCandidatos.length ? 'cliente' : 'cuenta inexistente' });
     return res.status(401).json({ error: 'Credenciales incorrectas' });
   } catch (err) {
+    if (err.code === 'SESION_NO_DISPONIBLE') return res.status(503).json({ error: 'No se pudo abrir la sesión. Intentá de nuevo.' });
     fail(res, err);
   }
 });
@@ -350,6 +352,7 @@ router.post('/2fa/verificar', async (req, res) => {
     const { payload, token } = await sesionStaff({ ...usuario, tenant_id: req.db.tenantId }, req);
     res.json({ data: { token, tipo: 'staff', usuario: { ...payload, permisos_web: normalizarPermisos(usuario.permisos_web), ...(await casillasDeSesion(usuario.id)), preferencias: await preferenciasDe(usuario.id, usuario.rol), foto: usuario.foto || null } } });
   } catch (err) {
+    if (err.code === 'SESION_NO_DISPONIBLE') return res.status(503).json({ error: 'No se pudo abrir la sesión. Intentá de nuevo.' });
     fail(res, err);
   }
 });
@@ -635,7 +638,7 @@ async function clientesDelCorreo(email, taller) {
   const [filas] = await pool.query(
     `SELECT c.id, c.tenant_id, c.nombre, t.nombre AS taller_nombre, t.slug AS taller_slug
        FROM clientes c JOIN tenants t ON t.id = c.tenant_id
-      WHERE LOWER(c.email) = ? AND c.activo = 1 AND (c.password_hash IS NOT NULL OR c.google_sub IS NOT NULL)
+      WHERE LOWER(c.email) = ? AND c.activo = 1 AND c.portal_habilitado = 1 AND (c.password_hash IS NOT NULL OR c.google_sub IS NOT NULL)
         AND t.estado = 'activo'${filtro}`,
     params
   );

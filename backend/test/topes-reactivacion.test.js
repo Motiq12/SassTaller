@@ -16,7 +16,7 @@ const { fijarPlan } = require('../src/utils/estado-tenant');
 // El middleware de sesión va contra el pool: sin esto, el resultado dependía de lo que
 // hubiera en la base del .env de quien corre la prueba.
 const { pool } = require('../src/db/pool');
-pool.query = async (sql) => (/FROM usuarios/i.test(sql) ? [[{ activo: 1, sesiones_desde_ms: null }]] : [[]]);
+pool.query = async (sql) => (/FROM usuarios/i.test(sql) ? [[{ activo: 1, sesiones_desde_ms: null }]] : /FROM sesiones_personal/i.test(sql) ? [[{ id: 1, cerrada: null }]] : [[]]);
 
 const TALLER = 1;
 let estado;       // lo que hay en la "base" en cada test
@@ -53,7 +53,7 @@ test.beforeEach(() => {
   escrituras = [];
 });
 
-const TOKEN_ADMIN = jwt.sign({ id: 1, rol: 'admin', tenant_id: TALLER }, process.env.JWT_SECRET);
+const TOKEN_ADMIN = jwt.sign({ id: 1, rol: 'admin', tenant_id: TALLER, sid: 'sesion-admin' }, process.env.JWT_SECRET);
 async function patch(ruta, cuerpo) {
   const res = await fetch(base + ruta, {
     method: 'PATCH',

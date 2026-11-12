@@ -225,7 +225,9 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
       const r = await pedir('POST', '/usuarios', { token: Bb.token, body: { nombre: rol, email: `${rol}-${sello}@prueba.test`, password: 'ClaveSegura123', rol, sucursal_id: sb.id, telefono: '88880001' } });
       ok(r.status < 300, `B crea un usuario ${rol}`, r.json);
       const id = r.json.data.id;
-      return jwt.sign({ id, nombre: rol, email: `${rol}-${sello}@prueba.test`, rol, tenant_id: Bb.id }, process.env.JWT_SECRET, { expiresIn: '2h' });
+      const ingreso = await pedir('POST', '/auth/login', { body: { email: `${rol}-${sello}@prueba.test`, password: 'ClaveSegura123' } });
+      ok(ingreso.status === 200 && !!jwt.decode(ingreso.json.data?.token || '')?.sid, `B inicia sesión como ${rol}`, ingreso.json);
+      return ingreso.json.data.token;
     };
     const sesiones = {
       admin: Bb.token,
@@ -358,7 +360,9 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     const creaMec = async (nombre) => {
       const r = await pedir('POST', '/usuarios', { token: A.token, body: { nombre, email: `${nombre}-${sello}@prueba.test`, password: 'ClaveSegura123', rol: 'tecnico', sucursal_id: sa.id, telefono: '88880002' } });
       ok(r.status < 300, `A crea al mecánico ${nombre}`, r.json);
-      return { id: r.json.data.id, token: jwt.sign({ id: r.json.data.id, nombre, email: `${nombre}-${sello}@prueba.test`, rol: 'tecnico', tenant_id: A.id }, process.env.JWT_SECRET, { expiresIn: '2h' }) };
+      const ingreso = await pedir('POST', '/auth/login', { body: { email: `${nombre}-${sello}@prueba.test`, password: 'ClaveSegura123' } });
+      ok(ingreso.status === 200, `A inicia sesión como ${nombre}`, ingreso.json);
+      return { id: r.json.data.id, token: ingreso.json.data.token };
     };
     const m1 = await creaMec('mec1');
     const m2 = await creaMec('mec2');

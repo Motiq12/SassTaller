@@ -11,7 +11,7 @@ const { normalizarPermisos, PERMISOS_WEB } = require('../utils/permisos-web');
 const { ROL_DE_BASE, BASES_PROPIAS } = require('../utils/permisos');
 const { getConfig } = require('../utils/configuracion');
 const { politica, problemaDeContrasena } = require('../utils/contrasena');
-const { olvidar } = require('../utils/sesiones');
+const { olvidar, cerrarSesiones } = require('../utils/sesiones');
 const { topeAlcanzado } = require('../utils/cuenta');
 
 router.use(auth, requireRol('admin'));
@@ -110,6 +110,7 @@ router.post('/', async (req, res) => {
 });
 
 router.put('/:id', async (req, res) => {
+  let conn;
   try {
     const { nombre, email, telefono } = req.body;
     if (faltante(res, req.body, [['nombre', 'el nombre'], ['email', 'el correo'], ['rol', 'el rol']])) return;
@@ -133,25 +134,41 @@ router.put('/:id', async (req, res) => {
       return invalido(res, 'rol', 'No podés cambiar tu propio rol de administrador');
     }
     const sucursal_id = await sucursalDelBody(req.db, req.body.sucursal_id);
-    const [[antes]] = await req.db.query('SELECT rol, rol_id FROM usuarios WHERE id = ? AND tenant_id = @tenant', [req.params.id]);
+    conn = await req.db.conexion();
+    await conn.beginTransaction();
+    const [[antes]] = await conn.query('SELECT rol, rol_id, sucursal_id, permisos_web FROM usuarios WHERE id = ? AND tenant_id = @tenant FOR UPDATE', [req.params.id]);
+    if (!antes) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
     // permisos_web es opcional en el PUT: si el formulario no lo manda, se conservan.
     const camposPermisos = 'permisos_web' in req.body ? ', permisos_web=?' : '';
     const valores = [nombre, email, rol, elegido.rol_id, telefono ?? null, sucursal_id];
     if (camposPermisos) valores.push(permisosParaGuardar(rol, req.body.permisos_web));
-    await req.db.query(
+    await conn.query(
       `UPDATE usuarios SET nombre=?, email=?, rol=?, rol_id=?, telefono=?, sucursal_id=?${camposPermisos} WHERE id=? AND tenant_id = @tenant`,
       [...valores, req.params.id]
     );
-    const [[actualizado]] = await req.db.query(
+    const [[actualizado]] = await conn.query(
       'SELECT id, nombre, email, telefono, rol, rol_id, activo, created_at, sucursal_id, permisos_web FROM usuarios WHERE id = ? AND tenant_id = @tenant',
       [req.params.id]
     );
+    const permisos = (v) => JSON.stringify(Object.entries(normalizarPermisos(v)).sort(([a], [b]) => a.localeCompare(b)));
+    if (antes.rol !== actualizado.rol || (antes.rol_id || null) !== (actualizado.rol_id || null)
+        || (antes.sucursal_id || null) !== (actualizado.sucursal_id || null)
+        || permisos(antes.permisos_web) !== permisos(actualizado.permisos_web)) {
+      await cerrarSesiones([actualizado.id], conn);
+    }
+    await conn.commit();
     if (antes && actualizado && (antes.rol !== actualizado.rol || (antes.rol_id || null) !== (actualizado.rol_id || null))) {
       registrarEvento('rol_cambiado', { ip: req.ip, usuarioId: actualizado.id, actorId: req.usuario.id, detalle: `${antes.rol} → ${actualizado.rol}` });
     }
     res.json({ data: conPermisos(actualizado), message: 'Usuario actualizado' });
   } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
     fail(res, err);
+  } finally {
+    if (conn) conn.release();
   }
 });
 
@@ -186,13 +203,25 @@ router.patch('/:id/activo', async (req, res) => {
 
 // PATCH /:id/sucursal — cambia el local de un empleado desde la lista (null = Ambas).
 router.patch('/:id/sucursal', async (req, res) => {
+  let conn;
   try {
     const sucursal_id = await sucursalDelBody(req.db, req.body.sucursal_id);
-    const [result] = await req.db.query('UPDATE usuarios SET sucursal_id = ? WHERE id = ? AND tenant_id = @tenant', [sucursal_id, req.params.id]);
-    if (!result.affectedRows) return res.status(404).json({ error: 'Usuario no encontrado' });
+    conn = await req.db.conexion();
+    await conn.beginTransaction();
+    const [[antes]] = await conn.query('SELECT sucursal_id FROM usuarios WHERE id = ? AND tenant_id = @tenant FOR UPDATE', [req.params.id]);
+    if (!antes) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    await conn.query('UPDATE usuarios SET sucursal_id = ? WHERE id = ? AND tenant_id = @tenant', [sucursal_id, req.params.id]);
+    if ((antes.sucursal_id || null) !== sucursal_id) await cerrarSesiones([req.params.id], conn);
+    await conn.commit();
     res.json({ data: { sucursal_id }, message: 'Sucursal actualizada' });
   } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
     fail(res, err);
+  } finally {
+    if (conn) conn.release();
   }
 });
 
