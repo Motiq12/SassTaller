@@ -95,3 +95,19 @@ async function migrar({ log = console.log } = {}) {
 }
 
 module.exports = { migrar };
+
+// Importarlo desde el servidor no migra dos veces. Ejecutarlo como comando sí
+// aplica las migraciones, libera el pool y devuelve un código de salida útil.
+if (require.main === module) {
+  (async () => {
+    try {
+      if (process.argv.length > 2) throw new Error('Uso: node src/db/migrar.js');
+      await migrar();
+    } catch (err) {
+      console.error('No se pudo migrar:', err.message);
+      process.exitCode = 1;
+    } finally {
+      await pool.end();
+    }
+  })();
+}
