@@ -121,7 +121,8 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
 
     // ── Citas y órdenes ──
     const manana = new Date(Date.now() + 3 * 864e5);
-    while (manana.getDay() === 0) manana.setDate(manana.getDate() + 1);
+    // La fecha enviada es UTC: el d?a de semana debe consultarse en el mismo huso.
+    while (manana.getUTCDay() === 0) manana.setUTCDate(manana.getUTCDate() + 1);
     const fecha = manana.toISOString().slice(0, 10);
     const [[sa]] = await db.query('SELECT MIN(id) id FROM sucursales WHERE tenant_id = ?', [A.id]);
     const [[sb]] = await db.query('SELECT MIN(id) id FROM sucursales WHERE tenant_id = ?', [Bb.id]);
