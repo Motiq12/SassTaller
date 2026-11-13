@@ -1,24 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { pool } = require('../db/pool');
-
-// ¿La cuenta sigue activa? Sin esto, alguien a quien se le quitó el acceso seguía
-// entrando hasta que le venciera el token (8 horas), con los datos de todos los talleres.
-// Se guarda 10 s para no ir a la base en cada pedido.
-const TTL_MS = 10 * 1000;
-const cache = new Map();
-async function cuentaActiva(id) {
-  const g = cache.get(Number(id));
-  if (g && Date.now() - g.t < TTL_MS) return g.activa;
-  try {
-    const [[a]] = await pool.query('SELECT activo FROM plataforma_admins WHERE id = ?', [id]);
-    const activa = !!a && Number(a.activo) === 1;
-    cache.set(Number(id), { activa, t: Date.now() });
-    return activa;
-  } catch (err) {
-    console.error('⚠️  No se pudo revisar la cuenta de plataforma:', err.code || err.message);
-    return true; // la firma ya se verificó
-  }
-}
+const { sesionVigente } = require('../utils/sesiones-plataforma');
 
 /**
  * Sesión de un administrador de MOTIQ (la plataforma), no de un taller.
@@ -35,27 +16,41 @@ async function cuentaActiva(id) {
  * taller 1 con permisos de admin. Como consecuencia `req.db` no existe acá — las
  * rutas de plataforma consultan sin scope, que es correcto porque su trabajo es
  * justamente mirar a través de todos los talleres.
+ *
+ * B-06: la firma no alcanza. Cada pedido comprueba en la base que la sesión (`sid`)
+ * siga abierta, que la cuenta siga activa y con segundo factor, y que la versión de
+ * credenciales sea la de ahora. Sin caché: desactivar a alguien o cambiar la
+ * contraseña corta su acceso en el pedido siguiente, en todos los workers. Si la base
+ * no responde, se falla cerrado.
  */
 module.exports = function authPlataforma(req, res, next) {
   const header = req.headers['authorization'];
   if (!header || !header.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Token requerido' });
   }
+  let payload;
   try {
-    const payload = jwt.verify(header.slice(7), process.env.JWT_SECRET, { algorithms: ['HS256'] });
-    // Se exige el tipo explícito. Sin este chequeo, el token de un admin de
-    // cualquier taller entraría al panel de Motiq y vería a toda la competencia.
-    if (payload.tipo !== 'plataforma' || !payload.id) {
-      return res.status(403).json({ error: 'Esta sección es de administración de Motiq' });
-    }
-    req.plataforma = payload;
-    return cuentaActiva(payload.id).then((activa) => {
-      if (!activa) return res.status(401).json({ error: 'Esta cuenta ya no tiene acceso' });
-      next();
-    });
+    payload = jwt.verify(header.slice(7), process.env.JWT_SECRET, { algorithms: ['HS256'] });
   } catch {
     return res.status(401).json({ error: 'Token inválido o expirado' });
   }
+  // Se exige el tipo explícito. Sin este chequeo, el token de un admin de
+  // cualquier taller entraría al panel de Motiq y vería a toda la competencia.
+  // El token parcial del login (tipo 'plataforma_2fa') tampoco pasa.
+  if (payload.tipo !== 'plataforma' || !payload.id) {
+    return res.status(403).json({ error: 'Esta sección es de administración de Motiq' });
+  }
+  const cerrada = () => res.status(401).json({ error: 'Tu sesión se cerró. Volvé a iniciar sesión.', codigo: 'sesion_cerrada' });
+  // Un token sin sid es del formato de antes de B-06: no se puede revocar, no vale.
+  if (typeof payload.sid !== 'string' || !payload.sid) return cerrada();
+  return sesionVigente(payload.id, payload.sid).then((vale) => {
+    if (vale === undefined) {
+      return res.status(503).json({ error: 'No se pudo comprobar la sesión. Intentá de nuevo.', codigo: 'sesion_no_disponible' });
+    }
+    if (!vale) return cerrada();
+    req.plataforma = payload;
+    next();
+  });
 };
-// Tras activar o desactivar una cuenta: que rija en el próximo pedido.
-module.exports.olvidar = (id) => cache.delete(Number(id));
+// Compatibilidad: ya no hay caché que olvidar (cada pedido consulta la base).
+module.exports.olvidar = () => {};

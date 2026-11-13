@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, tap } from 'rxjs';
+import { Observable, catchError, finalize, of, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 /**
@@ -20,6 +20,21 @@ const TOKEN_KEY = 'motiq_token';
 const ADMIN_KEY = 'motiq_admin';
 
 export interface AdminPlataforma { id: number; nombre: string; email: string; }
+
+// Respuesta del paso de la contraseña: nunca trae sesión, solo un token parcial (5 min)
+// y qué falta. `requiere_2fa`: pedir el código. `requiere_configurar_2fa`: primer
+// ingreso, configurar la app con el QR.
+export interface PasoIngreso {
+  token_parcial: string;
+  requiere_2fa?: boolean;
+  requiere_configurar_2fa?: boolean;
+}
+
+// Clave nueva de la app de autenticación. `uri` es la otpauth:// que va en el QR.
+export interface ClaveDosPasos { secreto: string; secreto_legible: string; uri: string; }
+
+// Sesión abierta. `codigos_respaldo` llega una sola vez: al activar el segundo factor.
+export interface SesionMotiq { token: string; admin: AdminPlataforma; codigos_respaldo?: string[]; }
 
 export interface TallerDelPanel {
   id: number;
@@ -180,16 +195,50 @@ export class MotiqService {
     localStorage.setItem(ADMIN_KEY, JSON.stringify({ ...actual, ...datos }));
   }
 
-  login(email: string, password: string): Observable<{ data: { token: string; admin: AdminPlataforma } }> {
-    return this.http.post<{ data: { token: string; admin: AdminPlataforma } }>(
-      `${this.apiUrl}/motiq/login`, { email, password }
-    ).pipe(tap(res => {
-      this.token = res.data.token;
-      localStorage.setItem(TOKEN_KEY, res.data.token);
-      localStorage.setItem(ADMIN_KEY, JSON.stringify(res.data.admin));
-    }));
+  // ── Ingreso en dos pasos (B-06) ──
+  // La contraseña sola nunca abre sesión: devuelve un token PARCIAL que solo sirve
+  // para el segundo paso. Ver el contrato en backend/src/routes/motiq.routes.js.
+
+  /** Paso 1: correo y contraseña. No guarda nada: todavía no hay sesión. */
+  login(email: string, password: string): Observable<{ data: PasoIngreso }> {
+    return this.http.post<{ data: PasoIngreso }>(`${this.apiUrl}/motiq/login`, { email, password });
   }
 
+  /** Primer ingreso: genera la clave de la app de autenticación (para el QR). */
+  configurarDosPasos(tokenParcial: string): Observable<{ data: ClaveDosPasos }> {
+    return this.http.post<{ data: ClaveDosPasos }>(`${this.apiUrl}/motiq/login/configurar`, { token_parcial: tokenParcial });
+  }
+
+  /** Primer ingreso: el primer código activa el segundo factor y abre la sesión. */
+  activarDosPasos(tokenParcial: string, codigo: string): Observable<{ data: SesionMotiq }> {
+    return this.http.post<{ data: SesionMotiq }>(`${this.apiUrl}/motiq/login/activar`, { token_parcial: tokenParcial, codigo })
+      .pipe(tap(res => this.guardarSesion(res.data)));
+  }
+
+  /** Con el segundo factor ya configurado: código de la app o uno de respaldo. */
+  verificarDosPasos(tokenParcial: string, codigo: string): Observable<{ data: SesionMotiq }> {
+    return this.http.post<{ data: SesionMotiq }>(`${this.apiUrl}/motiq/login/verificar`, { token_parcial: tokenParcial, codigo })
+      .pipe(tap(res => this.guardarSesion(res.data)));
+  }
+
+  private guardarSesion(s: SesionMotiq): void {
+    this.token = s.token;
+    localStorage.setItem(TOKEN_KEY, s.token);
+    localStorage.setItem(ADMIN_KEY, JSON.stringify(s.admin));
+  }
+
+  /**
+   * "Salir" del panel: cierra la sesión también en el servidor, para que el token no
+   * sirva aunque alguien lo haya copiado. Se borra la copia local pase lo que pase.
+   */
+  salir(): Observable<unknown> {
+    return this.http.post(`${this.apiUrl}/motiq/salir`, {}).pipe(
+      catchError(() => of(null)),
+      finalize(() => this.logout()),
+    );
+  }
+
+  /** Solo borra la sesión local (token vencido o ya cerrado en el servidor). */
   logout(): void {
     this.token = null;
     localStorage.removeItem(TOKEN_KEY);
