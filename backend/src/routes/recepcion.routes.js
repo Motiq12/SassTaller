@@ -974,7 +974,11 @@ router.post('/cotizaciones/:id/aprobar', soloRoles('recepcion', 'admin'), exigir
     if (orden.estado !== 'esperando_aprobacion') {
       return res.status(400).json({ error: 'La orden no está esperando aprobación' });
     }
-    await registrarAprobacion(req.db, req.params.id);
+    // La comprobación de arriba no bloquea: registrarAprobacion la repite con la orden
+    // bloqueada y devuelve false si otra petición ya la resolvió, entregó o canceló.
+    if (!(await registrarAprobacion(req.db, req.params.id))) {
+      return res.status(400).json({ error: 'La orden no está esperando aprobación' });
+    }
     res.json({ message: 'Cotización aprobada' });
   } catch (err) {
     fail(res, err);

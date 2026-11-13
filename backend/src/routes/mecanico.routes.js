@@ -175,6 +175,7 @@ router.patch('/citas/:id/estado', async (req, res) => {
 // corte a medias no deja piezas repetidas cuando el mecánico vuelve a enviar.
 const MAX_PIEZAS_SOLICITUD = 30;
 router.post('/ordenes/:id/repuestos', exigirPermiso('taller.repuestos'), async (req, res) => {
+  let conn;
   try {
     const lista = Array.isArray(req.body.piezas) ? req.body.piezas : [{ nombre: req.body.nombre, cantidad: req.body.cantidad }];
     const piezas = lista
@@ -184,41 +185,55 @@ router.post('/ordenes/:id/repuestos', exigirPermiso('taller.repuestos'), async (
     if (piezas.length > MAX_PIEZAS_SOLICITUD) {
       return res.status(400).json({ error: `Máximo ${MAX_PIEZAS_SOLICITUD} repuestos por solicitud` });
     }
-    const [[orden]] = await req.db.query(
-      'SELECT id, numero_orden, estado, total_aprobado FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ? AND tecnico_id = ?',
+    // QP-04: estado, asignación e INSERT en una sola transacción, con la orden
+    // bloqueada (FOR UPDATE) igual que en la entrega. Antes la comprobación y el INSERT
+    // iban sueltos: una entrega que cayera en el medio dejaba una orden entregada con
+    // un repuesto nuevo. Ahora una espera a la otra y la solicitud ve el estado final.
+    conn = await req.db.conexion();
+    await conn.beginTransaction();
+    const [[orden]] = await conn.query(
+      'SELECT id, numero_orden, estado, total_aprobado FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ? AND tecnico_id = ? FOR UPDATE',
       [req.params.id, req.usuario.id]
     );
-    if (!orden) return res.status(404).json({ error: 'Orden no encontrada o no asignada a vos' });
+    if (!orden) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Orden no encontrada o no asignada a vos' });
+    }
     // Q-03: una orden entregada o cancelada ya no suma repuestos.
     if (['entregada', 'cancelada'].includes(orden.estado)) {
+      await conn.rollback();
       return res.status(409).json({ error: 'Esta orden ya está cerrada: no se le pueden pedir repuestos' });
     }
     // Sin precio todavía: recepción lo cotiza. Si el cliente ya había aprobado, queda
     // marcado como adicional y al ponerle precio se le pide aprobación otra vez.
     const adicional = orden.total_aprobado !== null ? 1 : 0;
-    const [result] = await req.db.query(
+    const [result] = await conn.query(
       `INSERT INTO orden_repuestos (tenant_id, orden_id, nombre, cantidad, costo_unitario, estado, adicional)
        VALUES ${piezas.map(() => "(@tenant, ?, ?, ?, 0, 'solicitado', ?)").join(', ')}`,
       piezas.flatMap((p) => [req.params.id, p.nombre, p.cantidad, adicional])
     );
-    const [nuevos] = await req.db.query(
+    const [nuevos] = await conn.query(
       'SELECT * FROM orden_repuestos WHERE tenant_id = @tenant AND orden_id = ? AND id >= ? ORDER BY id ASC LIMIT ?',
       [req.params.id, result.insertId, piezas.length]
     );
     // Notificar a recepción vía mensaje interno (uno por solicitud, no uno por pieza)
     const detalle = piezas.map((p) => `${p.nombre} ×${p.cantidad}`).join(', ');
-    await req.db.query(
+    await conn.query(
       `INSERT INTO mensajes_internos (tenant_id, remitente_id, destino_rol, mensaje, orden_id, tipo, sucursal_id)
        VALUES (@tenant, ?, 'recepcion', ?, ?, 'directo', (SELECT sucursal_id FROM usuarios WHERE tenant_id = @tenant AND id = ?))`,
       [req.usuario.id, `Solicitud de repuesto (${orden.numero_orden}): ${detalle}`.slice(0, 500), req.params.id, req.usuario.id]
     );
+    await conn.commit();
     const unaSola = !Array.isArray(req.body.piezas);
     res.status(201).json({
       data: unaSola ? nuevos[0] : nuevos,
       message: piezas.length === 1 ? 'Repuesto solicitado' : `${piezas.length} repuestos solicitados`,
     });
   } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
     fail(res, err);
+  } finally {
+    if (conn) conn.release();
   }
 });
 

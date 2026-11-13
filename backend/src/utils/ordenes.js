@@ -154,6 +154,9 @@ async function cerrarOrden(db, ordenId, datos = {}, opciones = {}) {
   }
 }
 
+// Una orden entregada o cancelada no vuelve a ninguna etapa de trabajo.
+const TERMINALES = ['entregada', 'cancelada'];
+
 // Etapas que llevan registro de tiempo (orden_tiempos). Espejo de ordenes.routes.
 const ETAPAS_TIEMPO = ['recepcion', 'diagnostico', 'esperando_aprobacion', 'esperando_repuestos', 'en_reparacion', 'lista_entrega'];
 
@@ -161,17 +164,29 @@ const ETAPAS_TIEMPO = ['recepcion', 'diagnostico', 'esperando_aprobacion', 'espe
 // la etapa actual, abre el de la nueva, actualiza el estado y sincroniza la cita.
 // Se usa al aprobar/rechazar el presupuesto, para que la orden no quede "esperando
 // aprobación" después de que el cliente ya decidió. No-op si el estado no cambia.
+// Devuelve true solo si cambió el estado.
+//
+// QP-03: nunca sale de un estado terminal, y el cambio es condicional al estado que
+// leyó (compare-and-set): si otra transacción entregó o canceló la orden entre la
+// lectura y la escritura, el UPDATE espera su bloqueo, vuelve a evaluar la condición
+// sobre la fila ya entregada y no toca nada. Así ningún llamador la reabre, aunque
+// se olvide de bloquear la orden antes.
 async function avanzarEstadoOrden(db, ordenId, nuevoEstado) {
   const [[o]] = await db.query('SELECT estado FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant', [ordenId]);
-  if (!o || o.estado === nuevoEstado) return;
+  if (!o || o.estado === nuevoEstado || TERMINALES.includes(o.estado)) return false;
+  const [r] = await db.query(
+    'UPDATE ordenes_trabajo SET estado = ? WHERE id = ? AND tenant_id = @tenant AND estado = ?',
+    [nuevoEstado, ordenId, o.estado]
+  );
+  if (!r.affectedRows) return false;
   if (ETAPAS_TIEMPO.includes(o.estado)) {
     await db.query('UPDATE orden_tiempos SET fin = NOW() WHERE orden_id = ? AND etapa = ? AND fin IS NULL AND tenant_id = @tenant', [ordenId, o.estado]);
   }
-  await db.query('UPDATE ordenes_trabajo SET estado = ? WHERE id = ? AND tenant_id = @tenant', [nuevoEstado, ordenId]);
   if (ETAPAS_TIEMPO.includes(nuevoEstado)) {
     await db.query('INSERT INTO orden_tiempos (tenant_id, orden_id, etapa) VALUES (@tenant, ?, ?)', [ordenId, nuevoEstado]);
   }
   await sincronizarCitaDesdeOrden(db, ordenId, nuevoEstado);
+  return true;
 }
 
 // Estado al que pasa una orden recién aprobada: si tiene repuestos por conseguir
@@ -203,13 +218,15 @@ async function esAdicional(db, ordenId) {
 
 // El cliente aprobó (desde el portal o de palabra en el mostrador): se guarda cuánto
 // aprobó, para saber después si algo que se agregue le sube la cuenta, y la orden
-// pasa a trabajo (o a esperar repuestos).
-async function registrarAprobacion(db, ordenId) {
+// pasa a trabajo (o a esperar repuestos). Con `clienteId` (portal), la orden tiene que
+// ser de ese cliente. Devuelve false si al bloquearla ya no estaba esperando la
+// aprobación (otra petición la resolvió, la entregó o la canceló).
+async function registrarAprobacion(db, ordenId, { clienteId } = {}) {
   const conn = await db.conexion();
   try {
     await conn.beginTransaction();
-    const [[orden]] = await conn.query('SELECT estado FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant FOR UPDATE', [ordenId]);
-    if (!orden || orden.estado !== 'esperando_aprobacion') { await conn.rollback(); return; }
+    const [[orden]] = await bloquearOrden(conn, ordenId, clienteId, 'estado');
+    if (!orden || orden.estado !== 'esperando_aprobacion') { await conn.rollback(); return false; }
     await conn.query(
     `UPDATE ordenes_trabajo
         SET aprobacion_cliente = 'aprobado', motivo_rechazo = NULL,
@@ -221,6 +238,46 @@ async function registrarAprobacion(db, ordenId) {
     await guardarPresupuestoAprobado(conn, ordenId);
     await avanzarEstadoOrden(conn, ordenId, await estadoTrasAprobacion(conn, ordenId));
     await conn.commit();
+    return true;
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally { conn.release(); }
+}
+
+// SELECT … FOR UPDATE de la orden, el mismo bloqueo que toma cerrarOrden. Con
+// `clienteId`, además tiene que ser de ese cliente: se revalida con la fila bloqueada.
+function bloquearOrden(conn, ordenId, clienteId, columnas) {
+  return clienteId == null
+    ? conn.query(`SELECT ${columnas} FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant FOR UPDATE`, [ordenId])
+    : conn.query(`SELECT ${columnas} FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant AND cliente_id = ? FOR UPDATE`, [ordenId, clienteId]);
+}
+
+// El cliente rechazó su PRIMER presupuesto (todavía no aprobó nada): la orden vuelve a
+// diagnóstico. QP-03: antes era una lectura sin bloqueo seguida de un UPDATE
+// incondicional; si entre las dos se entregaba la orden, el rechazo la reabría
+// (estado diagnóstico con fecha de entrega) y volvía a dejar editar sus costos.
+// Ahora bloquea la orden como el cierre y revalida cliente, estado y que no haya
+// aprobación previa dentro de la misma transacción. False si ya no correspondía.
+async function registrarRechazoInicial(db, ordenId, motivo, { clienteId } = {}) {
+  const conn = await db.conexion();
+  try {
+    await conn.beginTransaction();
+    const [[orden]] = await bloquearOrden(conn, ordenId, clienteId, 'estado, total_aprobado');
+    if (!orden || orden.estado !== 'esperando_aprobacion' || orden.total_aprobado !== null) {
+      await conn.rollback();
+      return false;
+    }
+    await conn.query(
+      `UPDATE ordenes_trabajo
+         SET aprobacion_cliente = 'rechazado', motivo_rechazo = ?,
+             aprobado_por_cliente = 0, fecha_aprobacion = NOW()
+       WHERE tenant_id = @tenant AND id = ?`,
+      [motivo, ordenId]
+    );
+    await avanzarEstadoOrden(conn, ordenId, 'diagnostico');
+    await conn.commit();
+    return true;
   } catch (err) {
     await conn.rollback();
     throw err;
@@ -301,12 +358,13 @@ async function revisarAdicional(db, ordenId, totalAntes) {
 // rechazado = 1 (no se borran, pero dejan de sumar) y la propuesta entera se guarda en
 // adicionales_rechazados. No se usa estadoTrasAprobacion: mandaría la orden a
 // "Esperando repuestos" por piezas que ya no se van a comprar.
-async function registrarRechazoAdicional(db, ordenId, motivo) {
+async function registrarRechazoAdicional(db, ordenId, motivo, { clienteId } = {}) {
   const conn = await db.conexion();
+  let sinCopia = false;
   try {
     await conn.beginTransaction();
-    const [[orden]] = await conn.query('SELECT estado, presupuesto_aprobado, total_aprobado FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant FOR UPDATE', [ordenId]);
-    if (!orden || orden.estado !== 'esperando_aprobacion' || orden.total_aprobado === null) { await conn.rollback(); return; }
+    const [[orden]] = await bloquearOrden(conn, ordenId, clienteId, 'estado, presupuesto_aprobado, total_aprobado');
+    if (!orden || orden.estado !== 'esperando_aprobacion' || orden.total_aprobado === null) { await conn.rollback(); return false; }
     const propuesta = await leerPresupuesto(conn, ordenId);
     const aprobado = orden.presupuesto_aprobado;
     // Sin una copia histórica no se inventa la distribución de un presupuesto viejo.
@@ -327,7 +385,27 @@ async function registrarRechazoAdicional(db, ordenId, motivo) {
       await conn.query('UPDATE ordenes_trabajo SET costo_mano_obra = ?, costo_repuestos = ?, descuento = ? WHERE id = ? AND tenant_id = @tenant',
         [aprobado.costo_mano_obra, aprobado.costo_repuestos, aprobado.descuento, ordenId]);
     } else {
-      await conn.query('UPDATE ordenes_trabajo SET descuento = costo_mano_obra + costo_repuestos - total_aprobado WHERE id = ? AND tenant_id = @tenant', [ordenId]);
+      // QP-07: presupuesto aprobado antes de que existiera la copia. No se sabe cómo
+      // se repartía, pero sí qué piezas NO aprobó nunca: las que se agregaron como
+      // adicional después de su última aprobación (fecha_aprobacion). Esas son la
+      // propuesta que acaba de rechazar: quedan rechazado = 1 (no se borran y siguen
+      // en adicionales_rechazados) para que el portal no las muestre y no dejen la
+      // orden esperando repuestos que no se van a comprar. Lo demás no se toca; si aun
+      // así la cuenta pasa lo aprobado, el exceso se compensa con descuento, y nunca
+      // se sube un descuento que ya alcanzaba. Recepción recibe el aviso para conciliar.
+      sinCopia = true;
+      await conn.query(
+        `UPDATE orden_repuestos SET rechazado = 1
+          WHERE orden_id = ? AND tenant_id = @tenant AND rechazado = 0 AND adicional = 1
+            AND created_at > (SELECT fecha_aprobacion FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant)`,
+        [ordenId, ordenId]
+      );
+      await conn.query(
+        `UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE rechazado = 0 AND orden_id = ? AND tenant_id = @tenant)
+          WHERE id = ? AND tenant_id = @tenant`,
+        [ordenId, ordenId]
+      );
+      await conn.query('UPDATE ordenes_trabajo SET descuento = GREATEST(descuento, costo_mano_obra + costo_repuestos - total_aprobado) WHERE id = ? AND tenant_id = @tenant', [ordenId]);
     }
     await conn.query(
     "UPDATE ordenes_trabajo SET aprobacion_cliente = 'aprobado', motivo_rechazo = ? WHERE id = ? AND tenant_id = @tenant",
@@ -348,6 +426,11 @@ async function registrarRechazoAdicional(db, ordenId, motivo) {
     await conn.rollback();
     throw err;
   } finally { conn.release(); }
+  await avisarRechazoAdicional(db, ordenId, motivo, sinCopia);
+  return true;
+}
+
+async function avisarRechazoAdicional(db, ordenId, motivo, sinCopia) {
   try {
     const [[o]] = await db.query(
       'SELECT numero_orden, tecnico_id, recepcionista_id, sucursal_id FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant',
@@ -356,7 +439,8 @@ async function registrarRechazoAdicional(db, ordenId, motivo) {
     if (!o) return;
     const texto = `El cliente rechazó el adicional de la orden ${o.numero_orden}`
       + (motivo ? `: «${String(motivo).slice(0, 200)}»` : '')
-      + '. El adicional quedó rechazado y fuera del total a cobrar.';
+      + '. El adicional quedó rechazado y fuera del total a cobrar.'
+      + (sinCopia ? ' Era un presupuesto aprobado antes de que se guardara su copia: revisá las piezas y el descuento.' : '');
     await notificarMecanico(db, o.tecnico_id, texto);
     // mensajes_internos exige un remitente del personal: el que recibió la moto o,
     // si no hay, el mecánico.
@@ -379,4 +463,5 @@ module.exports = {
   validarEdicionCostos,
   avanzarEstadoOrden, estadoTrasAprobacion,
   totalOrden, esAdicional, registrarAprobacion, revisarAdicional, registrarRechazoAdicional,
+  registrarRechazoInicial, TERMINALES,
 };

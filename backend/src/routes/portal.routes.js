@@ -24,7 +24,7 @@ const { serviciosDelPedido, problemaConServicios, textoServicios, guardarServici
 const { getConfig, horasDisponibles } = require('../utils/configuracion');
 const { agendaDia, agendaRango, conflictosDeCita, horasPasadas } = require('../utils/agenda');
 const { getSucursales, sucursalValida, sucursalPorDefecto } = require('../utils/sucursales');
-const { avanzarEstadoOrden, registrarAprobacion, registrarRechazoAdicional } = require('../utils/ordenes');
+const { registrarAprobacion, registrarRechazoAdicional, registrarRechazoInicial } = require('../utils/ordenes');
 const { recompensas } = require('../utils/recompensas');
 const { problemaDeContrasena, PISO } = require('../utils/contrasena');
 const { verificarIdToken, googleConfigurado } = require('../utils/google-id');
@@ -1708,21 +1708,13 @@ async function actualizarAprobacion(db, ordenId, clienteId, decision, motivo) {
   if (!orden) return false;
   // La orden no debe quedar "esperando aprobación" después de la decisión:
   // aprobado → a trabajar (o esperar repuestos); rechazado → vuelve a diagnóstico.
-  if (decision === 'aprobado') {
-    await registrarAprobacion(db, ordenId);
-  } else if (orden.total_aprobado !== null) {
-    await registrarRechazoAdicional(db, ordenId, motivo);
-  } else {
-    await db.query(
-      `UPDATE ordenes_trabajo
-         SET aprobacion_cliente = 'rechazado', motivo_rechazo = ?,
-             aprobado_por_cliente = 0, fecha_aprobacion = NOW()
-       WHERE tenant_id = @tenant AND id = ?`,
-      [motivo, ordenId]
-    );
-    await avanzarEstadoOrden(db, ordenId, 'diagnostico');
-  }
-  return true;
+  // QP-03: esta lectura sin bloqueo solo elige el camino. Cada camino bloquea la orden
+  // (FOR UPDATE, el mismo bloqueo que la entrega) y vuelve a comprobar cliente y estado
+  // dentro de su transacción: si mientras tanto otra petición la resolvió, la entregó
+  // o la canceló, devuelve false y la ruta responde 400 sin escribir nada.
+  if (decision === 'aprobado') return registrarAprobacion(db, ordenId, { clienteId });
+  if (orden.total_aprobado !== null) return registrarRechazoAdicional(db, ordenId, motivo, { clienteId });
+  return registrarRechazoInicial(db, ordenId, motivo, { clienteId });
 }
 
 module.exports = router;
