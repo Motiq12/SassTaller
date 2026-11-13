@@ -17,6 +17,8 @@
   background: $noche;
   color: #fff;
   @media (min-width: 640px) { height: calc(100svh - 1.5rem); }
+  // Hasta escritorio crece si no le alcanza la pantalla: nunca recorta la acción.
+  @media (max-width: 1023px) { height: auto; min-height: max(calc(100svh - 1rem), 560px); }
 }
 
 // El foco de teclado, igual para todos los enlaces y botones de la portada.
@@ -126,16 +128,23 @@
 }
 
 // ── Titular ──────────────────────────────────────────────────────────────────────
-.titulo-zona { padding: u(1) u(1.5) 0; @media (min-width: 640px) { padding: u(1) u(2.5) 0; } }
+.titulo-zona {
+  container-type: inline-size;
+  padding: u(1) u(1.5) 0;
+  @media (min-width: 640px) { padding: u(1) u(2.5) 0; }
+}
 .titulo {
   margin: 0;
   font-family: $fd;
-  font-size: 13.5vw;
+  // En unidades del ancho real del titular (cqi), con aire: nunca se sale de la tarjeta,
+  // aunque la fuente tarde o el sistema la cambie. En dos líneas manda «ordenado» (5,5em);
+  // en una, el titular entero (10,4em).
+  font-size: 15.5cqi;
   font-weight: 600;
   line-height: 0.86;
   letter-spacing: -0.03em;
   text-transform: uppercase;
-  @media (min-width: 768px) { font-size: 8.6vw; white-space: nowrap; }
+  @media (min-width: 768px) { font-size: 8.8cqi; white-space: nowrap; }
   // Cada parte del titular en su máscara; sube con la página, sin esperar a nada.
   .p {
     display: inline-block;
@@ -162,11 +171,13 @@
   gap: u(1.5);
   margin-top: auto;
   padding: 0 u(1.5) u(2);
-  @media (min-width: 640px) {
+  @media (min-width: 640px) { padding: 0 u(2.5) u(2.5); }
+  // En tablet el texto y las tarjetas van uno sobre otro: en fila, las tarjetas le
+  // dejaban al texto 160px y la bajada salía de a una palabra por línea.
+  @media (min-width: 1024px) {
     flex-direction: row;
     align-items: flex-end;
     justify-content: space-between;
-    padding: 0 u(2.5) u(2.5);
   }
 }
 .texto { max-width: max(30rem, #{u(30)}); min-width: 0; }
@@ -291,9 +302,5 @@
 
 // En el teléfono la portada lleva solo titular, una frase y la acción: el lema, la
 // cola de vehículos y las tarjetas de vidrio quedan para pantallas más anchas.
-// Y crece si no le alcanza la pantalla: nunca recorta la acción.
 @media (prefers-reduced-motion: reduce) { .foto, .momento { animation: none; transition: none; } }
-@media (max-width: 639px) {
-  .hero { height: auto; min-height: max(calc(100svh - 1rem), 560px); }
-  .lema, .solo-ancho, .racimo { display: none; }
-}
+@media (max-width: 639px) { .lema, .solo-ancho, .racimo { display: none; } }
