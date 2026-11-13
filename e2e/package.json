@@ -1,0 +1,19 @@
+{
+  "name": "motiq-e2e",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Suite end-to-end de los 12 flujos críticos de MOTIQ (Playwright).",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "instalar-navegador": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "pg": "^8.16.0"
+  }
+}
