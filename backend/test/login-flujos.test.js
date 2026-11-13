@@ -43,6 +43,8 @@ function baseFalsa(tenantId) {
       return [filas.map(f => recorte(sql, f))];
     }
     escrituras.push({ sql, params });
+    // La recuperación del portal sube portal_version y firma con la que devuelve.
+    if (/returning\s+portal_version/i.test(sql)) return [[{ portal_version: 1 }]];
     return [{ affectedRows: 1, insertId: 1 }];
   };
   return { tenantId, query, execute: query };
@@ -98,9 +100,10 @@ const cliente = (extra = {}) => ({
 const SECRETO = totp.generarSecreto();
 const usuario2fa = (extra = {}) => ({
   id: 7, tenant_id: 3, nombre: 'Ana', email: 'ana@x.com', rol: 'admin', activo: 1,
-  totp_secret: SECRETO, totp_activado: 1, totp_backup: null, totp_ultimo_contador: 0, ...extra,
+  totp_secret: SECRETO, totp_activado: 1, totp_backup: null, totp_ultimo_contador: 0, credenciales_version: 0, ...extra,
 });
-const parcial = () => jwt.sign({ id: 7, tenant_id: 3, pend2fa: true }, process.env.JWT_SECRET, { expiresIn: '5m' });
+// `cv`: la versión de credenciales leída con el hash en el primer paso (QA34-02).
+const parcial = (cv = 0) => jwt.sign({ id: 7, tenant_id: 3, cv, pend2fa: true }, process.env.JWT_SECRET, { expiresIn: '5m' });
 
 test('2FA con la app: la sesión sale con el taller del token parcial', async () => {
   tablas = [{ re: /from usuarios/i, filas: usuario2fa() }];
@@ -119,6 +122,13 @@ test('2FA con código de respaldo: entra y el código queda quemado', async () =
   const quema = escrituras.find(e => /totp_backup/.test(e.sql));
   assert.ok(quema, 'no se actualizó la lista de códigos de respaldo');
   assert.equal(quema.params[0], '[]');
+});
+
+test('2FA: un token parcial pedido con la contraseña anterior ya no abre sesión', async () => {
+  tablas = [{ re: /from usuarios/i, filas: usuario2fa({ credenciales_version: 1 }) }];
+  const codigo = totp.codigoPara(SECRETO, Math.floor(Date.now() / 1000 / totp.PERIODO));
+  const { status } = await pedir('POST', '/api/auth/2fa/verificar', { token_parcial: parcial(0), codigo });
+  assert.equal(status, 401);
 });
 
 // ── Portal del cliente ────────────────────────────────────────────────────
@@ -140,6 +150,9 @@ test('portal: recuperar la contraseña da un token con taller', async () => {
   const { status, body } = await pedir('POST', '/api/portal/recuperar/confirmar', { email: 'lu@x.com', codigo: '123456', password: 'nueva-clave-1' });
   assert.equal(status, 200, JSON.stringify(body));
   assert.equal(jwt.decode(body.data.token).tenant_id, 1);
+  // Firmado con la versión que dejó la recuperación, no con la que tenía antes.
+  assert.equal(jwt.decode(body.data.token).pv, 1);
+  assert.ok(escrituras.some(e => /portal_version = portal_version \+ 1/.test(e.sql)));
 });
 
 test('portal: confirmar el registro con el código da un token con taller', async () => {

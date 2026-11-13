@@ -193,11 +193,10 @@ router.patch('/:id/activo', async (req, res) => {
     }
     // Desactivar sube la versión de credenciales (QA34-02): una sesión que un login en
     // curso abra después no vuelve a valer cuando se reactive la cuenta.
+    const nuevo = activo ? 1 : 0;
     const [hecho] = await req.db.query(
-      activo
-        ? 'UPDATE usuarios SET activo = 1 WHERE id = ? AND tenant_id = @tenant'
-        : 'UPDATE usuarios SET activo = 0, credenciales_version = credenciales_version + 1 WHERE id = ? AND tenant_id = @tenant',
-      [req.params.id]
+      'UPDATE usuarios SET activo = ?, credenciales_version = credenciales_version + (1 - ?) WHERE id = ? AND tenant_id = @tenant',
+      [nuevo, nuevo, req.params.id]
     );
     if (!hecho.affectedRows) return res.status(404).json({ error: 'Usuario no encontrado' });
     olvidar(req.params.id); // desactivado: deja de entrar en el próximo pedido
