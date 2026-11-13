@@ -17,7 +17,8 @@ const pool = {
   },
 };
 require.cache[require.resolve('../src/db/pool')] = { id: 'pool', filename: 'pool', loaded: true, exports: { pool } };
-for (const id of [5, 7]) usuarios.set(id, { activo: 1, sesiones_desde_ms: null });
+usuarios.set(5, { activo: 1, sesiones_desde_ms: null, rol: 'recepcion', tenant_id: 1 });
+usuarios.set(7, { activo: 1, sesiones_desde_ms: null, rol: 'contenido', tenant_id: 1 });
 const auth = require('../src/middleware/auth');
 
 // res falso que captura status() y json().
@@ -110,14 +111,14 @@ test('contenido: no entra a nada del taller (403)', async () => {
 const { cerrarSesiones } = require('../src/utils/sesiones');
 
 test('una sesión cerrada por administración deja de valer aunque el token no venza', async () => {
-  usuarios.set(20, { activo: 1, sesiones_desde_ms: null });
+  usuarios.set(20, { activo: 1, sesiones_desde_ms: null, rol: 'recepcion', tenant_id: 1 });
   const viejo = jwt.sign({ id: 20, rol: 'recepcion', tenant_id: 1, sid: 'sesion-test', iat: Math.floor(Date.now() / 1000) - 60 }, process.env.JWT_SECRET);
   let res = fakeRes(); let llamado = false;
   await auth(reqCon(viejo), res, () => { llamado = true; });
   assert.equal(llamado, true, 'antes de cerrar, pasa');
 
   // cerrarSesiones escribe en la base: acá se simula lo que dejaría.
-  usuarios.set(20, { activo: 1, sesiones_desde_ms: Math.floor(Date.now() / 1000) * 1000 });
+  usuarios.set(20, { activo: 1, sesiones_desde_ms: Math.floor(Date.now() / 1000) * 1000, rol: 'recepcion', tenant_id: 1 });
   require('../src/utils/sesiones').olvidar(20);
   res = fakeRes(); llamado = false;
   await auth(reqCon(viejo), res, () => { llamado = true; });
@@ -133,7 +134,7 @@ test('una sesión cerrada por administración deja de valer aunque el token no v
 });
 
 test('un empleado desactivado o borrado no entra, aunque su token sea válido', async () => {
-  usuarios.set(21, { activo: 0, sesiones_desde_ms: null });
+  usuarios.set(21, { activo: 0, sesiones_desde_ms: null, rol: 'tecnico', tenant_id: 1 });
   for (const id of [21, 999]) {
     const token = jwt.sign({ id, rol: 'tecnico', tenant_id: 1, sid: 'sesion-test' }, process.env.JWT_SECRET);
     const res = fakeRes(); let llamado = false;
@@ -178,10 +179,27 @@ test('si falla solamente la consulta del sid, devuelve 503', async () => {
     return original(sql, params);
   };
   try {
-    const token = jwt.sign({ id: 5, rol: 'admin', tenant_id: 1, sid: 'caida-sid' }, process.env.JWT_SECRET);
+    const token = jwt.sign({ id: 5, rol: 'recepcion', tenant_id: 1, sid: 'caida-sid' }, process.env.JWT_SECRET);
     const res = fakeRes(); let llamado = false;
     await auth(reqCon(token), res, () => { llamado = true; });
     assert.equal(res._status, 503);
     assert.equal(llamado, false);
   } finally { pool.query = original; }
+});
+
+// QP-01: el rol firmado no autoriza solo; tiene que coincidir con el de la fila ahora.
+test('rechaza 401 un token cuyo rol o taller ya no coincide con la fila', async () => {
+  usuarios.set(23, { activo: 1, sesiones_desde_ms: null, rol: 'tecnico', tenant_id: 1 });
+  for (const [payload, esperado] of [
+    [{ rol: 'admin', tenant_id: 1 }, 401],
+    [{ rol: 'tecnico', tenant_id: 2 }, 401],
+    [{ rol: 'tecnico', tenant_id: 1 }, null],
+  ]) {
+    const token = jwt.sign({ id: 23, sid: 'sesion-test', ...payload }, process.env.JWT_SECRET);
+    const res = fakeRes(); let llamado = false;
+    await auth(reqCon(token), res, () => { llamado = true; });
+    assert.equal(res._status, esperado, JSON.stringify(payload));
+    assert.equal(llamado, esperado === null);
+    if (esperado) assert.equal(res._body.codigo, 'sesion_cerrada');
+  }
 });
