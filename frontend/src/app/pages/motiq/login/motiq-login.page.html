@@ -6,7 +6,8 @@
       <p class="sub">Panel de la plataforma</p>
     </div>
 
-    <form (ngSubmit)="entrar()">
+    <!-- 1. Correo y contraseña -->
+    <form *ngIf="paso === 'clave'" (ngSubmit)="entrar()">
       <ion-list lines="none" class="campos">
         <ion-item>
           <ion-input
@@ -45,9 +46,104 @@
 
       <ion-button expand="block" type="submit" [disabled]="cargando || !email.trim() || !password">
         <ion-spinner *ngIf="cargando" name="crescent"></ion-spinner>
-        <span *ngIf="!cargando">Entrar</span>
+        <span *ngIf="!cargando">Continuar</span>
       </ion-button>
     </form>
+
+    <!-- 2. Primer ingreso: configurar la app de autenticación -->
+    <form *ngIf="paso === 'configurar'" (ngSubmit)="confirmarCodigo()" class="paso">
+      <h2>Configurá la verificación en dos pasos</h2>
+      <p class="texto">
+        Esta cuenta ve los datos de todos los talleres, así que además de la contraseña
+        pide un código de tu teléfono. Escaneá el QR con Google Authenticator, Authy,
+        1Password u otra app de autenticación.
+      </p>
+
+      <div class="qr-caja">
+        <img *ngIf="qr" [src]="qr" alt="Código QR para la app de autenticación" class="qr" />
+      </div>
+
+      <p class="texto chico">¿No podés escanearlo? Cargá esta clave a mano en la app:</p>
+      <p class="clave" *ngIf="clave">{{ clave.secreto_legible }}</p>
+      <p class="texto chico" *ngIf="clave">
+        En el teléfono también podés <a [href]="clave.uri" class="enlace">abrirla directo en la app</a>.
+      </p>
+
+      <ion-list lines="none" class="campos">
+        <ion-item>
+          <ion-input
+            label="Código de 6 dígitos que muestra la app"
+            labelPlacement="stacked"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="6"
+            name="codigo"
+            [(ngModel)]="codigo"
+            required>
+          </ion-input>
+        </ion-item>
+      </ion-list>
+
+      <ion-text color="danger" *ngIf="error">
+        <p class="error" role="alert">{{ error }}</p>
+      </ion-text>
+
+      <ion-button expand="block" type="submit" [disabled]="cargando || !codigo.trim()">
+        <ion-spinner *ngIf="cargando" name="crescent"></ion-spinner>
+        <span *ngIf="!cargando">Activar y entrar</span>
+      </ion-button>
+      <button type="button" class="volver" (click)="volver()">Volver</button>
+    </form>
+
+    <!-- 3. Código de la app (o uno de respaldo) -->
+    <form *ngIf="paso === 'codigo'" (ngSubmit)="confirmarCodigo()" class="paso">
+      <h2>Verificación en dos pasos</h2>
+      <p class="texto">Escribí el código de 6 dígitos de tu app de autenticación.</p>
+
+      <ion-list lines="none" class="campos">
+        <ion-item>
+          <ion-input
+            label="Código"
+            labelPlacement="stacked"
+            autocomplete="one-time-code"
+            maxlength="9"
+            name="codigo"
+            [(ngModel)]="codigo"
+            required>
+          </ion-input>
+        </ion-item>
+      </ion-list>
+      <p class="texto chico">¿Perdiste el teléfono? Usá uno de tus códigos de respaldo (por ejemplo A1B2-C3D4).</p>
+
+      <ion-text color="danger" *ngIf="error">
+        <p class="error" role="alert">{{ error }}</p>
+      </ion-text>
+
+      <ion-button expand="block" type="submit" [disabled]="cargando || !codigo.trim()">
+        <ion-spinner *ngIf="cargando" name="crescent"></ion-spinner>
+        <span *ngIf="!cargando">Entrar</span>
+      </ion-button>
+      <button type="button" class="volver" (click)="volver()">Volver</button>
+    </form>
+
+    <!-- 4. Códigos de respaldo: se muestran esta única vez -->
+    <div *ngIf="paso === 'respaldo'" class="paso">
+      <h2>Guardá tus códigos de respaldo</h2>
+      <p class="texto">
+        Si perdés el teléfono, cada uno de estos códigos te deja entrar una vez. No se
+        vuelven a mostrar: anotalos o guardalos en tu gestor de contraseñas.
+      </p>
+      <ul class="respaldos">
+        <li *ngFor="let c of respaldos">{{ c }}</li>
+      </ul>
+      <button type="button" class="volver" (click)="copiarRespaldos()">{{ copiado ? 'Copiados' : 'Copiar los códigos' }}</button>
+
+      <ion-item lines="none" class="confirmo">
+        <ion-checkbox [(ngModel)]="respaldosGuardados" labelPlacement="end" justify="start">Ya los guardé</ion-checkbox>
+      </ion-item>
+
+      <ion-button expand="block" [disabled]="!respaldosGuardados" (click)="alPanel()">Entrar al panel</ion-button>
+    </div>
 
     <p class="pie">Acceso restringido al equipo de {{ producto.nombre }}.</p>
   </div>

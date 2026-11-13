@@ -282,6 +282,8 @@ export class MotiqPanelPage implements OnInit {
       edito_aviso: 'editó un aviso',
       atendio_contacto: 'atendió un contacto',
       atendio_reporte: 'atendió un reporte de falla',
+      activo_2fa: 'activó la verificación en dos pasos',
+      cambio_contrasena: 'cambió su contraseña',
     };
     const base = textos[l.accion] || l.accion;
     return l.detalle ? `${base} — ${l.detalle}` : base;
@@ -294,7 +296,8 @@ export class MotiqPanelPage implements OnInit {
       creo_cuenta: 'person-add-outline', edito_cuenta: 'person-outline',
       edito_plan: 'pricetag-outline', creo_aviso: 'megaphone-outline',
       edito_aviso: 'megaphone-outline', atendio_contacto: 'mail-open-outline',
-      atendio_reporte: 'bug-outline',
+      atendio_reporte: 'bug-outline', activo_2fa: 'shield-checkmark-outline',
+      cambio_contrasena: 'key-outline',
     }[accion] || 'ellipse-outline';
   }
 
@@ -937,7 +940,9 @@ export class MotiqPanelPage implements OnInit {
   }
 
   salir() {
-    this.motiq.logout();
-    this.router.navigate(['/motiq/login'], { replaceUrl: true });
+    // Cierra la sesión también en el servidor (B-06): el token deja de valer.
+    this.motiq.salir().subscribe({
+      complete: () => this.router.navigate(['/motiq/login'], { replaceUrl: true }),
+    });
   }
 }

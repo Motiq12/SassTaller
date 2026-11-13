@@ -23,14 +23,86 @@ const { generarPassword } = require('../utils/password');
 const { ordenDeBorrado } = require('../utils/orden-borrado');
 const { TABLAS_CON_TENANT } = require('../db/tenant-db');
 const { anotar } = require('../utils/bitacora');
+const totp = require('../utils/totp');
+const { registrarEvento } = require('../utils/eventos-seguridad');
+const { DURACION_SEG, abrirSesion, cerrarSid, cambiarContrasena, cerrarTodas } = require('../utils/sesiones-plataforma');
 
 const ESTADOS = ['activo', 'suspendido', 'cancelado'];
 const TIPOS_AVISO = ['info', 'mantenimiento', 'urgente'];
 
-// POST /api/motiq/login — sesión de administración de la plataforma.
+// ───────────── Ingreso: contraseña + segundo factor (B-06) ─────────────
+// Esta cuenta abre los datos de TODOS los talleres, así que la contraseña sola no
+// alcanza nunca: el segundo factor es obligatorio, no opcional como en el personal.
+//
+//   1. POST /login            correo y contraseña → token PARCIAL (5 min), nunca sesión.
+//                             `requiere_2fa`: la cuenta ya tiene la app → paso 3.
+//                             `requiere_configurar_2fa`: primer ingreso → paso 2.
+//   2. POST /login/configurar token parcial → clave nueva y URI otpauth para el QR.
+//      POST /login/activar    token parcial + primer código → activa, devuelve los
+//                             códigos de respaldo (única vez) y abre la sesión.
+//   3. POST /login/verificar  token parcial + código (o uno de respaldo) → sesión.
+//
+// El token parcial lleva `tipo: 'plataforma_2fa'` (authPlataforma exige 'plataforma'
+// y middleware/auth exige rol, así que no sirve en ninguna ruta), el `paso` para el
+// que se emitió y la versión de credenciales leída junto con el hash (QA34-02).
+
+const DUMMY_HASH = bcrypt.hashSync('igualar-tiempos-plataforma', 10);
+
+function firmarParcial(admin, paso) {
+  return jwt.sign(
+    { id: admin.id, tipo: 'plataforma_2fa', paso, cv: Number(admin.credenciales_version) },
+    process.env.JWT_SECRET, { expiresIn: '5m' }
+  );
+}
+
+// Lee el token parcial y la cuenta. Devuelve { datos, admin } o responde el error.
+async function leerParcial(req, res, paso) {
+  let datos;
+  try {
+    datos = jwt.verify(String(req.body?.token_parcial || ''), process.env.JWT_SECRET, { algorithms: ['HS256'] });
+  } catch {
+    res.status(401).json({ error: 'El ingreso venció. Volvé a poner tu contraseña.' });
+    return null;
+  }
+  if (datos.tipo !== 'plataforma_2fa' || !datos.id || !Number.isInteger(datos.cv)) {
+    res.status(401).json({ error: 'Token no válido' });
+    return null;
+  }
+  if (datos.paso !== paso) {
+    res.status(paso === 'verificar' ? 401 : 400).json({ error: paso === 'verificar'
+      ? 'Primero configurá la verificación en dos pasos'
+      : 'La verificación en dos pasos ya está configurada' });
+    return null;
+  }
+  const [[admin]] = await pool.query(
+    `SELECT id, nombre, email, totp_secret, totp_activado, totp_backup, totp_ultimo_contador, credenciales_version
+       FROM plataforma_admins WHERE id = ? AND activo = 1`, [datos.id]
+  );
+  // La contraseña con que se pidió este paso ya no es la vigente (o la cuenta se
+  // desactivó): hay que volver a entrar.
+  if (!admin || Number(admin.credenciales_version) !== datos.cv) {
+    res.status(401).json({ error: 'El ingreso venció. Volvé a poner tu contraseña.' });
+    return null;
+  }
+  return { datos, admin };
+}
+
+// Abre la sesión con la versión de credenciales del token parcial, no la de ahora.
+async function entregarSesion(req, res, admin, cv, extra = {}) {
+  const sid = await abrirSesion(admin.id, req, cv);
+  if (!sid) return res.status(503).json({ error: 'No se pudo abrir la sesión. Intentá de nuevo.' });
+  await pool.query('UPDATE plataforma_admins SET ultimo_acceso = NOW() WHERE id = ?', [admin.id]);
+  // Sin `rol` ni `tenant_id`: middleware/auth exige rol y rechaza este tipo, así
+  // que este token no sirve para entrar a ningún taller.
+  const visible = { id: admin.id, tipo: 'plataforma', nombre: admin.nombre, email: admin.email };
+  const token = jwt.sign({ ...visible, sid, cv: Number(cv) }, process.env.JWT_SECRET, { expiresIn: DURACION_SEG });
+  return res.json({ data: { token, admin: visible, ...extra } });
+}
+
+// POST /api/motiq/login — paso 1: la contraseña.
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password } = req.body || {};
     if (!email || !password) return res.status(400).json({ error: 'Email y contraseña requeridos' });
 
     // Más estricto que el login de talleres: acá una sola cuenta comprometida abre
@@ -40,25 +112,151 @@ router.post('/login', async (req, res) => {
       return res.status(429).json({ error: `Demasiados intentos. Esperá ${limite.retryAfter}s.` });
     }
 
+    // La versión de credenciales se lee junto con el hash, ANTES de comprobarlo.
     const [[admin]] = await pool.query(
-      'SELECT id, nombre, email, password_hash FROM plataforma_admins WHERE email = ? AND activo = 1',
+      'SELECT id, password_hash, totp_activado, credenciales_version FROM plataforma_admins WHERE email = ? AND activo = 1',
       [String(email).trim().toLowerCase()]
     );
-    if (!admin || !(await bcrypt.compare(password, admin.password_hash))) {
+    // Con un correo que no existe también corre un bcrypt, para no delatarlo por el tiempo.
+    const correcta = await bcrypt.compare(String(password), admin ? admin.password_hash : DUMMY_HASH);
+    if (!admin || !correcta) {
+      registrarEvento('login_fallido', { email, ip: req.ip, detalle: 'plataforma' });
       return res.status(401).json({ error: 'Credenciales incorrectas' });
     }
 
-    await pool.query('UPDATE plataforma_admins SET ultimo_acceso = NOW() WHERE id = ?', [admin.id]);
-
-    // Sin `rol` ni `tenant_id`: middleware/auth exige rol y rechaza este tipo, así
-    // que este token no sirve para entrar a ningún taller.
-    const payload = { id: admin.id, tipo: 'plataforma', nombre: admin.nombre, email: admin.email };
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '8h' });
-    res.json({ data: { token, admin: payload } });
+    if (Number(admin.totp_activado) === 1) {
+      return res.json({ data: { requiere_2fa: true, token_parcial: firmarParcial(admin, 'verificar') } });
+    }
+    // Primer ingreso desde B-06 (o se reinició el segundo factor): sin configurarlo no
+    // hay sesión.
+    return res.json({ data: { requiere_configurar_2fa: true, token_parcial: firmarParcial(admin, 'configurar') } });
   } catch (err) {
     fail(res, err);
   }
 });
+
+// POST /api/motiq/login/configurar — paso 2a: genera la clave de la app.
+// Se puede repetir (si cerró el QR sin escanearlo): cada vez reemplaza la clave
+// pendiente. Una vez activada, ya no: solo se reinicia con el script de recuperación.
+router.post('/login/configurar', async (req, res) => {
+  try {
+    const leido = await leerParcial(req, res, 'configurar');
+    if (!leido) return;
+    const { admin } = leido;
+    const limite = consumir(`motiq-2fa-alta:${admin.id}`, { porMinuto: 5, porHora: 30 });
+    if (!limite.ok) return res.status(429).json({ error: `Demasiados intentos. Esperá ${limite.retryAfter}s.` });
+    if (Number(admin.totp_activado) === 1) {
+      return res.status(400).json({ error: 'La verificación en dos pasos ya está configurada' });
+    }
+    const secreto = totp.generarSecreto();
+    const [r] = await pool.query(
+      'UPDATE plataforma_admins SET totp_secret = ?, totp_ultimo_contador = NULL WHERE id = ? AND totp_activado = 0',
+      [secreto, admin.id]
+    );
+    if (!r.affectedRows) return res.status(400).json({ error: 'La verificación en dos pasos ya está configurada' });
+    res.json({
+      data: {
+        secreto,
+        secreto_legible: totp.secretoLegible(secreto),
+        uri: totp.uriOtpauth(secreto, admin.email, 'Motiq'),
+      },
+    });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// POST /api/motiq/login/activar — paso 2b: el primer código confirma que la app quedó
+// bien configurada. Activa el segundo factor, devuelve los códigos de respaldo (única
+// vez que se ven) y abre la sesión.
+router.post('/login/activar', async (req, res) => {
+  try {
+    const leido = await leerParcial(req, res, 'configurar');
+    if (!leido) return;
+    const { datos, admin } = leido;
+    const limite = consumir(`motiq-2fa-alta:${admin.id}`, { porMinuto: 5, porHora: 30 });
+    if (!limite.ok) return res.status(429).json({ error: `Demasiados intentos. Esperá ${limite.retryAfter}s.` });
+    if (Number(admin.totp_activado) === 1) {
+      return res.status(400).json({ error: 'La verificación en dos pasos ya está configurada' });
+    }
+    if (!admin.totp_secret) return res.status(400).json({ error: 'Primero generá la clave' });
+    const contador = totp.verificar(admin.totp_secret, req.body?.codigo);
+    if (!contador) return res.status(401).json({ error: 'Código incorrecto. Revisá que la hora del teléfono esté al día.' });
+
+    const codigos = totp.generarCodigosRespaldo();
+    const hashes = await Promise.all(codigos.map(c => bcrypt.hash(totp.normalizarRespaldo(c), 10)));
+    // Condicionado a la misma clave y a que siga sin activar: si dos pestañas
+    // configuran a la vez, solo una gana y la otra tiene que volver a empezar.
+    const [r] = await pool.query(
+      `UPDATE plataforma_admins SET totp_activado = 1, totp_backup = ?, totp_ultimo_contador = ?
+        WHERE id = ? AND totp_activado = 0 AND totp_secret = ? AND credenciales_version = ?`,
+      [JSON.stringify(hashes), contador, admin.id, admin.totp_secret, datos.cv]
+    );
+    if (!r.affectedRows) return res.status(409).json({ error: 'La configuración cambió mientras tanto. Volvé a entrar.' });
+    anotar(admin, 'activo_2fa');
+    return entregarSesion(req, res, admin, datos.cv, { codigos_respaldo: codigos });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// POST /api/motiq/login/verificar — paso 3: el código de la app o uno de respaldo.
+router.post('/login/verificar', async (req, res) => {
+  try {
+    const leido = await leerParcial(req, res, 'verificar');
+    if (!leido) return;
+    const { datos, admin } = leido;
+    // 6 dígitos son un millón de combinaciones: sin tope se agotan rápido. Por cuenta,
+    // no por IP (que el atacante puede rotar).
+    const limite = consumir(`motiq-2fa:${admin.id}`, { porMinuto: 5, porHora: 20 });
+    if (!limite.ok) return res.status(429).json({ error: `Demasiados intentos. Esperá ${limite.retryAfter}s.` });
+    if (Number(admin.totp_activado) !== 1) return res.status(401).json({ error: 'Token no válido' });
+
+    const codigo = req.body?.codigo;
+    let valido = false;
+    const contador = totp.verificar(admin.totp_secret, codigo, { ultimoContador: admin.totp_ultimo_contador });
+    if (contador) {
+      // Anti-replay en la misma sentencia: si dos pedidos traen el mismo código a la
+      // vez, solo uno avanza el contador.
+      const [r] = await pool.query(
+        'UPDATE plataforma_admins SET totp_ultimo_contador = ? WHERE id = ? AND (totp_ultimo_contador IS NULL OR totp_ultimo_contador < ?)',
+        [contador, admin.id, contador]
+      );
+      valido = r.affectedRows === 1;
+    } else {
+      valido = await consumirRespaldo(admin, codigo);
+    }
+    if (!valido) {
+      registrarEvento('dosfa_fallido', { email: admin.email, ip: req.ip, detalle: 'plataforma' });
+      return res.status(401).json({ error: 'Código incorrecto' });
+    }
+    return entregarSesion(req, res, admin, datos.cv);
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// Un código de respaldo sirve una vez: si coincide, se saca de la lista. La escritura
+// se condiciona a la lista leída, para que dos pedidos con el mismo código no entren
+// los dos.
+async function consumirRespaldo(admin, codigo) {
+  let hashes;
+  try { hashes = JSON.parse(admin.totp_backup || '[]'); } catch { return false; }
+  if (!Array.isArray(hashes) || !hashes.length) return false;
+  const limpio = totp.normalizarRespaldo(codigo);
+  if (!/^[0-9A-F]{8}$/.test(limpio)) return false;
+  for (let i = 0; i < hashes.length; i++) {
+    if (await bcrypt.compare(limpio, hashes[i])) {
+      const quedan = hashes.filter((_, j) => j !== i);
+      const [r] = await pool.query(
+        'UPDATE plataforma_admins SET totp_backup = ? WHERE id = ? AND totp_backup = ?',
+        [JSON.stringify(quedan), admin.id, admin.totp_backup]
+      );
+      return r.affectedRows === 1;
+    }
+  }
+  return false;
+}
 
 // POST /api/motiq/contacto — "Hablá con nosotros" de la landing. PÚBLICO.
 //
@@ -119,6 +317,17 @@ router.post('/contacto', async (req, res) => {
 });
 
 router.use(authPlataforma);
+
+// POST /api/motiq/salir — cierra esta sesión: el token deja de valer aunque alguien
+// lo haya copiado.
+router.post('/salir', async (req, res) => {
+  try {
+    await cerrarSid(req.plataforma.id, req.plataforma.sid);
+    res.json({ message: 'Sesión cerrada' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
 
 // Respaldos de la base entera, con los datos de todas las empresas: por eso viven acá
 // y no en el panel de un taller. Nunca devuelve las llaves del almacenamiento ni la
@@ -824,6 +1033,9 @@ router.patch('/admins/:id', async (req, res) => {
         if (!n) return res.status(400).json({ error: 'Tiene que quedar al menos una cuenta activa' });
       }
       sets.push('activo = ?'); params.push(activo);
+      // Desactivar sube la versión de credenciales: un login que ya pasó la contraseña
+      // no abre una sesión que reviva al reactivar la cuenta (QA34-02).
+      if (!activo) sets.push('credenciales_version = credenciales_version + 1');
       detalles.push(activo ? 'activada' : 'desactivada');
     }
 
@@ -832,7 +1044,8 @@ router.patch('/admins/:id', async (req, res) => {
     params.push(id);
     const [r] = await pool.query(`UPDATE plataforma_admins SET ${sets.join(', ')} WHERE id = ?`, params);
     if (!r.affectedRows) return res.status(404).json({ error: 'Cuenta no encontrada' });
-    authPlataforma.olvidar(id);
+    // B-06: sus sesiones abiertas se cierran ya, no cuando venza el token.
+    if (req.body?.activo !== undefined && !req.body.activo) await cerrarTodas(id);
     anotar(req.plataforma, 'edito_cuenta', { detalle: `${id === req.plataforma?.id ? 'su perfil' : 'cuenta #' + id}: ${detalles.join(', ')}` });
     res.json({ message: 'Cuenta actualizada' });
   } catch (err) {
@@ -1094,9 +1307,11 @@ router.post('/password', async (req, res) => {
     if (!admin || !(await bcrypt.compare(actual, admin.password_hash))) {
       return res.status(401).json({ error: 'La contraseña actual no es correcta' });
     }
-    await pool.query('UPDATE plataforma_admins SET password_hash = ? WHERE id = ?',
-      [await bcrypt.hash(nueva, 10), admin.id]);
-    res.json({ message: 'Contraseña actualizada' });
+    // B-06 y QA34-02: sube la versión de credenciales, deja abierta solo la sesión
+    // desde la que se cambió y cierra todas las demás.
+    await cambiarContrasena(admin.id, req.plataforma.sid, await bcrypt.hash(nueva, 10));
+    anotar(req.plataforma, 'cambio_contrasena');
+    res.json({ message: 'Contraseña actualizada. Se cerraron tus otras sesiones.' });
   } catch (err) {
     fail(res, err);
   }

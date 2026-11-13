@@ -597,8 +597,22 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
 
     // ── Un taller suspendido no abre sesión ──
     const correoMotiq = `motiq-${sello}@prueba.test`;
-    const [[plataforma]] = await db.query("INSERT INTO plataforma_admins (nombre, email, password_hash, activo) VALUES ('Prueba', ?, 'x', 1) RETURNING id", [correoMotiq]);
-    const tokenMotiq = jwt.sign({ id: plataforma.id, tipo: 'plataforma', nombre: 'Prueba', email: correoMotiq }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    // B-06: la cuenta de plataforma entra por el login real, con contraseña y segundo
+    // factor. Un token firmado a mano (sin sesión persistida) ya no vale.
+    const bcrypt = require('bcrypt');
+    const totp = require('../src/utils/totp');
+    const claveMotiq = 'ClaveDePlataforma123';
+    const secretoMotiq = totp.generarSecreto();
+    const [[plataforma]] = await db.query("INSERT INTO plataforma_admins (nombre, email, password_hash, activo, totp_secret, totp_activado) VALUES ('Prueba', ?, ?, 1, ?, 1) RETURNING id", [correoMotiq, bcrypt.hashSync(claveMotiq, 4), secretoMotiq]);
+    const aMano = jwt.sign({ id: plataforma.id, tipo: 'plataforma', nombre: 'Prueba', email: correoMotiq }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    ok((await pedir('GET', '/motiq/resumen', { token: aMano })).status === 401, 'Motiq: un token sin sesión persistida no entra');
+    const pasoMotiq = await pedir('POST', '/motiq/login', { body: { email: correoMotiq, password: claveMotiq } });
+    ok(pasoMotiq.status === 200 && pasoMotiq.json.data?.requiere_2fa === true && !pasoMotiq.json.data?.token, 'Motiq: la contraseña sola no abre sesión', pasoMotiq.json);
+    const codigoMotiq = totp.codigoPara(secretoMotiq, Math.floor(Date.now() / 1000 / totp.PERIODO));
+    const verificadoMotiq = await pedir('POST', '/motiq/login/verificar', { body: { token_parcial: pasoMotiq.json.data?.token_parcial, codigo: codigoMotiq } });
+    const tokenMotiq = verificadoMotiq.json?.data?.token;
+    ok(verificadoMotiq.status === 200 && !!jwt.decode(tokenMotiq || '')?.sid, 'Motiq: entra con el segundo factor', verificadoMotiq.json);
+    ok((await pedir('GET', '/admin/roles', { token: tokenMotiq })).status === 403, 'Motiq: su sesión no sirve en las rutas de un taller');
     const entrarB = () => pedir('POST', '/auth/login', { body: { email: `beta-${sello}@prueba.test`, password: 'ClaveSegura123' } });
     ok((await entrarB()).status === 200, 'B entra mientras está activa');
     const suspender = await pedir('PATCH', `/motiq/talleres/${Bb.id}/estado`, { token: tokenMotiq, body: { estado: 'suspendido', motivo: 'Prueba' } });

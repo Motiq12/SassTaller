@@ -10,7 +10,7 @@
 //
 // Lo que NO sale, y por qué:
 //   • plataforma_admins: son cuentas que ven todos los talleres. Cada quien crea la
-//     suya con `npm run motiq:admin`.
+//     suya con `npm run motiq:admin`. Sus sesiones (plataforma_sesiones) tampoco.
 //   • Contraseñas del personal y de clientes: la fila sí (hace falta con quién entrar),
 //     el hash no. Se reemplaza por el centinela de db/credenciales.js y el import
 //     genera contraseñas nuevas. Un hash commiteado queda en el historial para siempre.
@@ -22,7 +22,7 @@ const path = require('path');
 
 const DESTINO = path.join(__dirname, 'datos-prueba.sql');
 const FUERA = new Set([
-  'schema_migraciones', 'plataforma_admins',
+  'schema_migraciones', 'plataforma_admins', 'plataforma_sesiones',
   'email_verify_codes', 'login_codes', 'password_reset_codes', 'usuario_verify_codes',
 ]);
 const CON_PASSWORD = new Set(['usuarios', 'clientes']);
