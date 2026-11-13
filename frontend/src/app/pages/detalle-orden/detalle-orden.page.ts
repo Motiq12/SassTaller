@@ -10,6 +10,7 @@ import { AuthService } from '../../services/auth.service';
 import { MecanicoService } from '../../services/mecanico.service';
 import { VehiculosService } from '../../services/vehiculos.service';
 import { EntregaService } from '../../services/entrega.service';
+import { InventarioService, Repuesto, repuestoPorTexto } from '../../services/inventario.service';
 import { Moto } from '../../models/moto.model';
 import {
   Orden, OrdenAvance, OrdenRepuesto, OrdenChecklist, OrdenFoto, EstadoOrden, ESTADO_CONFIG,
@@ -83,6 +84,10 @@ export class DetalleOrdenPage implements OnInit, OnDestroy {
   readonly estadosRepuesto = (Object.keys(ESTADO_REPUESTO_CONFIG) as EstadoRepuesto[])
     .map(valor => ({ valor, label: ESTADO_REPUESTO_CONFIG[valor].label }));
   mostrarFormRepuesto = false;
+  // El inventario, para elegir de ahí la pieza: así sale del stock al entregar.
+  catalogo: Repuesto[] = [];
+  private catalogoPedido = false;
+  delCatalogo: Repuesto | null = null;
   mostrarFormSolicitud = false;
   listaSolicitud: { nombre: string; cantidad: number }[] = [];
   enviandoSolicitud = false;
@@ -173,6 +178,7 @@ export class DetalleOrdenPage implements OnInit, OnDestroy {
     private mecSvc: MecanicoService,
     private motoSvc: VehiculosService,
     private entrega: EntregaService,
+    private inventario: InventarioService,
     private alert: AlertController,
     private toast: ToastController,
     private actionSheet: ActionSheetController,
@@ -537,11 +543,42 @@ export class DetalleOrdenPage implements OnInit, OnDestroy {
   }
 
   // ═══ Repuestos ═══
+  abrirFormRepuesto() {
+    this.mostrarFormRepuesto = true;
+    // Solo quien ve precios puede leer el inventario; para los demás se escribe a mano.
+    if (this.catalogoPedido || !this.auth.puede('ordenes.precios')) return;
+    this.catalogoPedido = true;
+    this.inventario.listar({ sucursal_id: this.orden?.sucursal_id || null }).pipe(takeUntil(this.destroy$))
+      .subscribe({ next: r => this.catalogo = r.data || [], error: () => { this.catalogoPedido = false; } });
+  }
+
+  // Al escribir (o elegir de la lista) un repuesto del inventario, propone su precio.
+  alEscribirRepuesto() {
+    const r = repuestoPorTexto(this.catalogo, this.nuevoRepuesto.nombre);
+    const antes = this.delCatalogo;
+    this.delCatalogo = r;
+    this.nuevoRepuesto.repuesto_id = r?.id ?? null;
+    if (r && (!this.nuevoRepuesto.costo_unitario || (antes && this.nuevoRepuesto.costo_unitario === Number(antes.precio)))) {
+      this.nuevoRepuesto.costo_unitario = Number(r.precio) || 0;
+    }
+    if (r && r.codigo && this.nuevoRepuesto.nombre.trim().toLowerCase() === r.codigo.trim().toLowerCase()) {
+      this.nuevoRepuesto.nombre = r.nombre;
+    }
+    // Si está en el estante, no hay que conseguirla.
+    if (r && r.disponible >= (this.nuevoRepuesto.cantidad || 1) && this.nuevoRepuesto.estado === 'pendiente') {
+      this.nuevoRepuesto.estado = 'disponible';
+    } else if (!r && antes && this.nuevoRepuesto.estado === 'disponible') {
+      this.nuevoRepuesto.estado = 'pendiente';
+    }
+  }
+
   agregarRepuesto() {
     if (!this.nuevoRepuesto.nombre.trim()) return;
     this.ordenSvc.addRepuesto(this.orden!.id!, this.nuevoRepuesto).pipe(takeUntil(this.destroy$)).subscribe({
       next: (res: any) => {
         this.nuevoRepuesto = { nombre: '', cantidad: 1, costo_unitario: 0, estado: 'pendiente' };
+        this.delCatalogo = null;
+        this.catalogoPedido = false; // las cantidades cambiaron: se vuelve a leer la próxima vez
         this.mostrarFormRepuesto = false;
         this.cargar(this.orden!.id!);
         this.avisarCambioDeCosto(res, 'Repuesto agregado');

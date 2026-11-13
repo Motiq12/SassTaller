@@ -28,6 +28,8 @@ const TABLAS_CON_TENANT = new Set([
   // cruzaban roles, feriados, bloqueos y órdenes eliminadas entre talleres.
   'actividad_personal', 'bloqueos_horario', 'cita_servicios', 'eventos_seguridad',
   'feriados', 'ordenes_eliminadas', 'roles', 'sesiones_personal',
+  // Inventario de repuestos (migración 0010).
+  'repuestos', 'repuesto_existencias', 'movimientos_inventario',
 ]);
 
 // Tablas de la PLATAFORMA (el panel de Motiq) que también tienen tenant_id, pero con

@@ -1,0 +1,312 @@
+<ion-header>
+  <ion-toolbar class="admin-topbar">
+    <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+    <ion-title>Inventario</ion-title>
+    <app-admin-actions slot="end"></app-admin-actions>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="admin-dark">
+  <ion-refresher slot="fixed" (ionRefresh)="cargar($event)"><ion-refresher-content></ion-refresher-content></ion-refresher>
+
+  <div class="admin">
+    <div class="cd">
+      <div class="inv-header">
+        <span class="cd-title"><ion-icon name="cube-outline"></ion-icon> Repuestos</span>
+        <button class="btn btn-cr btn-sm nuevo-cta" (click)="nuevo()">
+          <ion-icon name="add"></ion-icon> Nuevo repuesto
+        </button>
+      </div>
+
+      <p class="inv-intro">
+        Los repuestos que agregás a una orden desde este catálogo salen solos del inventario
+        cuando se entrega el vehículo. Mientras la orden está abierta cuentan como apartados.
+      </p>
+
+      <div class="inv-tools">
+        <div class="adm-buscador">
+          <ion-icon name="search-outline" class="bs-lupa"></ion-icon>
+          <input type="text" [(ngModel)]="busqueda" name="busqueda" placeholder="Buscar por nombre, código o marca…">
+          <button type="button" class="bs-x" *ngIf="busqueda" (click)="busqueda = ''" aria-label="Limpiar búsqueda">
+            <ion-icon name="close-circle"></ion-icon>
+          </button>
+        </div>
+        <select *ngIf="variasSucursales" class="inv-select" [(ngModel)]="sucursalId" name="sucursalId" (ngModelChange)="cargar()" aria-label="Sucursal">
+          <option [ngValue]="null">Todas las sucursales</option>
+          <option *ngFor="let s of sucursales" [ngValue]="s.id">{{ s.nombre }}</option>
+        </select>
+        <label class="inv-check">
+          <input type="checkbox" [(ngModel)]="soloBajos" name="soloBajos"> Por agotarse
+          <span class="bg bg-rd" *ngIf="cuantosBajos">{{ cuantosBajos }}</span>
+        </label>
+        <label class="inv-check">
+          <input type="checkbox" [(ngModel)]="verInactivos" name="verInactivos" (ngModelChange)="cargar()"> Ver desactivados
+        </label>
+      </div>
+
+      <div class="inv-resumen" *ngIf="repuestos.length">
+        {{ repuestos.length }} repuestos en {{ nombreSucursal }} ·
+        valor al costo {{ valorInventario | currency:'CRC':'symbol-narrow':'1.0-0' }}
+      </div>
+
+      <div *ngIf="cargando" style="display:flex;flex-direction:column;gap:8px">
+        <div class="sk-dark" style="height:64px"></div>
+        <div class="sk-dark" style="height:64px"></div>
+        <div class="sk-dark" style="height:64px"></div>
+      </div>
+
+      <div *ngIf="!cargando">
+        <div class="inv-row" *ngFor="let r of filtrados" [class.inactivo]="!r.activo" [class.bajo]="r.bajo && r.activo">
+          <div class="inv-info">
+            <div class="inv-nombre">
+              <strong>{{ r.nombre }}</strong>
+              <span class="inv-codigo" *ngIf="r.codigo">{{ r.codigo }}</span>
+              <span class="bg bg-n" *ngIf="!r.activo">Desactivado</span>
+              <span class="bg bg-rd" *ngIf="r.activo && r.disponible < 0">Faltan {{ -r.disponible }}</span>
+              <span class="bg bg-am" *ngIf="r.activo && r.bajo && r.disponible >= 0">Por agotarse</span>
+            </div>
+            <div class="inv-sub">
+              <span *ngIf="r.marca">{{ r.marca }} · </span>
+              Precio {{ +r.precio | currency:'CRC':'symbol-narrow':'1.0-0' }}
+              <span *ngIf="+r.costo"> · costo {{ +r.costo | currency:'CRC':'symbol-narrow':'1.0-0' }}</span>
+              <span *ngIf="r.minimo"> · mínimo {{ r.minimo }}</span>
+            </div>
+          </div>
+
+          <div class="inv-cant">
+            <div class="ic"><span>Hay</span><strong [class.neg]="r.existencia < 0">{{ r.existencia }}</strong></div>
+            <div class="ic" *ngIf="r.comprometido"><span>Apartados</span><strong>{{ r.comprometido }}</strong></div>
+            <div class="ic"><span>Disponibles</span><strong [class.neg]="r.disponible < 0" [class.alerta]="r.bajo">{{ r.disponible }}</strong></div>
+          </div>
+
+          <div class="inv-actions">
+            <button class="btn btn-sm btn-em" *ngIf="r.activo" (click)="abrirEntrada(r)">
+              <ion-icon name="add-circle-outline"></ion-icon> Compra
+            </button>
+            <button class="btn btn-sm" *ngIf="r.activo" (click)="abrirAjuste(r)">Contar</button>
+            <button class="btn btn-sm" (click)="verMovimientos(r)" title="Historial" aria-label="Ver historial">
+              <ion-icon name="time-outline"></ion-icon>
+            </button>
+            <button class="btn btn-sm" (click)="editar(r)" title="Editar" aria-label="Editar repuesto">
+              <ion-icon name="create-outline"></ion-icon>
+            </button>
+            <button class="btn btn-sm" [ngClass]="r.activo ? 'btn-ou' : 'btn-em'" (click)="cambiarActivo(r)">
+              {{ r.activo ? 'Desactivar' : 'Activar' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="empty" *ngIf="!filtrados.length">
+          <ion-icon [name]="busqueda || soloBajos ? 'search-outline' : 'cube-outline'"></ion-icon>
+          <p *ngIf="busqueda">Ningún repuesto coincide con «{{ busqueda }}».</p>
+          <p *ngIf="!busqueda && soloBajos">No hay repuestos por agotarse.</p>
+          <p *ngIf="!busqueda && !soloBajos">Todavía no hay repuestos. Agregá el primero para llevar las existencias.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</ion-content>
+
+<!-- Ionic monta el modal fuera de .admin-dark: de ahí la clase repetida adentro. -->
+<ion-modal class="adm-modal" [isOpen]="modal === 'repuesto'" (didDismiss)="cerrar()">
+  <ng-template>
+    <div class="admin-dark adm-modal-box">
+      <div class="amb-head">
+        <span class="cd-title">{{ elegido ? 'Editar repuesto' : 'Nuevo repuesto' }}</span>
+        <button type="button" class="amb-x" (click)="cerrar()" aria-label="Cerrar"><ion-icon name="close"></ion-icon></button>
+      </div>
+      <div class="amb-body">
+        <div class="fg">
+          <label>Nombre</label>
+          <input type="text" maxlength="200" [(ngModel)]="form.nombre" name="nombre" placeholder="Ej: Filtro de aceite">
+        </div>
+        <div class="inv-2">
+          <div class="fg">
+            <label>Código <span class="opc">(opcional)</span></label>
+            <input type="text" maxlength="60" [(ngModel)]="form.codigo" name="codigo" placeholder="Ej: FA-1020">
+          </div>
+          <div class="fg">
+            <label>Marca <span class="opc">(opcional)</span></label>
+            <input type="text" maxlength="100" [(ngModel)]="form.marca" name="marca">
+          </div>
+        </div>
+        <div class="inv-2">
+          <div class="fg">
+            <label>Costo (lo que te cuesta)</label>
+            <input type="number" min="0" step="0.01" inputmode="decimal" [(ngModel)]="form.costo" name="costo">
+          </div>
+          <div class="fg">
+            <label>Precio al cliente</label>
+            <input type="number" min="0" step="0.01" inputmode="decimal" [(ngModel)]="form.precio" name="precio">
+          </div>
+        </div>
+        <div class="inv-2">
+          <div class="fg">
+            <label>Unidad</label>
+            <input type="text" maxlength="20" [(ngModel)]="form.unidad" name="unidad" placeholder="unidad, litro, juego…">
+          </div>
+          <div class="fg">
+            <label>Avisar cuando queden</label>
+            <input type="number" min="0" step="1" inputmode="numeric" [(ngModel)]="form.minimo" name="minimo">
+          </div>
+        </div>
+        <ng-container *ngIf="!elegido">
+          <div class="inv-2">
+            <div class="fg">
+              <label>Cuántos hay hoy <span class="opc">(opcional)</span></label>
+              <input type="number" min="0" step="1" inputmode="numeric" [(ngModel)]="form.existencia_inicial" name="existencia_inicial">
+            </div>
+            <div class="fg" *ngIf="variasSucursales">
+              <label>En la sucursal</label>
+              <select [(ngModel)]="form.sucursal_id" name="sucursal_id">
+                <option [ngValue]="null">Elegí…</option>
+                <option *ngFor="let s of sucursales" [ngValue]="s.id">{{ s.nombre }}</option>
+              </select>
+            </div>
+          </div>
+        </ng-container>
+        <div class="hint" *ngIf="elegido">
+          Las existencias no se cambian acá: usá «Compra» cuando entran y «Contar» si el conteo no coincide.
+        </div>
+      </div>
+      <div class="amb-foot">
+        <div class="amb-btns">
+          <button type="button" class="btn" (click)="cerrar()">Cancelar</button>
+          <button type="button" class="btn btn-cr" (click)="guardar()" [disabled]="guardando">
+            {{ guardando ? 'Guardando…' : (elegido ? 'Guardar' : 'Agregar repuesto') }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </ng-template>
+</ion-modal>
+
+<ion-modal class="adm-modal" [isOpen]="modal === 'entrada'" (didDismiss)="cerrar()">
+  <ng-template>
+    <div class="admin-dark adm-modal-box">
+      <div class="amb-head">
+        <span class="cd-title">Compra: {{ elegido?.nombre }}</span>
+        <button type="button" class="amb-x" (click)="cerrar()" aria-label="Cerrar"><ion-icon name="close"></ion-icon></button>
+      </div>
+      <div class="amb-body">
+        <div class="inv-2">
+          <div class="fg">
+            <label>Cuántas entraron</label>
+            <input type="number" min="1" step="1" inputmode="numeric" [(ngModel)]="entradaForm.cantidad" name="cantidad">
+          </div>
+          <div class="fg">
+            <label>Costo por unidad</label>
+            <input type="number" min="0" step="0.01" inputmode="decimal" [(ngModel)]="entradaForm.costo_unitario" name="costo_unitario">
+          </div>
+        </div>
+        <div class="fg" *ngIf="variasSucursales">
+          <label>Sucursal</label>
+          <select [(ngModel)]="entradaForm.sucursal_id" name="sucursal_id">
+            <option [ngValue]="null">Elegí…</option>
+            <option *ngFor="let s of sucursales" [ngValue]="s.id">{{ s.nombre }}</option>
+          </select>
+        </div>
+        <div class="inv-2">
+          <div class="fg">
+            <label>Proveedor <span class="opc">(opcional)</span></label>
+            <input type="text" maxlength="150" [(ngModel)]="entradaForm.proveedor" name="proveedor">
+          </div>
+          <div class="fg">
+            <label>Factura <span class="opc">(opcional)</span></label>
+            <input type="text" maxlength="60" [(ngModel)]="entradaForm.documento" name="documento" placeholder="Número">
+          </div>
+        </div>
+        <div class="fg">
+          <label>Nota <span class="opc">(opcional)</span></label>
+          <input type="text" maxlength="300" [(ngModel)]="entradaForm.nota" name="nota">
+        </div>
+        <div class="hint">El costo que escribas pasa a ser el costo del repuesto.</div>
+      </div>
+      <div class="amb-foot">
+        <div class="amb-btns">
+          <button type="button" class="btn" (click)="cerrar()">Cancelar</button>
+          <button type="button" class="btn btn-cr" (click)="guardarEntrada()" [disabled]="guardando">
+            {{ guardando ? 'Guardando…' : 'Registrar compra' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </ng-template>
+</ion-modal>
+
+<ion-modal class="adm-modal" [isOpen]="modal === 'ajuste'" (didDismiss)="cerrar()">
+  <ng-template>
+    <div class="admin-dark adm-modal-box">
+      <div class="amb-head">
+        <span class="cd-title">Contar: {{ elegido?.nombre }}</span>
+        <button type="button" class="amb-x" (click)="cerrar()" aria-label="Cerrar"><ion-icon name="close"></ion-icon></button>
+      </div>
+      <div class="amb-body">
+        <p class="inv-intro">
+          <ng-container *ngIf="sucursalId || !variasSucursales">El sistema dice que hay <strong>{{ elegido?.existencia }}</strong>. </ng-container>
+          Escribí cuántas contaste en el estante y se anota la diferencia.
+        </p>
+        <div class="fg" *ngIf="variasSucursales">
+          <label>Sucursal</label>
+          <select [(ngModel)]="ajusteForm.sucursal_id" name="sucursal_id">
+            <option [ngValue]="null">Elegí…</option>
+            <option *ngFor="let s of sucursales" [ngValue]="s.id">{{ s.nombre }}</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Cuántas contaste</label>
+          <input type="number" min="0" step="1" inputmode="numeric" [(ngModel)]="ajusteForm.conteo" name="conteo">
+        </div>
+        <div class="fg">
+          <label>Motivo</label>
+          <input type="text" maxlength="300" [(ngModel)]="ajusteForm.nota" name="nota" placeholder="Ej: conteo mensual, se dañó una">
+        </div>
+      </div>
+      <div class="amb-foot">
+        <div class="amb-btns">
+          <button type="button" class="btn" (click)="cerrar()">Cancelar</button>
+          <button type="button" class="btn btn-cr" (click)="guardarAjuste()" [disabled]="guardando">
+            {{ guardando ? 'Guardando…' : 'Guardar conteo' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </ng-template>
+</ion-modal>
+
+<ion-modal class="adm-modal" [isOpen]="modal === 'movimientos'" (didDismiss)="cerrar()">
+  <ng-template>
+    <div class="admin-dark adm-modal-box">
+      <div class="amb-head">
+        <span class="cd-title">Historial: {{ elegido?.nombre }}</span>
+        <button type="button" class="amb-x" (click)="cerrar()" aria-label="Cerrar"><ion-icon name="close"></ion-icon></button>
+      </div>
+      <div class="amb-body">
+        <div *ngIf="cargandoMovs" class="sk-dark" style="height:120px"></div>
+        <div *ngIf="!cargandoMovs">
+          <div class="mov" *ngFor="let m of movimientos">
+            <span class="bg" [ngClass]="m.tipo === 'entrada' ? 'bg-em' : m.tipo === 'salida' ? 'bg-in' : 'bg-am'">
+              {{ m.tipo === 'entrada' ? 'Entrada' : m.tipo === 'salida' ? 'Salida' : 'Ajuste' }}
+            </span>
+            <div class="mov-info">
+              <div class="mov-txt">{{ textoMovimiento(m) }}</div>
+              <div class="mov-sub">
+                {{ m.created_at | date:'d MMM y, h:mm a' }}
+                <span *ngIf="m.usuario_nombre"> · {{ m.usuario_nombre }}</span>
+                <span *ngIf="variasSucursales && m.sucursal_nombre"> · {{ m.sucursal_nombre }}</span>
+              </div>
+            </div>
+            <div class="mov-cant">
+              <strong [class.neg]="m.cantidad < 0">{{ m.cantidad > 0 ? '+' : '' }}{{ m.cantidad }}</strong>
+              <span>quedan {{ m.existencia_despues }}</span>
+            </div>
+          </div>
+          <div class="empty" *ngIf="!movimientos.length">
+            <ion-icon name="time-outline"></ion-icon>
+            <p>Sin movimientos todavía.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </ng-template>
+</ion-modal>

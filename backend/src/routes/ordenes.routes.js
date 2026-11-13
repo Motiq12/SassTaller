@@ -1,6 +1,7 @@
 const router = require('express').Router();
 // Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
 const { fail, invalido, faltante } = require('../utils/responder');
+const { repuestoDelCatalogo } = require('../utils/inventario');
 const { referenciaAjena, sedeDelCuerpo } = require('../utils/referencias');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
@@ -585,10 +586,12 @@ router.post('/:id/repuestos', soloRoles('recepcion', 'admin'), exigirPermiso('or
     const { nombre, cantidad, costo_unitario, estado } = req.body;
     if (!nombre) return res.status(400).json({ error: 'Nombre del repuesto requerido' });
     if (estado && !ESTADOS_REPUESTO[estado]) return res.status(400).json({ error: 'Estado de repuesto inválido' });
+    const delCatalogo = await repuestoDelCatalogo(conn, req.body.repuesto_id);
+    if (delCatalogo === false) return res.status(400).json({ error: 'Ese repuesto no está en el inventario', campo: 'repuesto_id' });
     const totalAntes = await totalOrden(conn, req.params.id);
     const [result] = await conn.query(
-      'INSERT INTO orden_repuestos (tenant_id, orden_id, nombre, cantidad, costo_unitario, estado, adicional) VALUES (@tenant, ?, ?, ?, ?, ?, ?)',
-      [req.params.id, nombre, cantidad || 1, costo_unitario || 0, estado || 'pendiente', await esAdicional(conn, req.params.id)]
+      'INSERT INTO orden_repuestos (tenant_id, orden_id, nombre, cantidad, costo_unitario, estado, adicional, repuesto_id) VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?)',
+      [req.params.id, nombre, cantidad || 1, costo_unitario || 0, estado || 'pendiente', await esAdicional(conn, req.params.id), delCatalogo ? delCatalogo.id : null]
     );
     // Actualizar costo_repuestos en la orden
     await conn.query(

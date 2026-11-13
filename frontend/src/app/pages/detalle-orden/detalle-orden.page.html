@@ -210,7 +210,7 @@
         <section class="ot-card">
           <div class="ot-card-cab">
             <h2 class="ot-h2">{{ esTecnico ? 'Repuestos' : 'Repuestos y costos' }}</h2>
-            <button type="button" class="btn btn-ou btn-sm" *ngIf="editaRepuestos && !mostrarFormRepuesto" (click)="mostrarFormRepuesto = true">
+            <button type="button" class="btn btn-ou btn-sm" *ngIf="editaRepuestos && !mostrarFormRepuesto" (click)="abrirFormRepuesto()">
               <ion-icon name="add" aria-hidden="true"></ion-icon> Agregar repuesto
             </button>
             <button type="button" class="btn btn-ou btn-sm" *ngIf="pideRepuestos && !mostrarFormSolicitud" (click)="mostrarFormSolicitud = true">
@@ -222,7 +222,14 @@
           <div class="ot-form-rep" *ngIf="mostrarFormRepuesto && !esTecnico">
             <div class="fg ot-f-nombre">
               <label for="rep-nombre">Repuesto</label>
-              <input id="rep-nombre" name="nombre" [(ngModel)]="nuevoRepuesto.nombre" (keyup.enter)="agregarRepuesto()" />
+              <input id="rep-nombre" name="nombre" [(ngModel)]="nuevoRepuesto.nombre" (ngModelChange)="alEscribirRepuesto()"
+                     (keyup.enter)="agregarRepuesto()" [attr.list]="catalogo.length ? 'rep-catalogo' : null" autocomplete="off" />
+              <datalist id="rep-catalogo">
+                <option *ngFor="let r of catalogo" [value]="r.nombre">{{ r.codigo ? r.codigo + ' · ' : '' }}quedan {{ r.disponible }}</option>
+              </datalist>
+              <div class="hint" *ngIf="delCatalogo">
+                Del inventario: quedan {{ delCatalogo.disponible }}. Sale del stock al entregar.
+              </div>
             </div>
             <div class="fg ot-f-cant">
               <label for="rep-cant">Cant.</label>

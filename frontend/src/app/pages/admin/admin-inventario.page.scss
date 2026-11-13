@@ -1,0 +1,153 @@
+// ────────────────────────────────────────────────
+// Admin Inventario — component-scoped styles
+// Tokens de .admin-dark; la cáscara del modal es compartida (global.scss).
+// ────────────────────────────────────────────────
+
+.inv-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  .cd-title { margin: 0; }
+}
+
+.nuevo-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  ion-icon { font-size: 15px; }
+}
+
+.inv-intro {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--tx3);
+  margin: 0 0 14px;
+}
+
+.inv-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin-bottom: 12px;
+  .adm-buscador { flex: 1 1 220px; }
+}
+
+.inv-select {
+  background: var(--sur2);
+  color: var(--tx);
+  border: 1px solid var(--bd);
+  border-radius: 2px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.inv-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--tx2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.inv-resumen {
+  font-size: 12px;
+  color: var(--tx2);
+  margin-bottom: 12px;
+}
+
+// La fila envuelve en pantallas angostas en vez de desbordar a lo ancho.
+.inv-row {
+  display: flex;
+  align-items: center;
+  gap: 12px 16px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  background: var(--sur2);
+  border: 1px solid var(--bd);
+  border-radius: 2px;
+  margin-bottom: 10px;
+
+  &.inactivo { opacity: .55; }
+  &.bajo { border-left: 3px solid var(--rd, #e5484d); }
+}
+
+.inv-info {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.inv-nombre {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  strong { font-size: 13px; font-weight: 700; word-break: break-word; }
+}
+.inv-codigo {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--tx3);
+}
+.inv-sub {
+  font-size: 12px;
+  color: var(--tx3);
+  margin-top: 3px;
+}
+
+.inv-cant {
+  display: flex;
+  gap: 14px;
+  .ic {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    min-width: 44px;
+    span { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--tx3); }
+    strong { font-size: 16px; font-variant-numeric: tabular-nums; }
+  }
+}
+.neg { color: var(--rd, #e5484d); }
+.alerta { color: var(--am, #f5a524); }
+
+.inv-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
+  .btn { display: inline-flex; align-items: center; gap: 4px; }
+}
+
+.inv-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 12px;
+  @media (max-width: 420px) { grid-template-columns: 1fr; }
+}
+.opc { font-weight: 400; color: var(--tx3); }
+
+.mov {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--bd);
+  &:last-child { border-bottom: 0; }
+  .bg { flex: 0 0 auto; }
+}
+.mov-info { flex: 1 1 auto; min-width: 0; }
+.mov-txt { font-size: 13px; word-break: break-word; }
+.mov-sub { font-size: 11px; color: var(--tx3); margin-top: 2px; }
+.mov-cant {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  strong { font-size: 14px; font-variant-numeric: tabular-nums; }
+  span { font-size: 11px; color: var(--tx3); white-space: nowrap; }
+}

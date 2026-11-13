@@ -64,10 +64,16 @@
       <div class="fg rc-piezas">
         <label>Piezas</label>
         <div class="rc-pieza" *ngFor="let p of form.piezas; let i = index">
-          <input type="text" [(ngModel)]="p.nombre" placeholder="Nombre de la pieza" aria-label="Nombre de la pieza" />
+          <input type="text" [(ngModel)]="p.nombre" (ngModelChange)="alEscribirPieza(p)" placeholder="Nombre de la pieza" aria-label="Nombre de la pieza"
+                 [attr.list]="catalogo.length ? 'rc-catalogo' : null" autocomplete="off"
+                 [title]="disponibleDe(p) !== null ? 'Del inventario: quedan ' + disponibleDe(p) : ''" />
           <input type="number" [(ngModel)]="p.monto" placeholder="₡" class="rc-monto" aria-label="Precio de la pieza" />
           <button type="button" class="rc-x" (click)="quitarPieza(i)" aria-label="Quitar pieza"><ion-icon name="trash-outline"></ion-icon></button>
         </div>
+        <datalist id="rc-catalogo">
+          <option *ngFor="let r of catalogo" [value]="r.nombre">{{ r.codigo ? r.codigo + ' · ' : '' }}quedan {{ r.disponible }}</option>
+        </datalist>
+        <div class="hint" *ngIf="catalogo.length">Elegí de la lista para que la pieza salga del inventario al entregar.</div>
         <button type="button" class="btn btn-ou btn-sm rc-mas" (click)="agregarPieza()"><ion-icon name="add"></ion-icon> Agregar pieza</button>
       </div>
 
