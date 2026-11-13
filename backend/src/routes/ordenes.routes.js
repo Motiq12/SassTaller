@@ -7,7 +7,7 @@ const requireRol = require('../middleware/roles');
 const { cargarAlcance, soloSucursal, sucursalParaGuardar, exigirSucursal, delTaller, soloOrdenAsignada, SUCURSAL_DE_ORDEN } = require('../utils/alcance');
 const { soloRoles } = require('../middleware/roles');
 const {
-  generarNumeroOrden, sincronizarCitaDesdeOrden, cerrarOrden, totalOrden, esAdicional, revisarAdicional,
+  generarNumeroOrden, sincronizarCitaDesdeOrden, cerrarOrden, validarEdicionCostos, totalOrden, esAdicional, revisarAdicional,
   crearCitaDeOrden,
 } = require('../utils/ordenes');
 const { ESTADOS_REPUESTO, estadosSiguientes, avisosDeCambio, montoSinAprobar, estadoAlEditarRepuesto } = require('../utils/reglas-orden');
@@ -226,20 +226,25 @@ router.get('/:id', async (req, res) => {
 // PUT /api/ordenes/:id — edita diagnóstico y costos (mano de obra, repuestos, descuento).
 // Toca plata: lo limita a técnico o superior (recepción no edita montos).
 router.put('/:id', requireRol('tecnico'), async (req, res) => {
+  let conn;
+  let confirmada = false;
   try {
+    conn = await req.db.conexion();
+    await conn.beginTransaction();
+    if (!(await validarEdicionCostos(conn, req.params.id, res))) return;
     const {
       diagnostico, tiempo_estimado_horas, costo_mano_obra, costo_repuestos, descuento,
       fecha_estimada_entrega, prioridad, categoria, accesorios_entregados, estado_fisico,
     } = req.body;
-    const totalAntes = await totalOrden(req.db, req.params.id);
+    const totalAntes = await totalOrden(conn, req.params.id);
     // El mecánico no ve los montos (middleware/ocultar-al-mecanico.js): lo que mande
     // en esos campos se ignora y quedan los de la orden, para no borrarlos en cero.
     let montos = { costo_mano_obra, costo_repuestos, descuento };
     if (req.usuario.rol === 'tecnico') {
-      const [[actual]] = await req.db.query('SELECT costo_mano_obra, costo_repuestos, descuento FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
+      const [[actual]] = await conn.query('SELECT costo_mano_obra, costo_repuestos, descuento FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
       if (actual) montos = actual;
     }
-    await req.db.query(
+    await conn.query(
       `UPDATE ordenes_trabajo SET
         diagnostico=?, tiempo_estimado_horas=?, costo_mano_obra=?, costo_repuestos=?,
         descuento=?, fecha_estimada_entrega=?, prioridad=?, categoria=?,
@@ -253,11 +258,18 @@ router.put('/:id', requireRol('tecnico'), async (req, res) => {
         req.params.id,
       ]
     );
-    const reaprobacion = await revisarAdicional(req.db, req.params.id, totalAntes);
-    const [[actualizada]] = await req.db.query('SELECT * FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
+    const reaprobacion = await revisarAdicional(conn, req.params.id, totalAntes);
+    const [[actualizada]] = await conn.query('SELECT * FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
+    await conn.commit();
+    confirmada = true;
     res.json({ data: actualizada, reaprobacion, message: reaprobacion ? MSG_REAPROBACION : 'Orden actualizada' });
   } catch (err) {
     fail(res, err);
+  } finally {
+    if (conn) {
+      if (!confirmada) await conn.rollback();
+      conn.release();
+    }
   }
 });
 
@@ -367,11 +379,12 @@ router.delete('/:id', requireRol('admin'), async (req, res) => {
     );
 
     // Cortesía canjeada en esta orden: vuelve a estar disponible.
-    const [canjes] = await conn.query('SELECT id FROM recompensas_canjeadas WHERE tenant_id = @tenant AND orden_id = ?', [o.id]);
+    const [canjes] = await conn.query('SELECT id FROM recompensas_canjeadas WHERE tenant_id = @tenant AND orden_id = ? AND devuelta_en IS NULL', [o.id]);
     if (canjes.length) {
-      await conn.query('DELETE FROM recompensas_canjeadas WHERE tenant_id = @tenant AND orden_id = ?', [o.id]);
       await conn.query('UPDATE clientes SET cortesia_disponible = 1 WHERE tenant_id = @tenant AND id = ?', [o.cliente_id]);
     }
+
+    await conn.query('DELETE FROM recompensas_canjeadas WHERE tenant_id = @tenant AND orden_id = ?', [o.id]);
 
     // Su cita (ver arriba).
     const [citas] = await conn.query('SELECT id, creada_por_orden FROM citas WHERE tenant_id = @tenant AND orden_id = ?', [o.id]);
@@ -410,6 +423,8 @@ const ESTADOS_VALIDOS = ['recepcion','diagnostico','esperando_aprobacion','esper
 const ETAPAS_TIEMPO = ['recepcion','diagnostico','esperando_aprobacion','esperando_repuestos','en_reparacion','lista_entrega'];
 
 router.patch('/:id/estado', exigirPermiso('ordenes.estado'), async (req, res) => {
+  let conn;
+  let confirmada = false;
   try {
     const { estado, confirmar } = req.body;
     if (!ESTADOS_VALIDOS.includes(estado)) {
@@ -427,7 +442,9 @@ router.patch('/:id/estado', exigirPermiso('ordenes.estado'), async (req, res) =>
       return invalido(res, 'motivo', `El motivo no puede pasar de ${MAX_MOTIVO_CANCELACION} caracteres`);
     }
 
-    const [[orden]] = await req.db.query('SELECT estado, aprobacion_cliente FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
+    conn = await req.db.conexion();
+    await conn.beginTransaction();
+    const [[orden]] = await conn.query('SELECT estado, aprobacion_cliente, cliente_id FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ? FOR UPDATE', [req.params.id]);
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
 
     // Solo transiciones válidas (evita saltos ilógicos, p. ej. entregada→diagnostico).
@@ -440,8 +457,8 @@ router.patch('/:id/estado', exigirPermiso('ordenes.estado'), async (req, res) =>
     // con los avisos y la pantalla pregunta; si la persona confirma, reenvía con
     // confirmar: true.
     if (!confirmar) {
-      const [repuestos] = await req.db.query('SELECT nombre, cantidad, estado FROM orden_repuestos WHERE tenant_id = @tenant AND orden_id = ?', [req.params.id]);
-      const [[{ n: fotosIngreso }]] = await req.db.query("SELECT COUNT(*) AS n FROM orden_fotos WHERE tenant_id = @tenant AND orden_id = ? AND tipo = 'ingreso'", [req.params.id]);
+      const [repuestos] = await conn.query('SELECT nombre, cantidad, estado FROM orden_repuestos WHERE tenant_id = @tenant AND orden_id = ? AND rechazado = 0', [req.params.id]);
+      const [[{ n: fotosIngreso }]] = await conn.query("SELECT COUNT(*) AS n FROM orden_fotos WHERE tenant_id = @tenant AND orden_id = ? AND tipo = 'ingreso'", [req.params.id]);
       const avisos = avisosDeCambio({ desde: orden.estado, hacia: estado, repuestos, fotosIngreso, aprobacion: orden.aprobacion_cliente });
       if (avisos.length) {
         return res.status(409).json({ error: 'Hay avisos antes de cambiar el estado', codigo: 'requiere_confirmacion', avisos });
@@ -450,20 +467,24 @@ router.patch('/:id/estado', exigirPermiso('ordenes.estado'), async (req, res) =>
 
     // Cerrar tiempo de etapa anterior
     if (ETAPAS_TIEMPO.includes(orden.estado)) {
-      await req.db.query(
+      await conn.query(
         'UPDATE orden_tiempos SET fin = NOW() WHERE tenant_id = @tenant AND orden_id = ? AND etapa = ? AND fin IS NULL',
         [req.params.id, orden.estado]
       );
     }
 
-    await req.db.query('UPDATE ordenes_trabajo SET estado = ? WHERE tenant_id = @tenant AND id = ?', [estado, req.params.id]);
+    await conn.query('UPDATE ordenes_trabajo SET estado = ? WHERE tenant_id = @tenant AND id = ?', [estado, req.params.id]);
     if (estado === 'cancelada') {
-      await req.db.query('UPDATE ordenes_trabajo SET motivo_cancelacion = ? WHERE tenant_id = @tenant AND id = ?', [motivo || null, req.params.id]);
+      await conn.query('UPDATE ordenes_trabajo SET motivo_cancelacion = ? WHERE tenant_id = @tenant AND id = ?', [motivo || null, req.params.id]);
+      const [devueltos] = await conn.query('UPDATE recompensas_canjeadas SET devuelta_en = NOW() WHERE tenant_id = @tenant AND orden_id = ? AND devuelta_en IS NULL RETURNING cliente_id', [req.params.id]);
+      for (const canje of devueltos) {
+        await conn.query('UPDATE clientes SET cortesia_disponible = 1 WHERE tenant_id = @tenant AND id = ?', [canje.cliente_id]);
+      }
     }
     // Un presupuesto que se vuelve a mandar (p. ej. después de un rechazo) arranca sin
     // decisión: si quedaba "rechazado", el portal no se lo mostraba al cliente.
     if (estado === 'esperando_aprobacion') {
-      await req.db.query(
+      await conn.query(
         "UPDATE ordenes_trabajo SET aprobacion_cliente = 'pendiente', motivo_rechazo = NULL WHERE tenant_id = @tenant AND id = ?",
         [req.params.id]
       );
@@ -471,8 +492,11 @@ router.patch('/:id/estado', exigirPermiso('ordenes.estado'), async (req, res) =>
 
     // Abrir nuevo tiempo
     if (ETAPAS_TIEMPO.includes(estado)) {
-      await req.db.query('INSERT INTO orden_tiempos (tenant_id,orden_id, etapa) VALUES (@tenant, ?, ?)', [req.params.id, estado]);
+      await conn.query('INSERT INTO orden_tiempos (tenant_id,orden_id, etapa) VALUES (@tenant, ?, ?)', [req.params.id, estado]);
     }
+
+    await conn.commit();
+    confirmada = true;
 
     // Refleja el avance en la cita vinculada (si la hay) → portal del cliente + mecánico.
     await sincronizarCitaDesdeOrden(req.db, req.params.id, estado);
@@ -484,6 +508,11 @@ router.patch('/:id/estado', exigirPermiso('ordenes.estado'), async (req, res) =>
     res.json({ data: { estado }, message: 'Estado actualizado' });
   } catch (err) {
     fail(res, err);
+  } finally {
+    if (conn) {
+      if (!confirmada) await conn.rollback();
+      conn.release();
+    }
   }
 });
 
@@ -540,25 +569,37 @@ router.get('/:id/avances', async (req, res) => {
 // POST /api/ordenes/:id/repuestos
 // Repuestos con precio: mostrador y administración (el mecánico los pide por /api/mecanico).
 router.post('/:id/repuestos', soloRoles('recepcion', 'admin'), exigirPermiso('ordenes.costos'), async (req, res) => {
+  let conn;
+  let confirmada = false;
   try {
+    conn = await req.db.conexion();
+    await conn.beginTransaction();
+    if (!(await validarEdicionCostos(conn, req.params.id, res))) return;
     const { nombre, cantidad, costo_unitario, estado } = req.body;
     if (!nombre) return res.status(400).json({ error: 'Nombre del repuesto requerido' });
     if (estado && !ESTADOS_REPUESTO[estado]) return res.status(400).json({ error: 'Estado de repuesto inválido' });
-    const totalAntes = await totalOrden(req.db, req.params.id);
-    const [result] = await req.db.query(
+    const totalAntes = await totalOrden(conn, req.params.id);
+    const [result] = await conn.query(
       'INSERT INTO orden_repuestos (tenant_id, orden_id, nombre, cantidad, costo_unitario, estado, adicional) VALUES (@tenant, ?, ?, ?, ?, ?, ?)',
-      [req.params.id, nombre, cantidad || 1, costo_unitario || 0, estado || 'pendiente', await esAdicional(req.db, req.params.id)]
+      [req.params.id, nombre, cantidad || 1, costo_unitario || 0, estado || 'pendiente', await esAdicional(conn, req.params.id)]
     );
     // Actualizar costo_repuestos en la orden
-    await req.db.query(
-      'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ? AND tenant_id = @tenant) WHERE tenant_id = @tenant AND id = ?',
+    await conn.query(
+      'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE rechazado = 0 AND orden_id = ? AND tenant_id = @tenant) WHERE tenant_id = @tenant AND id = ?',
       [req.params.id, req.params.id]
     );
-    const reaprobacion = await revisarAdicional(req.db, req.params.id, totalAntes);
-    const [[nuevo]] = await req.db.query('SELECT * FROM orden_repuestos WHERE tenant_id = @tenant AND id = ?', [result.insertId]);
+    const reaprobacion = await revisarAdicional(conn, req.params.id, totalAntes);
+    const [[nuevo]] = await conn.query('SELECT * FROM orden_repuestos WHERE tenant_id = @tenant AND id = ?', [result.insertId]);
+    await conn.commit();
+    confirmada = true;
     res.status(201).json({ data: nuevo, reaprobacion, message: reaprobacion ? MSG_REAPROBACION : 'Repuesto agregado' });
   } catch (err) {
     fail(res, err);
+  } finally {
+    if (conn) {
+      if (!confirmada) await conn.rollback();
+      conn.release();
+    }
   }
 });
 
@@ -576,10 +617,12 @@ router.get('/:id/tiempos', async (req, res) => {
 });
 
 // GET /api/ordenes/:id/repuestos
+// Los que el cliente rechazó no salen (la factura y el detalle suman esta lista):
+// ?incluir_rechazados=1 los trae marcados con rechazado = 1.
 router.get('/:id/repuestos', async (req, res) => {
   try {
     const [rows] = await req.db.query(
-      'SELECT * FROM orden_repuestos WHERE tenant_id = @tenant AND orden_id = ? ORDER BY created_at ASC',
+      `SELECT * FROM orden_repuestos WHERE tenant_id = @tenant AND orden_id = ?${req.query.incluir_rechazados === '1' ? '' : ' AND rechazado = 0'} ORDER BY created_at ASC`,
       [req.params.id]
     );
     res.json({ data: rows });
@@ -590,40 +633,68 @@ router.get('/:id/repuestos', async (req, res) => {
 
 // PUT /api/ordenes/:id/repuestos/:rid
 router.put('/:id/repuestos/:rid', soloRoles('recepcion', 'admin'), exigirPermiso('ordenes.costos'), async (req, res) => {
+  let conn;
+  let confirmada = false;
   try {
+    conn = await req.db.conexion();
+    await conn.beginTransaction();
+    if (!(await validarEdicionCostos(conn, req.params.id, res))) return;
     const { nombre, cantidad, costo_unitario, estado } = req.body;
-    const [[existe]] = await req.db.query('SELECT id, estado FROM orden_repuestos WHERE tenant_id = @tenant AND id = ? AND orden_id = ?', [req.params.rid, req.params.id]);
+    const [[existe]] = await conn.query('SELECT id, estado, rechazado FROM orden_repuestos WHERE tenant_id = @tenant AND id = ? AND orden_id = ?', [req.params.rid, req.params.id]);
     if (!existe) return res.status(404).json({ error: 'Repuesto no encontrado' });
+    if (existe.rechazado) return res.status(409).json({ error: 'El cliente rechazó este repuesto: queda como registro; si hace falta, agregá uno nuevo' });
     if (estado && !ESTADOS_REPUESTO[estado]) return res.status(400).json({ error: 'Estado de repuesto inválido' });
-    const totalAntes = await totalOrden(req.db, req.params.id);
-    await req.db.query(
+    const totalAntes = await totalOrden(conn, req.params.id);
+    await conn.query(
       'UPDATE orden_repuestos SET nombre=?, cantidad=?, costo_unitario=?, estado=? WHERE tenant_id = @tenant AND id=? AND orden_id=?',
       [nombre, cantidad || 1, costo_unitario || 0, estadoAlEditarRepuesto(existe.estado, estado, costo_unitario), req.params.rid, req.params.id]
     );
-    await req.db.query(
-      'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ? AND tenant_id = @tenant) WHERE tenant_id = @tenant AND id = ?',
+    await conn.query(
+      'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE rechazado = 0 AND orden_id = ? AND tenant_id = @tenant) WHERE tenant_id = @tenant AND id = ?',
       [req.params.id, req.params.id]
     );
-    const reaprobacion = await revisarAdicional(req.db, req.params.id, totalAntes);
-    const [[actualizado]] = await req.db.query('SELECT * FROM orden_repuestos WHERE tenant_id = @tenant AND id = ?', [req.params.rid]);
+    const reaprobacion = await revisarAdicional(conn, req.params.id, totalAntes);
+    const [[actualizado]] = await conn.query('SELECT * FROM orden_repuestos WHERE tenant_id = @tenant AND id = ?', [req.params.rid]);
+    await conn.commit();
+    confirmada = true;
     res.json({ data: actualizado, reaprobacion, message: reaprobacion ? MSG_REAPROBACION : 'Repuesto actualizado' });
   } catch (err) {
     fail(res, err);
+  } finally {
+    if (conn) {
+      if (!confirmada) await conn.rollback();
+      conn.release();
+    }
   }
 });
 
 // DELETE /api/ordenes/:id/repuestos/:rid
 router.delete('/:id/repuestos/:rid', requireRol('admin'), async (req, res) => {
+  let conn;
+  let confirmada = false;
   try {
-    const [result] = await req.db.query('DELETE FROM orden_repuestos WHERE tenant_id = @tenant AND id=? AND orden_id=?', [req.params.rid, req.params.id]);
+    conn = await req.db.conexion();
+    await conn.beginTransaction();
+    if (!(await validarEdicionCostos(conn, req.params.id, res))) return;
+    const totalAntes = await totalOrden(conn, req.params.id);
+    const [result] = await conn.query('DELETE FROM orden_repuestos WHERE tenant_id = @tenant AND id=? AND orden_id=? AND rechazado = 0', [req.params.rid, req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ error: 'Repuesto no encontrado' });
-    await req.db.query(
-      'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ? AND tenant_id = @tenant) WHERE tenant_id = @tenant AND id = ?',
+    await conn.query(
+      'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE rechazado = 0 AND orden_id = ? AND tenant_id = @tenant) WHERE tenant_id = @tenant AND id = ?',
       [req.params.id, req.params.id]
     );
+    // Quitar nunca sube la cuenta: solo actualiza la copia de lo aprobado.
+    await revisarAdicional(conn, req.params.id, totalAntes);
+    await conn.commit();
+    confirmada = true;
     res.json({ message: 'Repuesto eliminado' });
   } catch (err) {
     fail(res, err);
+  } finally {
+    if (conn) {
+      if (!confirmada) await conn.rollback();
+      conn.release();
+    }
   }
 });
 
@@ -676,8 +747,11 @@ router.patch('/:id/cerrar', requireRol('admin'), async (req, res) => {
     if (['entregada', 'cancelada'].includes(actual.estado)) {
       return res.status(400).json({ error: actual.estado === 'entregada' ? 'La orden ya estaba entregada' : 'La orden está cancelada' });
     }
-    const r = await cerrarOrden(req.db, req.params.id, { metodo_pago, garantia_dias, observaciones_finales });
+    const r = await cerrarOrden(req.db, req.params.id, { metodo_pago, garantia_dias, observaciones_finales }, {
+      soloDesdeListaEntrega: false, confirmar: req.body.confirmar, motivo: req.body.motivo, usuarioId: req.usuario.id,
+    });
     if (r.notFound) return res.status(404).json({ error: 'Orden no encontrada' });
+    if (r.estadoInvalido) return res.status(409).json({ error: 'La orden debe estar lista para entrega; el cierre excepcional requiere confirmar: true y un motivo de 5 a 500 caracteres', codigo: 'requiere_confirmacion', estado_actual: r.estadoActual });
     res.json({ message: 'Orden cerrada y entregada', cortesia_ganada: r.cortesiaGanada });
   } catch (err) {
     fail(res, err);

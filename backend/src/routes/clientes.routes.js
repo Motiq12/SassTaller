@@ -79,7 +79,7 @@ router.get('/:id', async (req, res) => {
     const [[cliente]] = await req.db.query(
       `SELECT ${COLS},
               (SELECT COUNT(*) FROM recompensas_canjeadas
-                WHERE cliente_id = clientes.id AND tenant_id = @tenant) AS cortesias_canjeadas
+                WHERE cliente_id = clientes.id AND tenant_id = @tenant AND devuelta_en IS NULL) AS cortesias_canjeadas
        FROM clientes WHERE id = ? AND activo = 1 AND tenant_id = @tenant`,
       [req.params.id]
     );

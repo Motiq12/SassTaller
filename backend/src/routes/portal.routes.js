@@ -1116,7 +1116,8 @@ router.get('/ordenes/:id', async (req, res) => {
       [req.params.id]
     );
     const [repuestos] = await req.db.query(
-      'SELECT nombre, cantidad, costo_unitario, estado, adicional FROM orden_repuestos WHERE tenant_id = @tenant AND orden_id = ? ORDER BY created_at ASC',
+      // Lo que el cliente rechazó no se le cobra: no figura en su detalle ni en el comprobante.
+      'SELECT nombre, cantidad, costo_unitario, estado, adicional FROM orden_repuestos WHERE tenant_id = @tenant AND orden_id = ? AND rechazado = 0 ORDER BY created_at ASC',
       [req.params.id]
     );
     const [fotos] = await req.db.query(
@@ -1205,7 +1206,8 @@ router.get('/fidelidad', async (req, res) => {
 router.get('/recompensas', async (req, res) => {
   try {
     const [rows] = await req.db.query(
-      `SELECT rc.id, to_char(rc.created_at, 'YYYY-MM-DD') AS fecha, rc.descripcion, o.numero_orden
+      `SELECT rc.id, to_char(rc.created_at, 'YYYY-MM-DD') AS fecha, rc.descripcion, o.numero_orden,
+              to_char(rc.devuelta_en, 'YYYY-MM-DD') AS devuelta
        FROM recompensas_canjeadas rc
        LEFT JOIN ordenes_trabajo o ON o.id = rc.orden_id AND o.tenant_id = @tenant
        WHERE rc.tenant_id = @tenant AND rc.cliente_id = ?

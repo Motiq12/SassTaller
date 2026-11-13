@@ -55,7 +55,7 @@ router.get('/resumen', async (req, res) => {
       `SELECT COUNT(*) AS citas_entregadas_mes FROM citas WHERE tenant_id = @tenant AND estado = 'entregado' AND ${enPeriodo('fecha_fin', 'mes', { momento: true, offset: off })}`
     );
     const [[{ repuestos_pendientes }]] = await req.db.query(
-      "SELECT COUNT(*) AS repuestos_pendientes FROM orden_repuestos r JOIN ordenes_trabajo o ON o.id = r.orden_id AND o.tenant_id = @tenant WHERE r.tenant_id = @tenant AND r.estado IN ('pendiente','pedido_especial') AND o.estado NOT IN ('entregada','cancelada')"
+      "SELECT COUNT(*) AS repuestos_pendientes FROM orden_repuestos r JOIN ordenes_trabajo o ON o.id = r.orden_id AND o.tenant_id = @tenant WHERE r.tenant_id = @tenant AND r.estado IN ('pendiente','pedido_especial') AND r.rechazado = 0 AND o.estado NOT IN ('entregada','cancelada')"
     );
     // Satisfacción: el cliente califica sobre todo en la CITA (citas.calificacion),
     // no en la orden. Unimos citas + órdenes sin doble conteo (una orden ligada a una

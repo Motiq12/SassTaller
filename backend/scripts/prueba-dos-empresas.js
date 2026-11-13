@@ -121,7 +121,8 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
 
     // ── Citas y órdenes ──
     const manana = new Date(Date.now() + 3 * 864e5);
-    while (manana.getDay() === 0) manana.setDate(manana.getDate() + 1);
+    // La fecha enviada es UTC: el d?a de semana debe consultarse en el mismo huso.
+    while (manana.getUTCDay() === 0) manana.setUTCDate(manana.getUTCDate() + 1);
     const fecha = manana.toISOString().slice(0, 10);
     const [[sa]] = await db.query('SELECT MIN(id) id FROM sucursales WHERE tenant_id = ?', [A.id]);
     const [[sb]] = await db.query('SELECT MIN(id) id FROM sucursales WHERE tenant_id = ?', [Bb.id]);
@@ -542,6 +543,18 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     ok(negado.status === 403 && !negado.json.data, 'suspendida no abre sesión', negado.json);
     const reactivar = await pedir('PATCH', `/motiq/talleres/${Bb.id}/estado`, { token: tokenMotiq, body: { estado: 'activo' } });
     ok(reactivar.status === 200 && (await entrarB()).status === 200, 'reactivada vuelve a entrar', reactivar.json);
+
+    // ── Dinero en órdenes (Q-03 a Q-08): los mismos casos que npm test, ahora con el
+    // servidor completo y las dos empresas. B intenta tocar las órdenes de A. ──
+    const { casosDinero } = require('./lib/casos-dinero');
+    const ctxDinero = {
+      db, tenantId: A.id, usuarioId: adminA.id, clienteId: clienteA, vehiculoId: vehA,
+      token: A.token, otroToken: Bb.token, clienteToken: clienteTok,
+      pedir: (met, ruta, opciones) => pedir(met, ruta, opciones),
+    };
+    for (const [nombre, ejecutar] of casosDinero(ctxDinero)) {
+      try { await ejecutar(); ok(true, `dinero: ${nombre}`); } catch (e) { ok(false, `dinero: ${nombre}`, e.message); }
+    }
 
     // ── Cuadre de la base ──
     const hijos = [['vehiculos', 'cliente_id', 'clientes'], ['citas', 'cliente_id', 'clientes'], ['citas', 'sucursal_id', 'sucursales'], ['ordenes_trabajo', 'cliente_id', 'clientes'], ['ordenes_trabajo', 'sucursal_id', 'sucursales'], ['cita_servicios', 'cita_id', 'citas'], ['usuarios', 'sucursal_id', 'sucursales'], ['sesiones_personal', 'usuario_id', 'usuarios'], ['actividad_personal', 'usuario_id', 'usuarios']];

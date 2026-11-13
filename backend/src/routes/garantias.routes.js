@@ -74,34 +74,63 @@ router.get('/:id', async (req, res) => {
 
 // POST /api/garantias — registrar un reclamo de garantía
 router.post('/', soloRoles('recepcion', 'admin'), async (req, res) => {
+  let conn;
+  let confirmada = false;
   try {
     const { orden_id, descripcion_problema, cubre_repuestos, cubre_mano_obra } = req.body;
     if (!orden_id || !descripcion_problema) {
       return res.status(400).json({ error: 'Orden y descripción del problema son requeridos' });
     }
-    const [[orden]] = await req.db.query(`SELECT id, estado FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant${soloSucursal(req, 'sucursal_id')}`, [orden_id]);
+    conn = await req.db.conexion();
+    await conn.beginTransaction();
+    const [[orden]] = await conn.query(`SELECT id, estado,
+      (garantia_dias > 0 AND fecha_entrega_real <= clock_timestamp()
+       AND clock_timestamp() <= fecha_entrega_real + garantia_dias * INTERVAL '1 day')::int AS vigente
+      FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant${soloSucursal(req, 'sucursal_id')} FOR UPDATE`, [orden_id]);
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
     if (orden.estado !== 'entregada') {
       return res.status(400).json({ error: 'Solo se puede reclamar garantía sobre órdenes entregadas' });
     }
-    const [result] = await req.db.query(
+    if (!orden.vigente) return res.status(400).json({ error: 'La orden no tiene una garantía vigente desde su entrega' });
+    const [[abierto]] = await conn.query("SELECT id FROM garantias WHERE orden_id = ? AND tenant_id = @tenant AND estado IN ('abierto', 'en_revision', 'aprobado') LIMIT 1", [orden_id]);
+    if (abierto) return res.status(409).json({ error: 'La orden ya tiene un reclamo de garantía abierto' });
+    const [result] = await conn.query(
       `INSERT INTO garantias (tenant_id, orden_id, descripcion_problema, cubre_repuestos, cubre_mano_obra, creado_por)
        VALUES (@tenant, ?, ?, ?, ?, ?)`,
       [orden_id, descripcion_problema, cubre_repuestos ? 1 : 0, cubre_mano_obra ? 1 : 0, req.usuario.id]
     );
-    const [[nueva]] = await req.db.query(SELECT_GARANTIA + ' AND g.id = ?', [result.insertId]);
+    const [[nueva]] = await conn.query(SELECT_GARANTIA + ' AND g.id = ?', [result.insertId]);
+    await conn.commit();
+    confirmada = true;
     res.status(201).json({ data: nueva, message: 'Reclamo de garantía registrado' });
   } catch (err) {
     fail(res, err);
+  } finally {
+    if (conn) {
+      if (!confirmada) await conn.rollback();
+      conn.release();
+    }
   }
 });
 
 // PATCH /api/garantias/:id/estado — avanzar el trámite (admin)
 router.patch('/:id/estado', requireRol('admin'), async (req, res) => {
+  let conn;
+  let confirmada = false;
   try {
     const { estado, resolucion, cubre_repuestos, cubre_mano_obra } = req.body;
     if (!ESTADOS.includes(estado)) return res.status(400).json({ error: 'Estado inválido' });
-    await req.db.query(
+    conn = await req.db.conexion();
+    await conn.beginTransaction();
+    const [[orden]] = await conn.query(`SELECT o.id FROM ordenes_trabajo o
+      JOIN garantias g ON g.orden_id = o.id AND g.tenant_id = @tenant
+      WHERE g.id = ? AND o.tenant_id = @tenant FOR UPDATE OF o`, [req.params.id]);
+    if (!orden) return res.status(404).json({ error: 'Reclamo no encontrado' });
+    if (['abierto', 'en_revision', 'aprobado'].includes(estado)) {
+      const [[otro]] = await conn.query("SELECT id FROM garantias WHERE orden_id = ? AND id <> ? AND tenant_id = @tenant AND estado IN ('abierto', 'en_revision', 'aprobado') LIMIT 1", [orden.id, req.params.id]);
+      if (otro) return res.status(409).json({ error: 'La orden ya tiene otro reclamo de garantía abierto' });
+    }
+    await conn.query(
       `UPDATE garantias SET estado = ?, resolucion = ?,
          cubre_repuestos = COALESCE(?, cubre_repuestos),
          cubre_mano_obra = COALESCE(?, cubre_mano_obra)
@@ -114,10 +143,17 @@ router.patch('/:id/estado', requireRol('admin'), async (req, res) => {
         req.params.id,
       ]
     );
-    const [[actualizada]] = await req.db.query(SELECT_GARANTIA + ' AND g.id = ?', [req.params.id]);
+    const [[actualizada]] = await conn.query(SELECT_GARANTIA + ' AND g.id = ?', [req.params.id]);
+    await conn.commit();
+    confirmada = true;
     res.json({ data: actualizada, message: 'Trámite actualizado' });
   } catch (err) {
     fail(res, err);
+  } finally {
+    if (conn) {
+      if (!confirmada) await conn.rollback();
+      conn.release();
+    }
   }
 });
 

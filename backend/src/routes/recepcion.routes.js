@@ -9,7 +9,7 @@ const { cerrarLasDemas } = require('../utils/sesiones');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { soloRoles } = require('../middleware/roles');
-const { generarNumeroOrden, sincronizarCitaDesdeOrden, cerrarOrden, totalOrden, esAdicional, registrarAprobacion, revisarAdicional } = require('../utils/ordenes');
+const { generarNumeroOrden, sincronizarCitaDesdeOrden, cerrarOrden, validarEdicionCostos, totalOrden, esAdicional, registrarAprobacion, revisarAdicional } = require('../utils/ordenes');
 const { ESTADOS_REPUESTO, estadoAlEditarRepuesto } = require('../utils/reglas-orden');
 const { getConfig, horasDisponibles } = require('../utils/configuracion');
 const { politica, problemaDeContrasena } = require('../utils/contrasena');
@@ -347,7 +347,7 @@ router.get('/alertas', async (req, res) => {
        JOIN ordenes_trabajo o ON o.id = r.orden_id AND o.tenant_id = @tenant
        JOIN vehiculos m ON m.id = o.vehiculo_id AND m.tenant_id = @tenant
        LEFT JOIN usuarios u ON u.id = o.tecnico_id AND u.tenant_id = @tenant
-       WHERE r.tenant_id = @tenant AND r.estado = 'solicitado'${soloSucursal(req, 'o.sucursal_id')}
+       WHERE r.tenant_id = @tenant AND r.estado = 'solicitado' AND r.rechazado = 0${soloSucursal(req, 'o.sucursal_id')}
          AND r.created_at >= NOW() - INTERVAL '24 hours'
        ORDER BY r.created_at DESC LIMIT 10`
     );
@@ -476,11 +476,15 @@ router.post('/ordenes/:id/entregar', soloRoles('recepcion', 'admin'), exigirPerm
     if (actual.estado !== 'lista_entrega' && forzar !== true) {
       return res.status(409).json({ error: 'La orden todavía no está lista para entrega', requiere_confirmacion: true, estado_actual: actual.estado });
     }
+    // forzar: true es la confirmación de la pantalla («¿La entregas igual?»). Queda
+    // registrada en cierre_excepcional con quién, cuándo y desde qué estado.
+    const dado = typeof req.body.motivo === 'string' ? req.body.motivo.trim().slice(0, 500) : '';
+    const motivo = dado.length >= 5 ? dado : 'Entrega confirmada en recepción sin estar lista para entrega';
     const r = await cerrarOrden(
       req.db,
       req.params.id,
       { metodo_pago, garantia_dias, observaciones_finales },
-      { soloDesdeListaEntrega: forzar !== true }
+      { soloDesdeListaEntrega: forzar !== true, confirmar: forzar === true, motivo, usuarioId: req.usuario.id }
     );
     if (r.notFound) return res.status(404).json({ error: 'Orden no encontrada' });
     if (r.estadoInvalido) return res.status(400).json({ error: 'La orden todavía no está lista para entrega' });
@@ -525,10 +529,11 @@ router.get('/cotizaciones', async (req, res) => {
 });
 
 // Repuestos de una orden
+// Igual que GET /api/ordenes/:id/repuestos: sin los rechazados, salvo ?incluir_rechazados=1.
 router.get('/cotizaciones/:id/repuestos', async (req, res) => {
   try {
     const [rows] = await req.db.query(
-      'SELECT * FROM orden_repuestos WHERE orden_id = ? AND tenant_id = @tenant ORDER BY created_at ASC',
+      `SELECT * FROM orden_repuestos WHERE orden_id = ? AND tenant_id = @tenant${req.query.incluir_rechazados === '1' ? '' : ' AND rechazado = 0'} ORDER BY created_at ASC`,
       [req.params.id]
     );
     res.json({ data: rows });
@@ -543,83 +548,135 @@ const MSG_REAPROBACION = 'La cuenta subió: la orden volvió a «Esperando aprob
 // Recalcula costo_repuestos de la orden a partir de sus piezas.
 async function recalcularRepuestos(db, ordenId) {
   await db.query(
-    'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ? AND tenant_id = @tenant) WHERE id = ? AND tenant_id = @tenant',
+    'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE rechazado = 0 AND orden_id = ? AND tenant_id = @tenant) WHERE id = ? AND tenant_id = @tenant',
     [ordenId, ordenId]
   );
 }
 
 // Agregar repuesto
 router.post('/cotizaciones/:id/repuestos', exigirPermiso('ordenes.costos'), async (req, res) => {
+  let conn;
+  let confirmada = false;
   try {
+    conn = await req.db.conexion();
+    await conn.beginTransaction();
+    if (!(await validarEdicionCostos(conn, req.params.id, res))) return;
     const { nombre, cantidad, costo_unitario, estado } = req.body;
     if (!nombre) return res.status(400).json({ error: 'Nombre del repuesto requerido' });
     if (estado && !ESTADOS_REPUESTO[estado]) return res.status(400).json({ error: 'Estado de repuesto inválido' });
-    const totalAntes = await totalOrden(req.db, req.params.id);
-    const [result] = await req.db.query(
+    const totalAntes = await totalOrden(conn, req.params.id);
+    const [result] = await conn.query(
       'INSERT INTO orden_repuestos (tenant_id, orden_id, nombre, cantidad, costo_unitario, estado, adicional) VALUES (@tenant, ?, ?, ?, ?, ?, ?)',
-      [req.params.id, nombre, cantidad || 1, costo_unitario || 0, estado || 'pendiente', await esAdicional(req.db, req.params.id)]
+      [req.params.id, nombre, cantidad || 1, costo_unitario || 0, estado || 'pendiente', await esAdicional(conn, req.params.id)]
     );
-    await recalcularRepuestos(req.db, req.params.id);
-    const reaprobacion = await revisarAdicional(req.db, req.params.id, totalAntes);
-    const [[nuevo]] = await req.db.query('SELECT * FROM orden_repuestos WHERE tenant_id = @tenant AND id = ?', [result.insertId]);
+    await recalcularRepuestos(conn, req.params.id);
+    const reaprobacion = await revisarAdicional(conn, req.params.id, totalAntes);
+    const [[nuevo]] = await conn.query('SELECT * FROM orden_repuestos WHERE tenant_id = @tenant AND id = ?', [result.insertId]);
+    await conn.commit();
+    confirmada = true;
     res.status(201).json({ data: nuevo, reaprobacion, message: reaprobacion ? MSG_REAPROBACION : 'Repuesto agregado' });
   } catch (err) {
     fail(res, err);
+  } finally {
+    if (conn) {
+      if (!confirmada) await conn.rollback();
+      conn.release();
+    }
   }
 });
 
 // Editar repuesto
 router.put('/cotizaciones/:id/repuestos/:rid', exigirPermiso('ordenes.costos'), async (req, res) => {
+  let conn;
+  let confirmada = false;
   try {
+    conn = await req.db.conexion();
+    await conn.beginTransaction();
+    if (!(await validarEdicionCostos(conn, req.params.id, res))) return;
     const { nombre, cantidad, costo_unitario, estado } = req.body;
-    const [[existe]] = await req.db.query('SELECT id, estado FROM orden_repuestos WHERE tenant_id = @tenant AND id = ? AND orden_id = ?', [req.params.rid, req.params.id]);
+    const [[existe]] = await conn.query('SELECT id, estado, rechazado FROM orden_repuestos WHERE tenant_id = @tenant AND id = ? AND orden_id = ?', [req.params.rid, req.params.id]);
     if (!existe) return res.status(404).json({ error: 'Repuesto no encontrado' });
+    if (existe.rechazado) return res.status(409).json({ error: 'El cliente rechazó este repuesto: queda como registro; si hace falta, agregá uno nuevo' });
     if (estado && !ESTADOS_REPUESTO[estado]) return res.status(400).json({ error: 'Estado de repuesto inválido' });
-    const totalAntes = await totalOrden(req.db, req.params.id);
-    await req.db.query(
+    const totalAntes = await totalOrden(conn, req.params.id);
+    await conn.query(
       'UPDATE orden_repuestos SET nombre=?, cantidad=?, costo_unitario=?, estado=? WHERE tenant_id = @tenant AND id=? AND orden_id=?',
       [nombre, cantidad || 1, costo_unitario || 0, estadoAlEditarRepuesto(existe.estado, estado, costo_unitario), req.params.rid, req.params.id]
     );
-    await recalcularRepuestos(req.db, req.params.id);
-    const reaprobacion = await revisarAdicional(req.db, req.params.id, totalAntes);
-    const [[actualizado]] = await req.db.query('SELECT * FROM orden_repuestos WHERE tenant_id = @tenant AND id = ?', [req.params.rid]);
+    await recalcularRepuestos(conn, req.params.id);
+    const reaprobacion = await revisarAdicional(conn, req.params.id, totalAntes);
+    const [[actualizado]] = await conn.query('SELECT * FROM orden_repuestos WHERE tenant_id = @tenant AND id = ?', [req.params.rid]);
+    await conn.commit();
+    confirmada = true;
     res.json({ data: actualizado, reaprobacion, message: reaprobacion ? MSG_REAPROBACION : 'Repuesto actualizado' });
   } catch (err) {
     fail(res, err);
+  } finally {
+    if (conn) {
+      if (!confirmada) await conn.rollback();
+      conn.release();
+    }
   }
 });
 
 // Eliminar repuesto
 router.delete('/cotizaciones/:id/repuestos/:rid', exigirPermiso('ordenes.costos'), async (req, res) => {
+  let conn;
+  let confirmada = false;
   try {
-    const [result] = await req.db.query('DELETE FROM orden_repuestos WHERE id=? AND orden_id=? AND tenant_id = @tenant', [req.params.rid, req.params.id]);
+    conn = await req.db.conexion();
+    await conn.beginTransaction();
+    if (!(await validarEdicionCostos(conn, req.params.id, res))) return;
+    const totalAntes = await totalOrden(conn, req.params.id);
+    const [result] = await conn.query('DELETE FROM orden_repuestos WHERE id=? AND orden_id=? AND tenant_id = @tenant AND rechazado = 0', [req.params.rid, req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ error: 'Repuesto no encontrado' });
-    await recalcularRepuestos(req.db, req.params.id);
+    await recalcularRepuestos(conn, req.params.id);
+    // Quitar nunca sube la cuenta: solo actualiza la copia de lo aprobado.
+    await revisarAdicional(conn, req.params.id, totalAntes);
+    await conn.commit();
+    confirmada = true;
     res.json({ message: 'Repuesto eliminado' });
   } catch (err) {
     fail(res, err);
+  } finally {
+    if (conn) {
+      if (!confirmada) await conn.rollback();
+      conn.release();
+    }
   }
 });
 
 // Actualizar mano de obra y descuento
 router.put('/cotizaciones/:id/costos', exigirPermiso('ordenes.costos'), async (req, res) => {
+  let conn;
+  let confirmada = false;
   try {
+    conn = await req.db.conexion();
+    await conn.beginTransaction();
+    if (!(await validarEdicionCostos(conn, req.params.id, res))) return;
     const { costo_mano_obra, descuento } = req.body;
-    const [[orden]] = await req.db.query('SELECT id FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant', [req.params.id]);
+    const [[orden]] = await conn.query('SELECT id FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant', [req.params.id]);
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
-    const totalAntes = await totalOrden(req.db, req.params.id);
-    await req.db.query(
+    const totalAntes = await totalOrden(conn, req.params.id);
+    await conn.query(
       'UPDATE ordenes_trabajo SET costo_mano_obra = ?, descuento = ? WHERE tenant_id = @tenant AND id = ?',
       [costo_mano_obra || 0, descuento || 0, req.params.id]
     );
-    const reaprobacion = await revisarAdicional(req.db, req.params.id, totalAntes);
-    const [[actualizada]] = await req.db.query(
+    const reaprobacion = await revisarAdicional(conn, req.params.id, totalAntes);
+    const [[actualizada]] = await conn.query(
       'SELECT id, costo_mano_obra, costo_repuestos, descuento, (costo_mano_obra + costo_repuestos - descuento) AS total FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ?',
       [req.params.id]
     );
+    await conn.commit();
+    confirmada = true;
     res.json({ data: actualizada, reaprobacion, message: reaprobacion ? MSG_REAPROBACION : 'Costos actualizados' });
   } catch (err) {
     fail(res, err);
+  } finally {
+    if (conn) {
+      if (!confirmada) await conn.rollback();
+      conn.release();
+    }
   }
 });
 
@@ -654,11 +711,12 @@ router.post('/cotizaciones/:id/armar', exigirPermiso('ordenes.costos'), async (r
       }
     }
 
-    const totalAntes = await totalOrden(req.db, ordenId);
-    const adicional = await esAdicional(req.db, ordenId);
     const conn = await req.db.conexion();
     try {
       await conn.beginTransaction();
+      if (!(await validarEdicionCostos(conn, ordenId, res))) { await conn.rollback(); return; }
+      const totalAntes = await totalOrden(conn, ordenId);
+      const adicional = await esAdicional(conn, ordenId);
       if (tecnico_id) {
         await conn.query('UPDATE ordenes_trabajo SET tecnico_id = ? WHERE id = ? AND tenant_id = @tenant', [tecnico_id, ordenId]);
       }
@@ -673,10 +731,16 @@ router.post('/cotizaciones/:id/armar', exigirPermiso('ordenes.costos'), async (r
         [Number(costo_mano_obra) || 0, Number(descuento) || 0, ordenId]
       );
       await conn.query(
-        'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE orden_id = ? AND tenant_id = @tenant) WHERE id = ? AND tenant_id = @tenant',
+        'UPDATE ordenes_trabajo SET costo_repuestos = (SELECT COALESCE(SUM(cantidad * costo_unitario), 0) FROM orden_repuestos WHERE rechazado = 0 AND orden_id = ? AND tenant_id = @tenant) WHERE id = ? AND tenant_id = @tenant',
         [ordenId, ordenId]
       );
+      const reaprobacion = await revisarAdicional(conn, ordenId, totalAntes);
+      const [[cotizacion]] = await conn.query(
+        'SELECT id, costo_mano_obra, costo_repuestos, descuento, (costo_mano_obra + costo_repuestos - descuento) AS total FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ?',
+        [ordenId]
+      );
       await conn.commit();
+      res.status(201).json({ data: cotizacion, reaprobacion, message: reaprobacion ? MSG_REAPROBACION : 'Cotización guardada' });
     } catch (e) {
       await conn.rollback();
       throw e;
@@ -684,12 +748,6 @@ router.post('/cotizaciones/:id/armar', exigirPermiso('ordenes.costos'), async (r
       conn.release();
     }
 
-    const reaprobacion = await revisarAdicional(req.db, ordenId, totalAntes);
-    const [[cotizacion]] = await req.db.query(
-      'SELECT id, costo_mano_obra, costo_repuestos, descuento, (costo_mano_obra + costo_repuestos - descuento) AS total FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ?',
-      [ordenId]
-    );
-    res.status(201).json({ data: cotizacion, reaprobacion, message: reaprobacion ? MSG_REAPROBACION : 'Cotización guardada' });
   } catch (err) {
     fail(res, err);
   }
