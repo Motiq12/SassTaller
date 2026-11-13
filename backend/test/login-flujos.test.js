@@ -54,6 +54,8 @@ tenantDb.paraTenant = (id) => baseFalsa(id);
 // entra), así que el guard no aplica: se simula sin él. Nunca toca la base real.
 const { pool } = require('../src/db/pool');
 pool.query = async (sql) => {
+  if (/^INSERT INTO sesiones_personal/i.test(sql)) return [{ affectedRows: 1 }];
+  if (/FROM sesiones_personal/i.test(sql)) return [[{ id: 1, cerrada: null }]];
   const hit = tablas.find(t => t.re.test(sql));
   return [(hit ? [].concat(hit.filas) : []).map(f => recorte(sql, f))];
 };
@@ -89,7 +91,7 @@ async function pedir(metodo, ruta, cuerpo, token) {
 const HASH_123456 = bcrypt.hashSync('123456', 4);
 const cliente = (extra = {}) => ({
   id: 40, tenant_id: 1, nombre: 'Lu', apellido: 'Mora', email: 'lu@x.com',
-  foto: null, activo: 1, password_hash: 'h', email_verificado: 0, ...extra,
+  foto: null, activo: 1, portal_habilitado: 1, portal_version: 0, password_hash: 'h', email_verificado: 0, ...extra,
 });
 
 // ── 2FA del personal ──────────────────────────────────────────────────────
@@ -201,7 +203,7 @@ test('mecánico: cambiar el estado de su cita no choca con el guard de tenant', 
     { re: /from citas/i, filas: { id: 5, estado: 'agendado', orden_id: null } },
     { re: /from usuarios/i, filas: { activo: 1, sesiones_desde_ms: null } },
   ];
-  const token = jwt.sign({ id: 9, rol: 'tecnico', tenant_id: 1 }, process.env.JWT_SECRET);
+  const token = jwt.sign({ id: 9, rol: 'tecnico', tenant_id: 1, sid: 'sesion-mecanico' }, process.env.JWT_SECRET);
   const { status, body } = await pedir('PATCH', '/api/mecanico/citas/5/estado', { estado: 'en_revision' }, token);
   assert.equal(status, 200, JSON.stringify(body));
   assert.ok(escrituras.some(e => /^UPDATE citas SET/.test(e.sql)));

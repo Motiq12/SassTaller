@@ -62,7 +62,7 @@ const { codigoDeSeisDigitos } = require('../utils/verificacion-usuario');
 // taller y middleware/tenant corta con 401 el primer pedido (pasó en tres flujos).
 function tokenCliente(cliente) {
   if (!cliente.tenant_id) throw new Error('tokenCliente: el cliente no trae tenant_id');
-  const payload = { id: cliente.id, tipo: 'cliente', nombre: cliente.nombre, apellido: cliente.apellido, tenant_id: cliente.tenant_id };
+  const payload = { id: cliente.id, tipo: 'cliente', nombre: cliente.nombre, apellido: cliente.apellido, tenant_id: cliente.tenant_id, pv: Number(cliente.portal_version || 0) };
   const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '8h' });
   return { payload, token };
 }
@@ -99,7 +99,7 @@ router.post('/login', async (req, res) => {
     if (!emailValido(email)) return invalido(res, 'email', 'El correo no tiene un formato válido');
     // Sin mayúsculas ni espacios, igual que el login principal y la recuperación.
     const [[cliente]] = await req.db.query(
-      'SELECT * FROM clientes WHERE tenant_id = @tenant AND LOWER(email) = ? AND activo = 1 ORDER BY id LIMIT 1',
+      'SELECT * FROM clientes WHERE tenant_id = @tenant AND LOWER(email) = ? AND activo = 1 AND portal_habilitado = 1 ORDER BY id LIMIT 1',
       [String(email).trim().toLowerCase()]
     );
     if (!cliente || !cliente.password_hash) {
@@ -192,6 +192,7 @@ async function unirConGoogle(db, cliente, sub) {
 }
 
 async function entrarConGoogle(req, res, cliente, g) {
+  if (Number(cliente.portal_habilitado) !== 1) return res.status(401).json({ error: 'Portal no habilitado' });
   if (!cliente.google_sub) await unirConGoogle(req.db, cliente, g.sub);
   const { payload, token } = tokenCliente(cliente);
   res.json({ data: { token, cliente: { ...payload, foto: cliente.foto || null } } });
@@ -290,11 +291,12 @@ router.post('/registro', antibot(), async (req, res) => {
       return res.status(429).json({ error: `Demasiados intentos. Espera ${limite.retryAfter}s e intenta de nuevo.` });
     }
 
-    const [[existente]] = await req.db.query('SELECT id, password_hash FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1', [email]);
+    const [[existente]] = await req.db.query('SELECT id, password_hash, portal_habilitado FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1', [email]);
     const hash = await bcrypt.hash(password, 10);
     let clienteId;
 
     if (existente) {
+      if (Number(existente.portal_habilitado) !== 1) return res.status(401).json({ error: 'Portal no habilitado' });
       if (existente.password_hash) {
         return invalido(res, 'email', 'Ese correo ya tiene una cuenta. Inicia sesión.', 409);
       }
@@ -329,7 +331,7 @@ router.post('/registro/verificar', async (req, res) => {
     if (!codigo) return invalido(res, 'codigo', 'Falta el código');
 
     const [[cliente]] = await req.db.query(
-      'SELECT id, tenant_id, nombre, apellido, email_verificado FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1', [email]
+      'SELECT id, tenant_id, portal_version, nombre, apellido, email_verificado FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND portal_habilitado = 1', [email]
     );
     const ERR_CODIGO = 'Código inválido o expirado';
     if (!cliente) return invalido(res, 'codigo', ERR_CODIGO);
@@ -385,7 +387,7 @@ router.post('/registro/reenviar', antibot(), async (req, res) => {
     }
 
     const [[cliente]] = await req.db.query(
-      'SELECT id, nombre FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND email_verificado = 0', [email]
+      'SELECT id, nombre FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND portal_habilitado = 1 AND email_verificado = 0', [email]
     );
     if (cliente) await enviarVerificacion(req.db, req.tallerSlug, cliente.id, email, cliente.nombre);
 
@@ -412,7 +414,7 @@ router.post('/recuperar/solicitar', antibot(), async (req, res) => {
 
     const [[cliente]] = await req.db.query(
       // También quien entró solo con Google: así se crea una contraseña.
-      'SELECT id, nombre, apellido FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND (password_hash IS NOT NULL OR google_sub IS NOT NULL)',
+      'SELECT id, nombre, apellido FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND portal_habilitado = 1 AND (password_hash IS NOT NULL OR google_sub IS NOT NULL)',
       [email]
     );
 
@@ -444,7 +446,7 @@ router.post('/recuperar/confirmar', async (req, res) => {
     if (malaClave) return invalido(res, 'password', malaClave);
 
     const [[cliente]] = await req.db.query(
-      'SELECT id, tenant_id, nombre, apellido FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND (password_hash IS NOT NULL OR google_sub IS NOT NULL)',
+      'SELECT id, tenant_id, portal_version, nombre, apellido FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND portal_habilitado = 1 AND (password_hash IS NOT NULL OR google_sub IS NOT NULL)',
       [email]
     );
     const ERR_CODIGO = 'Código inválido o expirado';
@@ -497,7 +499,7 @@ router.post('/otp/solicitar', antibot(), async (req, res) => {
     }
 
     const [[cliente]] = await req.db.query(
-      'SELECT id, nombre FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1',
+      'SELECT id, nombre FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND portal_habilitado = 1',
       [email]
     );
     if (cliente) {
@@ -526,7 +528,7 @@ router.post('/otp/verificar', async (req, res) => {
     if (!codigo) return invalido(res, 'codigo', 'Falta el código');
 
     const [[cliente]] = await req.db.query(
-      'SELECT id, tenant_id, nombre, apellido, foto FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1',
+      'SELECT id, tenant_id, portal_version, nombre, apellido, foto FROM clientes WHERE tenant_id = @tenant AND email = ? AND activo = 1 AND portal_habilitado = 1',
       [email]
     );
     const ERR_CODIGO = 'Código inválido o expirado';

@@ -19,15 +19,18 @@ router.use(cargarAlcance);
 
 // El hash de la contraseña del portal no sale del servidor: la pantalla solo necesita
 // saber si el cliente tiene acceso.
+// tiene_portal: la bandera explícita (B-05) y un correo con el que entrar. Sin
+// correo no hay forma de ingresar (contraseña, código ni Google), aunque esté habilitado.
 function sinSecretos(cliente) {
-  const { password_hash: hash, google_sub: google, sesiones_desde_ms: _s, ...resto } = cliente;
-  return { ...resto, tiene_portal: hash || google ? 1 : 0 };
+  const { password_hash: _h, google_sub: _g, sesiones_desde_ms: _s, portal_version: _v, ...resto } = cliente;
+  const conCorreo = !!String(cliente.email || '').trim();
+  return { ...resto, tiene_portal: Number(cliente.portal_habilitado) === 1 && conCorreo ? 1 : 0 };
 }
 
 // Columnas seguras (nunca exponer password_hash); tiene_portal indica si el acceso está activo.
 const COLS = `id, nombre, apellido, telefono, email, cedula, direccion, activo, created_at, updated_at,
               visitas, cortesia_disponible,
-              (password_hash IS NOT NULL OR google_sub IS NOT NULL)::int AS tiene_portal`;
+              (portal_habilitado = 1 AND COALESCE(TRIM(email), '') <> '')::int AS tiene_portal`;
 
 // Tope del listado: con miles de clientes, devolverlos todos hace respuestas de varios
 // MB que tardan más en viajar y renderizar que en consultarse. La búsqueda por `q` es
@@ -132,9 +135,12 @@ router.patch('/:id/portal', requireRol('admin'), async (req, res) => {
 
     if (activar === false) {
       await req.db.query(
-        'UPDATE clientes SET password_hash = NULL WHERE id = ? AND tenant_id = @tenant',
+        'UPDATE clientes SET password_hash = NULL, portal_habilitado = 0, portal_version = portal_version + 1 WHERE id = ? AND tenant_id = @tenant',
         [req.params.id]
       );
+      // Los códigos pendientes (por correo o de recuperación) tampoco deben poder canjearse.
+      await req.db.query('DELETE FROM login_codes WHERE cliente_id = ? AND tenant_id = @tenant', [req.params.id]);
+      await req.db.query('DELETE FROM password_reset_codes WHERE cliente_id = ? AND tenant_id = @tenant', [req.params.id]);
       return res.json({ message: 'Acceso al portal desactivado' });
     }
     if (!cliente.email) return res.status(400).json({ error: 'El cliente necesita un email para acceder al portal' });
@@ -142,7 +148,7 @@ router.patch('/:id/portal', requireRol('admin'), async (req, res) => {
     if (malaClave) return invalido(res, 'password', malaClave);
     const hash = await bcrypt.hash(password, 10);
     await req.db.query(
-      'UPDATE clientes SET password_hash = ? WHERE id = ? AND tenant_id = @tenant',
+      'UPDATE clientes SET password_hash = ?, portal_habilitado = 1, portal_version = portal_version + 1 WHERE id = ? AND tenant_id = @tenant',
       [hash, req.params.id]
     );
     res.json({ message: 'Acceso al portal activado' });

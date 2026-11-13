@@ -48,15 +48,16 @@ module.exports = function authMiddleware(req, res, next) {
   } catch {
     return res.status(401).json({ error: 'Token inválido o expirado' });
   }
-  // La firma es buena; falta saber si esa sesión sigue abierta: si administración la
-  // cerró, o si la persona está desactivada, el token deja de valer aunque no venza
-  // (utils/sesiones.js). Si la base no responde, vale la firma.
-  // Y si el token es de una sesión con dispositivo (lleva `sid`), que esa no se haya
-  // cerrado desde Mi perfil.
+  // Fallar cerrado: ni la firma ni una caché sustituyen el estado persistido.
   const cerrada = () => res.status(401).json({ error: 'Tu sesión se cerró. Volvé a iniciar sesión.', codigo: 'sesion_cerrada' });
+  const noDisponible = () => res.status(503).json({ error: 'No se pudo comprobar la sesión. Intentá de nuevo.', codigo: 'sesion_no_disponible' });
+  if (typeof req.usuario.sid !== 'string' || !req.usuario.sid) return cerrada();
   return estadoDeSesion(req.usuario.id).then(async (estado) => {
-    if (estado !== undefined && !sesionVigente(req.usuario, estado)) return cerrada();
-    if (req.usuario.sid && (await sidAbierto(req.usuario.sid)) === false) return cerrada();
+    if (estado === undefined) return noDisponible();
+    if (!sesionVigente(req.usuario, estado)) return cerrada();
+    const abierta = await sidAbierto(req.usuario.sid, req.usuario.id, req.usuario.tenant_id);
+    if (abierta === undefined) return noDisponible();
+    if (!abierta) return cerrada();
     return tenant(req, res, next);
   });
 };

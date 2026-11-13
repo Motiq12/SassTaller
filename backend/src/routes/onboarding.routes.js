@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const jwt = require('jsonwebtoken');
+const { nuevoSid, abrirSesion } = require('../utils/sesiones');
 // Registro de talleres nuevos: es la única ruta que crea tenants, así que va contra
 // el pool sin scope a propósito. Todavía no existe el taller al que acotarse — es lo
 // que esta ruta hace. Todo lo que escribe declara su tenant_id explícitamente.
@@ -172,6 +173,19 @@ router.post('/', antibot(), async (req, res) => {
       },
     });
 
+    // Sesión inmediata: el admin entra a su taller recién creado sin volver a
+    // escribir la contraseña que acaba de elegir.
+    const payload = {
+      id: adminId, nombre: String(admin.nombre).trim(),
+      email: String(admin.email).trim().toLowerCase(), rol: 'admin', tenant_id: tenantId, sid: nuevoSid(),
+    };
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '8h' });
+
+    if (!(await abrirSesion(adminId, req, jwt.decode(token).exp, payload.sid, conn))) {
+      await conn.rollback();
+      return res.status(503).json({ error: 'No se pudo abrir la sesión. Intentá de nuevo.' });
+    }
+
     await conn.commit();
 
     // La foto en memoria de los planes (utils/estado-tenant) se refresca cada 30s, así
@@ -183,14 +197,6 @@ router.post('/', antibot(), async (req, res) => {
     // Va DESPUÉS del commit a propósito: si la transacción se cae, la caché no puede
     // quedar afirmando un taller que no llegó a existir.
     fijarPlan(tenantId, 'trial', finDeTrial());
-
-    // Sesión inmediata: el admin entra a su taller recién creado sin volver a
-    // escribir la contraseña que acaba de elegir.
-    const payload = {
-      id: adminId, nombre: String(admin.nombre).trim(),
-      email: String(admin.email).trim().toLowerCase(), rol: 'admin', tenant_id: tenantId,
-    };
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '8h' });
 
     // Código para confirmar el correo del dueño. Va DESPUÉS del commit y sin await sobre
     // la respuesta: el taller ya está creado y su sesión lista, así que un correo que no

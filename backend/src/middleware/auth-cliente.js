@@ -20,9 +20,10 @@ module.exports = function authCliente(req, res, next) {
     // SIEMPRE del token, no de la URL. Sin esto req.db queda sin definir o, peor, lo
     // decide un ?taller= que cualquiera puede cambiar.
     // La firma es buena; falta saber si la cuenta sigue activa y si esa sesión no se
-    // cerró (cambio o recuperación de contraseña). Si la base no responde, vale la firma.
+    // cerró (cambio o recuperación de contraseña). Si la base no responde, se deniega temporalmente el acceso.
     return estadoDeCliente(payload.id).then((estado) => {
-      if (estado !== undefined && !sesionVigente(payload, estado)) {
+      if (estado === undefined) return res.status(503).json({ error: 'No se pudo comprobar la sesión. Intenta de nuevo.', codigo: 'sesion_no_disponible' });
+      if (!sesionVigente(payload, estado) || Number(payload.pv || 0) !== estado.portal_version) {
         return res.status(401).json({ error: 'Tu sesión se cerró. Vuelve a iniciar sesión.', codigo: 'sesion_cerrada' });
       }
       return tenant(req, res, next);
