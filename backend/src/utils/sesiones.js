@@ -8,17 +8,18 @@ const { pool } = require('../db/pool');
 const TOQUE_MS = 2 * 60 * 1000;
 const toques = new Map();
 
-// { activo, sesiones_desde_ms, rol, tenant_id } del usuario; null si no existe;
-// undefined si no se pudo leer la base (quien llama decide: la firma del token ya se
-// verificó).
+// { activo, sesiones_desde_ms, rol, tenant_id, credenciales_version } del usuario;
+// null si no existe; undefined si no se pudo leer la base (quien llama decide: la
+// firma del token ya se verificó).
 async function estadoDeSesion(id) {
   try {
-    const [[u]] = await pool.query('SELECT activo, sesiones_desde_ms, rol, tenant_id FROM usuarios WHERE id = ?', [id]);
+    const [[u]] = await pool.query('SELECT activo, sesiones_desde_ms, rol, tenant_id, credenciales_version FROM usuarios WHERE id = ?', [id]);
     const estado = u ? {
       activo: Number(u.activo) === 1,
       sesiones_desde_ms: u.sesiones_desde_ms == null ? null : Number(u.sesiones_desde_ms),
       rol: u.rol,
       tenant_id: Number(u.tenant_id),
+      credenciales_version: Number(u.credenciales_version ?? 0),
     } : null;
     return estado;
   } catch (err) {
@@ -27,17 +28,18 @@ async function estadoDeSesion(id) {
   }
 }
 
-// ¿Esa sesión (sid) sigue abierta? true / false; undefined si la base no respondió.
-// Una fila que no existe cuenta como cerrada: el sid lo pone el servidor al firmar.
+// ¿Esa sesión (sid) sigue abierta? La sesión ({ credenciales_version }) si sí, false
+// si no; undefined si la base no respondió. Una fila que no existe cuenta como
+// cerrada: el sid lo pone el servidor al firmar.
 async function sidAbierto(sid, usuarioId, tenantId) {
   try {
-    const [[s]] = await pool.query('SELECT id, cerrada FROM sesiones_personal WHERE sid = ? AND usuario_id = ? AND tenant_id = ? AND vence > NOW()', [sid, usuarioId, tenantId]);
+    const [[s]] = await pool.query('SELECT id, cerrada, credenciales_version FROM sesiones_personal WHERE sid = ? AND usuario_id = ? AND tenant_id = ? AND vence > NOW()', [sid, usuarioId, tenantId]);
     const abierta = !!s && !s.cerrada;
     if (abierta && Date.now() - (toques.get(sid) || 0) > TOQUE_MS) {
       toques.set(sid, Date.now());
       pool.query('UPDATE sesiones_personal SET ultima_vez = CURRENT_TIMESTAMP WHERE id = ?', [s.id]).catch(() => {});
     }
-    return abierta;
+    return abierta ? { credenciales_version: Number(s.credenciales_version ?? 0) } : false;
   } catch (err) {
     console.error('⚠️  No se pudo revisar la sesión:', err.code || err.message);
     return undefined;
@@ -62,6 +64,19 @@ function rolVigente(payload, estado) {
   return payload.rol === estado.rol && Number(payload.tenant_id) === Number(estado.tenant_id);
 }
 
+// QA34-02: la sesión vale solo con la versión de credenciales con que se abrió. El
+// login lee la versión junto con el hash ANTES de comprobar la contraseña y la guarda
+// en la sesión (y en el token); cambiar o recuperar la contraseña, o desactivar la
+// cuenta, la sube. Un login que validó la contraseña vieja y abrió su sesión después
+// del cambio queda con la versión vieja y no sirve, sin depender de fechas ni sids.
+// Se compara la guardada en la fila de la sesión y no solo la firmada en el token,
+// para que quien cambia su propia contraseña conserve la sesión desde la que lo hizo:
+// esa fila se actualiza en la misma sentencia que el cambio (cambiarContrasenaPropia).
+function credencialesVigentes(sesion, estado) {
+  if (!sesion || !estado) return false;
+  return Number(sesion.credenciales_version ?? 0) === Number(estado.credenciales_version ?? 0);
+}
+
 // "Chrome en Windows", "App de Android"… Solo para que la persona reconozca el equipo.
 function describirAgente(ua) {
   const s = String(ua || '');
@@ -84,11 +99,14 @@ function describirAgente(ua) {
 function nuevoSid() { return crypto.randomBytes(16).toString('hex'); }
 
 // Abre una sesión persistida. Si falla, nunca se debe entregar un token.
-async function abrirSesion(usuarioId, req, venceSeg, sid, db = pool) {
+// `credenciales` es la versión que el login leyó junto con el hash que comprobó
+// (QA34-02): se guarda esa, no la de ahora. Sin ella (el alta de un taller, que crea
+// la cuenta en la misma transacción) se toma la de la fila.
+async function abrirSesion(usuarioId, req, venceSeg, sid, db = pool, credenciales = null) {
   try {
     const [insertada] = await db.query(
-      'INSERT INTO sesiones_personal (tenant_id, usuario_id, sid, agente, ip, ultima_vez, vence) SELECT tenant_id, id, ?, ?, ?, CURRENT_TIMESTAMP, to_timestamp(?::bigint) FROM usuarios WHERE id = ?',
-      [sid, String(req.headers['user-agent'] || '').slice(0, 255) || null, String(req.ip || '').slice(0, 64) || null, venceSeg, usuarioId]
+      'INSERT INTO sesiones_personal (tenant_id, usuario_id, sid, agente, ip, ultima_vez, vence, credenciales_version) SELECT tenant_id, id, ?, ?, ?, CURRENT_TIMESTAMP, to_timestamp(?::bigint), COALESCE(?::int, credenciales_version) FROM usuarios WHERE id = ?',
+      [sid, String(req.headers['user-agent'] || '').slice(0, 255) || null, String(req.ip || '').slice(0, 64) || null, venceSeg, credenciales == null ? null : Number(credenciales), usuarioId]
     );
     if (!insertada.affectedRows) return false;
     // De paso, se borran las vencidas hace más de un mes: la tabla no crece sola.
@@ -164,6 +182,22 @@ async function cerrarSesiones(ids, db = pool) {
   return r.affectedRows || 0;
 }
 
+// Cambio de la propia contraseña (perfil del panel que sea). En UNA sentencia: guarda el
+// hash, sube la versión de credenciales y le pasa la versión nueva a la sesión desde la
+// que se hizo el cambio, que sigue abierta. Cualquier otra sesión, incluida la de un
+// login con la contraseña vieja que todavía no terminó, queda con la versión anterior.
+async function cambiarContrasenaPropia(payload, hash) {
+  await pool.query(
+    `WITH u AS (
+       UPDATE usuarios SET password_hash = ?, credenciales_version = credenciales_version + 1
+        WHERE id = ? AND tenant_id = ? RETURNING credenciales_version
+     )
+     UPDATE sesiones_personal SET credenciales_version = (SELECT credenciales_version FROM u)
+      WHERE sid = ? AND usuario_id = ? AND tenant_id = ? AND cerrada IS NULL`,
+    [hash, payload.id, payload.tenant_id, payload.sid || '', payload.id, payload.tenant_id]
+  );
+}
+
 // Al cambiar la contraseña: se cierran todas las demás sesiones de esa persona y queda
 // abierta solo la que hizo el cambio. Si alguien más tenía la cuenta abierta, sale.
 // Los tokens anteriores al actual dejan de valer por fecha; las sesiones abiertas
@@ -204,7 +238,7 @@ function olvidarCliente() {} // Compatibilidad: ya no hay caché de autorizació
 function olvidar() {}
 
 module.exports = {
-  estadoDeSesion, sidAbierto, sesionVigente, rolVigente, cerrarSesiones, olvidar,
+  estadoDeSesion, sidAbierto, sesionVigente, rolVigente, credencialesVigentes, cambiarContrasenaPropia, cerrarSesiones, olvidar,
   cerrarLasDemas, estadoDeCliente, cerrarSesionesDeCliente, olvidarCliente,
   describirAgente, nuevoSid, abrirSesion, sesionesAbiertas, cerrarSesionPropia, cerrarOtrasSesiones, cerrarSid,
 };

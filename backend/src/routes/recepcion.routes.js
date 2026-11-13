@@ -6,7 +6,7 @@ const { filtrarAvisos } = require('../utils/preferencias');
 const { fail, invalido } = require('../utils/responder');
 const { repuestoDelCatalogo } = require('../utils/inventario');
 const { referenciaAjena } = require('../utils/referencias');
-const { cerrarLasDemas } = require('../utils/sesiones');
+const { cerrarLasDemas, cambiarContrasenaPropia } = require('../utils/sesiones');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { soloRoles } = require('../middleware/roles');
@@ -917,7 +917,8 @@ router.put('/perfil/password', async (req, res) => {
     const ok = await bcrypt.compare(String(actual), u.password_hash);
     if (!ok) return res.status(400).json({ error: 'La contraseña actual no es correcta' });
     const hash = await bcrypt.hash(String(nueva), 10);
-    await req.db.query('UPDATE usuarios SET password_hash = ? WHERE tenant_id = @tenant AND id = ?', [hash, req.usuario.id]);
+    // QA34-02: hash, versión de credenciales y esta sesión, en una sola sentencia.
+    await cambiarContrasenaPropia(req.usuario, hash);
     await cerrarLasDemas(req.usuario);
     anotar(req.usuario.id, 'contrasena');
     res.json({ message: 'Contraseña actualizada' });

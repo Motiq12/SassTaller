@@ -470,12 +470,17 @@ router.post('/recuperar/confirmar', async (req, res) => {
     // Completar el reset por correo prueba que se controla la bandeja: de paso
     // verifica la cuenta (cierra el reset como atajo para "reclamar" sin verificar).
     const hash = await bcrypt.hash(password, 10);
-    await req.db.query('UPDATE clientes SET password_hash = ?, email_verificado = 1 WHERE id = ? AND tenant_id = @tenant', [hash, cliente.id]);
+    // portal_version sube (QA34-02): un login con la contraseña vieja que firme después
+    // lleva la anterior y no sirve. El token de abajo se firma con la nueva.
+    const [[version]] = await req.db.query(
+      'UPDATE clientes SET password_hash = ?, email_verificado = 1, portal_version = portal_version + 1 WHERE id = ? AND tenant_id = @tenant RETURNING portal_version',
+      [hash, cliente.id]
+    );
     await req.db.query('UPDATE password_reset_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
     // Salen todas las sesiones anteriores; la que se abre abajo es posterior y vale.
     await cerrarSesionesDeCliente(cliente.id);
 
-    const { payload, token } = tokenCliente(cliente);
+    const { payload, token } = tokenCliente({ ...cliente, portal_version: version.portal_version });
     res.json({ data: { token, cliente: payload } });
   } catch (err) {
     fail(res, err);
@@ -940,15 +945,21 @@ router.put('/perfil/password', async (req, res) => {
     if (faltante(res, req.body, [['actual', 'la contraseña actual'], ['nueva', 'la nueva contraseña']])) return;
     const malaClave = problemaDeContrasena(nueva, PISO);
     if (malaClave) return invalido(res, 'nueva', malaClave);
-    const [[c]] = await req.db.query('SELECT password_hash FROM clientes WHERE tenant_id = @tenant AND id = ? AND activo = 1', [req.cliente.id]);
+    const [[c]] = await req.db.query('SELECT id, tenant_id, nombre, apellido, password_hash FROM clientes WHERE tenant_id = @tenant AND id = ? AND activo = 1', [req.cliente.id]);
     if (!c || !c.password_hash) return res.status(404).json({ error: 'Cuenta no encontrada' });
     const ok = await bcrypt.compare(String(actual), c.password_hash);
     if (!ok) return invalido(res, 'actual', 'La contraseña actual no es correcta');
     const hash = await bcrypt.hash(String(nueva), 10);
-    await req.db.query('UPDATE clientes SET password_hash = ? WHERE id = ? AND tenant_id = @tenant', [hash, req.cliente.id]);
-    // Las otras sesiones salen; esta, donde se hizo el cambio, sigue.
+    // portal_version sube (QA34-02): todos los tokens anteriores, incluido el de un login
+    // con la contraseña vieja que todavía no terminó, dejan de valer. Esta sesión sigue
+    // con el token nuevo que va en la respuesta (el portal lo guarda).
+    const [[version]] = await req.db.query(
+      'UPDATE clientes SET password_hash = ?, portal_version = portal_version + 1 WHERE id = ? AND tenant_id = @tenant RETURNING portal_version',
+      [hash, req.cliente.id]
+    );
     await cerrarSesionesDeCliente(req.cliente.id, req.cliente.iat);
-    res.json({ message: 'Contraseña actualizada' });
+    const { token } = tokenCliente({ ...c, portal_version: version.portal_version });
+    res.json({ data: { token }, message: 'Contraseña actualizada' });
   } catch (err) {
     fail(res, err);
   }
@@ -976,7 +987,7 @@ router.put('/perfil/foto', async (req, res) => {
 // del taller; se desactiva el acceso al portal (activo=0 + sin contraseña).
 router.delete('/perfil', async (req, res) => {
   try {
-    await req.db.query('UPDATE clientes SET activo = 0, password_hash = NULL WHERE id = ? AND tenant_id = @tenant', [req.cliente.id]);
+    await req.db.query('UPDATE clientes SET activo = 0, password_hash = NULL, portal_version = portal_version + 1 WHERE id = ? AND tenant_id = @tenant', [req.cliente.id]);
     olvidarCliente(req.cliente.id);
     res.json({ message: 'Cuenta eliminada' });
   } catch (err) {

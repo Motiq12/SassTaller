@@ -40,13 +40,18 @@ function anotarIngreso(usuarioId) {
 
 // Abre la sesión del personal: la anota con su dispositivo (Mi perfil → Sesiones) y
 // firma el token con ese `sid`. Si no se pudo anotar, el ingreso responde 503.
-async function sesionStaff(usuario, req) {
+//
+// `cv`: la versión de credenciales leída JUNTO con el hash que se comprobó (QA34-02).
+// No se relee acá: si la contraseña cambió mientras corría bcrypt, esta sesión tiene
+// que nacer con la versión vieja para que middleware/auth la rechace.
+async function sesionStaff(usuario, req, cv) {
+  if (!Number.isInteger(Number(cv))) throw new Error('sesionStaff: falta la versión de credenciales leída con el hash');
   // tenant_id va en el token: es de donde lo saca middleware/tenant para acotar
   // req.db. Sin él, auth encadena a tenant y tenant rechaza TODO con 401.
   const payload = { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol, tenant_id: usuario.tenant_id };
   const sid = nuevoSid();
-  const token = firmar({ ...payload, sid });
-  const ok = await abrirSesion(usuario.id, req, jwt.decode(token).exp, sid);
+  const token = firmar({ ...payload, sid, cv: Number(cv) });
+  const ok = await abrirSesion(usuario.id, req, jwt.decode(token).exp, sid, pool, Number(cv));
   if (!ok) throw Object.assign(new Error('No se pudo abrir la sesión'), { code: 'SESION_NO_DISPONIBLE' });
   anotarIngreso(usuario.id);
   anotar(usuario.id, 'ingreso', describirAgente(req.headers['user-agent']));
@@ -60,8 +65,10 @@ async function sesionStaff(usuario, req) {
 // Lleva el taller: la contraseña ya se validó, así que en este punto se sabe de qué
 // taller es el usuario. Sin esto, al canjear el código habría que volver a buscarlo
 // sin scope, que es justo lo que queremos evitar.
-function firmarParcial(usuarioId, tenantId) {
-  return jwt.sign({ id: usuarioId, tenant_id: tenantId, pend2fa: true }, process.env.JWT_SECRET, { expiresIn: '5m' });
+// También lleva la versión de credenciales leída con el hash: el segundo paso abre la
+// sesión con ESA, y no con la que haya al presentar el código (QA34-02).
+function firmarParcial(usuarioId, tenantId, cv) {
+  return jwt.sign({ id: usuarioId, tenant_id: tenantId, cv: Number(cv), pend2fa: true }, process.env.JWT_SECRET, { expiresIn: '5m' });
 }
 
 // Hash señuelo (bcrypt válido) para igualar el tiempo de respuesta cuando el correo
@@ -179,11 +186,12 @@ router.post('/login', async (req, res) => {
       // Con verificación en dos pasos activa, la contraseña sola no abre sesión:
       // se devuelve un token parcial que solo sirve para canjear el código.
       if (usuario.totp_activado) {
-        return res.json({ data: { requiere_2fa: true, tipo: 'staff', token_parcial: firmarParcial(usuario.id, usuario.tenant_id) } });
+        return res.json({ data: { requiere_2fa: true, tipo: 'staff', token_parcial: firmarParcial(usuario.id, usuario.tenant_id, usuario.credenciales_version) } });
       }
       // Los permisos del sitio web van en la respuesta (el panel arma su menú con
       // ellos) pero NO en el token: la API los relee en cada petición.
-      const { payload, token } = await sesionStaff(usuario, req);
+      // `usuario` es la fila que trajo el SELECT * de arriba, antes de bcrypt.
+      const { payload, token } = await sesionStaff(usuario, req, usuario.credenciales_version);
       return res.json({ data: { token, tipo: 'staff', taller: await tallerDe(usuario.tenant_id), usuario: { ...payload, permisos_web: normalizarPermisos(usuario.permisos_web), ...(await casillasDeSesion(usuario.id)), preferencias: await preferenciasDe(usuario.id, usuario.rol), foto: usuario.foto || null } } });
     }
 
@@ -311,7 +319,7 @@ router.post('/2fa/verificar', async (req, res) => {
     } catch {
       return res.status(401).json({ error: 'La sesión de ingreso venció. Iniciá sesión de nuevo.' });
     }
-    if (!datos.pend2fa || !datos.id || !datos.tenant_id) {
+    if (!datos.pend2fa || !datos.id || !datos.tenant_id || !Number.isInteger(datos.cv)) {
       return res.status(401).json({ error: 'Token no válido' });
     }
     // Esta ruta no pasa por middleware/auth (todavía no hay sesión abierta), así que
@@ -326,10 +334,14 @@ router.post('/2fa/verificar', async (req, res) => {
     }
 
     const [[usuario]] = await pool.query(
-      'SELECT id, nombre, email, rol, foto, permisos_web, totp_secret, totp_activado, totp_backup, totp_ultimo_contador FROM usuarios WHERE id = ? AND activo = 1',
+      'SELECT id, nombre, email, rol, foto, permisos_web, totp_secret, totp_activado, totp_backup, totp_ultimo_contador, credenciales_version FROM usuarios WHERE id = ? AND activo = 1',
       [datos.id]
     );
     if (!usuario || !usuario.totp_activado) return res.status(401).json({ error: 'Token no válido' });
+    // La contraseña con que se pidió este código ya no es la vigente: hay que volver a entrar.
+    if (Number(usuario.credenciales_version) !== datos.cv) {
+      return res.status(401).json({ error: 'La sesión de ingreso venció. Iniciá sesión de nuevo.' });
+    }
 
     const ERR = 'Código incorrecto';
     const contador = totp.verificar(usuario.totp_secret, codigo, { ultimoContador: usuario.totp_ultimo_contador });
@@ -349,7 +361,7 @@ router.post('/2fa/verificar', async (req, res) => {
     // El SELECT de arriba no trae tenant_id: el taller sale del token parcial ya
     // verificado. Sin él la sesión recién abierta no serviría para nada (middleware/tenant
     // la corta con 401 en el primer pedido).
-    const { payload, token } = await sesionStaff({ ...usuario, tenant_id: req.db.tenantId }, req);
+    const { payload, token } = await sesionStaff({ ...usuario, tenant_id: req.db.tenantId }, req, datos.cv);
     res.json({ data: { token, tipo: 'staff', usuario: { ...payload, permisos_web: normalizarPermisos(usuario.permisos_web), ...(await casillasDeSesion(usuario.id)), preferencias: await preferenciasDe(usuario.id, usuario.rol), foto: usuario.foto || null } } });
   } catch (err) {
     if (err.code === 'SESION_NO_DISPONIBLE') return res.status(503).json({ error: 'No se pudo abrir la sesión. Intentá de nuevo.' });
@@ -723,7 +735,7 @@ router.post('/recuperar/confirmar', async (req, res) => {
       // El código llegó a esa casilla: de paso queda verificado el correo.
       const hash = await bcrypt.hash(String(password), 10);
       await db.query(
-        'UPDATE usuarios SET password_hash = ?, email_verificado = 1 WHERE id = ? AND tenant_id = @tenant',
+        'UPDATE usuarios SET password_hash = ?, email_verificado = 1, credenciales_version = credenciales_version + 1 WHERE id = ? AND tenant_id = @tenant',
         [hash, c.id]
       );
       await db.query('UPDATE usuario_reset_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
@@ -747,7 +759,9 @@ router.post('/recuperar/confirmar', async (req, res) => {
       }
       // Recibir el código prueba que se controla la casilla: de paso queda verificada.
       const hash = await bcrypt.hash(String(password), 10);
-      await db.query('UPDATE clientes SET password_hash = ?, email_verificado = 1 WHERE id = ? AND tenant_id = @tenant', [hash, c.id]);
+      // portal_version es la versión de credenciales del cliente: un login con la
+      // contraseña vieja que firme después de esto lleva la anterior (QA34-02).
+      await db.query('UPDATE clientes SET password_hash = ?, email_verificado = 1, portal_version = portal_version + 1 WHERE id = ? AND tenant_id = @tenant', [hash, c.id]);
       await db.query('UPDATE password_reset_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
       await cerrarSesionesDeCliente(c.id);
       return res.json({ message: 'Listo, tu contraseña quedó cambiada. Ya podés entrar.' });
