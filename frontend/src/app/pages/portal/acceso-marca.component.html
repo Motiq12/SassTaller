@@ -3,6 +3,12 @@
        cargó el taller y, si no cargó ninguno, sus iniciales. -->
   <app-marca-logo class="marca-logo" [tamano]="72"></app-marca-logo>
 
+  <!-- De vuelta a la página de Motiq. Solo en la puerta del producto: en el portal de
+       un taller, «/» es la página de venta de Motiq y no la de ese taller. -->
+  <a *ngIf="marca.esProducto" class="marca-volver" routerLink="/">
+    <ion-icon name="arrow-back-outline" aria-hidden="true"></ion-icon> Volver al inicio
+  </a>
+
   <!-- La figura va en su propia zona y entera. Como fondo a pantalla completa quedaba
        recortada y con el titular encima, sin importar lo bien que estuviera dibujada. -->
   <img class="marca-figura" src="assets/portal/taller-iso.webp" alt="" />
