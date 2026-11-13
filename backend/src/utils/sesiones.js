@@ -46,6 +46,46 @@ async function sidAbierto(sid, usuarioId, tenantId) {
   }
 }
 
+// QP3-06: el estado del usuario Y el de su sesión (sid), en UNA sola sentencia. Leídos
+// en dos consultas, un pedido que leyó al usuario antes de que esa misma sesión
+// cambiara la contraseña y a la sesión después comparaba la versión vieja de uno con
+// la nueva de la otra, y respondía 401 a una sesión que debía seguir abierta. Una
+// sentencia ve una sola instantánea: las dos versiones son de antes o de después del
+// cambio, que las sube juntas (cambiarContrasenaPropia).
+// Devuelve { estado, sesion }: `estado` como estadoDeSesion (null si el usuario no
+// existe), `sesion` como sidAbierto (false si está cerrada, vencida o no existe).
+// undefined si la base no respondió.
+async function estadoYSesion(usuarioId, sid, tenantId) {
+  try {
+    const [[f]] = await pool.query(
+      `SELECT u.activo, u.sesiones_desde_ms, u.rol, u.tenant_id, u.credenciales_version,
+              s.id AS sesion_id, s.cerrada AS sesion_cerrada, s.credenciales_version AS sesion_cv
+         FROM usuarios u
+         LEFT JOIN sesiones_personal s
+           ON s.sid = ? AND s.usuario_id = u.id AND s.tenant_id = ? AND s.vence > NOW()
+        WHERE u.id = ?`,
+      [sid, tenantId, usuarioId]
+    );
+    if (!f) return { estado: null, sesion: false };
+    const estado = {
+      activo: Number(f.activo) === 1,
+      sesiones_desde_ms: f.sesiones_desde_ms == null ? null : Number(f.sesiones_desde_ms),
+      rol: f.rol,
+      tenant_id: Number(f.tenant_id),
+      credenciales_version: Number(f.credenciales_version ?? 0),
+    };
+    const abierta = f.sesion_id != null && !f.sesion_cerrada;
+    if (abierta && Date.now() - (toques.get(sid) || 0) > TOQUE_MS) {
+      toques.set(sid, Date.now());
+      pool.query('UPDATE sesiones_personal SET ultima_vez = CURRENT_TIMESTAMP WHERE id = ?', [f.sesion_id]).catch(() => {});
+    }
+    return { estado, sesion: abierta ? { credenciales_version: Number(f.sesion_cv ?? 0) } : false };
+  } catch (err) {
+    console.error('⚠️  No se pudo revisar la sesión:', err.code || err.message);
+    return undefined;
+  }
+}
+
 // ¿Este token (su payload) sigue valiendo para ese estado?
 function sesionVigente(payload, estado) {
   if (!estado || !estado.activo || !Number.isFinite(payload.iat)) return false;
@@ -238,7 +278,7 @@ function olvidarCliente() {} // Compatibilidad: ya no hay caché de autorizació
 function olvidar() {}
 
 module.exports = {
-  estadoDeSesion, sidAbierto, sesionVigente, rolVigente, credencialesVigentes, cambiarContrasenaPropia, cerrarSesiones, olvidar,
+  estadoDeSesion, sidAbierto, estadoYSesion, sesionVigente, rolVigente, credencialesVigentes, cambiarContrasenaPropia, cerrarSesiones, olvidar,
   cerrarLasDemas, estadoDeCliente, cerrarSesionesDeCliente, olvidarCliente,
   describirAgente, nuevoSid, abrirSesion, sesionesAbiertas, cerrarSesionPropia, cerrarOtrasSesiones, cerrarSid,
 };

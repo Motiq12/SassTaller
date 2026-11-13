@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { estadoDeSesion, sesionVigente, rolVigente, credencialesVigentes, sidAbierto } = require('../utils/sesiones');
+const { estadoYSesion, sesionVigente, rolVigente, credencialesVigentes } = require('../utils/sesiones');
 // El scope por taller se encadena acá y no ruta por ruta: si dependiera de que cada
 // endpoint se acuerde de sumarlo, el olvido sería una fuga. Así, estar autenticado y
 // tener req.db acotado al taller son la misma cosa.
@@ -52,16 +52,17 @@ module.exports = function authMiddleware(req, res, next) {
   const cerrada = () => res.status(401).json({ error: 'Tu sesión se cerró. Volvé a iniciar sesión.', codigo: 'sesion_cerrada' });
   const noDisponible = () => res.status(503).json({ error: 'No se pudo comprobar la sesión. Intentá de nuevo.', codigo: 'sesion_no_disponible' });
   if (typeof req.usuario.sid !== 'string' || !req.usuario.sid) return cerrada();
-  return estadoDeSesion(req.usuario.id).then(async (estado) => {
-    if (estado === undefined) return noDisponible();
+  // QP3-06: usuario y sesión en una sola lectura (utils/sesiones.js → estadoYSesion),
+  // para comparar versiones de credenciales de la misma instantánea.
+  return estadoYSesion(req.usuario.id, req.usuario.sid, req.usuario.tenant_id).then((leido) => {
+    if (leido === undefined) return noDisponible();
+    const { estado, sesion } = leido;
     if (!sesionVigente(req.usuario, estado)) return cerrada();
     // QP-01: rol y taller del token contra los de la fila en este momento.
     if (!rolVigente(req.usuario, estado)) return cerrada();
-    const abierta = await sidAbierto(req.usuario.sid, req.usuario.id, req.usuario.tenant_id);
-    if (abierta === undefined) return noDisponible();
-    if (!abierta) return cerrada();
+    if (!sesion) return cerrada();
     // QA34-02: la versión de credenciales con que se abrió esta sesión, contra la de ahora.
-    if (!credencialesVigentes(abierta, estado)) return cerrada();
+    if (!credencialesVigentes(sesion, estado)) return cerrada();
     return tenant(req, res, next);
   });
 };
