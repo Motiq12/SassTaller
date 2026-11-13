@@ -16,6 +16,7 @@ const { nuevoCodigo, canjear, codigoDeSeisDigitos, VIGENCIA_MIN } = require('../
 const { enviarCodigoCorreoStaff, enviarCodigoReset } = require('../services/mailer');
 const { antibot } = require('../utils/antibot');
 const totp = require('../utils/totp');
+const { canjearCodigo } = require('../utils/codigos-un-uso');
 const { normalizarPermisos } = require('../utils/permisos-web');
 const { permisosDeUsuario } = require('../middleware/permisos');
 const {
@@ -347,8 +348,17 @@ router.post('/2fa/verificar', async (req, res) => {
     const contador = totp.verificar(usuario.totp_secret, codigo, { ultimoContador: usuario.totp_ultimo_contador });
 
     if (contador) {
-      // Guarda el período consumido: ese mismo código ya no se puede reusar.
-      await req.db.query('UPDATE usuarios SET totp_ultimo_contador = ? WHERE id = ? AND tenant_id = @tenant', [contador, usuario.id]);
+      // Guarda el período consumido: ese mismo código ya no se puede reusar. El UPDATE
+      // solo avanza si nadie consumió ya ese período (B-09): dos pedidos con el mismo
+      // código leen el mismo contador viejo, pero la fila la gana uno solo.
+      const [avance] = await req.db.query(
+        'UPDATE usuarios SET totp_ultimo_contador = ? WHERE id = ? AND tenant_id = @tenant AND totp_activado = 1 AND (totp_ultimo_contador IS NULL OR totp_ultimo_contador < ?)',
+        [contador, usuario.id, contador]
+      );
+      if (avance.affectedRows !== 1) {
+        registrarEvento('dosfa_fallido', { email: usuario.email, ip: req.ip, usuarioId: usuario.id });
+        return res.status(401).json({ error: ERR });
+      }
     } else {
       // ¿Será un código de respaldo? (un solo uso: si acierta, se elimina)
       const usado = await consumirCodigoRespaldo(req.db, usuario, codigo);
@@ -371,22 +381,37 @@ router.post('/2fa/verificar', async (req, res) => {
 
 // Busca el código entre los de respaldo del usuario. Si coincide, lo quema
 // (lo saca de la lista) para que no sirva una segunda vez.
+//
+// La quema es una comparación-e-intercambio (B-09): solo escribe si la lista sigue
+// siendo la que se leyó. Si otro pedido la cambió en el medio (quemó este mismo código
+// u otro), se relee y se vuelve a buscar: el código ya quemado no está y no entra.
 async function consumirCodigoRespaldo(db, usuario, codigo) {
-  let hashes;
-  try {
-    hashes = JSON.parse(usuario.totp_backup || '[]');
-  } catch {
-    return false;
-  }
-  if (!Array.isArray(hashes) || !hashes.length) return false;
   const limpio = totp.normalizarRespaldo(codigo);
   if (!limpio) return false;
-  for (let i = 0; i < hashes.length; i++) {
-    if (await bcrypt.compare(limpio, hashes[i])) {
-      hashes.splice(i, 1);
-      await db.query('UPDATE usuarios SET totp_backup = ? WHERE id = ? AND tenant_id = @tenant', [JSON.stringify(hashes), usuario.id]);
-      return true;
+  let actual = usuario.totp_backup;
+  for (let vuelta = 0; vuelta < 5; vuelta++) {
+    let hashes;
+    try {
+      hashes = JSON.parse(actual || '[]');
+    } catch {
+      return false;
     }
+    if (!Array.isArray(hashes) || !hashes.length) return false;
+    let i = 0;
+    while (i < hashes.length && !(await bcrypt.compare(limpio, hashes[i]))) i++;
+    if (i === hashes.length) return false;
+    const restantes = hashes.filter((_, j) => j !== i);
+    const [r] = await db.query(
+      'UPDATE usuarios SET totp_backup = ? WHERE id = ? AND tenant_id = @tenant AND totp_activado = 1 AND totp_backup = ?',
+      [JSON.stringify(restantes), usuario.id, actual]
+    );
+    if (r.affectedRows === 1) return true;
+    const [[fresco]] = await db.query(
+      'SELECT totp_backup, totp_activado FROM usuarios WHERE id = ? AND tenant_id = @tenant',
+      [usuario.id]
+    );
+    if (!fresco || !fresco.totp_activado) return false;
+    actual = fresco.totp_backup;
   }
   return false;
 }
@@ -450,10 +475,13 @@ router.post('/2fa/activar', auth, async (req, res) => {
 
     const codigos = totp.generarCodigosRespaldo();
     const hashes = await Promise.all(codigos.map(c => bcrypt.hash(totp.normalizarRespaldo(c), 10)));
-    await req.db.query(
-      'UPDATE usuarios SET totp_activado = 1, totp_backup = ?, totp_ultimo_contador = ? WHERE id = ? AND tenant_id = @tenant',
-      [JSON.stringify(hashes), contador, req.usuario.id]
+    // Solo activa quien llega primero con la clave que se leyó: dos altas simultáneas
+    // generaban dos juegos de códigos de respaldo y el primero mostrado no servía.
+    const [alta] = await req.db.query(
+      'UPDATE usuarios SET totp_activado = 1, totp_backup = ?, totp_ultimo_contador = ? WHERE id = ? AND tenant_id = @tenant AND totp_activado = 0 AND totp_secret = ?',
+      [JSON.stringify(hashes), contador, req.usuario.id, u.totp_secret]
     );
+    if (alta.affectedRows !== 1) return res.status(400).json({ error: 'La verificación en dos pasos ya está activa' });
 
     anotar(req.usuario.id, 'dosfa_on');
     res.json({ data: { codigos_respaldo: codigos }, message: 'Verificación en dos pasos activada' });
@@ -728,17 +756,14 @@ router.post('/recuperar/confirmar', async (req, res) => {
         [c.id]
       );
       if (!reg || reg.attempts >= MAX_INTENTOS_RESET) continue;
-      if (!(await bcrypt.compare(String(codigo).trim(), reg.code_hash))) {
-        await db.query('UPDATE usuario_reset_codes SET attempts = attempts + 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
-        continue;
-      }
+      // El código se quema ANTES de cambiar la contraseña, y solo uno lo quema (B-09).
+      if ((await canjearCodigo(db, 'usuario_reset_codes', reg, codigo, MAX_INTENTOS_RESET)) !== 'ok') continue;
       // El código llegó a esa casilla: de paso queda verificado el correo.
       const hash = await bcrypt.hash(String(password), 10);
       await db.query(
         'UPDATE usuarios SET password_hash = ?, email_verificado = 1, credenciales_version = credenciales_version + 1 WHERE id = ? AND tenant_id = @tenant',
         [hash, c.id]
       );
-      await db.query('UPDATE usuario_reset_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
       // Quien recupera la contraseña puede estar echando a un intruso: salen todas.
       await cerrarSesiones([c.id]);
       return res.json({ message: 'Listo, tu contraseña quedó cambiada. Ya podés entrar.' });
@@ -753,16 +778,12 @@ router.post('/recuperar/confirmar', async (req, res) => {
         [c.id]
       );
       if (!reg || reg.attempts >= MAX_INTENTOS_RESET) continue;
-      if (!(await bcrypt.compare(String(codigo).trim(), reg.code_hash))) {
-        await db.query('UPDATE password_reset_codes SET attempts = attempts + 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
-        continue;
-      }
+      if ((await canjearCodigo(db, 'password_reset_codes', reg, codigo, MAX_INTENTOS_RESET)) !== 'ok') continue;
       // Recibir el código prueba que se controla la casilla: de paso queda verificada.
       const hash = await bcrypt.hash(String(password), 10);
       // portal_version es la versión de credenciales del cliente: un login con la
       // contraseña vieja que firme después de esto lleva la anterior (QA34-02).
       await db.query('UPDATE clientes SET password_hash = ?, email_verificado = 1, portal_version = portal_version + 1 WHERE id = ? AND tenant_id = @tenant', [hash, c.id]);
-      await db.query('UPDATE password_reset_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
       await cerrarSesionesDeCliente(c.id);
       return res.json({ message: 'Listo, tu contraseña quedó cambiada. Ya podés entrar.' });
     }

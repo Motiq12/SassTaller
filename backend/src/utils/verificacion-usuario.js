@@ -12,6 +12,7 @@
 // 10 minutos, un solo uso, tope de intentos), sobre su propia tabla.
 const bcrypt = require('bcrypt');
 const crypto = require('node:crypto');
+const { canjearCodigo } = require('./codigos-un-uso');
 
 const VIGENCIA_MIN = 10;
 const MAX_INTENTOS = 5;
@@ -53,15 +54,12 @@ async function canjear(db, usuarioId, codigo) {
   if (!reg) return 'El código venció o ya se usó. Pedí uno nuevo.';
   if (reg.attempts >= MAX_INTENTOS) return 'Demasiados intentos con ese código. Pedí uno nuevo.';
 
-  if (!(await bcrypt.compare(String(codigo || ''), reg.code_hash))) {
-    await db.query(
-      'UPDATE usuario_verify_codes SET attempts = attempts + 1 WHERE id = ? AND tenant_id = @tenant',
-      [reg.id]
-    );
-    return 'El código no es correcto.';
-  }
+  // Intento contado y código quemado por la base (B-09): de dos pedidos con el mismo
+  // código, uno solo verifica.
+  const resultado = await canjearCodigo(db, 'usuario_verify_codes', reg, codigo, MAX_INTENTOS);
+  if (resultado === 'incorrecto') return 'El código no es correcto.';
+  if (resultado !== 'ok') return 'El código venció o ya se usó. Pedí uno nuevo.';
 
-  await db.query('UPDATE usuario_verify_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
   await db.query(
     'UPDATE usuarios SET email_verificado = 1 WHERE id = ? AND tenant_id = @tenant',
     [usuarioId]

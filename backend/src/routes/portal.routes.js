@@ -14,6 +14,8 @@ const {
 const MAX_MOTIVO = 1000;
 const MAX_MOTIVO_RECHAZO = 1000;
 const { consumir } = require('../utils/rate-limit');
+const { canjearCodigo } = require('../utils/codigos-un-uso');
+const { bloquearAgenda } = require('../utils/cupos');
 const {
   enviarCodigoReset, enviarCodigoLogin, enviarCodigoVerificacion,
   enviarCodigoCambioCorreo, enviarAvisoCambioCorreo,
@@ -358,13 +360,10 @@ router.post('/registro/verificar', async (req, res) => {
     );
     if (!reg || reg.attempts >= 5) return invalido(res, 'codigo', ERR_CODIGO);
 
-    const ok = await bcrypt.compare(String(codigo).trim(), reg.code_hash);
-    if (!ok) {
-      await req.db.query('UPDATE email_verify_codes SET attempts = attempts + 1 WHERE tenant_id = @tenant AND id = ?', [reg.id]);
-      return invalido(res, 'codigo', ERR_CODIGO);
-    }
+    // El código se cuenta y se quema en la base (B-09): con dos pedidos simultáneos con
+    // el mismo código, uno solo abre la sesión.
+    if ((await canjearCodigo(req.db, 'email_verify_codes', reg, codigo, 5)) !== 'ok') return invalido(res, 'codigo', ERR_CODIGO);
 
-    await req.db.query('UPDATE email_verify_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
     await req.db.query('UPDATE clientes SET email_verificado = 1 WHERE id = ? AND tenant_id = @tenant', [cliente.id]);
 
     const { payload, token } = tokenCliente(cliente);
@@ -461,11 +460,9 @@ router.post('/recuperar/confirmar', async (req, res) => {
     );
     if (!reg || reg.attempts >= 5) return invalido(res, 'codigo', ERR_CODIGO);
 
-    const ok = await bcrypt.compare(String(codigo).trim(), reg.code_hash);
-    if (!ok) {
-      await req.db.query('UPDATE password_reset_codes SET attempts = attempts + 1 WHERE tenant_id = @tenant AND id = ?', [reg.id]);
-      return invalido(res, 'codigo', ERR_CODIGO);
-    }
+    // Quemado antes de tocar la contraseña: dos pedidos con el mismo código no la
+    // cambian dos veces ni abren dos sesiones (B-09).
+    if ((await canjearCodigo(req.db, 'password_reset_codes', reg, codigo, 5)) !== 'ok') return invalido(res, 'codigo', ERR_CODIGO);
 
     // Completar el reset por correo prueba que se controla la bandeja: de paso
     // verifica la cuenta (cierra el reset como atajo para "reclamar" sin verificar).
@@ -476,7 +473,6 @@ router.post('/recuperar/confirmar', async (req, res) => {
       'UPDATE clientes SET password_hash = ?, email_verificado = 1, portal_version = portal_version + 1 WHERE id = ? AND tenant_id = @tenant RETURNING portal_version',
       [hash, cliente.id]
     );
-    await req.db.query('UPDATE password_reset_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
     // Salen todas las sesiones anteriores; la que se abre abajo es posterior y vale.
     await cerrarSesionesDeCliente(cliente.id);
 
@@ -548,13 +544,9 @@ router.post('/otp/verificar', async (req, res) => {
     );
     if (!reg || reg.attempts >= 5) return invalido(res, 'codigo', ERR_CODIGO);
 
-    const ok = await bcrypt.compare(String(codigo).trim(), reg.code_hash);
-    if (!ok) {
-      await req.db.query('UPDATE login_codes SET attempts = attempts + 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
-      return invalido(res, 'codigo', ERR_CODIGO);
-    }
+    // Un código, una sesión (B-09): la base deja quemarlo a un solo pedido.
+    if ((await canjearCodigo(req.db, 'login_codes', reg, codigo, 5)) !== 'ok') return invalido(res, 'codigo', ERR_CODIGO);
 
-    await req.db.query('UPDATE login_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
     // Entrar con el código prueba que se controla la bandeja, pero NO que la contraseña
     // pendiente sea de quien entra: pudo ponerla otro "reclamando" la cuenta en
     // /registro. Promover ahí la volvería válida y le daría la cuenta a ese otro. Por
@@ -863,10 +855,8 @@ router.post('/perfil/email/confirmar', async (req, res) => {
     );
     if (!reg || reg.attempts >= 5) return invalido(res, 'codigo', ERR_CODIGO);
 
-    if (!(await bcrypt.compare(String(codigo).trim(), reg.code_hash))) {
-      await req.db.query('UPDATE email_verify_codes SET attempts = attempts + 1 WHERE tenant_id = @tenant AND id = ?', [reg.id]);
-      return invalido(res, 'codigo', ERR_CODIGO);
-    }
+    // Quemado antes de cambiar el correo, y por un solo pedido (B-09).
+    if ((await canjearCodigo(req.db, 'email_verify_codes', reg, codigo, 5)) !== 'ok') return invalido(res, 'codigo', ERR_CODIGO);
 
     // Se vuelve a comprobar acá: entre el pedido y la confirmación alguien más pudo
     // haberse quedado con ese correo.
@@ -875,7 +865,6 @@ router.post('/perfil/email/confirmar', async (req, res) => {
       return invalido(res, 'email', 'Ese correo ya está en uso por otra cuenta', 409);
     }
 
-    await req.db.query('UPDATE email_verify_codes SET used = 1 WHERE id = ? AND tenant_id = @tenant', [reg.id]);
     await req.db.query(
       'UPDATE clientes SET email = email_pendiente, email_verificado = 1, email_pendiente = NULL WHERE id = ? AND tenant_id = @tenant',
       [req.cliente.id]
@@ -1526,18 +1515,27 @@ router.put('/citas/:id', async (req, res) => {
 
     // Cupo atómico de la NUEVA franja (por sucursal), excluyendo esta misma cita: en
     // todas las horas que dura (si administración la alargó) y sin horas bloqueadas.
+    // El candado del día de destino (utils/cupos.js) va antes de contar: otra reserva o
+    // reprogramación a ese día espera a que esta confirme (B-13).
     const conn = await req.db.conexion();
     try {
       await conn.beginTransaction();
+      await bloquearAgenda(conn, sucursalId, fecha);
       const dia = await agendaDia(fecha, sucursalId, config, { db: conn, bloquear: true, excluirId: req.params.id });
       if (conflictosDeCita(dia, hora, cita.duracion_horas, Number(config.max_citas_hora) || 1).length) {
         await conn.rollback();
         return invalido(res, 'hora', 'Esa hora ya no está disponible, elige otra.');
       }
-      await conn.query(
-        'UPDATE citas SET vehiculo_id = ?, fecha = ?, hora = ?, motivo = ?, sucursal_id = ? WHERE tenant_id = @tenant AND id = ?',
+      // Sigue agendada y sin orden: si el taller la canceló o le abrió una orden
+      // mientras tanto, no se mueve.
+      const [movida] = await conn.query(
+        "UPDATE citas SET vehiculo_id = ?, fecha = ?, hora = ?, motivo = ?, sucursal_id = ? WHERE tenant_id = @tenant AND id = ? AND estado = 'agendado' AND orden_id IS NULL",
         [vehiculo_id, fecha, hora, motivo, sucursalId, req.params.id]
       );
+      if (movida.affectedRows !== 1) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'Esta cita ya no se puede modificar. Comunícate con el taller.' });
+      }
       await guardarServiciosCita(req.params.id, servicios, conn);
       const [[actualizada]] = await conn.query(
         `SELECT ci.id, ci.fecha, ci.hora, ci.motivo, ci.tipo_servicio, ci.servicios, ci.estado, m.marca, m.modelo, m.placa
@@ -1606,13 +1604,15 @@ router.post('/citas', async (req, res) => {
       return invalido(res, 'descripcion', `La descripción no puede pasar de ${MAX_MOTIVO} caracteres`);
     }
 
-    // Cupo atómico: una transacción bloquea las citas del día (FOR UPDATE), cuenta y
-    // recién ahí inserta. Dos solicitudes simultáneas se serializan, así nunca se
-    // superan las citas por hora (evita la carrera del COUNT+INSERT). Cuenta también
-    // las citas largas que pasan por esa hora, y no deja agendar en horas bloqueadas.
+    // Cupo atómico: una transacción toma el candado de la agenda de ese día en esa sede
+    // (utils/cupos.js), cuenta y recién ahí inserta. Dos solicitudes simultáneas se
+    // serializan, así nunca se superan las citas por hora (la carrera del COUNT+INSERT,
+    // B-13: el FOR UPDATE solo no frenaba a una fila nueva). Cuenta también las citas
+    // largas que pasan por esa hora, y no deja agendar en horas bloqueadas.
     const conn = await req.db.conexion();
     try {
       await conn.beginTransaction();
+      await bloquearAgenda(conn, sucursalId, fecha);
       const dia = await agendaDia(fecha, sucursalId, config, { db: conn, bloquear: true });
       if (conflictosDeCita(dia, hora, 1, Number(config.max_citas_hora) || 1).length) {
         await conn.rollback();
