@@ -133,7 +133,8 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     const citaB = await pedir('POST', '/citas', { token: Bb.token, body: { ...datosCita(clienteB, vehB, sb.id), descripcion: 'x', motivo: 'x' } });
     ok(citaB.status < 300, 'B agenda a la misma hora: el cupo es de cada una', citaB.json);
     const citaCruzada = await pedir('POST', '/citas', { token: Bb.token, body: { ...datosCita(clienteB, vehB, sa.id), descripcion: 'x', motivo: 'x', hora: '11:00' } });
-    ok(citaCruzada.status >= 400 || citaCruzada.json.data.sucursal_id !== sa.id, 'B no puede agendar en la sucursal de A', citaCruzada.json);
+    // Rechazo explícito (QP-06): antes se aceptaba y se guardaba sin sede.
+    ok(citaCruzada.status === 400 && citaCruzada.json.campo === 'sucursal_id', 'B no puede agendar en la sucursal de A', citaCruzada.json);
     const datosOrden = (cliente, veh, suc) => ({ cliente_id: cliente, vehiculo_id: veh, moto_id: veh, sucursal_id: suc, descripcion: CANARIO, diagnostico: CANARIO, trabajo_solicitado: CANARIO, problema_reportado: CANARIO, tipo_servicio: 'Revisión general', servicio: 'Revisión general' });
     const oa = await pedir('POST', '/ordenes', { token: A.token, body: datosOrden(clienteA, vehA, sa.id) });
     const ob = await pedir('POST', '/ordenes', { token: Bb.token, body: { ...datosOrden(clienteB, vehB, sb.id), descripcion: 'x', diagnostico: 'x', trabajo_solicitado: 'x', problema_reportado: 'x' } });
@@ -275,7 +276,7 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     ok(sigue.status === 200, 'la sesión de B siguió viva durante toda la prueba', sigue.status);
 
     // Lo que B escribió nunca apunta a filas de A.
-    const padres = { cliente_id: 'clientes', vehiculo_id: 'vehiculos', moto_id: 'vehiculos', cita_id: 'citas', orden_id: 'ordenes_trabajo', sucursal_id: 'sucursales', tecnico_id: 'usuarios', usuario_id: 'usuarios', remitente_id: 'usuarios', asignado_a: 'usuarios', rol_id: 'roles' };
+    const padres = { cliente_id: 'clientes', vehiculo_id: 'vehiculos', moto_id: 'vehiculos', cita_id: 'citas', orden_id: 'ordenes_trabajo', sucursal_id: 'sucursales', tecnico_id: 'usuarios', usuario_id: 'usuarios', remitente_id: 'usuarios', destino_id: 'usuarios', recepcionista_id: 'usuarios', aplicado_por: 'usuarios', asignado_a: 'usuarios', rol_id: 'roles' };
     const [cols] = await db.query("SELECT c.TABLE_NAME t, c.COLUMN_NAME col FROM information_schema.COLUMNS c JOIN information_schema.COLUMNS tn ON tn.TABLE_SCHEMA = c.TABLE_SCHEMA AND tn.TABLE_NAME = c.TABLE_NAME AND tn.COLUMN_NAME = 'tenant_id' WHERE c.TABLE_SCHEMA = current_schema()");
     let revisadas = 0;
     for (const { t, col } of cols) {
@@ -512,6 +513,11 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
       ok(r.status === 400, `B no puede ${met} ${ruta} con un id de A (${Object.keys(body).filter((k) => /_id$/.test(k)).join(', ')})`, [r.status, r.json && r.json.error]);
     }
     const citaDeB = (await pedir('GET', '/citas', { token: Bb.token })).json.data[0];
+    // QP-02: el canje de cortesía de B no puede colgarse de una orden de A.
+    await db.query('UPDATE clientes SET cortesia_disponible = 1 WHERE id = ?', [clienteB]);
+    const canjeAjeno = await pedir('PATCH', `/clientes/${clienteB}/cortesia`, { token: Bb.token, body: { orden_id: ordenA } });
+    const [[trasCanje]] = await db.query('SELECT cortesia_disponible AS c, (SELECT COUNT(*) FROM recompensas_canjeadas WHERE orden_id = ? AND tenant_id = ?) AS n FROM clientes WHERE id = ?', [ordenA, Bb.id, clienteB]);
+    ok(canjeAjeno.status === 404 && canjeAjeno.json.campo === 'orden_id' && Number(trasCanje.c) === 1 && trasCanje.n === 0, 'B no puede canjear la cortesía de su cliente sobre una orden de A', [canjeAjeno.status, canjeAjeno.json, trasCanje]);
     const asignarAjeno = await pedir('PATCH', `/citas/${citaDeB.id}/asignar`, { token: Bb.token, body: { tecnico_id: m1.id } });
     ok(asignarAjeno.status === 400, 'B no puede asignarle su cita a un mecánico de A', asignarAjeno.json);
     const [[{ cruzadas }]] = await db.query(
@@ -556,12 +562,36 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
       try { await ejecutar(); ok(true, `dinero: ${nombre}`); } catch (e) { ok(false, `dinero: ${nombre}`, e.message); }
     }
 
+    // ── T04: ids de A en el CUERPO de las altas y ediciones de B (los mismos casos que
+    // npm test), con cada papel de B. Sesiones nuevas: la suspensión de arriba cerró las de B. ──
+    const { casosReferencias, conciliar } = require('./lib/casos-referencias');
+    const entrar = async (email) => (await pedir('POST', '/auth/login', { body: { email, password: 'ClaveSegura123' } })).json?.data?.token;
+    const idDe = async (email) => (await db.query('SELECT id FROM usuarios WHERE tenant_id = ? AND LOWER(email) = ?', [Bb.id, email]))[0][0].id;
+    const ctxRef = {
+      db, pedir: (met, ruta, opciones) => pedir(met, ruta, opciones), conexionAparte: () => abrir(URL_BASE.href),
+      propio: {
+        tenantId: Bb.id, sedeId: sb.id, clienteId: clienteB, vehiculoId: vehB,
+        adminId: await idDe(`beta-${sello}@prueba.test`), recepcionId: await idDe(`recepcion-${sello}@prueba.test`), tecnicoId: await idDe(`tecnico-${sello}@prueba.test`),
+        tokens: {
+          admin: await entrar(`beta-${sello}@prueba.test`), recepcion: await entrar(`recepcion-${sello}@prueba.test`), tecnico: await entrar(`tecnico-${sello}@prueba.test`),
+          cliente: sesiones.cliente,
+        },
+      },
+      otro: { tenantId: A.id },
+    };
+    ok(Object.values(ctxRef.propio.tokens).every(Boolean), 'B vuelve a entrar con sus tres papeles para la prueba de referencias');
+    for (const [nombre, ejecutar] of casosReferencias(ctxRef)) {
+      try { await ejecutar(); ok(true, `referencias: ${nombre}`); } catch (e) { ok(false, `referencias: ${nombre}`, e.message); }
+    }
+
     // ── Cuadre de la base ──
     const hijos = [['vehiculos', 'cliente_id', 'clientes'], ['citas', 'cliente_id', 'clientes'], ['citas', 'sucursal_id', 'sucursales'], ['ordenes_trabajo', 'cliente_id', 'clientes'], ['ordenes_trabajo', 'sucursal_id', 'sucursales'], ['cita_servicios', 'cita_id', 'citas'], ['usuarios', 'sucursal_id', 'sucursales'], ['sesiones_personal', 'usuario_id', 'usuarios'], ['actividad_personal', 'usuario_id', 'usuarios']];
     for (const [h, col, p] of hijos) {
       const [[{ n }]] = await db.query(`SELECT COUNT(*) n FROM ${h} x JOIN ${p} y ON y.id = x.${col} WHERE x.tenant_id <> y.tenant_id`);
       ok(n === 0, `cuadre ${h}.${col} -> ${p}: ${n} cruzados`);
     }
+    const conciliacion = await conciliar(db);
+    ok(conciliacion.problemas.length === 0, `conciliación: ${conciliacion.revisadas} relaciones y recompensas_canjeadas cuadran`, conciliacion.problemas);
     const [dflt] = await db.query(`SELECT TABLE_NAME t FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = current_schema() AND COLUMN_NAME = 'tenant_id' AND COLUMN_DEFAULT IS NOT NULL AND COLUMN_DEFAULT <> 'NULL'`);
     ok(dflt.length === 0, 'ninguna tabla le pone taller por defecto', dflt.map((x) => x.t));
     await db.end();
