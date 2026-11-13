@@ -15,7 +15,7 @@ import { MensajesService } from '../../services/mensajes.service';
 @Component({ standalone: false,
   selector: 'app-cliente-detalle',
   templateUrl: './cliente-detalle.page.html',
-  styleUrls: ['./cliente-detalle.page.scss'],
+  styleUrls: ['../../../theme/panel/base.scss', '../../../theme/panel/contenidos.scss', '../../../theme/panel/agenda.scss', '../../../theme/panel/capsulas.scss', '../../../theme/panel/estandar.scss', './cliente-detalle.page.scss'],
 })
 export class ClienteDetallePage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();

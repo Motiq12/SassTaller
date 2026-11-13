@@ -14,7 +14,7 @@ import { Moto } from '../../models/moto.model';
 @Component({ standalone: false,
   selector: 'app-nueva-orden',
   templateUrl: './nueva-orden.page.html',
-  styleUrls: ['./nueva-orden.page.scss'],
+  styleUrls: ['../../../theme/panel/base.scss', '../../../theme/panel/contenidos.scss', '../../../theme/panel/agenda.scss', '../../../theme/panel/capsulas.scss', '../../../theme/panel/estandar.scss', './nueva-orden.page.scss'],
 })
 export class NuevaOrdenPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();

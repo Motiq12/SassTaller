@@ -1,0 +1,101 @@
+// El contenido del panel: tarjetas, KPIs, barras, tablas, botones, empleados, promos y vacíos. Formularios, filtros, buscador y subida de imágenes viven en capsulas.scss.
+// Parte de la hoja del panel (F-03): ya no vive en global.scss, que cargaba toda la
+// app. La incluyen las páginas anfitrionas (admin-shell, recepcion-tabs,
+// mecanico-tabs, tabs, PortalTabsPage y las pantallas sueltas del panel/portal);
+// ::ng-deep hace que se inyecte sin encapsular, igual que cuando era global.
+::ng-deep {
+.admin-dark {
+  .admin { max-width: 1120px; margin: 0 auto; padding: 18px 16px 60px; }
+  .cd { background: var(--sur); border: 1px solid var(--bd); border-radius: 8px; padding: 20px; }
+  .cd-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--tx3); margin-bottom: 14px; display: block; }
+  .mb { margin-bottom: 18px; }
+  .section-sub { font-family: var(--fd); font-size: 16px; font-weight: 800; margin-bottom: 14px; color: var(--tx); }
+  .g2 { display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 18px; }
+  .g21 { display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 18px; }
+  .mono { font-family: var(--fm); font-feature-settings: "tnum" 1; }
+
+  .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+  .kpi { background: var(--sur); border: 1px solid var(--bd); border-radius: 8px; padding: 18px; position: relative; overflow: hidden;
+    &::after { content: ''; position: absolute; top: -20px; right: -20px; width: 80px; height: 80px; border-radius: 50%; opacity: .08; }
+    &.cr::after { background: var(--cr); } &.em::after { background: var(--em); } &.am::after { background: var(--am); } &.in::after { background: var(--in); }
+    .kpi-label { font-size: 11px; font-weight: 700; color: var(--tx3); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+    .kpi-val { font-family: var(--fd); font-size: 28px; font-weight: 900; letter-spacing: 0; line-height: 1; }
+    &.cr .kpi-val { color: var(--cr-tx); } &.em .kpi-val { color: var(--em); } &.am .kpi-val { color: var(--am); } &.in .kpi-val { color: var(--in); } }
+
+  .bar-item { margin-bottom: 12px; &:last-child { margin-bottom: 0; } }
+  .bar-head { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; gap: 10px;
+    span { color: var(--tx2); } strong { color: var(--tx); font-family: var(--fm); white-space: nowrap; } }
+  .bar-track { height: 8px; background: var(--sur3); border-radius: 2px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--cr), var(--ion-color-primary-tint)); }
+
+  .tbl { width: 100%; border-collapse: collapse;
+    th { text-align: left; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--tx3); padding: 10px 12px; border-bottom: 1px solid var(--bd); white-space: nowrap; }
+    td { padding: 11px 12px; font-size: 13px; border-bottom: 1px solid var(--bd2); vertical-align: middle; color: var(--tx); }
+    tr:last-child td { border-bottom: none; }
+    .mono { font-family: var(--fm); font-size: 12px; } }
+  .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch;
+    position: relative;
+    &::after { content: ''; position: sticky; right: 0; top: 0; bottom: 0; width: 24px;
+      background: linear-gradient(to left, var(--sur), transparent); pointer-events: none; } }
+  .pct-bar { height: 5px; background: var(--sur3); border-radius: 2px; overflow: hidden; margin-top: 3px; width: 80px; }
+  .pct-fill { height: 100%; background: var(--cr); border-radius: 2px; }
+
+  .fw-bold { font-weight: 600; }
+  .clr-em { color: var(--em); }
+  .clr-rd { color: var(--rd); }
+  .clr-cr { color: var(--cr-tx); }
+  .clr-am { color: var(--am); }
+  .clr-in { color: var(--in); }
+
+  .bg { font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 2px; display: inline-flex; white-space: nowrap; }
+  .bg-cr { background: var(--adm-cr-bg); color: var(--adm-cr-fg); } .bg-am { background: var(--adm-am-bg); color: var(--adm-am-fg); }
+  .bg-em { background: var(--adm-em-bg); color: var(--adm-em-fg); } .bg-in { background: var(--adm-in-bg); color: var(--adm-in-fg); }
+  .bg-n { background: var(--sur2); color: var(--tx2); } .bg-rd { background: var(--adm-rd-bg); color: var(--adm-rd-fg); }
+
+  .btn { padding: 12px 20px; border-radius: 2px; font-family: var(--fd); font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; cursor: pointer; border: none; background: var(--sur3); color: var(--tx);
+    min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background .15s, border-color .15s; ion-icon { font-size: 16px; }
+    &:active { transform: scale(.97); } &:disabled { opacity: .5; } }
+  .btn-cr { background: var(--cr); color: #fff; &:hover { background: var(--cr-d); } }
+  .btn-ou { background: none; border: 1px solid var(--bd); color: var(--tx2); &:hover { border-color: var(--tx2); color: var(--tx); } }
+  .btn-em { background: var(--adm-em-bg); color: var(--adm-em-fg); border: 1px solid var(--adm-em-bd); }
+  .btn-rd { background: var(--adm-rd-bg); color: var(--adm-rd-fg); border: 1px solid var(--adm-rd-bd); }
+  .btn-am { background: var(--adm-am-bg); color: var(--adm-am-fg); border: 1px solid var(--adm-am-bd); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 2px; }
+  .btn-block { width: 100%; padding: 12px; }
+
+
+
+  // La fila envuelve: en pantallas angostas el bloque de acciones (estado +
+  // activar/desactivar + eliminar) no cabe junto al nombre, y sin wrap estiraba
+  // la tarjeta y desbordaba toda la página en horizontal.
+  .emp-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px; background: var(--sur2); border-radius: 2px; margin-bottom: 10px; border: 1px solid var(--bd);
+    &.inactivo { opacity: .55; }
+    .emp-av { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0; background: var(--cr);
+      &.in { background: var(--ion-color-tertiary); } &.am { background: #78350F; } &.off { background: var(--sur3); } }
+    // Con base 140px pide su espacio, pero cede y deja que las acciones bajen a otra línea.
+    .emp-info { flex: 1 1 140px; min-width: 0; strong { display: block; font-size: 13px; font-weight: 700; } span { display: block; font-size: 11px; color: var(--tx3); margin-top: 1px; } }
+    // margin-left:auto lo mantiene pegado a la derecha, tanto en una línea como al envolver.
+    .emp-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; } }
+
+  .promo-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  @media (min-width: 640px) { .promo-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (min-width: 1024px) { .promo-grid { grid-template-columns: repeat(3, 1fr); } }
+  .promo-card { background: var(--sur2); border: 1px solid var(--bd); border-radius: 8px; overflow: hidden;
+    &.inactiva { opacity: .55; }
+    .promo-img { width: 100%; height: 90px; object-fit: cover; display: block; }
+    .promo-img-ph { height: 80px; display: flex; align-items: center; justify-content: center; font-size: 28px; background: linear-gradient(135deg, var(--adm-cr-bg), var(--sur3)); }
+    .promo-body { padding: 12px; }
+    .promo-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; h4 { font-size: 14px; font-weight: 700; margin: 0; } }
+    .promo-body p { font-size: 11px; color: var(--tx2); margin: 0 0 8px; line-height: 1.5; }
+    .promo-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .promo-price { font-family: var(--fm); font-size: 14px; font-weight: 700; color: var(--em); }
+    .promo-btns { display: flex; gap: 6px; flex-wrap: wrap; } }
+
+  .empty { text-align: center; padding: 48px 20px; color: var(--tx3);
+    ion-icon { font-size: 46px; opacity: .4; display: block; margin: 0 auto 10px; } p { font-size: 13px; margin: 0; } }
+  .placeholder { text-align: center; padding: 70px 24px; color: var(--tx3);
+    ion-icon { font-size: 54px; opacity: .35; display: block; margin: 0 auto 14px; color: var(--cr); }
+    h3 { font-family: var(--fd); font-size: 18px; color: var(--tx); margin: 0 0 6px; } p { font-size: 13px; margin: 0; } }
+  .sk-dark { background: linear-gradient(90deg, var(--sur2) 25%, var(--sur3) 37%, var(--sur2) 63%); background-size: 400% 100%; animation: shimmer 1.5s infinite; border-radius: 2px; min-height: 20px; }
+}
+}

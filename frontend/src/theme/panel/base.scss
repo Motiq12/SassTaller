@@ -1,0 +1,126 @@
+// La cáscara del panel: topbar, sidebar y el arranque del tema .admin-dark (tokens y menú lateral con su usuario). El isotipo de las toolbars vive en capsulas.scss.
+// Parte de la hoja del panel (F-03): ya no vive en global.scss, que cargaba toda la
+// app. La incluyen las páginas anfitrionas (admin-shell, recepcion-tabs,
+// mecanico-tabs, tabs, PortalTabsPage y las pantallas sueltas del panel/portal);
+// ::ng-deep hace que se inyecte sin encapsular, igual que cuando era global.
+::ng-deep {
+
+.admin-topbar {
+  --background: var(--adm-sur); --color: var(--adm-tx); --border-color: var(--adm-bd); --border-width: 0 0 1px 0;
+  ion-title { font-family: 'Rajdhani', sans-serif; font-weight: 800; letter-spacing: 0; font-size: 17px; }
+  ion-menu-button, ion-buttons ion-button { --color: var(--adm-tx2); }
+  // Acciones del topbar (fecha de hoy + botón Nueva cita), estilo del mockup.
+  app-admin-actions { display: flex; align-items: center; gap: 8px; padding-right: 6px; }
+  .adm-date { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: var(--adm-tx2);
+    background: var(--adm-sur2); border: 1px solid var(--adm-bd); border-radius: 2px; padding: 5px 12px; white-space: nowrap; }
+  .adm-nueva { --background: var(--ion-color-primary); --background-hover: var(--ion-color-primary-shade); --background-activated: var(--ion-color-primary-shade); --color: #fff;
+    --border-radius: 2px; --box-shadow: none; font-weight: 700; text-transform: none; font-size: 12px; letter-spacing: 0; margin: 0;
+    flex-shrink: 0;
+    ion-icon { font-size: 15px; }
+    .adm-nueva-txt { margin-left: 5px; white-space: nowrap; }
+  }
+  // El título necesita poder recortarse: si no, empuja al botón fuera de la barra.
+  ion-title { min-width: 0; }
+}
+@media (max-width: 640px) { .admin-topbar .adm-date { display: none; } }
+// Debajo de 560px el título largo ("Gestión de Citas y Órdenes") y el botón no
+// conviven: se deja el botón como un "+" compacto y el título recupera el ancho.
+@media (max-width: 560px) {
+  .admin-topbar .adm-nueva .adm-nueva-txt { display: none; }
+  .admin-topbar .adm-nueva { --padding-start: 7px; --padding-end: 7px; }
+  .admin-topbar .adm-nueva ion-icon { font-size: 18px; }
+}
+.admin-sidebar { --width: 256px; --background: var(--adm-sur); --border-color: var(--adm-bd); }
+ion-footer.admin-dark { background: var(--adm-sur); }
+.admin-dark {
+  // Superficies, bordes, textos y acentos: los valores de cada tema están en
+  // variables.scss (--adm-*); aquí solo se les dan los nombres cortos de siempre.
+  --sur: var(--adm-sur); --sur2: var(--adm-sur2); --sur3: var(--adm-sur3);
+  --bd: var(--adm-bd); --bd2: var(--adm-bd2);
+  --tx: var(--adm-tx); --tx2: var(--adm-tx2); --tx3: var(--adm-tx3);
+  --cr: var(--ion-color-primary); --cr-d: var(--ion-color-primary-shade);
+  // El rojo como TEXTO (números, enlaces, la fecha de hoy): el de marca da 3,5 a 3,8:1
+  // sobre el panel oscuro. --cr queda para los fondos (botones, el menú elegido).
+  --cr-tx: var(--adm-cr-fg);
+  --em: var(--adm-em); --am: var(--adm-am);
+  --in: var(--adm-in); --rd: var(--adm-rd);
+  --fd: 'Rajdhani', 'Inter', sans-serif;
+  --fm: 'JetBrains Mono', ui-monospace, monospace;
+  --background: var(--adm-bg);
+  // El color del texto de adentro. `color` de aquí abajo NO alcanza: lo que va
+  // dentro de ion-content lo hereda de su capa interna, que usa `--color`, y por
+  // defecto `--color` es el color de texto del TEMA del dispositivo. En tema
+  // oscuro es claro y todo se veía bien de casualidad; en tema claro es negro,
+  // y cada texto del panel sin color propio quedaba negro sobre fondo oscuro
+  // (los días en Configuración, los nombres en Empleados y en Servicios…).
+  --color: var(--tx);
+  color: var(--tx);
+  font-family: 'Inter', sans-serif;
+
+  // ── Menú lateral (panel, recepción y mecánico) ──
+  .sidebar-content { --background: var(--adm-sur); }
+  .sb-logo { padding: 22px 20px 18px; border-bottom: 1px solid var(--bd);
+    .sb-brand { width: 138px; max-width: 100%; height: auto; display: block; margin-bottom: 12px; }
+    .sb-brand.dark-only { display: none; }
+    // Reemplaza al logotipo fijo: isotipo del taller (o sus iniciales) junto a su
+    // nombre. Antes era un .sb-brand con el logotipo de MS Motos, que traía el
+    // nombre dibujado adentro — por eso ahora el nombre va como texto aparte.
+    .sb-marca { display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+      h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
+    h1 { font-family: var(--fd); font-size: 20px; font-weight: 900; letter-spacing: 0; margin: 0; .dot { color: var(--cr); } }
+    span { font-size: 11px; color: var(--tx3); font-weight: 600; }
+    .sb-rotulo { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border: 1px solid var(--bd2); border-radius: 2px;
+      font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--tx3);
+      &::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--cr); } } }
+  .sb-nav { padding: 14px 12px 18px; }
+  // Carpetas del menú (se abren y cierran): ícono propio, nombre legible y flecha que gira.
+  .sb-carpeta { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; margin-top: 2px;
+    background: none; border: none; border-radius: 2px; cursor: pointer; font-family: inherit; text-align: left;
+    font-size: 13px; font-weight: 600; letter-spacing: 0; color: var(--tx2); transition: background .15s, color .15s;
+    ion-icon { font-size: 17px; flex-shrink: 0; color: var(--tx3); transition: color .15s; }
+    .sb-carpeta-txt { flex: 1; min-width: 0; }
+    .sb-chev { font-size: 13px; transition: transform .2s ease; &.abierta { transform: rotate(90deg); } }
+    &:hover { color: var(--tx); background: var(--sur2); ion-icon { color: var(--tx2); } }
+    &.actual { color: var(--tx); > ion-icon:first-child { color: var(--cr-tx); } }
+    &:focus-visible { outline: 2px solid var(--cr); outline-offset: -2px; }
+    .nav-badge { min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800; letter-spacing: 0; color: #fff; background: var(--cr); border-radius: 9px; } }
+  // Lo de adentro de una carpeta: con una guía a la izquierda, como un árbol.
+  .sb-carpeta-items { position: relative; margin: 2px 0 8px 18px; padding-left: 10px; border-left: 1px solid var(--bd);
+    .nav-item { padding: 8px 10px; font-size: 13px; font-weight: 500; ion-icon { font-size: 16px; } } }
+  .nav-item.sb-suelto { margin: 2px 0 4px; font-weight: 600; }
+  .sb-section { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; color: var(--tx3); padding: 16px 10px 6px; }
+  .nav-item { position: relative; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 2px; font-size: 13px; font-weight: 600;
+    color: var(--tx2); cursor: pointer; margin-bottom: 1px; text-decoration: none; transition: background .15s, color .15s;
+    ion-icon { font-size: 17px; flex-shrink: 0; color: var(--tx3); transition: color .15s; }
+    &:hover { background: var(--sur2); color: var(--tx); ion-icon { color: var(--tx2); } }
+    &:focus-visible { outline: 2px solid var(--cr); outline-offset: -2px; }
+    // Elegido: fondo suave y una barra roja, en vez de todo el bloque rojo.
+    &.on { background: color-mix(in srgb, var(--cr) 13%, transparent); color: var(--tx); font-weight: 700;
+      ion-icon { color: var(--cr-tx); }
+      &::before { content: ''; position: absolute; left: -11px; top: 6px; bottom: 6px; width: 3px; border-radius: 2px; background: var(--cr); } }
+    .nav-badge { margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800; color: #fff; background: var(--cr);
+      border-radius: 9px; } }
+  // Los sueltos (Resumen, Mi perfil) no tienen guía: la barra va pegada al borde.
+  .sb-nav > .nav-item.on::before { left: 0; }
+  .nav-item.sb-suelto.on::before { left: 0; }
+  .nav-item--web { margin-top: 10px; border-top: 1px solid var(--bd); border-radius: 0; padding-top: 14px; color: var(--tx3); font-weight: 500; }
+  .sb-user { display: flex; align-items: center; gap: 10px; margin: 10px; padding: 10px 12px; background: var(--sur2); border: 1px solid var(--bd); border-radius: 8px;
+    .sb-av { width: 36px; height: 36px; border-radius: 50%; background: var(--cr); color: #fff; flex-shrink: 0; overflow: hidden;
+      display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; letter-spacing: .02em;
+      img { width: 100%; height: 100%; object-fit: cover; } }
+    .sb-info { flex: 1; min-width: 0; strong { display: block; font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      span { display: block; font-size: 11px; color: var(--tx3); } }
+    .sb-perfil-toggle { flex: 1; min-width: 0; display: block; }
+    .sb-perfil { display: flex; align-items: center; gap: 10px; min-width: 0; margin: -6px; padding: 6px; border-radius: 2px;
+      color: inherit; text-decoration: none; transition: background .15s;
+      .sb-perfil-chev { font-size: 14px; color: var(--tx3); margin-left: auto; flex-shrink: 0; }
+      &:hover { background: var(--sur); .sb-perfil-chev { color: var(--tx); } }
+      &:focus-visible { outline: 2px solid var(--cr); outline-offset: 1px; }
+      &.on { .sb-av { box-shadow: 0 0 0 2px var(--sur2), 0 0 0 4px var(--cr); } } }
+    .sb-logout { display: inline-flex; background: none; border: 1px solid transparent; border-radius: 2px; color: var(--tx3); cursor: pointer; padding: 6px;
+      ion-icon { font-size: 18px; } &:hover { color: var(--rd); border-color: var(--bd2); background: var(--sur); } } }
+}
+}

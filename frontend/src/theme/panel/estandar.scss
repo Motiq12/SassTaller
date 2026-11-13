@@ -1,0 +1,146 @@
+// El estándar de pantallas (.pg-*) y sus insignias; lo usan panel, recepción, mecánico y el portal con sesión. El calendario del mes (.pg-cal-*) vive en agenda.scss.
+// Parte de la hoja del panel (F-03): ya no vive en global.scss, que cargaba toda la
+// app. La incluyen las páginas anfitrionas (admin-shell, recepcion-tabs,
+// mecanico-tabs, tabs, PortalTabsPage y las pantallas sueltas del panel/portal);
+// ::ng-deep hace que se inyecte sin encapsular, igual que cuando era global.
+::ng-deep {
+/* ═══════════════════════════════════════════════════════════
+   Estándar de pantallas — el mismo diseño en el panel, recepción, el taller y el
+   portal del cliente. Son las piezas del Resumen ejecutivo y de Clientes, sacadas
+   acá para que cualquier pantalla las use igual. Van dentro de .admin-dark (los
+   colores --sur, --bd, --tx… de cada tema).
+   ═══════════════════════════════════════════════════════════ */
+.admin-dark {
+  // Página: ancho completo hasta 1240 px, alineada como el panel.
+  .pg { max-width: 1240px; margin: 0 auto; padding: 22px 18px 64px; }
+  @media (max-width: 600px) { .pg { padding: 16px 14px 48px; } }
+
+  // Encabezado: fecha o antetítulo, título, una línea de contexto y acciones.
+  .pg-cab {
+    display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px; margin-bottom: 18px;
+    h1 { margin: 2px 0; font-family: var(--fd); font-size: 28px; font-weight: 700; line-height: 1.1; color: var(--tx); }
+    p { margin: 0; font-size: 13.5px; color: var(--tx3); }
+  }
+  .pg-ante {
+    font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--cr-tx);
+    &::first-letter { text-transform: uppercase; }
+  }
+  .pg-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; ion-icon { font-size: 15px; } }
+
+  // Cifras: tarjeta con barra de color a la izquierda e ícono (--acento).
+  .pg-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+  @media (min-width: 992px) { .pg-kpis { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); } }
+  .pg-kpi {
+    --acento: var(--cr);
+    position: relative; display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 16px 16px 14px;
+    background: var(--sur); border: 1px solid var(--bd); border-radius: 8px; overflow: hidden; text-align: left;
+    &::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--acento); }
+    &.em { --acento: var(--em); } &.in { --acento: var(--in); } &.am { --acento: var(--am); }
+  }
+  button.pg-kpi { font: inherit; color: inherit; cursor: pointer; &:hover { border-color: var(--bd2); } }
+  .pg-kpi-icono {
+    position: absolute; top: 14px; right: 14px; display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: 8px; color: var(--acento);
+    background: color-mix(in srgb, var(--acento) 14%, transparent);
+    ion-icon { font-size: 18px; }
+  }
+  .pg-kpi-label { padding-right: 40px; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--tx3); }
+  .pg-kpi-val { margin-top: 4px; font-family: var(--fd); font-size: 30px; font-weight: 700; line-height: 1.05; color: var(--tx); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .pg-kpi-sub { font-size: 12px; color: var(--tx3); &.alerta { color: var(--am); font-weight: 600; } }
+
+  // Tarjeta (.cd) con cabecera: título a la izquierda, cuenta o acción a la derecha.
+  .pg-card { display: flex; flex-direction: column; min-width: 0; margin-bottom: 14px; }
+  .pg-card-cab {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px;
+    .cd-title { margin: 0; ion-icon { vertical-align: -2px; margin-right: 2px; } }
+  }
+  .pg-cuenta { font-size: 12px; color: var(--tx3); }
+  .pg-num {
+    min-width: 22px; height: 22px; padding: 0 7px; box-sizing: border-box; border-radius: 11px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--cr); color: #fff; font-size: 11.5px; font-weight: 800;
+  }
+
+  // Filas de tarjetas: una columna; desde 992 px, de a dos.
+  .pg-fila { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; margin-bottom: 14px; align-items: start; > .pg-card { margin-bottom: 0; } }
+  @media (min-width: 992px) {
+    .pg-fila { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pg-fila--7-5 { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+    .pg-fila--8-4 { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); }
+  }
+
+  // Vacío: una línea punteada que dice qué pasa (no una caja enorme).
+  .pg-vacio {
+    display: flex; align-items: center; gap: 8px; padding: 14px;
+    border: 1px dashed var(--bd2); border-radius: 2px; font-size: 13px; line-height: 1.45; color: var(--tx3);
+    ion-icon { font-size: 18px; flex-shrink: 0; }
+  }
+
+  // Pestañas grandes (Activas / Completadas…), las de Gestión de citas.
+  .pg-tabs {
+    display: flex; gap: 4px; margin-bottom: 14px; padding: 4px; background: var(--sur2); border-radius: 2px;
+    button {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px;
+      border: none; border-radius: 2px; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 700;
+      background: transparent; color: var(--tx2);
+      ion-icon { font-size: 16px; }
+      &.on { background: var(--cr); color: #fff; }
+      .pg-tab-n { padding: 0 6px; border-radius: 9px; background: rgba(0, 0, 0, .12); font-size: 11px; }
+    }
+  }
+
+  // Buscador, el de Clientes.
+  .pg-buscar {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 11px 16px;
+    background: var(--sur); border: 1px solid var(--bd); border-radius: 2px; transition: border-color .15s;
+    &:focus-within { border-color: var(--cr); }
+    ion-icon { font-size: 18px; color: var(--tx3); flex-shrink: 0; }
+    input {
+      flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--tx); font-size: 14px; font-family: inherit;
+      &::placeholder { color: var(--tx3); }
+      &::-webkit-search-cancel-button { display: none; }
+    }
+    .pg-buscar-x { display: flex; padding: 0; border: none; background: none; color: var(--tx3); cursor: pointer; }
+  }
+
+  // Filtros con número (Todos 14 · Aprobación 5…).
+  .pg-filtros {
+    display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto; scrollbar-width: none;
+    &::-webkit-scrollbar { display: none; }
+    .filter-btn { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; }
+    .filter-btn span { opacity: .75; font-variant-numeric: tabular-nums; }
+  }
+
+  // Lista dentro de una tarjeta: renglones separados por una línea.
+  .pg-lista { display: flex; flex-direction: column; }
+  .pg-item {
+    display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--bd);
+    &:first-child { border-top: 0; padding-top: 0; }
+    &:last-child { padding-bottom: 0; }
+  }
+  .pg-item-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
+    strong { font-size: 14px; font-weight: 700; color: var(--tx); }
+    span { font-size: 12.5px; color: var(--tx3); overflow-wrap: anywhere; } }
+  .pg-item-acc { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; flex-shrink: 0; .btn-sm { min-height: 34px; } }
+}
+
+// Insignias de estado (.pill) dentro del estándar: los mismos colores que las
+// etiquetas del panel (.bg-*), con el texto que pasa 4,5:1 en los dos temas.
+.admin-dark {
+  .pill { border-radius: 2px; font-weight: 700; }
+  .pill.rose   { background: var(--adm-cr-bg); color: var(--adm-cr-fg); }
+  .pill.green  { background: var(--adm-em-bg); color: var(--adm-em-fg); }
+  .pill.amber  { background: var(--adm-am-bg); color: var(--adm-am-fg); }
+  .pill.indigo { background: var(--adm-in-bg); color: var(--adm-in-fg); }
+  .pill.gris   { background: var(--sur2); color: var(--tx2); }
+}
+// Renglones en el celular: las acciones bajan debajo del texto en vez de apretarlo.
+@media (max-width: 560px) {
+  .admin-dark .pg-item { flex-wrap: wrap; }
+  .admin-dark .pg-item-acc { flex-basis: 100%; justify-content: flex-start; }
+}
+// Filtros dentro del estándar: el gris del texto sin elegir daba 4,36:1 sobre el
+// fondo del panel; --tx2 pasa en los dos temas.
+.admin-dark .chip-filtro:not(.on) { color: var(--tx2); border-color: var(--bd); background: var(--sur); }
+
+}

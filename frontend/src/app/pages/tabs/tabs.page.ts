@@ -5,7 +5,7 @@ import { AuthService } from '../../services/auth.service';
   standalone: false,
   selector: 'app-tabs',
   templateUrl: './tabs.page.html',
-  styleUrls: ['./tabs.page.scss'],
+  styleUrls: ['../../../theme/panel/base.scss', '../../../theme/panel/contenidos.scss', '../../../theme/panel/agenda.scss', '../../../theme/panel/capsulas.scss', '../../../theme/panel/estandar.scss', './tabs.page.scss'],
 })
 export class TabsPage {
   constructor(private auth: AuthService) {}

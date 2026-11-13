@@ -37,7 +37,7 @@ $tinta: #0b0d10;
   color: #fff;
   // --foto la pone el taller con su propia imagen; el respaldo es el dibujo de
   // la bahía, no la fotografía de un taller en particular.
-  background: var(--foto, url('/assets/portal/taller-iso.svg')) center 55% / cover no-repeat, $tinta;
+  background: var(--foto, url('/assets/portal/taller-iso.webp')) center 55% / cover no-repeat, $tinta;
   box-shadow: 0 14px 34px rgba(0, 0, 0, .28);
   animation: sube .45s $ease both;
 

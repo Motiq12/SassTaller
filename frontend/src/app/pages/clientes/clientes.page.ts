@@ -12,7 +12,7 @@ type Filtro = 'todos' | 'portal' | 'sin_portal' | 'cortesia';
 @Component({ standalone: false,
   selector: 'app-clientes',
   templateUrl: './clientes.page.html',
-  styleUrls: ['./clientes.page.scss'],
+  styleUrls: ['../../../theme/panel/base.scss', '../../../theme/panel/contenidos.scss', '../../../theme/panel/agenda.scss', '../../../theme/panel/capsulas.scss', '../../../theme/panel/estandar.scss', './clientes.page.scss'],
 })
 export class ClientesPage implements OnInit, OnDestroy {
   clientes: Cliente[] = [];

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+﻿import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ToastController, AlertController } from '@ionic/angular';
 import { Subject, interval } from 'rxjs';
@@ -11,11 +11,11 @@ import { FLUJO_CITA, ESTADO_CITA_LABEL, ETAPAS_PORTAL } from '../../shared/utils
   standalone: false,
   selector: 'app-portal-cita-detalle',
   templateUrl: './portal-cita-detalle.page.html',
-  styleUrls: ['./portal-cita-detalle.page.scss'],
+  styleUrls: ['../../../theme/panel/base.scss', '../../../theme/panel/contenidos.scss', '../../../theme/panel/agenda.scss', '../../../theme/panel/capsulas.scss', '../../../theme/panel/estandar.scss', '../../../theme/portal.scss', './portal-cita-detalle.page.scss'],
 })
 export class PortalCitaDetallePage implements OnInit, OnDestroy {
   // El comprobante lo imprime el cliente de CUALQUIER taller: el encabezado y el
-  // pie salen de su marca, no de un nombre escrito en el código.
+  // pie salen de su marca, no de un nombre escrito en el cÃ³digo.
   private readonly marcaSvc = inject(MarcaService);
 
   private destroy$ = new Subject<void>();
@@ -27,7 +27,7 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
   readonly flujo = FLUJO_CITA;
   readonly estadoLabel = ESTADO_CITA_LABEL;
 
-  // Etapas de la timeline (cockpit): los estados macro que ve el cliente, con su ícono.
+  // Etapas de la timeline (cockpit): los estados macro que ve el cliente, con su Ã­cono.
   // Compartidas con la vista de ejemplo de la landing (ver ETAPAS_PORTAL).
   private readonly etapasMeta = ETAPAS_PORTAL;
 
@@ -39,7 +39,7 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
     private alert: AlertController,
   ) {}
 
-  // Cada etapa con su posición relativa al estado actual (pasado | activo | futuro).
+  // Cada etapa con su posiciÃ³n relativa al estado actual (pasado | activo | futuro).
   get etapas(): { key: string; label: string; icon: string; estado: 'pasado' | 'activo' | 'futuro' }[] {
     const iActual = this.flujo.indexOf(this.cita?.estado);
     return this.etapasMeta.map((e, i) => ({
@@ -56,15 +56,15 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
     return Math.round((i / (this.etapasMeta.length - 1)) * 100);
   }
 
-  // ¿La orden vinculada espera que el cliente apruebe el presupuesto?
+  // Â¿La orden vinculada espera que el cliente apruebe el presupuesto?
   get esperandoAprobacion(): boolean {
     return this.cita?.orden_estado === 'esperando_aprobacion' && this.cita?.aprobacion_cliente === 'pendiente';
   }
 
-  // Iniciales para el avatar del mecánico (no hay foto de staff en la BD).
+  // Iniciales para el avatar del mecÃ¡nico (no hay foto de staff en la BD).
   iniciales(nombre?: string): string {
     const p = (nombre || '').trim().split(/\s+/);
-    return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || '·';
+    return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || 'Â·';
   }
 
   private citaId = 0;
@@ -103,9 +103,9 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
     });
   }
 
-  // —— Aprobar / rechazar el presupuesto SIN salir del cockpit (fricción cero) ——
-  // Reusa los mismos endpoints y el diálogo de confirmación que el flujo de Inicio.
-  // Si ya había aprobado antes, lo que se le pide ahora es un adicional.
+  // â€”â€” Aprobar / rechazar el presupuesto SIN salir del cockpit (fricciÃ³n cero) â€”â€”
+  // Reusa los mismos endpoints y el diÃ¡logo de confirmaciÃ³n que el flujo de Inicio.
+  // Si ya habÃ­a aprobado antes, lo que se le pide ahora es un adicional.
   get esAdicional(): boolean {
     return this.orden?.total_aprobado !== null && this.orden?.total_aprobado !== undefined;
   }
@@ -119,8 +119,8 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
       cssClass: 'portal-alert',
       header: this.esAdicional ? 'Aprobar adicional' : 'Aprobar presupuesto',
       message: this.esAdicional
-        ? `¿Apruebas el adicional de ₡${Number(this.montoAdicional || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 })}? El nuevo total es ₡${Number(this.total || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 })}.`
-        : `¿Apruebas el presupuesto de la orden ${this.cita?.numero_orden}? El taller comenzará la reparación.`,
+        ? `Â¿Apruebas el adicional de â‚¡${Number(this.montoAdicional || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 })}? El nuevo total es â‚¡${Number(this.total || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 })}.`
+        : `Â¿Apruebas el presupuesto de la orden ${this.cita?.numero_orden}? El taller comenzarÃ¡ la reparaciÃ³n.`,
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         { text: 'Aprobar', cssClass: 'portal-alert-confirm', handler: () => this.enviarDecision('aprobar') },
@@ -134,8 +134,8 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
       cssClass: 'portal-alert',
       header: this.esAdicional ? 'Rechazar adicional' : 'Rechazar presupuesto',
       message: this.esAdicional
-        ? 'Lo que ya aprobaste sigue en pie: el taller hace solo eso. Cuéntanos por qué no quieres el adicional (opcional).'
-        : 'Cuéntanos por qué rechazas el presupuesto (opcional).',
+        ? 'Lo que ya aprobaste sigue en pie: el taller hace solo eso. CuÃ©ntanos por quÃ© no quieres el adicional (opcional).'
+        : 'CuÃ©ntanos por quÃ© rechazas el presupuesto (opcional).',
       inputs: [{ name: 'motivo', type: 'textarea', placeholder: 'Motivo (opcional)' }],
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
@@ -154,12 +154,12 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
       next: async () => {
         this.procesando = false;
         const t = await this.toast.create({
-          message: decision === 'aprobar' ? 'Presupuesto aprobado ✓' : 'Presupuesto rechazado',
+          message: decision === 'aprobar' ? 'Presupuesto aprobado âœ“' : 'Presupuesto rechazado',
           duration: 1800,
           color: decision === 'aprobar' ? 'success' : 'medium',
         });
         await t.present();
-        this.cargar(this.cita.id); // recarga → la timeline avanza al nuevo estado
+        this.cargar(this.cita.id); // recarga â†’ la timeline avanza al nuevo estado
       },
       error: async () => {
         this.procesando = false;
@@ -175,30 +175,30 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
     return Number(this.cita?.monto || 0);
   }
 
-  estrellas(n: number): string { return '★'.repeat(n) + '☆'.repeat(5 - n); }
+  estrellas(n: number): string { return 'â˜…'.repeat(n) + 'â˜†'.repeat(5 - n); }
 
   // El cliente puede cancelar/editar solo mientras la cita sigue 'agendado' (sin orden).
-  // La ventana mínima de horas la valida el backend (mensaje claro si es muy tarde).
+  // La ventana mÃ­nima de horas la valida el backend (mensaje claro si es muy tarde).
   get puedeCancelar(): boolean {
     return this.cita?.estado === 'agendado' && !this.cita?.orden_id;
   }
 
   editar() { this.router.navigate(['/portal/cita', this.cita.id, 'editar']); }
 
-  // ¿Hay algo que valga la pena exportar? (orden vinculada o monto/entrega)
+  // Â¿Hay algo que valga la pena exportar? (orden vinculada o monto/entrega)
   get puedeDescargar(): boolean {
     return !!(this.orden || this.cita?.monto || this.cita?.estado === 'entregado');
   }
 
-  // Genera un comprobante imprimible (→ "Guardar como PDF" desde el diálogo de impresión).
+  // Genera un comprobante imprimible (â†’ "Guardar como PDF" desde el diÃ¡logo de impresiÃ³n).
   // Sin dependencias nuevas: abre una ventana con HTML formateado y lanza print().
   descargarComprobante() {
     const c = this.cita;
     const o = this.orden;
     const cli = this.portal.getCliente();
-    // El nombre del taller que atendió, no el del software ni el de otro taller.
+    // El nombre del taller que atendiÃ³, no el del software ni el de otro taller.
     const taller = this.marcaSvc.actual.nombre_taller;
-    const money = (n: any) => '₡' + Number(n || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 });
+    const money = (n: any) => 'â‚¡' + Number(n || 0).toLocaleString('es-CR', { maximumFractionDigits: 0 });
     const esc = (s: any) => String(s ?? '').replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' } as any)[m]);
     const fecha = c.fecha ? new Date(`${String(c.fecha).slice(0, 10)}T00:00:00`).toLocaleDateString('es-CR') : '';
 
@@ -206,19 +206,19 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
     if (o?.repuestos?.length) {
       for (const r of o.repuestos) {
         const sub = (r.cantidad || 1) * (r.costo_unitario || 0);
-        filas.push(`<tr><td>${esc(r.nombre)}${r.cantidad > 1 ? ' ×' + r.cantidad : ''}</td><td class="r">${money(sub)}</td></tr>`);
+        filas.push(`<tr><td>${esc(r.nombre)}${r.cantidad > 1 ? ' Ã—' + r.cantidad : ''}</td><td class="r">${money(sub)}</td></tr>`);
       }
     }
     if (o) {
       filas.push(`<tr><td>Mano de obra</td><td class="r">${money(o.costo_mano_obra)}</td></tr>`);
-      if (o.descuento > 0) filas.push(`<tr><td>Descuento</td><td class="r">− ${money(o.descuento)}</td></tr>`);
+      if (o.descuento > 0) filas.push(`<tr><td>Descuento</td><td class="r">âˆ’ ${money(o.descuento)}</td></tr>`);
     }
     const total = o ? Number(o.total || 0) : Number(c.monto || 0);
 
     // El acento del comprobante sale del color del taller. Esta ventana es otro
-    // documento, así que las variables CSS de la app no llegan: hay que interpolar
+    // documento, asÃ­ que las variables CSS de la app no llegan: hay que interpolar
     // el valor. Antes iba el rojo de MS Motos a fuego y el cliente de cualquier
-    // taller recibía un comprobante con el color de otra empresa.
+    // taller recibÃ­a un comprobante con el color de otra empresa.
     const acento = getComputedStyle(document.documentElement)
       .getPropertyValue('--ion-color-primary').trim();
     const cr = /^#[0-9a-fA-F]{3,8}$/.test(acento) ? acento : '#1e3a5f';
@@ -246,15 +246,15 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
         <div class="num"><strong>${esc(c.numero_orden || ('Cita #' + c.id))}</strong><br>${esc(fecha)}</div>
       </div>
       <div class="grid">
-        <div><div class="k">Cliente</div><div class="v">${esc(cli ? cli.nombre + ' ' + cli.apellido : '—')}</div></div>
-        <div><div class="k">Vehículo</div><div class="v">${esc(c.marca)} ${esc(c.modelo)}${c.placa ? ' · ' + esc(c.placa) : ''}</div></div>
-        <div><div class="k">Servicio</div><div class="v">${esc(c.tipo_servicio || c.motivo || '—')}</div></div>
-        <div><div class="k">Mecánico</div><div class="v">${esc(c.tecnico_nombre || 'Por asignar')}</div></div>
+        <div><div class="k">Cliente</div><div class="v">${esc(cli ? cli.nombre + ' ' + cli.apellido : 'â€”')}</div></div>
+        <div><div class="k">VehÃ­culo</div><div class="v">${esc(c.marca)} ${esc(c.modelo)}${c.placa ? ' Â· ' + esc(c.placa) : ''}</div></div>
+        <div><div class="k">Servicio</div><div class="v">${esc(c.tipo_servicio || c.motivo || 'â€”')}</div></div>
+        <div><div class="k">MecÃ¡nico</div><div class="v">${esc(c.tecnico_nombre || 'Por asignar')}</div></div>
       </div>
-      ${o?.diagnostico ? `<div class="diag"><strong>Diagnóstico:</strong> ${esc(o.diagnostico)}</div>` : ''}
+      ${o?.diagnostico ? `<div class="diag"><strong>DiagnÃ³stico:</strong> ${esc(o.diagnostico)}</div>` : ''}
       ${filas.length ? `<h3>Detalle</h3><table>${filas.join('')}</table>` : ''}
       <div class="total"><span>Total</span><span>${money(total)}</span></div>
-      <div class="ft">Gracias por confiar en ${esc(taller)} · Documento generado el ${new Date().toLocaleDateString('es-CR')}</div>
+      <div class="ft">Gracias por confiar en ${esc(taller)} Â· Documento generado el ${new Date().toLocaleDateString('es-CR')}</div>
       </div>
       <script>window.onload = function(){ window.print(); }</script>
       </body></html>`;
@@ -273,10 +273,10 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
     const al = await this.alert.create({
       cssClass: 'portal-alert',
       header: 'Cancelar cita',
-      message: 'Esta acción no se puede deshacer. ¿Quieres cancelar esta cita?',
+      message: 'Esta acciÃ³n no se puede deshacer. Â¿Quieres cancelar esta cita?',
       buttons: [
         { text: 'No', role: 'cancel' },
-        { text: 'Sí, cancelar', role: 'destructive', cssClass: 'portal-alert-danger', handler: () => this.confirmarCancelar() },
+        { text: 'SÃ­, cancelar', role: 'destructive', cssClass: 'portal-alert-danger', handler: () => this.confirmarCancelar() },
       ],
     });
     await al.present();
@@ -299,8 +299,8 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
   async calificar() {
     const al = await this.alert.create({
       cssClass: 'portal-alert',
-      header: '¿Cómo fue el servicio?',
-      inputs: [1, 2, 3, 4, 5].map(n => ({ type: 'radio' as const, label: '★'.repeat(n) + ` (${n})`, value: n })),
+      header: 'Â¿CÃ³mo fue el servicio?',
+      inputs: [1, 2, 3, 4, 5].map(n => ({ type: 'radio' as const, label: 'â˜…'.repeat(n) + ` (${n})`, value: n })),
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         { text: 'Enviar', handler: (n) => this.enviarCalif(n) },
@@ -314,7 +314,7 @@ export class PortalCitaDetallePage implements OnInit, OnDestroy {
     this.portal.calificarCita(this.cita.id, n).pipe(takeUntil(this.destroy$)).subscribe({
       next: async () => {
         this.cita.calificacion = n;
-        const t = await this.toast.create({ message: '¡Gracias por tu opinión!', duration: 2000, color: 'success' });
+        const t = await this.toast.create({ message: 'Â¡Gracias por tu opiniÃ³n!', duration: 2000, color: 'success' });
         await t.present();
       },
       error: async (err) => {
