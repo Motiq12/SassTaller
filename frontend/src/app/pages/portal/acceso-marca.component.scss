@@ -36,6 +36,32 @@
   animation: marcaEntra .6s .06s var(--ease-out, cubic-bezier(0.32, 0.72, 0, 1)) both;
 }
 
+// «Volver al inicio»: arriba, sobre la franja oscura, con el mismo trazo que la etiqueta.
+.marca-volver {
+  grid-column: 1 / -1;
+  order: -1;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, .22);
+  border-radius: 999px;
+  background: rgba(11, 13, 16, .55);
+  font-size: 13px;
+  font-weight: 600;
+  color: #e2e8f0;
+  text-decoration: none;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+
+  ion-icon { font-size: 15px; transition: transform .15s ease; }
+
+  &:hover { color: #fff; border-color: rgba(255, 255, 255, .45); background: rgba(255, 255, 255, .08); }
+  &:hover ion-icon { transform: translateX(-2px); }
+  &:focus-visible { outline: 2px solid var(--ion-color-primary-tint); outline-offset: 2px; }
+}
+
 // La etiqueta de arriba, con el punto rojo, como la del menú del panel.
 .marca-rotulo {
   display: inline-flex;
@@ -96,6 +122,9 @@
   // El logo flota en la esquina libre de la figura y no le quita alto.
   .marca-logo { position: absolute; top: 32px; left: clamp(40px, 5vw, 84px); z-index: 1; }
 
+  // A la derecha del logo, centrado con él.
+  .marca-volver { position: absolute; top: 52px; left: calc(clamp(40px, 5vw, 84px) + 72px + 18px); z-index: 1; }
+
   // Arriba a la derecha y entera. La losa es un rombo: su esquina de abajo a la
   // izquierda queda vacía, y ahí cae el titular sin que nada lo toque.
   .marca-figura {
@@ -153,4 +182,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .marca-logo, .marca-figura, .marca-cuerpo { animation: none; }
+  .marca-volver, .marca-volver ion-icon { transition: none; }
 }
