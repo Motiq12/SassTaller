@@ -19,7 +19,7 @@ import { serviciosDeCita } from '../../shared/elegir-servicios.component';
 @Component({ standalone: false,
   selector: 'app-cita-form',
   templateUrl: './cita-form.page.html',
-  styleUrls: ['./cita-form.page.scss'],
+  styleUrls: ['../../../theme/panel/base.scss', '../../../theme/panel/contenidos.scss', '../../../theme/panel/agenda.scss', '../../../theme/panel/capsulas.scss', '../../../theme/panel/estandar.scss', './cita-form.page.scss'],
 })
 export class CitaFormPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();

@@ -11,7 +11,7 @@ import { serviciosDeCita } from '../../shared/elegir-servicios.component';
   standalone: false,
   selector: 'app-portal-agendar',
   templateUrl: './portal-agendar.page.html',
-  styleUrls: ['./portal-agendar.page.scss'],
+  styleUrls: ['../../../theme/panel/base.scss', '../../../theme/panel/contenidos.scss', '../../../theme/panel/agenda.scss', '../../../theme/panel/capsulas.scss', '../../../theme/panel/estandar.scss', './portal-agendar.page.scss'],
 })
 export class PortalAgendarPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();

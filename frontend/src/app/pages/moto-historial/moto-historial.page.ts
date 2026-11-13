@@ -13,7 +13,7 @@ import { Orden } from '../../models/orden.model';
 @Component({ standalone: false,
   selector: 'app-moto-historial',
   templateUrl: './moto-historial.page.html',
-  styleUrls: ['./moto-historial.page.scss'],
+  styleUrls: ['../../../theme/panel/base.scss', '../../../theme/panel/contenidos.scss', '../../../theme/panel/agenda.scss', '../../../theme/panel/capsulas.scss', '../../../theme/panel/estandar.scss', './moto-historial.page.scss'],
 })
 export class MotoHistorialPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();

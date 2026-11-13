@@ -22,6 +22,7 @@ const CARPETA_DE_RUTA: [string, string][] = [
 const KEY_CARPETAS = 'tallerms_menu_carpetas';
 
 @Component({
+  styleUrls: ['../../../theme/panel/base.scss', '../../../theme/panel/contenidos.scss', '../../../theme/panel/agenda.scss', '../../../theme/panel/capsulas.scss', '../../../theme/panel/estandar.scss'],
   standalone: false,
   selector: 'app-admin-shell',
   templateUrl: './admin-shell.page.html',

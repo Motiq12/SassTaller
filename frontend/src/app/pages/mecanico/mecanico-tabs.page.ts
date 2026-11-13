@@ -6,6 +6,7 @@ import { MensajeriaService } from '../../services/mensajeria.service';
 import { MarcaService } from '../../services/marca.service';
 
 @Component({
+  styleUrls: ['../../../theme/panel/base.scss', '../../../theme/panel/contenidos.scss', '../../../theme/panel/agenda.scss', '../../../theme/panel/capsulas.scss', '../../../theme/panel/estandar.scss'],
   standalone: false,
   selector: 'app-mecanico-tabs',
   templateUrl: './mecanico-tabs.page.html',

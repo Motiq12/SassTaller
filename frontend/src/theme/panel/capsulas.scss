@@ -1,0 +1,187 @@
+// Piezas compartidas del panel: isotipo de las toolbars, avisos en franja, menú desplegable, modal reutilizable, formularios, filtros, buscador de filas, subida de imágenes, avisos de cambio de estado y el chat.
+// Parte de la hoja del panel (F-03): ya no vive en global.scss, que cargaba toda la
+// app. La incluyen las páginas anfitrionas (admin-shell, recepcion-tabs,
+// mecanico-tabs, tabs, PortalTabsPage y las pantallas sueltas del panel/portal);
+// ::ng-deep hace que se inyecte sin encapsular, igual que cuando era global.
+::ng-deep {
+// Aviso en franja: rd (algo salió mal o falta plata), am (ojo antes de seguir),
+// in (esperando a alguien). --interno: el chico, dentro de una tarjeta o un cuadro.
+.adm-aviso {
+  display: flex; align-items: flex-start; gap: 12px;
+  margin: 0; padding: 14px 18px; border-radius: 8px;
+  font-size: 13.5px; line-height: 1.5;
+  ion-icon { flex: 0 0 auto; margin-top: 1px; font-size: 20px; }
+  &.rd { background: var(--adm-rd-bg); color: var(--adm-rd-fg); }
+  &.am { background: var(--adm-am-bg); color: var(--adm-am-fg); }
+  &.in { background: var(--adm-in-bg); color: var(--adm-in-fg); }
+  &--interno { gap: 8px; padding: 10px 12px; border-radius: 2px; font-size: 13px; ion-icon { font-size: 18px; } }
+}
+
+// Menú desplegable (ion-popover con class="adm-menu-pop" y adentro .adm-menu).
+// Se monta como capa: usa los colores del panel directo (--adm-*).
+ion-popover.adm-menu-pop { --width: 290px; --background: var(--adm-sur); --box-shadow: 0 10px 30px var(--adm-sombra); }
+.adm-menu { padding: 6px 0; background: var(--adm-sur); }
+.adm-menu-it {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; min-height: 44px; padding: 0 14px;
+  border: none; background: none; text-align: left; cursor: pointer;
+  font: 500 13.5px 'Inter', system-ui, sans-serif; color: var(--adm-tx);
+  ion-icon { flex-shrink: 0; font-size: 17px; color: var(--adm-tx2); }
+  &:hover, &:focus-visible { background: var(--adm-sur2); }
+  &.peligro { color: var(--adm-cr-fg); ion-icon { color: inherit; } }
+  &.peligro:not(:first-child) { margin-top: 4px; border-top: 1px solid var(--adm-bd); }
+}
+/* ═══════════════════════════════════════════════════════════
+   Modal del panel de administración — cáscara reutilizable.
+   Ionic monta el modal en la raíz del DOM, FUERA de .admin-dark, así que los
+   tokens (--sur, --bd, --tx) y las clases del panel (.cd-title, .fg, .btn) no
+   se heredan: hay que volver a poner class="admin-dark" en la raíz de adentro.
+   Sin eso el contenido sale sin ningún estilo.
+   ═══════════════════════════════════════════════════════════ */
+ion-modal.adm-modal {
+  // Alto según contenido: un modal a pantalla completa para un puñado de campos
+  // se ve desproporcionado en escritorio.
+  --width: 92%;
+  --max-width: 520px;
+  --height: auto;
+  --border-radius: 8px;
+  --background: var(--adm-sur);
+  --box-shadow: 0 20px 60px var(--adm-sombra);
+}
+
+// Un modal abierto desde código (ModalController) recibe el componente con la clase
+// .ion-page, que es absoluta: con el alto automático de arriba quedaba en 0 de alto.
+ion-modal.adm-modal-auto .ion-page { position: relative; display: block; contain: content; }
+
+.adm-modal-box {
+  background: var(--sur);
+  color: var(--tx);
+  display: flex;
+  flex-direction: column;
+  max-height: 88vh;
+
+  .amb-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 20px 20px 0;
+    .cd-title { margin: 0; }
+    .amb-x {
+      background: none; border: none; color: var(--tx3); cursor: pointer;
+      padding: 4px; line-height: 0; border-radius: 2px;
+      &:hover { color: var(--tx); background: var(--sur2); }
+      ion-icon { font-size: 20px; }
+    }
+  }
+
+  .amb-body { padding: 16px 20px 4px; overflow-y: auto; }
+
+  .amb-foot {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    flex-wrap: wrap; padding: 14px 20px 20px;
+    border-top: 1px solid var(--bd); margin-top: 8px;
+    .amb-tip { font-size: 11px; color: var(--tx3); flex: 1 1 140px; }
+    .amb-btns { display: flex; gap: 8px; margin-left: auto; }
+  }
+}
+/* ═══════════════════════════════════════════════════════════
+   Buscador del panel — filtro por texto sobre una lista.
+   Va a nivel raíz (no anidado en .admin-dark) para poder usarlo también dentro de
+   los modales, que Ionic monta fuera. Las variables se heredan igual, porque el
+   elemento siempre cuelga de un contenedor con la clase .admin-dark.
+   ═══════════════════════════════════════════════════════════ */
+.adm-buscador {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  .bs-lupa {
+    position: absolute; left: 10px; font-size: 15px;
+    color: var(--tx3); pointer-events: none;
+  }
+
+  input {
+    width: 100%;
+    padding: 8px 30px 8px 32px;
+    border: 1px solid var(--bd);
+    border-radius: 2px;
+    background: var(--sur2);
+    color: var(--tx);
+    font-size: 12px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color .15s;
+
+    &:focus { border-color: var(--cr); }
+    &::placeholder { color: var(--tx3); }
+  }
+
+  .bs-x {
+    position: absolute; right: 6px;
+    background: none; border: none; padding: 2px; line-height: 0;
+    color: var(--tx3); cursor: pointer;
+    &:hover { color: var(--tx); }
+    ion-icon { font-size: 15px; }
+  }
+}
+/* Avisos antes de cambiar el estado de una orden (detalle de la orden): el texto
+   llega con saltos de línea y viñetas; sin esto se juntaba en un solo párrafo. */
+.avisos-cambio-alert .alert-message {
+  white-space: pre-line;
+  text-align: left;
+}
+/* Mensajes (admin, recepción y mecánico): con un chat abierto, la página deja de
+   desplazarse ([scrollY]="false" en su ion-content) y el chat ocupa todo el alto.
+   Solo se desplazan los mensajes; la cabecera y la barra de envío quedan fijas. */
+.chat-pantalla {
+  height: 100%;
+  box-sizing: border-box;
+  padding-bottom: 0 !important;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  app-chat-hilo { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  app-chat-hilo .ch { flex: 1 1 auto; }
+}
+/* Isotipo de marca en las toolbars de rol (mecánico/recepción): color en claro, blanco en oscuro. */
+.brand-hd { height: 26px; width: auto; margin-inline-start: 12px; }
+.brand-hd.dark-only { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not(.tema-claro) .brand-hd.light-only { display: none; }
+  :root:not(.tema-claro) .brand-hd.dark-only { display: inline-block; }
+}
+:root.tema-oscuro .brand-hd.light-only { display: none; }
+:root.tema-oscuro .brand-hd.dark-only { display: inline-block; }
+/* Logo del menú lateral, igual: a color en claro, blanco en oscuro. */
+@media (prefers-color-scheme: dark) {
+  :root:not(.tema-claro) .admin-dark .sb-logo .sb-brand.light-only { display: none; }
+  :root:not(.tema-claro) .admin-dark .sb-logo .sb-brand.dark-only { display: block; }
+}
+:root.tema-oscuro .admin-dark .sb-logo .sb-brand.light-only { display: none; }
+:root.tema-oscuro .admin-dark .sb-logo .sb-brand.dark-only { display: block; }
+
+// Formularios, filtros con chips, buscador de filas y subida de imágenes:
+// los comparten las pantallas del panel y los modales (van dentro de .admin-dark).
+.admin-dark {
+  .filter-bar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .filter-btn { padding: 7px 14px; border-radius: 2px; font-size: 12px; font-weight: 700; cursor: pointer; border: 1px solid var(--bd); background: none; color: var(--tx2);
+    &.on { background: var(--cr); color: #fff; border-color: var(--cr); } }
+  .search-row { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; align-items: center;
+    input, select { padding: 11px 14px; border: 1px solid var(--bd); border-radius: 2px; font-family: inherit; font-size: 14px; background: var(--sur2); color: var(--tx); outline: none; min-height: 44px; &:focus { border-color: var(--cr); } }
+    input.grow { flex: 1; min-width: 160px; } }
+  .fg { margin-bottom: 14px;
+    label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--tx3); margin-bottom: 6px; }
+    input, select, textarea { width: 100%; padding: 11px 14px; border: 1px solid var(--bd); border-radius: 2px; font-family: inherit; font-size: 14px; background: var(--sur2); color: var(--tx); outline: none; transition: border-color .2s; &:focus { border-color: var(--cr); } }
+    &.error input, &.error select { border-color: var(--rd); }
+    select option { background: var(--sur2); }
+    textarea { resize: none; min-height: 72px; }
+    .hint { font-size: 11px; color: var(--tx3); margin-top: 4px; } }
+  // Pares de campos (fecha/hora, etc.): en teléfonos angostos se apilan en vez de
+  // quedar dos inputs de ~130px donde no se lee ni el placeholder. Mismo patrón
+  // mobile-first que .promo-grid de más abajo.
+  .fg-row { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  @media (min-width: 480px) { .fg-row { grid-template-columns: 1fr 1fr; } }
+  .upload-box { border: 2px dashed var(--bd2); border-radius: 2px; padding: 20px; text-align: center; cursor: pointer;
+    .up-ico { font-size: 26px; margin-bottom: 6px; } .up-txt { font-size: 12px; color: var(--tx3); }
+    img { max-height: 110px; border-radius: 2px; } }
+}
+
+}

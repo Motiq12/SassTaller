@@ -5,8 +5,14 @@
 //
 // Sirve para cualquier taller porque es el oficio y no el local de nadie.
 //
-//   node frontend/tools/ilustracion/build.mjs           escribe src/assets/portal/taller-iso.svg
+//   node frontend/tools/ilustracion/build.mjs           escribe tools/ilustracion/salida/taller-iso.svg
 //   node frontend/tools/ilustracion/build.mjs --audit   además prueba la geometría
+//
+// Lo que se embarca ya no es el SVG: pesaba ~492 KB y lo descargaba cada visitante
+// del login (F-05). La app usa src/assets/portal/taller-iso.webp, una rasterización
+// de este dibujo a 1920x1200 en WebP calidad 95 (~170 KB, se ve igual en pantalla).
+// Tras regenerar el SVG hay que volver a rasterizarlo a ese WebP (con Chromium:
+// canvas.drawImage + toDataURL('image/webp', .95), o con cualquier encoder WebP).
 //
 // Escala real: 1 unidad = 2 cm. El auto mide 4,48 x 1,80 m, las columnas 3,20 m.
 // Los archivos del kit están copiados al lado para poder regenerarlo sin instalar nada.
@@ -20,7 +26,7 @@ import { tubePieces, tubeSvg } from "./tube.mjs";
 import { malla, recortar, curva } from "./malla.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SALIDA = join(HERE, "../../src/assets/portal/taller-iso.svg");
+const SALIDA = join(HERE, "salida/taller-iso.svg");
 const ANCHO = 960;
 const ALTO = 600;
 
@@ -820,5 +826,5 @@ const svg = k.figureSvg({
 }).replace("</style>", `${TINTE}</style>`);
 
 writeFileSync(SALIDA, svg, "utf8");
-console.log(`taller-iso.svg: ${R.solids.length} sólidos, ${R.items.length} ítems, ${(svg.match(/<path/g) || []).length} trazos, ${(svg.length / 1024).toFixed(0)} KB`);
+console.log(`salida/taller-iso.svg: ${R.solids.length} sólidos, ${R.items.length} ítems, ${(svg.match(/<path/g) || []).length} trazos, ${(svg.length / 1024).toFixed(0)} KB (fuente del .webp embarcado)`);
 A.auditOrExit(R, P, {});

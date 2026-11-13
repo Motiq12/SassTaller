@@ -13,7 +13,7 @@ import { AuthService } from '../../services/auth.service';
   standalone: false,
   selector: 'app-factura',
   templateUrl: './factura.page.html',
-  styleUrls: ['./factura.page.scss'],
+  styleUrls: ['../../../theme/panel/base.scss', '../../../theme/panel/contenidos.scss', '../../../theme/panel/agenda.scss', '../../../theme/panel/capsulas.scss', '../../../theme/panel/estandar.scss', './factura.page.scss'],
 })
 export class FacturaPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();

@@ -13,7 +13,7 @@ import { comprimirImagen } from '../../shared/image.util';
   standalone: false,
   selector: 'app-garantias',
   templateUrl: './garantias.page.html',
-  styleUrls: ['./garantias.page.scss'],
+  styleUrls: ['../../../theme/panel/base.scss', '../../../theme/panel/contenidos.scss', '../../../theme/panel/agenda.scss', '../../../theme/panel/capsulas.scss', '../../../theme/panel/estandar.scss', './garantias.page.scss'],
 })
 export class GarantiasPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();

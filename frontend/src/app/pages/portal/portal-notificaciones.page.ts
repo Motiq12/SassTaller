@@ -24,7 +24,7 @@ const META_TIPO: Record<string, { icon: string; tono: string }> = {
   standalone: false,
   selector: 'app-portal-notificaciones',
   templateUrl: './portal-notificaciones.page.html',
-  styleUrls: ['./portal-notificaciones.page.scss'],
+  styleUrls: ['../../../theme/panel/base.scss', '../../../theme/panel/contenidos.scss', '../../../theme/panel/agenda.scss', '../../../theme/panel/capsulas.scss', '../../../theme/panel/estandar.scss', './portal-notificaciones.page.scss'],
 })
 export class PortalNotificacionesPage implements OnDestroy {
   private destroy$ = new Subject<void>();

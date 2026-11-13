@@ -9,7 +9,7 @@ import { proximoServicio, ProximoServicio } from '../../utils/mantenimiento';
   standalone: false,
   selector: 'app-portal-moto-historial',
   templateUrl: './portal-moto-historial.page.html',
-  styleUrls: ['./portal-moto-historial.page.scss'],
+  styleUrls: ['../../../theme/panel/base.scss', '../../../theme/panel/contenidos.scss', '../../../theme/panel/agenda.scss', '../../../theme/panel/capsulas.scss', '../../../theme/panel/estandar.scss', './portal-moto-historial.page.scss'],
 })
 export class PortalMotoHistorialPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();

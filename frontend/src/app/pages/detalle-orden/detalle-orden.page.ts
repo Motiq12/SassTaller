@@ -52,7 +52,7 @@ interface ItemMenu { texto: string; icono?: string; peligro?: boolean; accion: (
 @Component({ standalone: false,
   selector: 'app-detalle-orden',
   templateUrl: './detalle-orden.page.html',
-  styleUrls: ['./detalle-orden.page.scss'],
+  styleUrls: ['../../../theme/panel/base.scss', '../../../theme/panel/contenidos.scss', '../../../theme/panel/agenda.scss', '../../../theme/panel/capsulas.scss', '../../../theme/panel/estandar.scss', './detalle-orden.page.scss'],
 })
 export class DetalleOrdenPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
