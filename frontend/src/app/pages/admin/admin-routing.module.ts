@@ -15,6 +15,7 @@ import { AdminPromosPage } from './admin-promos.page';
 import { AdminCalendarioPage } from './admin-calendario.page';
 import { AdminConfigPage } from './admin-config.page';
 import { AdminServiciosPage } from './admin-servicios.page';
+import { AdminInventarioPage } from './admin-inventario.page';
 import { AdminMensajesPage } from './admin-mensajes.page';
 import { AdminPerfilPage } from './admin-perfil.page';
 import { PanelAdminGuard } from '../../guards/panel-admin.guard';
@@ -39,6 +40,7 @@ const routes: Routes = [
       { path: 'promos', component: AdminPromosPage },
       { path: 'calendario', component: AdminCalendarioPage },
       { path: 'servicios', component: AdminServiciosPage },
+      { path: 'inventario', component: AdminInventarioPage },
       // Configuración va en partes (una por opción de la carpeta del menú).
       { path: 'config', redirectTo: 'config/taller', pathMatch: 'full' },
       { path: 'config/:seccion', component: AdminConfigPage },

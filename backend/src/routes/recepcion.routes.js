@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const { anotar } = require('../utils/actividad');
 const { filtrarAvisos } = require('../utils/preferencias');
 const { fail, invalido } = require('../utils/responder');
+const { repuestoDelCatalogo } = require('../utils/inventario');
 const { referenciaAjena } = require('../utils/referencias');
 const { cerrarLasDemas } = require('../utils/sesiones');
 const auth = require('../middleware/auth');
@@ -564,10 +565,12 @@ router.post('/cotizaciones/:id/repuestos', exigirPermiso('ordenes.costos'), asyn
     const { nombre, cantidad, costo_unitario, estado } = req.body;
     if (!nombre) return res.status(400).json({ error: 'Nombre del repuesto requerido' });
     if (estado && !ESTADOS_REPUESTO[estado]) return res.status(400).json({ error: 'Estado de repuesto inválido' });
+    const delCatalogo = await repuestoDelCatalogo(conn, req.body.repuesto_id);
+    if (delCatalogo === false) return res.status(400).json({ error: 'Ese repuesto no está en el inventario', campo: 'repuesto_id' });
     const totalAntes = await totalOrden(conn, req.params.id);
     const [result] = await conn.query(
-      'INSERT INTO orden_repuestos (tenant_id, orden_id, nombre, cantidad, costo_unitario, estado, adicional) VALUES (@tenant, ?, ?, ?, ?, ?, ?)',
-      [req.params.id, nombre, cantidad || 1, costo_unitario || 0, estado || 'pendiente', await esAdicional(conn, req.params.id)]
+      'INSERT INTO orden_repuestos (tenant_id, orden_id, nombre, cantidad, costo_unitario, estado, adicional, repuesto_id) VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?)',
+      [req.params.id, nombre, cantidad || 1, costo_unitario || 0, estado || 'pendiente', await esAdicional(conn, req.params.id), delCatalogo ? delCatalogo.id : null]
     );
     await recalcularRepuestos(conn, req.params.id);
     const reaprobacion = await revisarAdicional(conn, req.params.id, totalAntes);
@@ -689,7 +692,7 @@ router.post('/cotizaciones/:id/armar', exigirPermiso('ordenes.costos'), async (r
 
   const piezasValidas = Array.isArray(piezas)
     ? piezas
-        .map(p => ({ nombre: String(p?.nombre || '').trim(), cantidad: Number(p?.cantidad) || 1, costo_unitario: Number(p?.costo_unitario) || 0 }))
+        .map(p => ({ nombre: String(p?.nombre || '').trim(), cantidad: Number(p?.cantidad) || 1, costo_unitario: Number(p?.costo_unitario) || 0, repuesto_id: p?.repuesto_id ?? null }))
         .filter(p => p.nombre && p.costo_unitario > 0)
     : [];
   if (!piezasValidas.length) {
@@ -699,6 +702,11 @@ router.post('/cotizaciones/:id/armar', exigirPermiso('ordenes.costos'), async (r
   try {
     const [[orden]] = await req.db.query('SELECT id, sucursal_id FROM ordenes_trabajo WHERE id = ? AND tenant_id = @tenant', [ordenId]);
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
+    for (const p of piezasValidas) {
+      const r = await repuestoDelCatalogo(req.db, p.repuesto_id);
+      if (r === false) return res.status(400).json({ error: `«${p.nombre}» no está en el inventario`, campo: 'repuesto_id' });
+      p.repuesto_id = r ? r.id : null;
+    }
 
     if (tecnico_id) {
       const [[tec]] = await req.db.query(
@@ -722,8 +730,8 @@ router.post('/cotizaciones/:id/armar', exigirPermiso('ordenes.costos'), async (r
       }
       for (const p of piezasValidas) {
         await conn.query(
-          "INSERT INTO orden_repuestos (tenant_id, orden_id, nombre, cantidad, costo_unitario, estado, adicional) VALUES (@tenant, ?, ?, ?, ?, 'pendiente', ?)",
-          [ordenId, p.nombre, p.cantidad, p.costo_unitario, adicional]
+          "INSERT INTO orden_repuestos (tenant_id, orden_id, nombre, cantidad, costo_unitario, estado, adicional, repuesto_id) VALUES (@tenant, ?, ?, ?, ?, 'pendiente', ?, ?)",
+          [ordenId, p.nombre, p.cantidad, p.costo_unitario, adicional, p.repuesto_id]
         );
       }
       await conn.query(

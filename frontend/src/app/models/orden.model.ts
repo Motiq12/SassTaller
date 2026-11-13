@@ -97,6 +97,8 @@ export interface OrdenRepuesto {
   cantidad: number;
   costo_unitario: number;
   estado?: EstadoRepuesto;
+  /** El repuesto del inventario del que sale; vacío si se escribió a mano. */
+  repuesto_id?: number | null;
   /** 1 si se agregó después de que el cliente aprobó el presupuesto. */
   adicional?: number;
 }

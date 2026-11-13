@@ -2,6 +2,7 @@
 const { notificarCambioEstado, notificarPresupuestoListo, notificarMecanico } = require('./notificaciones');
 const { necesitaReaprobacion, montoSinAprobar, ESTADOS_TRAS_APROBACION } = require('./reglas-orden');
 const { getConfig } = require('./configuracion');
+const { descontarOrden } = require('./inventario');
 const { fechaLocalISO, horaLocal } = require('./fecha');
 const { minutosRapidosValidos } = require('./agenda');
 
@@ -129,6 +130,8 @@ async function cerrarOrden(db, ordenId, datos = {}, opciones = {}) {
     // La entrega termina la etapa en curso (normalmente "lista para entrega"): sin
     // esto su tiempo quedaba abierto para siempre en el registro de tiempos.
     await conn.query('UPDATE orden_tiempos SET fin = NOW() WHERE orden_id = ? AND fin IS NULL AND tenant_id = @tenant', [ordenId]);
+    // Las piezas del catálogo salen del inventario de la sucursal de la orden.
+    await descontarOrden(conn, ordenId, usuarioId || null);
 
     let cortesiaGanada = false;
     if (!orden.visita_contada) {

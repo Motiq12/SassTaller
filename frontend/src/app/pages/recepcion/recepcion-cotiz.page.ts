@@ -5,8 +5,11 @@ import { takeUntil } from 'rxjs/operators';
 import { RecepcionService } from '../../services/recepcion.service';
 import { abrirWhatsApp, colones, motoDe } from '../../shared/whatsapp.util';
 import { MensajesService } from '../../services/mensajes.service';
+import { AuthService } from '../../services/auth.service';
+import { InventarioService, Repuesto, repuestoPorTexto } from '../../services/inventario.service';
 
-interface PiezaNueva { nombre: string; monto: number | null; }
+// repuesto_id: si la pieza es del inventario, sale del stock al entregar la orden.
+interface PiezaNueva { nombre: string; monto: number | null; repuesto_id?: number | null; }
 
 // Los tres campos del formulario que se eligen de una lista. Comparten un solo
 // selector: lo que cambia es de dónde salen las opciones y cómo se rotulan.
@@ -60,9 +63,31 @@ export class RecepcionCotizPage implements OnInit, OnDestroy {
     tecnico: { titulo: 'Asignar mecánico', placeholder: 'Nombre del mecánico', vacio: 'Ningún mecánico coincide con la búsqueda.' },
   };
 
-  constructor(private rec: RecepcionService, private toast: ToastController, private alert: AlertController, private mensajes: MensajesService) {}
+  catalogo: Repuesto[] = [];
 
-  ngOnInit() { this.mensajes.precargar(); this.cargar(); }
+  constructor(private rec: RecepcionService, private toast: ToastController, private alert: AlertController, private mensajes: MensajesService,
+              private auth: AuthService, private inventario: InventarioService) {}
+
+  ngOnInit() { this.mensajes.precargar(); this.cargar(); this.cargarCatalogo(); }
+
+  // Solo quien ve precios puede leer el inventario; para los demás se escribe a mano.
+  private cargarCatalogo() {
+    if (!this.auth.puede('ordenes.precios')) return;
+    this.inventario.listar().pipe(takeUntil(this.destroy$)).subscribe({ next: r => this.catalogo = r.data || [], error: () => {} });
+  }
+
+  // Al escribir (o elegir de la lista) un repuesto del inventario, propone su precio.
+  alEscribirPieza(p: PiezaNueva) {
+    const antes = this.catalogo.find(r => r.id === p.repuesto_id);
+    const r = repuestoPorTexto(this.catalogo, p.nombre);
+    p.repuesto_id = r?.id ?? null;
+    if (r && (!p.monto || (antes && p.monto === Number(antes.precio)))) p.monto = Number(r.precio) || null;
+    if (r?.codigo && p.nombre.trim().toLowerCase() === r.codigo.trim().toLowerCase()) p.nombre = r.nombre;
+  }
+  disponibleDe(p: PiezaNueva): number | null {
+    const r = p.repuesto_id ? this.catalogo.find(x => x.id === p.repuesto_id) : null;
+    return r ? r.disponible : null;
+  }
   ionViewWillEnter() { this.cargar(); }
 
   cargar(ev?: any) {
@@ -264,7 +289,7 @@ export class RecepcionCotizPage implements OnInit, OnDestroy {
     this.guardando = true;
     const piezas = this.form.piezas
       .filter(p => p.nombre.trim() && Number(p.monto) > 0)
-      .map(p => ({ nombre: p.nombre.trim(), cantidad: 1, costo_unitario: Number(p.monto) || 0 }));
+      .map(p => ({ nombre: p.nombre.trim(), cantidad: 1, costo_unitario: Number(p.monto) || 0, repuesto_id: p.repuesto_id || null }));
     // Una sola llamada transaccional: si algo falla, no queda nada a medias.
     this.rec.armarCotizacion(this.form.orden_id!, {
       tecnico_id: this.form.tecnico_id,
@@ -277,6 +302,7 @@ export class RecepcionCotizPage implements OnInit, OnDestroy {
         this.mostrarForm = false;
         this.aviso('Cotización guardada', 'success');
         this.cargar();
+        this.cargarCatalogo(); // lo apartado cambió
       },
       error: () => {
         this.guardando = false;

@@ -16,7 +16,7 @@ const CARPETA_DE_RUTA: [string, string][] = [
   // Las órdenes se manejan en Gestión de citas (Agenda): abrir una deja esa carpeta abierta.
   ['/admin/ordenes', 'agenda'], ['/admin/detalle-orden', 'agenda'], ['/admin/nueva-orden', 'agenda'], ['/admin/factura', 'agenda'],
   ['/admin/clientes', 'operacion'], ['/admin/cliente-', 'operacion'],
-  ['/admin/moto-', 'operacion'], ['/admin/servicios', 'operacion'], ['/admin/garantias', 'operacion'],
+  ['/admin/moto-', 'operacion'], ['/admin/servicios', 'operacion'], ['/admin/inventario', 'operacion'], ['/admin/garantias', 'operacion'],
   ['/admin/config', 'config'],
 ];
 const KEY_CARPETAS = 'tallerms_menu_carpetas';

@@ -530,6 +530,64 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     const propia = await pedir('POST', '/citas', { token: Bb.token, body: { cliente_id: clienteB, vehiculo_id: vehB, sucursal_id: sb.id, fecha: dia, hora: '16:00', motivo: 'Propia' } });
     ok(propia.status < 300, 'B sí agenda con su propio cliente y vehículo', propia.json);
 
+    // ── Inventario de repuestos ──
+    const inv = (met, ruta, token, body) => pedir(met, '/inventario' + ruta, { token, body });
+    const nuevoRep = await inv('POST', '', A.token, { nombre: 'Pastillas de freno', codigo: 'PF-01', marca: 'Bosch', costo: 8000, precio: 12000, minimo: 2, existencia_inicial: 5, sucursal_id: sa.id });
+    ok(nuevoRep.status === 201, 'A agrega un repuesto con 5 en existencia', nuevoRep.json);
+    const repA = nuevoRep.json.data.id;
+    ok((await inv('POST', '', A.token, { nombre: 'Otro', codigo: 'pf-01' })).status === 409, 'el código no se repite (sin distinguir mayúsculas)');
+    ok((await inv('POST', '', A.token, { nombre: '', precio: 5 })).status === 400, 'un repuesto sin nombre se rechaza');
+    ok((await inv('POST', '', A.token, { nombre: 'X', precio: -1 })).status === 400, 'un precio negativo se rechaza');
+    const listaB = await inv('GET', '', Bb.token);
+    ok(listaB.status === 200 && !listaB.json.data.some((r) => r.id === repA), 'B no ve el inventario de A', listaB.json);
+    ok((await inv('PUT', `/${repA}`, Bb.token, { nombre: 'Robado' })).status === 404, 'B no puede editar un repuesto de A');
+    ok((await inv('POST', `/${repA}/entrada`, Bb.token, { cantidad: 100, sucursal_id: sb.id })).status === 404, 'B no puede cargar existencias a un repuesto de A');
+    ok((await inv('GET', `/${repA}/movimientos`, Bb.token)).status === 404, 'B no ve los movimientos de A');
+    ok((await inv('POST', `/${repA}/entrada`, A.token, { cantidad: 1, sucursal_id: sb.id })).status === 400, 'A no puede mover existencias a una sucursal de B');
+    const ordenDeB = ob.json.data.id;
+    const piezaAjena = await pedir('POST', `/recepcion/cotizaciones/${ordenDeB}/repuestos`, { token: Bb.token, body: { nombre: 'x', cantidad: 1, costo_unitario: 1, repuesto_id: repA } });
+    ok(piezaAjena.status === 400, 'B no puede usar en su orden un repuesto de A', piezaAjena.json);
+    ok((await inv('GET', '', m1.token)).status === 403, 'el mecánico no ve el inventario (no ve precios)');
+
+    const ordenInv = (await pedir('POST', '/ordenes', { token: A.token, body: datosOrden(clienteA, vehA, sa.id) })).json.data.id;
+    const conCatalogo = await pedir('POST', `/recepcion/cotizaciones/${ordenInv}/repuestos`, { token: A.token, body: { nombre: 'Pastillas de freno', cantidad: 2, costo_unitario: 12000, estado: 'disponible', repuesto_id: repA } });
+    ok(conCatalogo.status === 201 && conCatalogo.json.data.repuesto_id === repA, 'la orden usa el repuesto del catálogo', conCatalogo.json);
+    const delRep = async () => (await inv('GET', `?sucursal_id=${sa.id}`, A.token)).json.data.find((r) => r.id === repA);
+    let r1 = await delRep();
+    ok(r1.existencia === 5 && r1.comprometido === 2 && r1.disponible === 3, 'con la orden abierta: 5 en existencia, 2 comprometidos, 3 disponibles', r1);
+    await pedir('POST', `/recepcion/cotizaciones/${ordenInv}/enviar`, { token: A.token, body: {} });
+    await pedir('POST', `/recepcion/cotizaciones/${ordenInv}/aprobar`, { token: A.token, body: {} });
+    await pedir('PATCH', `/ordenes/${ordenInv}/estado`, { token: A.token, body: { estado: 'lista_entrega', confirmar: true } });
+    const entregaInv = await pedir('POST', `/recepcion/ordenes/${ordenInv}/entregar`, { token: A.token, body: { metodo_pago: 'efectivo' } });
+    ok(entregaInv.status === 200, 'A entrega la orden', entregaInv.json);
+    r1 = await delRep();
+    ok(r1.existencia === 3 && r1.comprometido === 0, 'al entregar salen las 2 del inventario', r1);
+    const entrada = await inv('POST', `/${repA}/entrada`, A.token, { cantidad: 4, sucursal_id: sa.id, costo_unitario: 7500, proveedor: 'Repuestos CR', documento: 'F-123' });
+    ok(entrada.status === 201 && entrada.json.data.existencia === 7, 'una compra de 4 deja 7', entrada.json);
+    ok((await inv('POST', `/${repA}/ajuste`, A.token, { conteo: 6, sucursal_id: sa.id })).status === 400, 'un ajuste sin motivo se rechaza');
+    const ajuste = await inv('POST', `/${repA}/ajuste`, A.token, { conteo: 6, sucursal_id: sa.id, nota: 'Conteo de fin de mes' });
+    ok(ajuste.status === 201 && ajuste.json.data.diferencia === -1, 'el conteo físico deja 6 y anota la diferencia', ajuste.json);
+    ok((await inv('POST', `/${repA}/ajuste`, A.token, { conteo: 6, sucursal_id: sa.id, nota: 'Otra vez' })).status === 400, 'ajustar a la misma cantidad se rechaza');
+    // Una orden abierta sin sucursal sale de la primera del taller al entregarse: ahí
+    // también tiene que contar como apartada.
+    const sinSede = await pedir('POST', '/ordenes', { token: A.token, body: { ...datosOrden(clienteA, vehA, null), sucursal_id: undefined } });
+    const [[sedeSinSede]] = await db.query(
+      `SELECT o.sucursal_id, (SELECT s.id FROM sucursales s WHERE s.tenant_id = o.tenant_id ORDER BY s.activa DESC, s.id LIMIT 1) AS primera
+         FROM ordenes_trabajo o WHERE o.id = ?`, [sinSede.json.data.id]);
+    await pedir('POST', `/recepcion/cotizaciones/${sinSede.json.data.id}/repuestos`, { token: A.token, body: { nombre: 'Pastillas de freno', cantidad: 1, costo_unitario: 12000, repuesto_id: repA } });
+    const enPrimera = (await inv('GET', `?sucursal_id=${sedeSinSede.sucursal_id || sedeSinSede.primera}`, A.token)).json.data.find((r) => r.id === repA);
+    ok(enPrimera.comprometido === 1, 'una orden sin sucursal también aparta el repuesto', { sedeSinSede, enPrimera });
+    const movs = await inv('GET', `/${repA}/movimientos`, A.token);
+    ok(movs.status === 200 && movs.json.data.map((m) => m.tipo).join() === 'ajuste,entrada,salida,entrada', 'quedan los 4 movimientos', movs.json.data && movs.json.data.map((m) => m.tipo));
+    const [[costoNuevo]] = await db.query('SELECT costo::float AS c FROM repuestos WHERE id = ?', [repA]);
+    ok(costoNuevo.c === 7500, 'la compra actualiza el costo del repuesto', costoNuevo);
+    const [[{ fugasInv }]] = await db.query(
+      `SELECT (SELECT COUNT(*) FROM repuesto_existencias e JOIN repuestos r ON r.id = e.repuesto_id WHERE e.tenant_id <> r.tenant_id)
+            + (SELECT COUNT(*) FROM movimientos_inventario m JOIN repuestos r ON r.id = m.repuesto_id WHERE m.tenant_id <> r.tenant_id)
+            + (SELECT COUNT(*) FROM orden_repuestos p JOIN repuestos r ON r.id = p.repuesto_id WHERE p.tenant_id <> r.tenant_id) AS "fugasInv"`
+    );
+    ok(fugasInv === 0, 'ningún movimiento ni pieza cruza de empresa', fugasInv);
+
     // ── Roles ──
     const rolesA = await pedir('GET', '/admin/roles', { token: A.token });
     const rolesB = await pedir('GET', '/admin/roles', { token: Bb.token });
