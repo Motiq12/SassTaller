@@ -10,6 +10,8 @@
 //      if (ajena) return invalido(res, ajena.campo, ajena.error);
 // Un campo vacío no se revisa: la obligatoriedad la decide cada ruta.
 
+const { sucursalValida } = require('./sucursales');
+
 const vacio = (v) => v === undefined || v === null || v === '';
 
 // Cada revisión: [campo, consulta que devuelve una fila si el id sirve, mensaje].
@@ -40,4 +42,20 @@ async function referenciaAjena(db, ids = {}) {
   return null;
 }
 
-module.exports = { referenciaAjena };
+// La sede que llega en el cuerpo. Antes un id de otra empresa (o de una sede que no
+// existe) se cambiaba en silencio por null: el pedido "salía bien" y, al editar una
+// orden, hasta le borraba la sede que tenía. Ahora se distinguen tres casos:
+//   - no vino (undefined):    { ausente: true, id: null } — la ruta decide (default o conservar).
+//   - vino vacía (null, ''):  { id: null } — "sin sede", como la manda la pantalla.
+//   - vino un id:             tiene que ser una sede activa de este taller, o { error }.
+// La sede que ya tenía el registro (`actual`) vale aunque hoy esté inactiva: reenviar el
+// formulario sin tocar la sede no puede fallar.
+async function sedeDelCuerpo(db, valor, { actual = null } = {}) {
+  if (valor === undefined) return { ausente: true, id: null };
+  if (valor === null || valor === '') return { id: null };
+  const n = Number(valor);
+  if (Number.isInteger(n) && n > 0 && (Number(actual) === n || await sucursalValida(db, n))) return { id: n };
+  return { error: 'Esa sucursal no existe en este taller' };
+}
+
+module.exports = { referenciaAjena, sedeDelCuerpo };

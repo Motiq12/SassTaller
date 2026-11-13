@@ -1,14 +1,14 @@
 const router = require('express').Router();
 // Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
 const { fail, invalido, faltante } = require('../utils/responder');
-const { referenciaAjena } = require('../utils/referencias');
+const { referenciaAjena, sedeDelCuerpo } = require('../utils/referencias');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { soloRoles } = require('../middleware/roles');
 const { cargarAlcance, soloSucursal, sucursalParaGuardar, exigirSucursal, delTaller, SUCURSAL_DE_CITA } = require('../utils/alcance');
 const { notificarCambioEstado, notificarMecanico, notificarCitaAgendada } = require('../utils/notificaciones');
 const { TRANSICIONES_CITA, transicionPermitida } = require('../utils/transiciones');
-const { sucursalValida, tecnicoEnSucursal } = require('../utils/sucursales');
+const { tecnicoEnSucursal } = require('../utils/sucursales');
 const { textoDentroDeLimite } = require('../utils/validar');
 const { getConfig } = require('../utils/configuracion');
 const { serviciosDelPedido, pedidoTraeServicios, problemaConServicios, textoServicios, guardarServiciosCita } = require('../utils/servicios-cita');
@@ -106,7 +106,9 @@ router.post('/', soloRoles(...GESTIONA_AGENDA), exigirPermiso('citas.agendar'), 
     const servicios = serviciosDelPedido(req.body);
     const problemaServicios = await problemaConServicios(req.db, servicios);
     if (problemaServicios) return invalido(res, 'servicios', problemaServicios);
-    const sucursal_id = sucursalParaGuardar(req, (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null);
+    const sede = await sedeDelCuerpo(req.db, req.body.sucursal_id);
+    if (sede.error) return invalido(res, 'sucursal_id', sede.error);
+    const sucursal_id = sucursalParaGuardar(req, sede.id);
     if (!(await tecnicoEnSucursal(req.db, tecnico_id, sucursal_id))) {
       return invalido(res, 'tecnico_id', 'El mecánico no atiende en esa sucursal');
     }
@@ -203,14 +205,17 @@ router.put('/:id', soloRoles(...GESTIONA_AGENDA), exigirPermiso('citas.agendar')
     const servicios = serviciosDelPedido(req.body);
     const problemaServicios = cambiaServicios ? await problemaConServicios(req.db, servicios) : null;
     if (problemaServicios) return invalido(res, 'servicios', problemaServicios);
-    // Solo cambia la sucursal si llega una válida (no la borra al editar otros campos).
-    const sucursalNueva = sucursalParaGuardar(req, (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null);
     // Fecha/hora previas: si el taller mueve la cita hay que avisarle al cliente
     // (antes se le cambiaba el día y no se enteraba por ningún lado).
     const [[previa]] = await req.db.query(
       "SELECT to_char(fecha, 'YYYY-MM-DD') AS fecha, to_char(hora, 'HH24:MI') AS hora, sucursal_id, duracion_horas, duracion_min FROM citas WHERE tenant_id = @tenant AND id = ?",
       [req.params.id]
     );
+    // La sucursal solo cambia si llega una de este taller (sin el campo, o vacío, se
+    // conserva). Una de otro taller se rechaza: antes se ignoraba y el pedido daba 200.
+    const sede = await sedeDelCuerpo(req.db, req.body.sucursal_id, { actual: previa?.sucursal_id });
+    if (sede.error) return invalido(res, 'sucursal_id', sede.error);
+    const sucursalNueva = sucursalParaGuardar(req, sede.id);
     // Solo si de verdad cambió el momento de la cita (editar el motivo no molesta al cliente).
     const movida = previa && (previa.fecha !== String(fecha).slice(0, 10) || previa.hora !== String(hora).slice(0, 5));
     const esAdmin = req.usuario.rol === 'admin';

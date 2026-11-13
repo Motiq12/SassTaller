@@ -24,6 +24,7 @@ const { serviciosDelPedido, problemaConServicios, textoServicios, guardarServici
 const { getConfig, horasDisponibles } = require('../utils/configuracion');
 const { agendaDia, agendaRango, conflictosDeCita, horasPasadas } = require('../utils/agenda');
 const { getSucursales, sucursalValida, sucursalPorDefecto } = require('../utils/sucursales');
+const { sedeDelCuerpo } = require('../utils/referencias');
 const { avanzarEstadoOrden, registrarAprobacion, registrarRechazoAdicional } = require('../utils/ordenes');
 const { recompensas } = require('../utils/recompensas');
 const { problemaDeContrasena, PISO } = require('../utils/contrasena');
@@ -1465,9 +1466,6 @@ router.put('/citas/:id', async (req, res) => {
     }
     const problemaServicios = await problemaConServicios(req.db, servicios, { obligatorio: true, delCatalogo: true });
     if (problemaServicios) return invalido(res, 'servicios', problemaServicios);
-    // Sucursal: la pedida (si es válida) o se conserva la actual de la cita más abajo.
-    const sucursalPedida = (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
-
     const [[cita]] = await req.db.query(
       "SELECT id, estado, orden_id, sucursal_id, duracion_horas, to_char(fecha, 'YYYY-MM-DD') AS fecha, to_char(hora, 'HH24:MI') AS hora FROM citas WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?",
       [req.params.id, req.cliente.id]
@@ -1476,6 +1474,11 @@ router.put('/citas/:id', async (req, res) => {
     if (cita.estado !== 'agendado' || cita.orden_id) {
       return res.status(400).json({ error: 'Esta cita ya no se puede modificar. Comunícate con el taller.' });
     }
+    // Sucursal: la pedida, o se conserva la de la cita (más abajo) si no viene. Una de otro
+    // taller se rechaza: antes se ignoraba y la reprogramación daba 200.
+    const sede = await sedeDelCuerpo(req.db, req.body.sucursal_id, { actual: cita.sucursal_id });
+    if (sede.error) return invalido(res, 'sucursal_id', 'Elige una sucursal válida');
+    const sucursalPedida = sede.id;
 
     const config = await getConfig(req.db);
     const minH = Number(config.cancelacion_horas_min || 0);
