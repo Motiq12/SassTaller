@@ -176,15 +176,18 @@ function baseFalsa() {
   const tablas = {
     clientes: { cols: [['id', 'integer', 'YES'], ['nombre', 'character varying', 'NO']], filas: [{ id: '1', nombre: "Ñandú O'Brien" }, { id: '2', nombre: null }] },
     fotos: { cols: [['clave', 'character', 'NO'], ['bytes', 'bytea', 'NO']], filas: [{ clave: 'abc', bytes: '\\x0102ff' }] },
-    schema_migraciones: { cols: [['archivo', 'text', 'NO']], filas: [{ archivo: '0001' }] },
+    schema_migraciones: { cols: [['nombre', 'text', 'NO'], ['aplicada_en', 'timestamp with time zone', 'NO']], filas: [{ nombre: '0001_esquema_base.sql', aplicada_en: '2026-10-01 00:00:00+00' }] },
   };
   const conexion = {
     liberada: false,
     async query(sql, params = []) {
       if (/^(BEGIN|ROLLBACK)/.test(sql)) return [[]];
       if (/current_database\(\)/.test(sql)) return [[{ base: 'taller' }]];
+      if (/SELECT nombre FROM schema_migraciones/.test(sql)) return [tablas.schema_migraciones.filas];
+      if (/SELECT last_value/.test(sql)) return [[{ valor: '2', llamada: true }]];
+      if (/FROM pg_sequence/.test(sql)) return [[{ incremento: '1' }]];
       if (/information_schema\.tables/.test(sql)) return [Object.keys(tablas).map((nombre) => ({ nombre }))];
-      if (/information_schema\.columns/.test(sql)) return [tablas[params[0]].cols.map(([nombre, tipo, identidad]) => ({ nombre, tipo, generada: 'NEVER', identidad }))];
+      if (/information_schema\.columns/.test(sql)) return [tablas[params[0]].cols.map(([nombre, tipo, identidad]) => ({ nombre, tipo, generada: 'NEVER', identidad, secuencia: identidad === 'YES' ? 'public.clientes_id_seq' : null }))];
       const m = sql.match(/FROM "([^"]+)" ORDER BY ctid LIMIT (\d+) OFFSET (\d+)/);
       if (m) return [tablas[m[1]].filas.slice(Number(m[3]), Number(m[3]) + Number(m[2]))];
       throw new Error('Consulta no prevista: ' + sql);
@@ -206,7 +209,7 @@ test('respaldo completo: vuelca, comprime, sube, comprueba y rota', async () => 
     const r = await respaldar({ pool, config, ahora: new Date('2026-10-08T08:30:00Z') });
 
     assert.equal(r.clave, 'respaldos/taller_2026-10-08T08-30-00Z.sql.gz');
-    assert.deepEqual([r.tablas, r.filas, r.borrados, r.cifrado], [2, 3, 1, false]);
+    assert.deepEqual([r.tablas, r.filas, r.borrados, r.cifrado], [3, 4, 1, false]);
     assert.equal(conexion.liberada, true, 'la conexión del volcado vuelve al pool');
     assert.deepEqual([...falso.objetos.keys()].sort(), [
       'respaldos/leeme.txt', 'respaldos/taller_2026-10-02T08-30-00Z.sql.gz', 'respaldos/taller_2026-10-08T08-30-00Z.sql.gz',
@@ -214,11 +217,11 @@ test('respaldo completo: vuelca, comprime, sube, comprueba y rota', async () => 
 
     const sql = zlib.gunzipSync(falso.objetos.get(r.clave)).toString('utf8');
     assert.match(sql, /SET CONSTRAINTS ALL DEFERRED;/);
-    assert.doesNotMatch(sql, /schema_migraciones/, 'la versión del esquema la pone el migrador');
-    assert.match(sql, /INSERT INTO "clientes" \("id", "nombre"\) VALUES\n\(1, 'Ñandú O''Brien'\),\n\(2, NULL\);/);
+    assert.match(sql, /INSERT INTO "schema_migraciones"/, 'el respaldo conserva el historial del esquema');
+    assert.match(sql, /INSERT INTO "clientes" \("id", "nombre"\) OVERRIDING SYSTEM VALUE VALUES\n\(1, 'Ñandú O''Brien'\),\n\(2, NULL\);/);
     assert.match(sql, /setval\(pg_get_serial_sequence\('"clientes"', 'id'\)/);
     assert.match(sql, /INSERT INTO "fotos" \("clave", "bytes"\) VALUES\n\('abc', '\\x0102ff'\);/);
-    assert.match(sql, /-- Respaldo completo: 2 tablas, 3 filas\.\n$/);
+    assert.match(sql, /-- Respaldo completo: 3 tablas, 4 filas\.\n$/);
 
     const subida = falso.pedidos.find((p) => p.metodo === 'PUT');
     assert.match(subida.auth, /^AWS4-HMAC-SHA256 Credential=id\/\d{8}\/auto\/s3\/aws4_request, SignedHeaders=content-length;host;x-amz-content-sha256;x-amz-date, Signature=[0-9a-f]{64}$/);

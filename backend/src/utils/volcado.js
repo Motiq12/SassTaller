@@ -19,8 +19,6 @@ const ES_NUMERO = /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/;
 const FILAS_POR_TANDA = 50;
 // Un INSERT se corta al pasar de este tamaño. Una fila sola puede superarlo: va sola.
 const BYTES_POR_INSERT = 512 * 1024;
-// Las escribe el migrador al preparar la base que se va a restaurar.
-const NO_SE_RESPALDAN = new Set(['schema_migraciones']);
 
 const id = (nombre) => `"${String(nombre).replace(/"/g, '""')}"`;
 
@@ -45,26 +43,60 @@ async function volcarBase(conexion, escribir, { ahora = new Date() } = {}) {
     const [todas] = await conexion.query(
       "SELECT table_name AS nombre FROM information_schema.tables WHERE table_schema = current_schema() AND table_type = 'BASE TABLE' ORDER BY table_name"
     );
-    const tablas = todas.filter((t) => !NO_SE_RESPALDAN.has(t.nombre));
+    const tablas = todas;
+    const tieneHistorial = tablas.some((t) => t.nombre === 'schema_migraciones');
+    if (tablas.length && !tieneHistorial) {
+      throw new Error('Falta schema_migraciones: ejecutar el migrador antes de respaldar');
+    }
+    const [migraciones] = tieneHistorial
+      ? await conexion.query('SELECT nombre FROM schema_migraciones ORDER BY nombre')
+      : [[]];
 
     await escribir([
       `-- Respaldo de los datos de la base ${base}`,
       `-- Hecho el ${ahora.toISOString()} por el sistema (respaldo automático).`,
-      '-- Para restaurar: base vacía, node src/db/migrar.js, y gunzip -c <archivo>.sql.gz | psql <base>',
+      '-- Preparar una base vacía con el mismo esquema: node src/db/migrar.js (ver docs/RESPALDOS.md).',
+      '-- Cargar: psql -X -v ON_ERROR_STOP=1 -d <destino> -f respaldo.sql',
+      `-- Migraciones: ${JSON.stringify(migraciones.map((m) => m.nombre))}`,
       '',
       'SET standard_conforming_strings = on;',
       "SET client_encoding = 'UTF8';",
       "SET TIME ZONE 'UTC';",
+      "SET search_path = public;",
       'BEGIN;',
       // Las claves foráneas se revisan al final: así no importa el orden de las tablas.
       'SET CONSTRAINTS ALL DEFERRED;',
       '',
     ].join('\n'));
 
+    // El esquema se reconstruye con el código de la fecha del respaldo. No se
+    // acepta una versión más nueva: podría cambiar defaults o saltarse backfills.
+    if (tieneHistorial) {
+      const versiones = migraciones.map((m) => literal(m.nombre, 'text')).join(', ');
+      await escribir(`\nDO $restaurar$ BEGIN
+  IF (SELECT COALESCE(array_agg(nombre ORDER BY nombre), ARRAY[]::text[]) FROM schema_migraciones)
+     IS DISTINCT FROM ARRAY[${versiones}]::text[] THEN
+    RAISE EXCEPTION 'El esquema destino no coincide con las migraciones del respaldo';
+  END IF;
+END $restaurar$;\n`);
+    }
+    // No borrar ni mezclar datos existentes. Los locks duran hasta COMMIT y
+    // evitan que otra sesión inserte después de comprobar que todo está vacío.
+    if (tablas.length) await escribir(`LOCK TABLE ${tablas.map((t) => id(t.nombre)).join(', ')} IN ACCESS EXCLUSIVE MODE;\n`);
+    for (const { nombre } of tablas.filter((t) => t.nombre !== 'schema_migraciones')) {
+      await escribir(`DO $restaurar$ BEGIN
+  IF EXISTS (SELECT 1 FROM ${id(nombre)}) THEN
+    RAISE EXCEPTION 'El destino debe estar vacío; tabla con datos: %', ${literal(nombre, 'text')};
+  END IF;
+END $restaurar$;\n`);
+    }
+
     let totalFilas = 0;
+    const secuencias = [];
     for (const { nombre } of tablas) {
       const [info] = await conexion.query(
-        `SELECT column_name AS nombre, data_type AS tipo, is_generated AS generada, is_identity AS identidad
+        `SELECT column_name AS nombre, data_type AS tipo, is_generated AS generada, is_identity AS identidad,
+                pg_get_serial_sequence(quote_ident(table_schema) || '.' || quote_ident(table_name), column_name) AS secuencia
            FROM information_schema.columns
           WHERE table_schema = current_schema() AND table_name = ? ORDER BY ordinal_position`,
         [nombre]
@@ -72,14 +104,20 @@ async function volcarBase(conexion, escribir, { ahora = new Date() } = {}) {
       const columnas = columnasRespaldables(info);
       const lista = columnas.map((c) => id(c.nombre)).join(', ');
       const seleccion = columnas.map((c) => `${id(c.nombre)}::text AS ${id(c.nombre)}`).join(', ');
-      const cabecera = `INSERT INTO ${id(nombre)} (${lista}) VALUES\n`;
+      const identidad = columnas.some((c) => c.identidad === 'YES') ? ' OVERRIDING SYSTEM VALUE' : '';
+      const cabecera = `INSERT INTO ${id(nombre)} (${lista})${identidad} VALUES\n`;
+      // El migrador ya creó estas filas. Recuperar sus fechas originales conserva
+      // el historial sin volver a ejecutar migraciones ni borrar su tabla.
+      const conflicto = nombre === 'schema_migraciones'
+        ? ' ON CONFLICT (nombre) DO UPDATE SET aplicada_en = EXCLUDED.aplicada_en'
+        : '';
 
       let lote = [];
       let bytes = 0;
       let filas = 0;
       const vaciar = async () => {
         if (!lote.length) return;
-        await escribir(cabecera + lote.join(',\n') + ';\n');
+        await escribir(cabecera + lote.join(',\n') + conflicto + ';\n');
         lote = [];
         bytes = 0;
       };
@@ -101,17 +139,28 @@ async function volcarBase(conexion, escribir, { ahora = new Date() } = {}) {
       await vaciar();
       totalFilas += filas;
 
-      // El contador de ids sigue después del último restaurado.
-      const conId = columnas.find((c) => c.identidad === 'YES');
-      if (conId) {
-        const c = id(conId.nombre);
-        await escribir(`SELECT setval(pg_get_serial_sequence('${id(nombre)}', '${conId.nombre}'), COALESCE(MAX(${c}), 1), MAX(${c}) IS NOT NULL) FROM ${id(nombre)};\n`);
+      // Identidades Y seriales, incluso vacíos o adelantados por filas borradas.
+      // ::text evita perder precisión por el parser global de bigint del pool.
+      for (const columna of columnas.filter((c) => c.secuencia)) {
+        const [[estado]] = await conexion.query(`SELECT last_value::text AS valor, is_called AS llamada FROM ${columna.secuencia}`);
+        const [[config]] = await conexion.query('SELECT seqincrement::text AS incremento FROM pg_sequence WHERE seqrelid = ?::regclass', [columna.secuencia]);
+        if (BigInt(config.incremento) <= 0n) throw new Error(`Secuencia descendente no soportada: ${columna.secuencia}`);
+        const c = id(columna.nombre);
+        secuencias.push(`SELECT setval(pg_get_serial_sequence(${literal(id(nombre), 'text')}, ${literal(columna.nombre, 'text')}), GREATEST(COALESCE(MAX(${c}), ${estado.valor}), ${estado.valor}), ${estado.llamada ? 'true' : 'false'} OR MAX(${c}) IS NOT NULL) FROM ${id(nombre)};`);
       }
       await escribir(`-- ${filas} filas en ${id(nombre)}\n`);
+      await escribir(`DO $restaurar$ BEGIN
+  IF (SELECT count(*) FROM ${id(nombre)}) <> ${filas} THEN
+    RAISE EXCEPTION 'Conteo incorrecto en %', ${literal(nombre, 'text')};
+  END IF;
+END $restaurar$;\n`);
     }
 
     await escribir([
       '',
+      // Validar las FK ANTES de setval: los cambios a secuencias no se revierten.
+      'SET CONSTRAINTS ALL IMMEDIATE;',
+      ...secuencias,
       'COMMIT;',
       // Si esta línea no está, el archivo quedó cortado y no hay que restaurarlo.
       `-- Respaldo completo: ${tablas.length} tablas, ${totalFilas} filas.`,
