@@ -201,7 +201,7 @@ test('portal: entrar por código no confirma una cuenta con contraseña pendient
 test('mecánico: cambiar el estado de su cita no choca con el guard de tenant', async () => {
   tablas = [
     { re: /from citas/i, filas: { id: 5, estado: 'agendado', orden_id: null } },
-    { re: /from usuarios/i, filas: { activo: 1, sesiones_desde_ms: null } },
+    { re: /from usuarios/i, filas: { activo: 1, sesiones_desde_ms: null, rol: 'tecnico', tenant_id: 1 } },
   ];
   const token = jwt.sign({ id: 9, rol: 'tecnico', tenant_id: 1, sid: 'sesion-mecanico' }, process.env.JWT_SECRET);
   const { status, body } = await pedir('PATCH', '/api/mecanico/citas/5/estado', { estado: 'en_revision' }, token);

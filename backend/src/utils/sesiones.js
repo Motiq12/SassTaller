@@ -8,12 +8,18 @@ const { pool } = require('../db/pool');
 const TOQUE_MS = 2 * 60 * 1000;
 const toques = new Map();
 
-// { activo, sesiones_desde_ms } del usuario; null si no existe; undefined si no se
-// pudo leer la base (quien llama decide: la firma del token ya se verificó).
+// { activo, sesiones_desde_ms, rol, tenant_id } del usuario; null si no existe;
+// undefined si no se pudo leer la base (quien llama decide: la firma del token ya se
+// verificó).
 async function estadoDeSesion(id) {
   try {
-    const [[u]] = await pool.query('SELECT activo, sesiones_desde_ms FROM usuarios WHERE id = ?', [id]);
-    const estado = u ? { activo: Number(u.activo) === 1, sesiones_desde_ms: u.sesiones_desde_ms == null ? null : Number(u.sesiones_desde_ms) } : null;
+    const [[u]] = await pool.query('SELECT activo, sesiones_desde_ms, rol, tenant_id FROM usuarios WHERE id = ?', [id]);
+    const estado = u ? {
+      activo: Number(u.activo) === 1,
+      sesiones_desde_ms: u.sesiones_desde_ms == null ? null : Number(u.sesiones_desde_ms),
+      rol: u.rol,
+      tenant_id: Number(u.tenant_id),
+    } : null;
     return estado;
   } catch (err) {
     console.error('⚠️  No se pudo revisar la sesión:', err.code || err.message);
@@ -43,6 +49,17 @@ function sesionVigente(payload, estado) {
   if (!estado || !estado.activo || !Number.isFinite(payload.iat)) return false;
   if (estado.sesiones_desde_ms && Number(payload.iat) * 1000 < estado.sesiones_desde_ms) return false;
   return true;
+}
+
+// QP-01: el rol firmado en el token no autoriza por sí solo. Un login que leyó la fila
+// antes de que administración le cambiara el rol firma con el rol viejo y abre su
+// sesión DESPUÉS del cierre de sesiones, así que ni la fecha ni el sid la invalidan.
+// Por eso, en cada petición, el rol (y el taller) del token tiene que coincidir con
+// el que la fila tiene AHORA; si no, la sesión no vale y hay que volver a entrar.
+// No se relee "antes de firmar" (eso deja otra ventana): se compara siempre.
+function rolVigente(payload, estado) {
+  if (!estado || typeof estado.rol !== 'string') return false;
+  return payload.rol === estado.rol && Number(payload.tenant_id) === Number(estado.tenant_id);
 }
 
 // "Chrome en Windows", "App de Android"… Solo para que la persona reconozca el equipo.
@@ -187,7 +204,7 @@ function olvidarCliente() {} // Compatibilidad: ya no hay caché de autorizació
 function olvidar() {}
 
 module.exports = {
-  estadoDeSesion, sidAbierto, sesionVigente, cerrarSesiones, olvidar,
+  estadoDeSesion, sidAbierto, sesionVigente, rolVigente, cerrarSesiones, olvidar,
   cerrarLasDemas, estadoDeCliente, cerrarSesionesDeCliente, olvidarCliente,
   describirAgente, nuevoSid, abrirSesion, sesionesAbiertas, cerrarSesionPropia, cerrarOtrasSesiones, cerrarSid,
 };
