@@ -1,7 +1,7 @@
 const router = require('express').Router();
 // Sin `pool`: todo el acceso pasa por req.db, scopeado al taller.
 const { fail, invalido, faltante } = require('../utils/responder');
-const { referenciaAjena } = require('../utils/referencias');
+const { referenciaAjena, sedeDelCuerpo } = require('../utils/referencias');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { cargarAlcance, soloSucursal, sucursalParaGuardar, exigirSucursal, delTaller, soloOrdenAsignada, SUCURSAL_DE_ORDEN } = require('../utils/alcance');
@@ -13,7 +13,6 @@ const {
 const { ESTADOS_REPUESTO, estadosSiguientes, avisosDeCambio, montoSinAprobar, estadoAlEditarRepuesto } = require('../utils/reglas-orden');
 const { notificarPresupuestoListo, notificarCambioEstado } = require('../utils/notificaciones');
 const { TRANSICIONES_ORDEN, transicionPermitida } = require('../utils/transiciones');
-const { sucursalValida } = require('../utils/sucursales');
 const { LEIDO_POR_MI, VISTO_POR_OTRO, marcarLeidos } = require('../utils/mensajes');
 const { fotoValida, textoDentroDeLimite } = require('../utils/validar');
 const { patronLike, patronDigitos, patronPlaca, SOLO_DIGITOS } = require('../utils/busqueda');
@@ -131,7 +130,9 @@ router.post('/', soloRoles('recepcion', 'admin'), exigirPermiso('ordenes.crear')
     const ajena = await referenciaAjena(req.db, { cliente_id, vehiculo_id });
     if (ajena) return invalido(res, ajena.campo, ajena.error);
 
-    const sucursal_id = sucursalParaGuardar(req, (await sucursalValida(req.db, req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null);
+    const sede = await sedeDelCuerpo(req.db, req.body.sucursal_id);
+    if (sede.error) return invalido(res, 'sucursal_id', sede.error);
+    const sucursal_id = sucursalParaGuardar(req, sede.id);
 
     const numero_orden = await generarNumeroOrden(req.db);
 
@@ -279,7 +280,7 @@ router.put('/:id', requireRol('tecnico'), async (req, res) => {
 // entregada o cancelada no se edita.
 router.patch('/:id/datos', soloRoles('recepcion', 'admin'), exigirPermiso('ordenes.editar'), async (req, res) => {
   try {
-    const [[orden]] = await req.db.query('SELECT id, cliente_id, estado FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
+    const [[orden]] = await req.db.query('SELECT id, cliente_id, estado, sucursal_id FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
     if (['entregada', 'cancelada'].includes(orden.estado)) {
       return res.status(409).json({ error: 'Esta orden ya está cerrada: no se puede editar' });
@@ -301,9 +302,15 @@ router.patch('/:id/datos', soloRoles('recepcion', 'admin'), exigirPermiso('orden
     const fechaEst = b.fecha_estimada_entrega ? String(b.fecha_estimada_entrega).slice(0, 10) : null;
     if (fechaEst && !/^\d{4}-\d{2}-\d{2}$/.test(fechaEst)) return invalido(res, 'fecha_estimada_entrega', 'Fecha estimada no válida');
     // La moto tiene que ser del mismo cliente (para cambiar de cliente, se elimina y se abre otra).
-    const [[moto]] = await req.db.query('SELECT id FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?', [b.vehiculo_id, orden.cliente_id]);
+    const vehiculoId = Number(b.vehiculo_id);
+    if (!Number.isInteger(vehiculoId) || vehiculoId <= 0) return invalido(res, 'vehiculo_id', 'Ese vehículo no es de este cliente');
+    const [[moto]] = await req.db.query('SELECT id FROM vehiculos WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?', [vehiculoId, orden.cliente_id]);
     if (!moto) return invalido(res, 'vehiculo_id', 'Ese vehículo no es de este cliente');
-    const sucursal_id = sucursalParaGuardar(req, (await sucursalValida(req.db, b.sucursal_id)) ? Number(b.sucursal_id) : null);
+    // Sede: si no viene, se conserva la que tenía; una de otro taller se rechaza (antes se
+    // guardaba null y la orden perdía su sede).
+    const sede = await sedeDelCuerpo(req.db, b.sucursal_id, { actual: orden.sucursal_id });
+    if (sede.error) return invalido(res, 'sucursal_id', sede.error);
+    const sucursal_id = sede.ausente ? orden.sucursal_id : sucursalParaGuardar(req, sede.id);
     const categoria = b.categoria || 'diagnostico';
 
     await req.db.query(

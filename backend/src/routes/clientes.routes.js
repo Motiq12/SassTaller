@@ -93,10 +93,36 @@ router.get('/:id', async (req, res) => {
 // PATCH /api/clientes/:id/cortesia — canjea (consume) la cortesía de fidelización.
 // Además del flag, deja un registro en recompensas_canjeadas (historial que ve el cliente).
 // Acepta orden_id y descripcion opcionales (la cortesía aplicada a un servicio puntual).
+//
+// La orden, si viene, tiene que ser de este taller, de ESTE cliente y no estar entregada
+// ni cancelada. Antes se guardaba el número tal cual: la empresa B podía colgar su canje
+// de una orden de A (y la cancelación de A nunca lo devolvía), y se podía consumir la
+// cortesía sobre una orden ya cancelada, sin nadie que la devuelva después.
+//
+// Bloqueos: primero la orden y después el cliente, el mismo orden que usan cancelar y
+// eliminar la orden (que la bloquean y después devuelven la cortesía al cliente). Así
+// un canje que llega mientras se cancela la orden espera, ve el estado nuevo y se rechaza.
+const ORDEN_TERMINADA = ['entregada', 'cancelada'];
 router.patch('/:id/cortesia', exigirPermiso('clientes.editar'), async (req, res) => {
+  const pedida = req.body?.orden_id;
+  const conOrden = !(pedida === undefined || pedida === null || pedida === '');
+  const ordenId = Number(pedida);
+  if (conOrden && (!Number.isInteger(ordenId) || ordenId <= 0)) return invalido(res, 'orden_id', 'La orden no existe en este taller');
   const conn = await req.db.conexion();
   try {
     await conn.beginTransaction();
+    if (conOrden) {
+      const [[orden]] = await conn.query(
+        'SELECT cliente_id, estado FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ? FOR UPDATE',
+        [ordenId]
+      );
+      if (!orden) { await conn.rollback(); return invalido(res, 'orden_id', 'La orden no existe en este taller', 404); }
+      if (Number(orden.cliente_id) !== Number(req.params.id)) { await conn.rollback(); return invalido(res, 'orden_id', 'Esa orden es de otro cliente'); }
+      if (ORDEN_TERMINADA.includes(orden.estado)) {
+        await conn.rollback();
+        return invalido(res, 'orden_id', 'La orden ya está entregada o cancelada: no se le puede aplicar la cortesía');
+      }
+    }
     const [[cliente]] = await conn.query(
       'SELECT cortesia_disponible FROM clientes WHERE id = ? AND activo = 1 AND tenant_id = @tenant FOR UPDATE',
       [req.params.id]
@@ -110,7 +136,7 @@ router.patch('/:id/cortesia', exigirPermiso('clientes.editar'), async (req, res)
     );
     await conn.query(
       'INSERT INTO recompensas_canjeadas (tenant_id, cliente_id, orden_id, aplicado_por, descripcion) VALUES (@tenant, ?, ?, ?, ?)',
-      [req.params.id, req.body.orden_id || null, req.usuario.id, (req.body.descripcion || 'Servicio de cortesía').slice(0, 150)]
+      [req.params.id, conOrden ? ordenId : null, req.usuario.id, String(req.body.descripcion || 'Servicio de cortesía').slice(0, 150)]
     );
     await conn.commit();
     res.json({ message: 'Cortesía canjeada' });
