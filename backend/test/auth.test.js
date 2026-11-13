@@ -10,6 +10,11 @@ process.env.JWT_SECRET = 'test-secret';
 const usuarios = new Map();
 const pool = {
   async query(sql, params) {
+    // QP3-06: usuario y sesión se leen juntos, en una sola consulta (estadoYSesion).
+    if (/FROM usuarios u\s+LEFT JOIN sesiones_personal/.test(sql)) {
+      const u = usuarios.get(params[2]);
+      return [u ? [{ ...u, sesion_id: 1, sesion_cerrada: null, sesion_cv: u.credenciales_version ?? 0 }] : []];
+    }
     if (/FROM sesiones_personal/.test(sql)) return [[{ id: 1, cerrada: null }]];
     if (/UPDATE sesiones_personal/.test(sql)) return [{ affectedRows: 1 }];
     if (/FROM usuarios WHERE id = \?/.test(sql)) return [[usuarios.get(params[0])].filter(Boolean)];
@@ -172,10 +177,11 @@ test('rechaza 401 un token de personal sin sid', async () => {
   assert.equal(llamado, false);
 });
 
-test('si falla solamente la consulta del sid, devuelve 503', async () => {
-  const original = pool.query;
+test('si falla la consulta de la sesión, devuelve 503', async () => {
+  const original = pool.query; const err = console.error;
+  console.error = () => {};
   pool.query = async (sql, params) => {
-    if (/FROM sesiones_personal/.test(sql)) throw new Error('ECONNREFUSED');
+    if (/sesiones_personal/.test(sql)) throw new Error('ECONNREFUSED');
     return original(sql, params);
   };
   try {
@@ -184,7 +190,7 @@ test('si falla solamente la consulta del sid, devuelve 503', async () => {
     await auth(reqCon(token), res, () => { llamado = true; });
     assert.equal(res._status, 503);
     assert.equal(llamado, false);
-  } finally { pool.query = original; }
+  } finally { pool.query = original; console.error = err; }
 });
 
 // QP-01: el rol firmado no autoriza solo; tiene que coincidir con el de la fila ahora.

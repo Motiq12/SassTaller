@@ -15,37 +15,64 @@ const { serviciosDelPedido, pedidoTraeServicios, problemaConServicios, textoServ
 const { agendaDia, duracionValida, horasDeCita, conflictosDeCita, textoConflictos, problemaDeHorario } = require('../utils/agenda');
 const { exigirPermiso } = require('../middleware/permisos');
 const { anotar } = require('../utils/actividad');
-const { bloquearAgenda } = require('../utils/cupos');
+const { bloquearAgenda, conCitaEnAgenda, AgendaOcupada, esInterbloqueo } = require('../utils/cupos');
 
 // Si se puede poner la cita ahí (utils/agenda.js → problemaDeHorario): nadie agenda en
 // el pasado; recepción, además, solo dentro del horario, sin bloqueo y con lugar.
 // Administración se salta eso último: ella puso el bloqueo y sabe si el taller da abasto.
 // `db` es la conexión de la transacción que ya tomó el candado de ese día (B-13): lo
 // que se cuenta acá no cambia hasta que esa misma transacción inserte o mueva.
-async function problemaDeHorarioDe(req, db, { fecha, hora, sucursalId, excluirId = null, minutos = null }) {
+// `duracion`: las horas que va a durar la cita (QP3-04): se validan todas, no solo la primera.
+async function problemaDeHorarioDe(req, db, { fecha, hora, sucursalId, excluirId = null, minutos = null, duracion = 1 }) {
   return problemaDeHorario({
-    db, fecha, hora, sucursalId, excluirId, minutos, config: await getConfig(db), puedeForzar: req.usuario.rol === 'admin',
+    db, fecha, hora, sucursalId, excluirId, minutos, duracion, config: await getConfig(db), puedeForzar: req.usuario.rol === 'admin',
   });
+}
+
+// Una cita del taller, para el protocolo de agenda (utils/cupos.js → conCitaEnAgenda).
+// Con `bloquear`, dentro de la transacción y después de los candados: FOR UPDATE de esa
+// sola fila.
+function leerCitaDeAgenda(id) {
+  return async (db, bloquear) => {
+    const [[c]] = await db.query(
+      `SELECT id, estado, sucursal_id, duracion_horas, duracion_min,
+              to_char(fecha, 'YYYY-MM-DD') AS fecha, to_char(hora, 'HH24:MI') AS hora
+         FROM citas WHERE tenant_id = @tenant AND id = ?${bloquear ? ' FOR UPDATE' : ''}`,
+      [id]
+    );
+    return c || null;
+  };
+}
+
+// La agenda estaba demasiado disputada (interbloqueos repetidos, o la cita cambiaba sin
+// parar): 409 para que la pantalla pida intentar de nuevo, nunca un 500.
+function responderAgenda(res, err) {
+  if (err && err.agendaOcupada) return res.status(409).json({ error: err.message });
+  return fail(res, err);
 }
 
 // Transacción de agenda (B-13): toma el candado del día de la sede (utils/cupos.js) y
 // corre `fn` con la conexión. `fn` devuelve { error } para descartar todo, o lo que sea
 // para confirmar. Lo que se avisa (notificaciones) va después, ya confirmado.
+// Un interbloqueo (40P01) se reintenta; si persiste, AgendaOcupada (409).
 async function enAgenda(req, sucursalId, fecha, fn) {
-  const conn = await req.db.conexion();
-  try {
-    await conn.beginTransaction();
-    await bloquearAgenda(conn, sucursalId, fecha);
-    const r = await fn(conn);
-    if (r && r.error) await conn.rollback();
-    else await conn.commit();
-    return r || {};
-  } catch (e) {
-    await conn.rollback();
-    throw e;
-  } finally {
-    conn.release();
+  for (let intento = 1; intento <= 4; intento++) {
+    const conn = await req.db.conexion();
+    try {
+      await conn.beginTransaction();
+      await bloquearAgenda(conn, sucursalId, fecha);
+      const r = await fn(conn);
+      if (r && r.error) await conn.rollback();
+      else await conn.commit();
+      return r || {};
+    } catch (e) {
+      await conn.rollback().catch(() => {});
+      if (!esInterbloqueo(e)) throw e;
+    } finally {
+      conn.release();
+    }
   }
+  throw new AgendaOcupada();
 }
 
 const ESTADOS = ['agendado', 'en_revision', 'en_mantenimiento', 'listo', 'entregado', 'cancelado'];
@@ -138,7 +165,7 @@ router.post('/', soloRoles(...GESTIONA_AGENDA), exigirPermiso('citas.agendar'), 
     // Validar el lugar e insertar en la misma transacción, con el día bloqueado: dos
     // altas simultáneas por la última plaza ya no entran las dos (B-13).
     const r = await enAgenda(req, sucursal_id, fecha, async (conn) => {
-      const problema = await problemaDeHorarioDe(req, conn, { fecha, hora, sucursalId: sucursal_id });
+      const problema = await problemaDeHorarioDe(req, conn, { fecha, hora, sucursalId: sucursal_id, duracion });
       if (problema) return { error: problema };
       const [result] = await conn.query(
         'INSERT INTO citas (tenant_id, cliente_id, vehiculo_id, usuario_id, tecnico_id, sucursal_id, fecha, hora, motivo, tipo_servicio, duracion_horas) VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -157,7 +184,7 @@ router.post('/', soloRoles(...GESTIONA_AGENDA), exigirPermiso('citas.agendar'), 
     await notificarCitaAgendada(req.db, result.insertId);
     res.status(201).json({ data: nueva, message: 'Cita creada' });
   } catch (err) {
-    fail(res, err);
+    responderAgenda(res, err);
   }
 });
 
@@ -233,47 +260,58 @@ router.put('/:id', soloRoles(...GESTIONA_AGENDA), exigirPermiso('citas.agendar')
     const servicios = serviciosDelPedido(req.body);
     const problemaServicios = cambiaServicios ? await problemaConServicios(req.db, servicios) : null;
     if (problemaServicios) return invalido(res, 'servicios', problemaServicios);
-    // Fecha/hora previas: si el taller mueve la cita hay que avisarle al cliente
-    // (antes se le cambiaba el día y no se enteraba por ningún lado).
-    const [[previa]] = await req.db.query(
-      "SELECT to_char(fecha, 'YYYY-MM-DD') AS fecha, to_char(hora, 'HH24:MI') AS hora, sucursal_id, duracion_horas, duracion_min FROM citas WHERE tenant_id = @tenant AND id = ?",
-      [req.params.id]
-    );
+    const leer = leerCitaDeAgenda(Number(req.params.id));
+    // Solo para validar la sede pedida contra la actual: lo que decide si la cita se
+    // mueve se relee dentro del candado (QP3-03).
+    const previa = await leer(req.db, false);
+    if (!previa) return res.status(404).json({ error: 'Cita no encontrada' });
     // La sucursal solo cambia si llega una de este taller (sin el campo, o vacío, se
     // conserva). Una de otro taller se rechaza: antes se ignoraba y el pedido daba 200.
-    const sede = await sedeDelCuerpo(req.db, req.body.sucursal_id, { actual: previa?.sucursal_id });
+    const sede = await sedeDelCuerpo(req.db, req.body.sucursal_id, { actual: previa.sucursal_id });
     if (sede.error) return invalido(res, 'sucursal_id', sede.error);
     const sucursalNueva = sucursalParaGuardar(req, sede.id);
-    // Solo si de verdad cambió el momento de la cita (editar el motivo no molesta al cliente).
-    const movida = previa && (previa.fecha !== String(fecha).slice(0, 10) || previa.hora !== String(hora).slice(0, 5));
     const esAdmin = req.usuario.rol === 'admin';
-    // Servicio rápido de Ingresar ahora (20, 30 o 40 min): editar la cita no se lo quita.
-    const minutos = previa?.duracion_min || null;
-    // La duración solo la cambia administración; si no viene, se conserva.
-    const duracion = minutos ? 1 : (esAdmin && duracionValida(req.body.duracion_horas) ? Number(req.body.duracion_horas) : (previa?.duracion_horas || 1));
-    // Con el día de destino bloqueado (B-13): la validación del lugar y el UPDATE van en
-    // la misma transacción, así otra alta o movida a ese día espera y cuenta después.
-    const sedeDestino = sucursalNueva || previa?.sucursal_id || null;
-    const r = await enAgenda(req, sedeDestino, fecha, async (conn) => {
-      // Solo si se mueve: editar el motivo de una cita vieja no tiene por qué fallar.
-      if (movida) {
-        const problema = await problemaDeHorarioDe(req, conn, { fecha, hora, sucursalId: sedeDestino, excluirId: Number(req.params.id), minutos });
-        if (problema) return { error: problema };
-      }
-      await conn.query(
-        `UPDATE citas SET cliente_id=?, vehiculo_id=?, tecnico_id=?, fecha=?, hora=?, motivo=?,
-           sucursal_id = COALESCE(?, sucursal_id), duracion_horas = ? WHERE tenant_id = @tenant AND id=?`,
-        [cliente_id, vehiculo_id || null, tecnico_id || null, fecha, hora, motivo, sucursalNueva, duracion, req.params.id]
-      );
-      if (cambiaServicios) await guardarServiciosCita(req.params.id, servicios, conn);
-      return {};
+    const sedeDestino = (c) => Number(sucursalNueva || c.sucursal_id) || null;
+    // Protocolo de agenda (utils/cupos.js → conCitaEnAgenda): candados del día y sede
+    // de ORIGEN y de DESTINO en el orden global, la cita releída adentro, y la validación
+    // del lugar y el UPDATE en la misma transacción (B-13, QP3-02, QP3-03).
+    const r = await conCitaEnAgenda(req.db, {
+      leer,
+      destinos: (c) => [{ fecha, sucursalId: sedeDestino(c) }],
+      fn: async (conn, c) => {
+        // Fecha/hora previas: si el taller mueve la cita hay que avisarle al cliente
+        // (antes se le cambiaba el día y no se enteraba por ningún lado). Solo si de
+        // verdad cambió el momento (editar el motivo no molesta al cliente).
+        const movida = c.fecha !== String(fecha).slice(0, 10) || c.hora !== String(hora).slice(0, 5);
+        // QP3-05: cambiar solo la sede también es cambiar de lugar: se valida el cupo
+        // de la sede nueva.
+        const cambiaSede = sedeDestino(c) !== (Number(c.sucursal_id) || null);
+        // Servicio rápido de Ingresar ahora (20, 30 o 40 min): editar la cita no se lo quita.
+        const minutos = c.duracion_min || null;
+        // La duración solo la cambia administración; si no viene, se conserva.
+        const duracion = minutos ? 1 : (esAdmin && duracionValida(req.body.duracion_horas) ? Number(req.body.duracion_horas) : (c.duracion_horas || 1));
+        // Solo si cambia de lugar: editar el motivo de una cita vieja no tiene por qué
+        // fallar. Se valida la duración FINAL completa (QP3-04), con la cita releída.
+        if (movida || cambiaSede) {
+          const problema = await problemaDeHorarioDe(req, conn, { fecha, hora, sucursalId: sedeDestino(c), excluirId: c.id, minutos, duracion });
+          if (problema) return { error: problema };
+        }
+        await conn.query(
+          `UPDATE citas SET cliente_id=?, vehiculo_id=?, tecnico_id=?, fecha=?, hora=?, motivo=?,
+             sucursal_id = COALESCE(?, sucursal_id), duracion_horas = ? WHERE tenant_id = @tenant AND id=?`,
+          [cliente_id, vehiculo_id || null, tecnico_id || null, fecha, hora, motivo, sucursalNueva, duracion, c.id]
+        );
+        if (cambiaServicios) await guardarServiciosCita(c.id, servicios, conn);
+        return { movida };
+      },
     });
+    if (r.noExiste) return res.status(404).json({ error: 'Cita no encontrada' });
     if (r.error) return invalido(res, r.error.campo, r.error.error, r.error.status || 400);
     const [[actualizada]] = await req.db.query('SELECT * FROM citas WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
-    if (movida) await notificarCitaAgendada(req.db, req.params.id, { reprogramada: true });
+    if (r.movida) await notificarCitaAgendada(req.db, req.params.id, { reprogramada: true });
     res.json({ data: actualizada, message: 'Cita actualizada' });
   } catch (err) {
-    fail(res, err);
+    responderAgenda(res, err);
   }
 });
 
@@ -286,23 +324,23 @@ router.patch('/:id/duracion', soloRoles('admin'), async (req, res) => {
   try {
     const duracion = Number(req.body.duracion_horas);
     if (!duracionValida(duracion)) return res.status(400).json({ error: 'Duración no válida' });
-    const [[cita]] = await req.db.query(
-      "SELECT id, estado, sucursal_id, to_char(fecha, 'YYYY-MM-DD') AS fecha, to_char(hora, 'HH24:MI') AS hora FROM citas WHERE tenant_id = @tenant AND id = ?",
-      [req.params.id]
-    );
-    if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
-    if (['entregado', 'cancelado'].includes(cita.estado)) {
-      return res.status(409).json({ error: 'Esta cita ya está cerrada' });
-    }
     const config = await getConfig(req.db);
     // Alargar una cita ocupa más horas: se cuenta y se guarda con el día bloqueado (B-13).
-    const r = await enAgenda(req, cita.sucursal_id, cita.fecha, async (conn) => {
-      const dia = await agendaDia(cita.fecha, cita.sucursal_id, config, { db: conn, excluirId: cita.id });
-      const conflictos = conflictosDeCita(dia, cita.hora, duracion, Number(config.max_citas_hora) || 1);
-      if (conflictos.length && !req.body.forzar) return { error: conflictos };
-      await conn.query('UPDATE citas SET duracion_horas = ?, duracion_min = NULL WHERE tenant_id = @tenant AND id = ?', [duracion, cita.id]);
-      return { horas: horasDeCita(cita.hora, duracion, dia.horas) };
+    // El día, la sede y la hora son los de la cita releída DENTRO del candado (QP3-03):
+    // si otra petición la movió mientras tanto, se bloquea su lugar nuevo y se cuenta ahí.
+    const r = await conCitaEnAgenda(req.db, {
+      leer: leerCitaDeAgenda(Number(req.params.id)),
+      fn: async (conn, cita) => {
+        if (['entregado', 'cancelado'].includes(cita.estado)) return { error: 'cerrada' };
+        const dia = await agendaDia(cita.fecha, cita.sucursal_id, config, { db: conn, excluirId: cita.id });
+        const conflictos = conflictosDeCita(dia, cita.hora, duracion, Number(config.max_citas_hora) || 1);
+        if (conflictos.length && !req.body.forzar) return { error: conflictos };
+        await conn.query('UPDATE citas SET duracion_horas = ?, duracion_min = NULL WHERE tenant_id = @tenant AND id = ?', [duracion, cita.id]);
+        return { horas: horasDeCita(cita.hora, duracion, dia.horas) };
+      },
     });
+    if (r.noExiste) return res.status(404).json({ error: 'Cita no encontrada' });
+    if (r.error === 'cerrada') return res.status(409).json({ error: 'Esta cita ya está cerrada' });
     if (r.error) {
       return res.status(409).json({
         requiere_confirmacion: true,
@@ -312,7 +350,7 @@ router.patch('/:id/duracion', soloRoles('admin'), async (req, res) => {
     }
     res.json({ message: 'Duración actualizada', horas: r.horas });
   } catch (err) {
-    fail(res, err);
+    responderAgenda(res, err);
   }
 });
 

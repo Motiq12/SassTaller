@@ -436,10 +436,14 @@ router.post('/2fa/setup', auth, async (req, res) => {
     if (u?.totp_activado) return res.status(400).json({ error: 'La verificación en dos pasos ya está activa' });
 
     const secreto = totp.generarSecreto();
-    await req.db.query(
-      'UPDATE usuarios SET totp_secret = ?, totp_activado = 0, totp_ultimo_contador = NULL WHERE id = ? AND tenant_id = @tenant',
+    // QP3-01: solo reemplaza la clave PENDIENTE. Un setup que leyó "inactivo" y llega
+    // después de que otra petición activó el 2FA no puede volver a apagarlo: la
+    // condición va en el propio UPDATE (la lectura de arriba es solo para el mensaje).
+    const [alta] = await req.db.query(
+      'UPDATE usuarios SET totp_secret = ?, totp_ultimo_contador = NULL WHERE id = ? AND tenant_id = @tenant AND totp_activado = 0',
       [secreto, req.usuario.id]
     );
+    if (alta.affectedRows !== 1) return res.status(409).json({ error: 'La verificación en dos pasos ya está activa' });
     res.json({
       data: {
         secreto,

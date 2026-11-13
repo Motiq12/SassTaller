@@ -58,6 +58,12 @@ const { pool } = require('../src/db/pool');
 pool.query = async (sql) => {
   if (/^INSERT INTO sesiones_personal/i.test(sql)) return [{ affectedRows: 1 }];
   if (/FROM sesiones_personal/i.test(sql)) return [[{ id: 1, cerrada: null }]];
+  // QP3-06: el middleware lee usuario y sesión juntos (estadoYSesion): la fila del
+  // usuario, con su sesión abierta.
+  if (/LEFT JOIN sesiones_personal/i.test(sql)) {
+    const hit = tablas.find(t => t.re.test(sql));
+    return [(hit ? [].concat(hit.filas) : []).map(f => ({ ...f, sesion_id: 1, sesion_cerrada: null, sesion_cv: f.credenciales_version ?? 0 }))];
+  }
   const hit = tablas.find(t => t.re.test(sql));
   return [(hit ? [].concat(hit.filas) : []).map(f => recorte(sql, f))];
 };

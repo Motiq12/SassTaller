@@ -183,9 +183,10 @@ const HORA = /^\d{2}:\d{2}$/;
 //   · Nadie agenda en una fecha u hora que ya pasó.
 //   · Con `puedeForzar` (administración) no se mira más: ella decide si el taller da
 //     abasto o si se salta un bloqueo que puso ella misma.
-//   · Si no: la hora tiene que estar dentro del horario, sin bloquear y con lugar.
+//   · Si no: la hora tiene que estar dentro del horario, sin bloquear y con lugar en
+//     cada una de las `duracion` horas que va a ocupar la cita.
 // Devuelve { campo, error, status? }.
-async function problemaDeHorario({ db, fecha, hora, sucursalId = null, config, puedeForzar = false, excluirId = null, minutos = null, ahora = Date.now() }) {
+async function problemaDeHorario({ db, fecha, hora, sucursalId = null, config, puedeForzar = false, excluirId = null, minutos = null, duracion = 1, ahora = Date.now() }) {
   const f = String(fecha || '').slice(0, 10);
   const h = String(hora || '').slice(0, 5);
   if (!FECHA.test(f)) return { campo: 'fecha', error: 'Elegí la fecha' };
@@ -199,7 +200,9 @@ async function problemaDeHorario({ db, fecha, hora, sucursalId = null, config, p
   const dia = await agendaDia(f, sucursalId, config, { db, excluirId });
   if (!dia.horas.length) return { campo: 'fecha', error: 'Ese día el taller está cerrado' };
   if (!dia.horas.includes(`${h.slice(0, 2)}:00`)) return { campo: 'hora', error: 'Esa hora está fuera del horario del taller' };
-  const [c] = conflictosDeCita(dia, h, 1, Number(config.max_citas_hora) || 1, minutos);
+  // QP3-04: todas las horas que va a ocupar (`duracion`), no solo la primera: una cita
+  // de dos horas movida a las 9:00 también necesita lugar a las 10:00.
+  const [c] = conflictosDeCita(dia, h, duracion, Number(config.max_citas_hora) || 1, minutos);
   if (c && c.tipo === 'bloqueada') {
     return { campo: 'hora', status: 409, error: `Ese horario está bloqueado${c.motivo ? ` (${c.motivo})` : ''}. Elegí otra hora.` };
   }

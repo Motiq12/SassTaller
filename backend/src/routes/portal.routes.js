@@ -15,7 +15,7 @@ const MAX_MOTIVO = 1000;
 const MAX_MOTIVO_RECHAZO = 1000;
 const { consumir } = require('../utils/rate-limit');
 const { canjearCodigo } = require('../utils/codigos-un-uso');
-const { bloquearAgenda } = require('../utils/cupos');
+const { bloquearAgenda, conCitaEnAgenda } = require('../utils/cupos');
 const {
   enviarCodigoReset, enviarCodigoLogin, enviarCodigoVerificacion,
   enviarCodigoCambioCorreo, enviarAvisoCambioCorreo,
@@ -1478,13 +1478,22 @@ router.put('/citas/:id', async (req, res) => {
     }
     const problemaServicios = await problemaConServicios(req.db, servicios, { obligatorio: true, delCatalogo: true });
     if (problemaServicios) return invalido(res, 'servicios', problemaServicios);
-    const [[cita]] = await req.db.query(
-      "SELECT id, estado, orden_id, sucursal_id, duracion_horas, to_char(fecha, 'YYYY-MM-DD') AS fecha, to_char(hora, 'HH24:MI') AS hora FROM citas WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?",
-      [req.params.id, req.cliente.id]
-    );
+    // La cita del cliente. Esta primera lectura es solo para cortar antes lo que ya no
+    // se puede; lo que decide (estado, ubicación, duración) se relee dentro del candado
+    // (QP3-03): `leer(conn, true)` en conCitaEnAgenda.
+    const leer = async (db, bloquear) => {
+      const [[c]] = await db.query(
+        `SELECT id, estado, orden_id, sucursal_id, duracion_horas, duracion_min, to_char(fecha, 'YYYY-MM-DD') AS fecha, to_char(hora, 'HH24:MI') AS hora
+           FROM citas WHERE tenant_id = @tenant AND id = ? AND cliente_id = ?${bloquear ? ' FOR UPDATE' : ''}`,
+        [req.params.id, req.cliente.id]
+      );
+      return c || null;
+    };
+    const cita = await leer(req.db, false);
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
+    const NO_MODIFICABLE = 'Esta cita ya no se puede modificar. Comunícate con el taller.';
     if (cita.estado !== 'agendado' || cita.orden_id) {
-      return res.status(400).json({ error: 'Esta cita ya no se puede modificar. Comunícate con el taller.' });
+      return res.status(400).json({ error: NO_MODIFICABLE });
     }
     // Sucursal: la pedida, o se conserva la de la cita (más abajo) si no viene. Una de otro
     // taller se rechaza: antes se ignoraba y la reprogramación daba 200.
@@ -1495,9 +1504,9 @@ router.put('/citas/:id', async (req, res) => {
     const config = await getConfig(req.db);
     const minH = Number(config.cancelacion_horas_min || 0);
     // Ventana mínima sobre la cita ACTUAL (no reprogramar a último momento).
-    if (minH > 0 && horasHastaCita(cita.fecha, cita.hora) < minH) {
-      return res.status(400).json({ error: `No se puede modificar con menos de ${minH} h de anticipación. Comunícate con el taller.` });
-    }
+    const fueraDeVentana = (c) => minH > 0 && horasHastaCita(c.fecha, c.hora) < minH;
+    const TARDE = `No se puede modificar con menos de ${minH} h de anticipación. Comunícate con el taller.`;
+    if (fueraDeVentana(cita)) return res.status(400).json({ error: TARDE });
 
     // Validaciones de la NUEVA fecha/hora (mismas reglas que agendar).
     const horas = horasDisponibles(fecha, config);
@@ -1523,46 +1532,49 @@ router.put('/citas/:id', async (req, res) => {
       return invalido(res, 'descripcion', `La descripción no puede pasar de ${MAX_MOTIVO} caracteres`);
     }
     // Sucursal efectiva: la nueva pedida, o la que ya tenía la cita (fallback al default).
-    const sucursalId = sucursalPedida || cita.sucursal_id || (await sucursalPorDefecto(req.db));
+    const porDefecto = sucursalPedida ? null : await sucursalPorDefecto(req.db);
+    const sedeDe = (c) => Number(sucursalPedida || c.sucursal_id || porDefecto) || null;
+    const max = Number(config.max_citas_hora) || 1;
 
-    // Cupo atómico de la NUEVA franja (por sucursal), excluyendo esta misma cita: en
-    // todas las horas que dura (si administración la alargó) y sin horas bloqueadas.
-    // El candado del día de destino (utils/cupos.js) va antes de contar: otra reserva o
-    // reprogramación a ese día espera a que esta confirme (B-13).
-    const conn = await req.db.conexion();
-    try {
-      await conn.beginTransaction();
-      await bloquearAgenda(conn, sucursalId, fecha);
-      const dia = await agendaDia(fecha, sucursalId, config, { db: conn, bloquear: true, excluirId: req.params.id });
-      if (conflictosDeCita(dia, hora, cita.duracion_horas, Number(config.max_citas_hora) || 1).length) {
-        await conn.rollback();
-        return invalido(res, 'hora', 'Esa hora ya no está disponible, elige otra.');
-      }
-      // Sigue agendada y sin orden: si el taller la canceló o le abrió una orden
-      // mientras tanto, no se mueve.
-      const [movida] = await conn.query(
-        "UPDATE citas SET vehiculo_id = ?, fecha = ?, hora = ?, motivo = ?, sucursal_id = ? WHERE tenant_id = @tenant AND id = ? AND estado = 'agendado' AND orden_id IS NULL",
-        [vehiculo_id, fecha, hora, motivo, sucursalId, req.params.id]
-      );
-      if (movida.affectedRows !== 1) {
-        await conn.rollback();
-        return res.status(400).json({ error: 'Esta cita ya no se puede modificar. Comunícate con el taller.' });
-      }
-      await guardarServiciosCita(req.params.id, servicios, conn);
-      const [[actualizada]] = await conn.query(
-        `SELECT ci.id, ci.fecha, ci.hora, ci.motivo, ci.tipo_servicio, ci.servicios, ci.estado, m.marca, m.modelo, m.placa
-         FROM citas ci LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant WHERE ci.tenant_id = @tenant AND ci.id = ?`,
-        [req.params.id]
-      );
-      await conn.commit();
-      res.json({ data: actualizada, message: 'Cita actualizada' });
-    } catch (e) {
-      await conn.rollback();
-      throw e;
-    } finally {
-      conn.release();
-    }
+    // Protocolo de agenda (utils/cupos.js → conCitaEnAgenda, B-13 / QP3-02 / QP3-03):
+    //   · candados del día y sede de ORIGEN y de DESTINO, todos en el orden global: dos
+    //     reprogramaciones cruzadas (A→B y B→A) se ponen en fila en vez de trabarse;
+    //   · la cita se relee dentro del candado, y el cupo de la NUEVA franja se cuenta con
+    //     su duración vigente (si administración la alargó mientras tanto, cuenta la nueva),
+    //     en todas las horas que dura y sin horas bloqueadas, excluyendo esta misma cita;
+    //   · sin FOR UPDATE sobre las citas del día: el candado ya protege lo que se cuenta.
+    const r = await conCitaEnAgenda(req.db, {
+      leer,
+      destinos: (c) => [{ fecha, sucursalId: sedeDe(c) }],
+      fn: async (conn, c) => {
+        // Sigue agendada y sin orden: si el taller la canceló o le abrió una orden
+        // mientras tanto, no se mueve.
+        if (c.estado !== 'agendado' || c.orden_id) return { error: { error: NO_MODIFICABLE } };
+        if (fueraDeVentana(c)) return { error: { error: TARDE } };
+        const dia = await agendaDia(fecha, sedeDe(c), config, { db: conn, excluirId: c.id });
+        if (conflictosDeCita(dia, hora, c.duracion_horas, max, c.duracion_min).length) {
+          return { error: { campo: 'hora', error: 'Esa hora ya no está disponible, elige otra.' } };
+        }
+        const [movida] = await conn.query(
+          "UPDATE citas SET vehiculo_id = ?, fecha = ?, hora = ?, motivo = ?, sucursal_id = ? WHERE tenant_id = @tenant AND id = ? AND estado = 'agendado' AND orden_id IS NULL",
+          [vehiculo_id, fecha, hora, motivo, sedeDe(c), c.id]
+        );
+        if (movida.affectedRows !== 1) return { error: { error: NO_MODIFICABLE } };
+        await guardarServiciosCita(c.id, servicios, conn);
+        const [[actualizada]] = await conn.query(
+          `SELECT ci.id, ci.fecha, ci.hora, ci.motivo, ci.tipo_servicio, ci.servicios, ci.estado, m.marca, m.modelo, m.placa
+           FROM citas ci LEFT JOIN vehiculos m ON m.id = ci.vehiculo_id AND m.tenant_id = @tenant WHERE ci.tenant_id = @tenant AND ci.id = ?`,
+          [c.id]
+        );
+        return { actualizada };
+      },
+    });
+    if (r.noExiste) return res.status(404).json({ error: 'Cita no encontrada' });
+    if (r.error) return res.status(400).json(r.error.campo ? { error: r.error.error, campo: r.error.campo } : { error: r.error.error });
+    res.json({ data: r.actualizada, message: 'Cita actualizada' });
   } catch (err) {
+    // La agenda estaba demasiado disputada (interbloqueos repetidos): 409, nunca 500.
+    if (err && err.agendaOcupada) return res.status(409).json({ error: err.message });
     fail(res, err);
   }
 });
@@ -1625,7 +1637,9 @@ router.post('/citas', async (req, res) => {
     try {
       await conn.beginTransaction();
       await bloquearAgenda(conn, sucursalId, fecha);
-      const dia = await agendaDia(fecha, sucursalId, config, { db: conn, bloquear: true });
+      // Sin FOR UPDATE sobre las citas del día: el candado ya protege lo que se cuenta, y
+      // bloquear filas ajenas era lo que cerraba el ciclo de un interbloqueo (QP3-02).
+      const dia = await agendaDia(fecha, sucursalId, config, { db: conn });
       if (conflictosDeCita(dia, hora, 1, Number(config.max_citas_hora) || 1).length) {
         await conn.rollback();
         return invalido(res, 'hora', 'Esa hora ya no está disponible, elige otra.');
