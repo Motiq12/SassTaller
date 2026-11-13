@@ -15,11 +15,16 @@ test.before(async () => {
   await require('../src/db/migrar').migrar({ log: () => {} });
   ctx.db = pool;
   const jwt = require('jsonwebtoken');
+  const { abrirSesion, nuevoSid } = require('../src/utils/sesiones');
   const sello = `${Date.now()}-${process.pid}`;
   for (const sufijo of ['a', 'b']) {
     const [t] = await pool.query("INSERT INTO tenants (nombre, slug) VALUES ('Dinero', ?)", [`dinero-${sello}-${sufijo}`]);
     const [u] = await pool.query("INSERT INTO usuarios (tenant_id, nombre, email, password_hash, rol) VALUES (?, 'Admin', ?, 'no-es-clave-real', 'admin')", [t.insertId, `dinero-${sello}-${sufijo}@prueba.test`]);
-    const token = jwt.sign({ id: u.insertId, rol: 'admin', tenant_id: t.insertId }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    // Sesión real, como en el login: el token lleva el sid de una fila de sesiones_personal
+    // (sin sid, la sesión del personal no vale).
+    const sid = nuevoSid();
+    const token = jwt.sign({ id: u.insertId, rol: 'admin', tenant_id: t.insertId, sid }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    if (!(await abrirSesion(u.insertId, { headers: {}, ip: '127.0.0.1' }, jwt.decode(token).exp, sid))) throw new Error('no se pudo abrir la sesión de prueba');
     if (sufijo === 'a') Object.assign(ctx, { tenantId: t.insertId, usuarioId: u.insertId, token });
     else ctx.otroToken = token;
   }
