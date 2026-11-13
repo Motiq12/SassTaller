@@ -846,6 +846,7 @@ router.post('/:id/mensajes', async (req, res) => {
   try {
     const { mensaje, foto } = req.body;
     if ((!mensaje || !mensaje.trim()) && !foto) return res.status(400).json({ error: 'El mensaje o una foto es requerido' });
+    if (!fotoValida(foto)) return res.status(400).json({ error: 'Imagen inválida' });
     const [[orden]] = await req.db.query('SELECT id, tecnico_id, sucursal_id FROM ordenes_trabajo WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
 

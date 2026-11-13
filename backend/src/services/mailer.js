@@ -1,5 +1,8 @@
 // Envío de correos vía Resend (API HTTP, sin SMTP).
-// Degradación segura: sin RESEND_API_KEY solo loguea (modo desarrollo), nunca lanza.
+// Sin RESEND_API_KEY: fuera de producción simula el envío y escribe el correo (con el
+// código, si lleva) en el registro, para poder probar los flujos en local. En producción
+// (NODE_ENV=production) no simula: registra un error claro, SIN el contenido, y devuelve
+// false. Nunca lanza.
 
 const RESEND_API_URL = 'https://api.resend.com/emails';
 const RESEND_DOMINIOS_URL = 'https://api.resend.com/domains';
@@ -47,8 +50,25 @@ function normalizarMarca(m) {
 // ─────────────────────────────────────────────────────────────
 // Núcleo de envío. Todas las plantillas pasan por acá.
 // Devuelve true si el correo salió (o si estamos en modo dev sin API key);
-// false ante un rechazo/red. Nunca lanza.
+// false ante un rechazo/red, o sin API key en producción. Nunca lanza.
 // ─────────────────────────────────────────────────────────────
+const enProduccion = () => process.env.NODE_ENV === 'production';
+
+// B-18: simular el envío escribe el código de un solo uso en el registro. En desarrollo
+// sirve; en producción el registro lo lee más gente que el dueño de la cuenta, y un
+// código de recuperación o de ingreso ahí es una puerta abierta. Por eso solo fuera de
+// producción.
+const ERROR_SIN_CLAVE = '❌ Falta RESEND_API_KEY en producción: los correos NO se están enviando. Definila en las variables del servidor.';
+
+// Al arrancar: avisa una vez, fuerte, si producción quedó sin clave. No corta el
+// arranque: sin correo la app sigue sirviendo, pero tiene que verse en el registro.
+// Devuelve true si la configuración sirve para enviar o simular.
+function revisarConfiguracionCorreo() {
+  if (process.env.RESEND_API_KEY || !enProduccion()) return true;
+  console.error(ERROR_SIN_CLAVE);
+  return false;
+}
+
 async function enviarCorreo({ to, subject, html, devLog }) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.MAIL_FROM || REMITENTE_DE_PRUEBA;
@@ -56,6 +76,11 @@ async function enviarCorreo({ to, subject, html, devLog }) {
   if (!to) return false;
 
   if (!apiKey) {
+    if (enProduccion()) {
+      // Ni el destinatario ni el asunto ni el devLog: solo que no salió.
+      console.error(ERROR_SIN_CLAVE);
+      return false;
+    }
     console.log(`📧 [DEV] ${devLog || `Email a ${to}: ${subject}`}`);
     return true;
   }
@@ -485,6 +510,7 @@ async function enviarCodigoCorreoStaff(email, { nombre, codigo, minutos }) {
 }
 
 module.exports = {
+  revisarConfiguracionCorreo,
   enviarAvisoTrial, enviarAvisoPlanGratis, enviarCodigoCorreoStaff,
   estadoCorreo, enviarCorreoPrueba, partesDelRemitente,
   enviarCorreo, enviarCodigoReset, enviarCodigoLogin, enviarCodigoVerificacion,

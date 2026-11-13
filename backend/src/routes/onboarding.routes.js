@@ -6,7 +6,7 @@ const { nuevoSid, abrirSesion } = require('../utils/sesiones');
 // que esta ruta hace. Todo lo que escribe declara su tenant_id explícitamente.
 const { pool } = require('../db/pool');
 const { fail } = require('../utils/responder');
-const { emailValido } = require('../utils/validar');
+const { emailValido, logoValido } = require('../utils/validar');
 const { consumir } = require('../utils/rate-limit');
 const { antibot, claveCaptcha } = require('../utils/antibot');
 const { crearTaller, normalizarSlug, motivoSlugInvalido } = require('../utils/onboarding');
@@ -19,9 +19,7 @@ const { nuevoCodigo, VIGENCIA_MIN } = require('../utils/verificacion-usuario');
 const { enviarCodigoCorreoStaff } = require('../services/mailer');
 
 const MIN_PASSWORD = 8;
-// El navegador ya la achica a 512 px antes de mandarla. SVG no: puede llevar código.
-const LOGO_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
-const LOGO_MAX = 700 * 1024;
+// El logo se revisa con logoValido (utils/validar.js): bytes reales y firma del formato.
 const COLOR_RE = /^#[0-9a-f]{6}$/i;
 
 // El código de verificación del dueño, en cuanto el taller existe. Necesita un cliente
@@ -106,7 +104,7 @@ router.post('/', antibot(), async (req, res) => {
     }
 
     const { logo, color_primario: color, razon_social: razon, cedula_juridica: cedula } = req.body;
-    if (logo && (typeof logo !== 'string' || logo.length > LOGO_MAX || !LOGO_RE.test(logo))) {
+    if (logo && !logoValido(logo)) {
       return res.status(400).json({ error: 'El logo tiene que ser una imagen PNG, JPG o WebP de menos de 500 KB' });
     }
     if (color && !COLOR_RE.test(String(color))) {

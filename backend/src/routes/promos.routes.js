@@ -3,6 +3,9 @@ const router = require('express').Router();
 const { fail, invalido } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
+const { fotoValida } = require('../utils/validar');
+
+const IMAGEN_INVALIDA = 'La imagen tiene que ser PNG, JPG o WebP de hasta 3 MB';
 
 router.use(auth);
 
@@ -47,6 +50,7 @@ router.post('/', requireRol('admin'), async (req, res) => {
     if (!imagen && (!String(titulo || '').trim() || !String(descripcion || '').trim())) {
       return invalido(res, 'titulo', 'Pon un título y una descripción, o sube una imagen');
     }
+    if (!fotoValida(imagen)) return invalido(res, 'imagen', IMAGEN_INVALIDA);
     const [result] = await req.db.query(
       'INSERT INTO promos (tenant_id, titulo, descripcion, descuento, activa, imagen, precio_final) VALUES (@tenant, ?, ?, ?, ?, ?, ?)',
       [String(titulo || '').trim(), String(descripcion || '').trim(), descuento || 0, activa === false ? 0 : 1, imagen || null, precio_final || null]
@@ -66,6 +70,12 @@ router.put('/:id', requireRol('admin'), async (req, res) => {
     // (precio, texto) puede ir sola. Las columnas son NOT NULL: sin texto va ''.
     if (!imagen && (!String(titulo || '').trim() || !String(descripcion || '').trim())) {
       return invalido(res, 'titulo', 'Pon un título y una descripción, o sube una imagen');
+    }
+    // La pantalla reenvía la imagen que ya tenía: esa no se vuelve a revisar, así una
+    // promoción vieja (de antes de esta validación) se puede seguir editando.
+    if (imagen) {
+      const [[previa]] = await req.db.query('SELECT imagen FROM promos WHERE id = ? AND tenant_id = @tenant', [req.params.id]);
+      if (imagen !== previa?.imagen && !fotoValida(imagen)) return invalido(res, 'imagen', IMAGEN_INVALIDA);
     }
     await req.db.query(
       'UPDATE promos SET titulo = ?, descripcion = ?, descuento = ?, imagen = ?, precio_final = ? WHERE id = ? AND tenant_id = @tenant',

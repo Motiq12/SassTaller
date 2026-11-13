@@ -353,6 +353,7 @@ router.post('/mensajes', exigirPermiso('equipo.mensajes'), async (req, res) => {
   try {
     const { mensaje, foto, orden_id, destino } = req.body;
     if ((!mensaje || !mensaje.trim()) && !foto) return res.status(400).json({ error: 'El mensaje o una foto es requerido' });
+    if (!fotoValida(foto)) return res.status(400).json({ error: 'Imagen inválida' });
     const ajena = await referenciaAjena(req.db, { orden_id });
     if (ajena) return invalido(res, ajena.campo, ajena.error);
     // El mecánico elige a quién escribe: recepción (default) o admin.

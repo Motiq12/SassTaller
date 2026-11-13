@@ -51,10 +51,13 @@ test('rechaza lo que no es una imagen en base64', () => {
 
 test('logoValido: solo PNG, JPG o WebP en base64 y de tamaño razonable', () => {
   const { logoValido } = require('../src/utils/validar');
-  for (const bueno of [null, '', undefined, `data:image/png;base64,${PNG_1x1}`, `data:image/jpeg;base64,${PNG_1x1}`, `data:image/webp;base64,${PNG_1x1}`]) {
+  const img = require('./imagenes');
+  // Cada formato con sus propios bytes (B-11): un PNG declarado como JPEG o WebP ya no pasa.
+  for (const bueno of [null, '', undefined, `data:image/png;base64,${PNG_1x1}`, img.jpeg, img.webp]) {
     assert.equal(logoValido(bueno), true, `deberia aceptar: ${String(bueno).slice(0, 30)}`);
   }
   const malos = [
+    `data:image/jpeg;base64,${PNG_1x1}`, `data:image/webp;base64,${PNG_1x1}`,
     `data:image/svg+xml;base64,${PNG_1x1}`, `data:text/html;base64,${PNG_1x1}`, 'https://ejemplo.com/logo.png',
     'javascript:alert(1)', `data:image/png;base64,${PNG_1x1}" onerror="alert(1)`, 'data:image/png;base64,' + 'A'.repeat(800 * 1024), 42, {},
   ];

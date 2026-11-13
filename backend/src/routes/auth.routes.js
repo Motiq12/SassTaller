@@ -8,7 +8,7 @@ const jwt = require('jsonwebtoken');
 const { pool } = require('../db/pool');
 const { fail, invalido, faltante } = require('../utils/responder');
 const auth = require('../middleware/auth');
-const { emailValido } = require('../utils/validar');
+const { emailValido, leerImagen } = require('../utils/validar');
 const { consumir } = require('../utils/rate-limit');
 const { estadoDe } = require('../utils/estado-tenant');
 const { resumenCuenta } = require('../utils/cuenta');
@@ -525,10 +525,11 @@ router.post('/2fa/desactivar', auth, async (req, res) => {
 // Van acá y no en cada panel porque son de la cuenta, sea cual sea el rol.
 // ───────────────────────────────────────────────────────────
 
-// Firma dibujada en el perfil: PNG en data URL, de tamaño razonable.
+// Firma dibujada en el perfil: PNG en data URL (bytes reales y firma del formato, ver
+// utils/validar.js), de hasta 225 KB decodificados (los 300 KB de texto de antes).
 function firmaValida(f) {
   if (f === null) return true;
-  return typeof f === 'string' && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(f) && f.length <= 300 * 1024;
+  return leerImagen(f, 225 * 1024)?.tipo === 'png';
 }
 
 router.get('/perfil', auth, async (req, res) => {

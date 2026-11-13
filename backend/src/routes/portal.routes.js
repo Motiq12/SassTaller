@@ -100,6 +100,18 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     if (faltante(res, req.body, [['email', 'el correo'], ['password', 'la contraseña']])) return;
     if (!emailValido(email)) return invalido(res, 'email', 'El correo no tiene un formato válido');
+    // Anti fuerza bruta por cuenta, con el mismo criterio y la MISMA clave que el login
+    // principal (auth.routes.js): 10 por minuto y 60 por hora por correo. Compartir la
+    // clave importa: si cada entrada tuviera su propio cupo, alternar entre las dos
+    // duplicaría los intentos contra la misma cuenta. El límite por IP (authLimiter) no
+    // alcanza solo: el atacante rota de IP, la cuenta atacada es siempre la misma.
+    // El almacén es la memoria del proceso (utils/rate-limit.js): con varios procesos el
+    // cupo se multiplica por la cantidad de procesos. Pendiente: almacén compartido.
+    const limite = consumir(`login:${String(email).trim().toLowerCase()}`, { porMinuto: 10, porHora: 60 });
+    if (!limite.ok) {
+      registrarEvento('login_bloqueado', { email, ip: req.ip, detalle: 'portal' });
+      return res.status(429).json({ error: `Demasiados intentos. Se puede volver a probar en ${limite.retryAfter} segundos.` });
+    }
     // Sin mayúsculas ni espacios, igual que el login principal y la recuperación.
     const [[cliente]] = await req.db.query(
       'SELECT * FROM clientes WHERE tenant_id = @tenant AND LOWER(email) = ? AND activo = 1 AND portal_habilitado = 1 ORDER BY id LIMIT 1',

@@ -30,6 +30,10 @@ if (!process.env.JWT_SECRET) {
   console.warn('⚠️  JWT_SECRET no definido: usando secreto de desarrollo (NO usar en producción).');
 }
 
+// B-18: en producción, sin clave de Resend no se simula el envío (los códigos irían al
+// registro): se avisa acá, al arrancar, y cada envío vuelve a avisar sin el contenido.
+require('./services/mailer').revisarConfiguracionCorreo();
+
 if (esProduccion) {
   if (!process.env.CORS_ORIGIN && !hasFrontend) {
     console.warn('⚠️  CORS_ORIGIN no definido en producción. Usando default restrictivo.');

@@ -4,9 +4,20 @@ const { fail } = require('../utils/responder');
 const { getConfig } = require('../utils/configuracion');
 const { normalizarTipos, puedeUsarTipo, catalogoDelTaller, limpiarAtributos, mensaje, etiquetaPara } = require('../utils/tipos-vehiculo');
 const auth = require('../middleware/auth');
-const { anioValido, placaValida } = require('../utils/validar');
+const { soloRoles } = require('../middleware/roles');
+const { exigirPermiso } = require('../middleware/permisos');
+const { cargarAlcance, soloSucursal } = require('../utils/alcance');
+const { anioValido, placaValida, fotoValida } = require('../utils/validar');
 
-router.use(auth);
+// Solo el personal del taller: el rol de contenido del sitio web no ve nada del taller.
+router.use(auth, soloRoles('recepcion', 'tecnico', 'admin'), cargarAlcance);
+
+// Registrar y editar vehículos es del mostrador y de administración, con la misma
+// casilla que los clientes (el catálogo la llama "Crear y editar clientes"). Antes
+// bastaba la sesión: un mecánico podía editar cualquier vehículo del taller, también
+// los que nunca pasaron por sus órdenes.
+const puedeEditar = [soloRoles('recepcion', 'admin'), exigirPermiso('clientes.editar')];
+const FOTO_INVALIDA = 'La foto tiene que ser una imagen PNG, JPG o WebP de hasta 3 MB';
 
 // Tope del listado global (ver comentario en clientes.routes.js): la búsqueda por `q`
 // y el filtro por cliente_id son server-side, así que no hace falta traer todo.
@@ -51,7 +62,7 @@ router.get('/tipos', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', ...puedeEditar, async (req, res) => {
   try {
     const { cliente_id, marca, modelo, anio, placa, color, numero_motor, numero_chasis, kilometraje_actual, foto_url } = req.body;
     if (!cliente_id || !marca || !modelo) {
@@ -59,6 +70,7 @@ router.post('/', async (req, res) => {
     }
     if (!placaValida(placa)) return res.status(400).json({ error: 'La placa no tiene un formato válido' });
     if (!anioValido(anio)) return res.status(400).json({ error: 'El año no es válido' });
+    if (!fotoValida(foto_url)) return res.status(400).json({ error: FOTO_INVALIDA });
 
     // El cliente tiene que ser de ESTE taller. Sin esta comprobación se podía colgar
     // una moto del cliente de otro taller mandando su id a mano: la FK apunta a
@@ -125,11 +137,17 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', ...puedeEditar, async (req, res) => {
   try {
     const { marca, modelo, anio, placa, color, numero_motor, numero_chasis, kilometraje_actual, foto_url } = req.body;
     if (!placaValida(placa)) return res.status(400).json({ error: 'La placa no tiene un formato válido' });
     if (!anioValido(anio)) return res.status(400).json({ error: 'El año no es válido' });
+    // La foto se revisa solo si cambió: la pantalla reenvía la que ya estaba, y una vieja
+    // (de antes de esta validación) no debe trabar el resto de la edición.
+    if (foto_url) {
+      const [[previa]] = await req.db.query('SELECT foto_url FROM vehiculos WHERE id = ? AND tenant_id = @tenant', [req.params.id]);
+      if (foto_url !== previa?.foto_url && !fotoValida(foto_url)) return res.status(400).json({ error: FOTO_INVALIDA });
+    }
     // Se revisa antes de guardar nada, para no dejar la edición a medias.
     const tipo = req.body.tipo === undefined ? undefined : String(req.body.tipo).toLowerCase();
     if (tipo !== undefined) {
@@ -167,8 +185,19 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// Historial de órdenes del vehículo, con el mismo alcance que el listado de órdenes
+// (ordenes.routes.js): el empleado con sede ve las de su sede (y las que no tienen), y
+// el mecánico solo las que tiene asignadas, por la orden o por su cita. Antes salían
+// todas las del taller, de cualquier sede y de cualquier mecánico.
 router.get('/:id/historial', async (req, res) => {
   try {
+    const params = [req.params.id];
+    let alcance = soloSucursal(req, 'ot.sucursal_id');
+    if (req.usuario.rol === 'tecnico') {
+      alcance += ` AND (ot.tecnico_id = ? OR EXISTS (
+        SELECT 1 FROM citas c WHERE c.orden_id = ot.id AND c.tenant_id = @tenant AND c.tecnico_id = ?))`;
+      params.push(req.usuario.id, req.usuario.id);
+    }
     const [rows] = await req.db.query(
       `SELECT ot.id, ot.numero_orden, ot.estado, ot.problema_reportado, ot.fecha_ingreso, ot.fecha_entrega_real,
               ot.costo_mano_obra, ot.costo_repuestos, ot.descuento,
@@ -176,9 +205,9 @@ router.get('/:id/historial', async (req, res) => {
               u.nombre AS tecnico_nombre
        FROM ordenes_trabajo ot
        LEFT JOIN usuarios u ON ot.tecnico_id = u.id AND u.tenant_id = @tenant
-       WHERE ot.vehiculo_id = ? AND ot.tenant_id = @tenant
+       WHERE ot.vehiculo_id = ? AND ot.tenant_id = @tenant${alcance}
        ORDER BY ot.fecha_ingreso DESC`,
-      [req.params.id]
+      params
     );
     res.json({ data: rows });
   } catch (err) {
