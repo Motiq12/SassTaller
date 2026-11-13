@@ -446,6 +446,7 @@ router.post('/ordenes/:id/fotos', exigirPermiso('taller.fotos'), async (req, res
   try {
     const { url, tipo, descripcion } = req.body;
     if (!url) return res.status(400).json({ error: 'Imagen requerida' });
+    if (!fotoValida(url)) return res.status(400).json({ error: 'Imagen inválida' });
     const tiposValidos = ['ingreso', 'diagnostico', 'avance', 'entrega'];
     const tipoFinal = tiposValidos.includes(tipo) ? tipo : 'avance';
     const [result] = await req.db.query(

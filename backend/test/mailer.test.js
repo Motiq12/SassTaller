@@ -144,3 +144,56 @@ test('la cabecera usa el logo solo si hay dominio publico', async () => {
     if (prevKey !== undefined) process.env.RESEND_API_KEY = prevKey; else delete process.env.RESEND_API_KEY;
   }
 });
+
+// ── B-18: sin clave, la simulación (que escribe el código en el registro) es solo de desarrollo ──
+async function conEntorno(env, fn) {
+  const previo = { NODE_ENV: process.env.NODE_ENV, RESEND_API_KEY: process.env.RESEND_API_KEY };
+  for (const [k, v] of Object.entries(env)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  const salida = [];
+  const orig = { log: console.log, warn: console.warn, error: console.error, fetch: global.fetch };
+  let fetchLlamado = false;
+  global.fetch = async () => { fetchLlamado = true; return { ok: true }; };
+  console.log = (...a) => salida.push(['log', a.join(' ')]);
+  console.warn = (...a) => salida.push(['warn', a.join(' ')]);
+  console.error = (...a) => salida.push(['error', a.join(' ')]);
+  try {
+    return await fn({ salida, fetchLlamado: () => fetchLlamado });
+  } finally {
+    Object.assign(console, { log: orig.log, warn: orig.warn, error: orig.error });
+    global.fetch = orig.fetch;
+    for (const [k, v] of Object.entries(previo)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  }
+}
+
+test('en producción sin RESEND_API_KEY no simula: devuelve false y el código no va al registro', async () => {
+  await conEntorno({ NODE_ENV: 'production', RESEND_API_KEY: undefined }, async ({ salida, fetchLlamado }) => {
+    const { enviarCodigoReset, enviarCodigoLogin, enviarCodigoCorreoStaff } = require('../src/services/mailer');
+    assert.equal(await enviarCodigoReset('user@correo.com', 'Ana', '918273'), false);
+    assert.equal(await enviarCodigoLogin('user@correo.com', 'Ana', '918274'), false);
+    assert.equal(await enviarCodigoCorreoStaff('staff@correo.com', { nombre: 'Ana', codigo: '918275', minutos: 10 }), false);
+    assert.equal(fetchLlamado(), false);
+    const todo = salida.map(([, t]) => t).join('\n');
+    for (const codigo of ['918273', '918274', '918275']) assert.ok(!todo.includes(codigo), `el código ${codigo} no debe aparecer en el registro`);
+    assert.ok(!todo.includes('user@correo.com'), 'tampoco el destinatario');
+    assert.ok(salida.some(([nivel, t]) => nivel === 'error' && t.includes('RESEND_API_KEY')), 'tiene que haber un error claro que nombre la variable');
+  });
+});
+
+test('fuera de producción sin RESEND_API_KEY sigue simulando el envío', async () => {
+  await conEntorno({ NODE_ENV: 'development', RESEND_API_KEY: undefined }, async ({ salida }) => {
+    const { enviarCodigoReset } = require('../src/services/mailer');
+    assert.equal(await enviarCodigoReset('user@correo.com', 'Ana', '555111'), true);
+    assert.ok(salida.some(([nivel, t]) => nivel === 'log' && t.includes('555111')), 'en desarrollo el código se ve en el registro');
+  });
+});
+
+test('al arrancar en producción sin clave se avisa con un error', async () => {
+  const { revisarConfiguracionCorreo } = require('../src/services/mailer');
+  assert.equal(typeof revisarConfiguracionCorreo, 'function', 'el mailer expone la revisión de arranque');
+  await conEntorno({ NODE_ENV: 'production', RESEND_API_KEY: undefined }, async ({ salida }) => {
+    assert.equal(revisarConfiguracionCorreo(), false);
+    assert.ok(salida.some(([nivel, t]) => nivel === 'error' && t.includes('RESEND_API_KEY')));
+  });
+  await conEntorno({ NODE_ENV: 'production', RESEND_API_KEY: 're_prueba' }, async () => assert.equal(revisarConfiguracionCorreo(), true));
+  await conEntorno({ NODE_ENV: 'development', RESEND_API_KEY: undefined }, async () => assert.equal(revisarConfiguracionCorreo(), true));
+});
