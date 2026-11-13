@@ -5,6 +5,7 @@ const { getConfig } = require('./configuracion');
 const { descontarOrden } = require('./inventario');
 const { fechaLocalISO, horaLocal } = require('./fecha');
 const { minutosRapidosValidos } = require('./agenda');
+const { bloquearAgenda } = require('./cupos');
 
 // Mapeo del flujo rico de la orden → flujo simple de la cita (lo que ve el cliente).
 const MAP_ORDEN_A_CITA = {
@@ -28,6 +29,10 @@ const MAP_ORDEN_A_CITA = {
 async function crearCitaDeOrden(conn, o) {
   const config = await getConfig(conn);
   const offset = Number(config.zona_horaria_offset) || -6;
+  // No valida cupo (la moto ya está en el taller), pero ocupa lugar: toma el candado del
+  // día igual que todas las altas (B-13), para que una reserva que se está validando en
+  // paralelo la cuente.
+  await bloquearAgenda(conn, o.sucursal_id, fechaLocalISO(offset));
   const [r] = await conn.query(
     `INSERT INTO citas (tenant_id, cliente_id, vehiculo_id, usuario_id, tecnico_id, sucursal_id, fecha, hora, motivo,
                         estado, fecha_inicio, hora_llegada, orden_id, creada_por_orden, duracion_min)

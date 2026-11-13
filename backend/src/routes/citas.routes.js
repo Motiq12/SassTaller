@@ -15,17 +15,37 @@ const { serviciosDelPedido, pedidoTraeServicios, problemaConServicios, textoServ
 const { agendaDia, duracionValida, horasDeCita, conflictosDeCita, textoConflictos, problemaDeHorario } = require('../utils/agenda');
 const { exigirPermiso } = require('../middleware/permisos');
 const { anotar } = require('../utils/actividad');
+const { bloquearAgenda } = require('../utils/cupos');
 
 // Si se puede poner la cita ahí (utils/agenda.js → problemaDeHorario): nadie agenda en
 // el pasado; recepción, además, solo dentro del horario, sin bloqueo y con lugar.
 // Administración se salta eso último: ella puso el bloqueo y sabe si el taller da abasto.
-async function rechazoDeHorario(req, res, { fecha, hora, sucursalId, excluirId = null, minutos = null }) {
-  const p = await problemaDeHorario({
-    db: req.db, fecha, hora, sucursalId, excluirId, minutos, config: await getConfig(req.db), puedeForzar: req.usuario.rol === 'admin',
+// `db` es la conexión de la transacción que ya tomó el candado de ese día (B-13): lo
+// que se cuenta acá no cambia hasta que esa misma transacción inserte o mueva.
+async function problemaDeHorarioDe(req, db, { fecha, hora, sucursalId, excluirId = null, minutos = null }) {
+  return problemaDeHorario({
+    db, fecha, hora, sucursalId, excluirId, minutos, config: await getConfig(db), puedeForzar: req.usuario.rol === 'admin',
   });
-  if (!p) return false;
-  invalido(res, p.campo, p.error, p.status || 400);
-  return true;
+}
+
+// Transacción de agenda (B-13): toma el candado del día de la sede (utils/cupos.js) y
+// corre `fn` con la conexión. `fn` devuelve { error } para descartar todo, o lo que sea
+// para confirmar. Lo que se avisa (notificaciones) va después, ya confirmado.
+async function enAgenda(req, sucursalId, fecha, fn) {
+  const conn = await req.db.conexion();
+  try {
+    await conn.beginTransaction();
+    await bloquearAgenda(conn, sucursalId, fecha);
+    const r = await fn(conn);
+    if (r && r.error) await conn.rollback();
+    else await conn.commit();
+    return r || {};
+  } catch (e) {
+    await conn.rollback();
+    throw e;
+  } finally {
+    conn.release();
+  }
 }
 
 const ESTADOS = ['agendado', 'en_revision', 'en_mantenimiento', 'listo', 'entregado', 'cancelado'];
@@ -113,14 +133,22 @@ router.post('/', soloRoles(...GESTIONA_AGENDA), exigirPermiso('citas.agendar'), 
       return invalido(res, 'tecnico_id', 'El mecánico no atiende en esa sucursal');
     }
     const esAdmin = req.usuario.rol === 'admin';
-    if (await rechazoDeHorario(req, res, { fecha, hora, sucursalId: sucursal_id })) return;
     // La duración solo la decide administración; las demás nacen de 1 hora.
     const duracion = esAdmin && duracionValida(req.body.duracion_horas) ? Number(req.body.duracion_horas) : 1;
-    const [result] = await req.db.query(
-      'INSERT INTO citas (tenant_id, cliente_id, vehiculo_id, usuario_id, tecnico_id, sucursal_id, fecha, hora, motivo, tipo_servicio, duracion_horas) VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [cliente_id, vehiculo_id || null, req.usuario.id, tecnico_id || null, sucursal_id, fecha, hora, motivo, servicios[0] || null, duracion]
-    );
-    await guardarServiciosCita(result.insertId, servicios, req.db);
+    // Validar el lugar e insertar en la misma transacción, con el día bloqueado: dos
+    // altas simultáneas por la última plaza ya no entran las dos (B-13).
+    const r = await enAgenda(req, sucursal_id, fecha, async (conn) => {
+      const problema = await problemaDeHorarioDe(req, conn, { fecha, hora, sucursalId: sucursal_id });
+      if (problema) return { error: problema };
+      const [result] = await conn.query(
+        'INSERT INTO citas (tenant_id, cliente_id, vehiculo_id, usuario_id, tecnico_id, sucursal_id, fecha, hora, motivo, tipo_servicio, duracion_horas) VALUES (@tenant, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [cliente_id, vehiculo_id || null, req.usuario.id, tecnico_id || null, sucursal_id, fecha, hora, motivo, servicios[0] || null, duracion]
+      );
+      await guardarServiciosCita(result.insertId, servicios, conn);
+      return { id: result.insertId };
+    });
+    if (r.error) return invalido(res, r.error.campo, r.error.error, r.error.status || 400);
+    const result = { insertId: r.id };
     const [[nueva]] = await req.db.query('SELECT * FROM citas WHERE tenant_id = @tenant AND id = ?', [result.insertId]);
     if (tecnico_id) {
       await notificarMecanico(req.db, tecnico_id, `Nueva cita asignada: ${textoServicios(servicios) || motivo} el ${fecha} a las ${hora}`, req.usuario.id);
@@ -221,16 +249,26 @@ router.put('/:id', soloRoles(...GESTIONA_AGENDA), exigirPermiso('citas.agendar')
     const esAdmin = req.usuario.rol === 'admin';
     // Servicio rápido de Ingresar ahora (20, 30 o 40 min): editar la cita no se lo quita.
     const minutos = previa?.duracion_min || null;
-    // Solo si se mueve: editar el motivo de una cita vieja no tiene por qué fallar.
-    if (movida && await rechazoDeHorario(req, res, { fecha, hora, sucursalId: sucursalNueva || previa.sucursal_id, excluirId: Number(req.params.id), minutos })) return;
     // La duración solo la cambia administración; si no viene, se conserva.
     const duracion = minutos ? 1 : (esAdmin && duracionValida(req.body.duracion_horas) ? Number(req.body.duracion_horas) : (previa?.duracion_horas || 1));
-    await req.db.query(
-      `UPDATE citas SET cliente_id=?, vehiculo_id=?, tecnico_id=?, fecha=?, hora=?, motivo=?,
-         sucursal_id = COALESCE(?, sucursal_id), duracion_horas = ? WHERE tenant_id = @tenant AND id=?`,
-      [cliente_id, vehiculo_id || null, tecnico_id || null, fecha, hora, motivo, sucursalNueva, duracion, req.params.id]
-    );
-    if (cambiaServicios) await guardarServiciosCita(req.params.id, servicios, req.db);
+    // Con el día de destino bloqueado (B-13): la validación del lugar y el UPDATE van en
+    // la misma transacción, así otra alta o movida a ese día espera y cuenta después.
+    const sedeDestino = sucursalNueva || previa?.sucursal_id || null;
+    const r = await enAgenda(req, sedeDestino, fecha, async (conn) => {
+      // Solo si se mueve: editar el motivo de una cita vieja no tiene por qué fallar.
+      if (movida) {
+        const problema = await problemaDeHorarioDe(req, conn, { fecha, hora, sucursalId: sedeDestino, excluirId: Number(req.params.id), minutos });
+        if (problema) return { error: problema };
+      }
+      await conn.query(
+        `UPDATE citas SET cliente_id=?, vehiculo_id=?, tecnico_id=?, fecha=?, hora=?, motivo=?,
+           sucursal_id = COALESCE(?, sucursal_id), duracion_horas = ? WHERE tenant_id = @tenant AND id=?`,
+        [cliente_id, vehiculo_id || null, tecnico_id || null, fecha, hora, motivo, sucursalNueva, duracion, req.params.id]
+      );
+      if (cambiaServicios) await guardarServiciosCita(req.params.id, servicios, conn);
+      return {};
+    });
+    if (r.error) return invalido(res, r.error.campo, r.error.error, r.error.status || 400);
     const [[actualizada]] = await req.db.query('SELECT * FROM citas WHERE tenant_id = @tenant AND id = ?', [req.params.id]);
     if (movida) await notificarCitaAgendada(req.db, req.params.id, { reprogramada: true });
     res.json({ data: actualizada, message: 'Cita actualizada' });
@@ -257,17 +295,22 @@ router.patch('/:id/duracion', soloRoles('admin'), async (req, res) => {
       return res.status(409).json({ error: 'Esta cita ya está cerrada' });
     }
     const config = await getConfig(req.db);
-    const dia = await agendaDia(cita.fecha, cita.sucursal_id, config, { db: req.db, excluirId: cita.id });
-    const conflictos = conflictosDeCita(dia, cita.hora, duracion, Number(config.max_citas_hora) || 1);
-    if (conflictos.length && !req.body.forzar) {
+    // Alargar una cita ocupa más horas: se cuenta y se guarda con el día bloqueado (B-13).
+    const r = await enAgenda(req, cita.sucursal_id, cita.fecha, async (conn) => {
+      const dia = await agendaDia(cita.fecha, cita.sucursal_id, config, { db: conn, excluirId: cita.id });
+      const conflictos = conflictosDeCita(dia, cita.hora, duracion, Number(config.max_citas_hora) || 1);
+      if (conflictos.length && !req.body.forzar) return { error: conflictos };
+      await conn.query('UPDATE citas SET duracion_horas = ?, duracion_min = NULL WHERE tenant_id = @tenant AND id = ?', [duracion, cita.id]);
+      return { horas: horasDeCita(cita.hora, duracion, dia.horas) };
+    });
+    if (r.error) {
       return res.status(409).json({
         requiere_confirmacion: true,
-        conflictos,
-        error: `En estas horas ya no hay lugar: ${textoConflictos(conflictos)}.`,
+        conflictos: r.error,
+        error: `En estas horas ya no hay lugar: ${textoConflictos(r.error)}.`,
       });
     }
-    await req.db.query('UPDATE citas SET duracion_horas = ?, duracion_min = NULL WHERE tenant_id = @tenant AND id = ?', [duracion, cita.id]);
-    res.json({ message: 'Duración actualizada', horas: horasDeCita(cita.hora, duracion, dia.horas) });
+    res.json({ message: 'Duración actualizada', horas: r.horas });
   } catch (err) {
     fail(res, err);
   }

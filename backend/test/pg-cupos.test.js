@@ -72,9 +72,40 @@ test('control: sin el candado, la misma carrera sobrevende la franja', { skip: s
   assert.strictEqual(await enFranja('2030-01-11'), 2, 'la prueba no produjo la carrera: el test de arriba no demostraría nada');
 });
 
-test('el candado es por franja: otra hora u otra fecha no espera', { skip: saltar }, async () => {
+test('el candado es por día: otra fecha no espera', { skip: saltar }, async () => {
   const inicio = Date.now();
   await Promise.all([reservar('2030-01-12', { conCandado: true }), reservar('2030-01-13', { conCandado: true })]);
   // Si se esperaran entre sí tardarían 2 × 300 ms; en paralelo, ~300 ms.
   assert.ok(Date.now() - inicio < 550, `franjas distintas se bloquearon entre sí (${Date.now() - inicio} ms)`);
+});
+
+// Recepción puede agendar sin sede: entonces cuenta todas las sedes del día, así que su
+// candado (exclusivo del día) tiene que esperar a una reserva con sede en curso, y una
+// reserva con sede tiene que esperar a la que no tiene. Dos talleres, en cambio, nunca.
+async function tomaYEspera(primero, segundo, otroTenant = null) {
+  const { bloquearAgenda } = require('../src/utils/cupos');
+  const c1 = await paraTenant(tenantId).conexion();
+  const c2 = await paraTenant(otroTenant || tenantId).conexion();
+  try {
+    await c1.beginTransaction();
+    await c2.beginTransaction();
+    await bloquearAgenda(c1, primero, '2030-02-04');
+    const inicio = Date.now();
+    const segunda = bloquearAgenda(c2, segundo, '2030-02-04').then(() => Date.now() - inicio);
+    await new Promise((r) => setTimeout(r, 300));
+    await c1.commit();
+    return await segunda;
+  } finally {
+    await c2.rollback().catch(() => {});
+    c1.release();
+    c2.release();
+  }
+}
+test('el candado sin sede espera a una reserva con sede del mismo día, y al revés', { skip: saltar }, async () => {
+  assert.ok((await tomaYEspera(sucursalId, null)) >= 250, 'la reserva sin sede no esperó');
+  assert.ok((await tomaYEspera(null, sucursalId)) >= 250, 'la reserva con sede no esperó a la sin sede');
+});
+test('el candado de la agenda no cruza talleres', { skip: saltar }, async () => {
+  const [t] = await pool.query("INSERT INTO tenants (nombre, slug) VALUES ('Cupos 2', ?)", [`cupos2-${Date.now()}`]);
+  assert.ok((await tomaYEspera(null, null, t.insertId)) < 200, 'otro taller esperó el candado');
 });
