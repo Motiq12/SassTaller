@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { estadoDeSesion, sesionVigente, rolVigente, sidAbierto } = require('../utils/sesiones');
+const { estadoDeSesion, sesionVigente, rolVigente, credencialesVigentes, sidAbierto } = require('../utils/sesiones');
 // El scope por taller se encadena acá y no ruta por ruta: si dependiera de que cada
 // endpoint se acuerde de sumarlo, el olvido sería una fuga. Así, estar autenticado y
 // tener req.db acotado al taller son la misma cosa.
@@ -60,6 +60,8 @@ module.exports = function authMiddleware(req, res, next) {
     const abierta = await sidAbierto(req.usuario.sid, req.usuario.id, req.usuario.tenant_id);
     if (abierta === undefined) return noDisponible();
     if (!abierta) return cerrada();
+    // QA34-02: la versión de credenciales con que se abrió esta sesión, contra la de ahora.
+    if (!credencialesVigentes(abierta, estado)) return cerrada();
     return tenant(req, res, next);
   });
 };

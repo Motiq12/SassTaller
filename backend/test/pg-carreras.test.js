@@ -65,16 +65,56 @@ async function respondeOBloquea(promesa) {
   throw new Error('la segunda petición ni respondió ni quedó esperando un bloqueo');
 }
 
+// Si la trampa no salta (cambió el SQL que se espera detener), la prueba falla en vez
+// de colgarse.
+function aTiempo(promesa, que) {
+  let t;
+  return Promise.race([promesa, new Promise((_, rej) => { t = setTimeout(() => rej(new Error(`no llegó: ${que}`)), 5000); })])
+    .finally(() => clearTimeout(t));
+}
+
 // Carrera completa: `primera` se detiene en `patron`; con ella detenida corre `segunda`.
 async function carrera(patron, primera, segunda) {
   const { llegada, soltar } = armar(patron);
-  const p1 = primera();
-  await llegada;
-  const p2 = segunda();
-  const fase = await respondeOBloquea(p2);
-  soltar();
-  const [r1, r2] = await Promise.all([p1, p2]);
-  return { fase, r1, r2 };
+  try {
+    const p1 = primera();
+    await aTiempo(llegada, String(patron));
+    const p2 = segunda();
+    const fase = await respondeOBloquea(p2);
+    soltar();
+    const [r1, r2] = await Promise.all([p1, p2]);
+    return { fase, r1, r2 };
+  } finally {
+    trampa = null;
+    soltar();
+  }
+}
+
+// QA34-02: detiene el login justo DESPUÉS de que bcrypt aceptó la contraseña (antes de
+// firmar el token y abrir la sesión). Para el cliente no hay ninguna consulta SQL en
+// ese tramo, así que la pausa va en el propio bcrypt.compare.
+const bcryptReal = bcrypt.compare;
+function pausarTrasBcrypt() {
+  let llego, soltar;
+  const llegada = new Promise(r => { llego = r; });
+  const suelta = new Promise(r => { soltar = r; });
+  bcrypt.compare = async function (...args) {
+    const ok = await bcryptReal.apply(this, args);
+    if (ok) { bcrypt.compare = bcryptReal; llego(); await suelta; }
+    return ok;
+  };
+  return { llegada: aTiempo(llegada, 'bcrypt del login'), soltar: () => { bcrypt.compare = bcryptReal; soltar(); } };
+}
+// Login con la clave vieja, detenido tras bcrypt; con él detenido corre `cambio`.
+async function loginContraCambio(email, cambio) {
+  const { llegada, soltar } = pausarTrasBcrypt();
+  try {
+    const login = pedir('POST', '/api/auth/login', { email, password: clave });
+    await llegada;
+    const r = await cambio();
+    soltar();
+    return { cambio: r, login: await login };
+  } finally { soltar(); }
 }
 
 async function pedir(method, ruta, body, token) {
@@ -296,4 +336,83 @@ t('QP-07: sin fecha de aprobación no se marca ninguna pieza y se compensa con d
   assert.equal(total(o), 100);
   const [[p]] = await q('SELECT rechazado FROM orden_repuestos WHERE orden_id = ?', [id]);
   assert.equal(Number(p.rechazado), 0, 'sin saber cuándo aprobó, no se inventa qué piezas rechazó');
+});
+
+// ── QA34-02: login con la contraseña vieja contra cambio o recuperación ──
+const nuevaClave = 'OtraClaveSegura456';
+const CODIGO = '482913';
+const hashCodigo = bcrypt.hashSync(CODIGO, 4);
+async function codigoDeRecuperacion(tabla, columna, id) {
+  await q(`INSERT INTO ${tabla} (tenant_id, ${columna}, code_hash, expires_at) VALUES (?, ?, ?, NOW() + INTERVAL '10 minutes')`, [tenantId, id, hashCodigo]);
+}
+const recuperar = email => pedir('POST', '/api/auth/recuperar/confirmar', { email, codigo: CODIGO, password: nuevaClave });
+
+t('QA34-02: un login con la contraseña vieja que termina después de la recuperación no sirve', async () => {
+  const otro = await personal('admin');
+  const orden = await nueva('diagnostico');
+  const previa = await entrar(otro.email);
+  await codigoDeRecuperacion('usuario_reset_codes', 'usuario_id', otro.id);
+  const { cambio, login } = await loginContraCambio(otro.email, () => recuperar(otro.email));
+  assert.equal(cambio.status, 200, JSON.stringify(cambio.body));
+  assert.equal(login.status, 200, JSON.stringify(login.body));
+  const tarde = login.body.data.token;
+  assert.equal((await pedir('GET', '/api/usuarios', null, previa)).status, 401, 'la sesión anterior ya salía');
+  // La sesión que abrió el login tardío no autoriza nada, tampoco tocar dinero.
+  assert.equal((await pedir('GET', '/api/usuarios', null, tarde)).status, 401);
+  assert.equal((await pedir('PUT', `/api/ordenes/${orden}`, { costo_mano_obra: 9876 }, tarde)).status, 401);
+  assert.equal(Number((await fila(orden)).costo_mano_obra), 100);
+  // La contraseña vieja ya no entra y la nueva sí.
+  assert.equal((await pedir('POST', '/api/auth/login', { email: otro.email, password: clave })).status, 401);
+  const r = await pedir('POST', '/api/auth/login', { email: otro.email, password: nuevaClave });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal((await pedir('GET', '/api/usuarios', null, r.body.data.token)).status, 200);
+});
+t('QA34-02: cambiar la propia contraseña deja la sesión del cambio y anula el login tardío', async () => {
+  const tec = await mecanicoAsignado();
+  const { cambio, login } = await loginContraCambio(tec.email,
+    () => pedir('PUT', '/api/mecanico/perfil/password', { actual: clave, nueva: nuevaClave }, tec.token));
+  assert.equal(cambio.status, 200, JSON.stringify(cambio.body));
+  assert.equal(login.status, 200, JSON.stringify(login.body));
+  assert.equal((await pedir('GET', '/api/mecanico/tareas', null, login.body.data.token)).status, 401);
+  assert.equal((await pedir('GET', '/api/mecanico/tareas', null, tec.token)).status, 200, 'la sesión desde la que cambió sigue');
+});
+t('QA34-02: desactivar mientras termina un login no deja una sesión que reviva al reactivar', async () => {
+  const otro = await personal('recepcion');
+  const { cambio, login } = await loginContraCambio(otro.email,
+    () => pedir('PATCH', `/api/usuarios/${otro.id}/activo`, { activo: false }, admin));
+  assert.equal(cambio.status, 200, JSON.stringify(cambio.body));
+  assert.equal(login.status, 200, JSON.stringify(login.body));
+  assert.equal((await pedir('PATCH', `/api/usuarios/${otro.id}/activo`, { activo: true }, admin)).status, 200);
+  assert.equal((await pedir('GET', '/api/recepcion/clientes', null, login.body.data.token)).status, 401);
+  assert.equal((await pedir('GET', '/api/recepcion/clientes', null, await entrar(otro.email))).status, 200);
+});
+
+async function clienteConClave() {
+  const email = `cliente-${sello}-${++secuencia}@prueba.test`;
+  const [c] = await q("INSERT INTO clientes (tenant_id, nombre, apellido, telefono, email, password_hash, email_verificado) VALUES (?, 'Ana', 'Mora', '88881111', ?, ?, 1)", [tenantId, email, hash]);
+  return { id: c.insertId, email };
+}
+t('QA34-02: portal: un login con la contraseña vieja que termina después de la recuperación no sirve', async () => {
+  const c = await clienteConClave();
+  await codigoDeRecuperacion('password_reset_codes', 'cliente_id', c.id);
+  const { cambio, login } = await loginContraCambio(c.email, () => recuperar(c.email));
+  assert.equal(cambio.status, 200, JSON.stringify(cambio.body));
+  assert.equal(login.status, 200, JSON.stringify(login.body));
+  assert.equal(login.body.data.tipo, 'cliente');
+  assert.equal((await pedir('GET', '/api/portal/ordenes', null, login.body.data.token)).status, 401);
+  const r = await pedir('POST', '/api/auth/login', { email: c.email, password: nuevaClave });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal((await pedir('GET', '/api/portal/ordenes', null, r.body.data.token)).status, 200);
+});
+t('QA34-02: portal: cambiar la contraseña entrega un token nuevo y anula el login tardío', async () => {
+  const c = await clienteConClave();
+  const propio = (await pedir('POST', '/api/auth/login', { email: c.email, password: clave })).body.data.token;
+  const { cambio, login } = await loginContraCambio(c.email,
+    () => pedir('PUT', '/api/portal/perfil/password', { actual: clave, nueva: nuevaClave }, propio));
+  assert.equal(cambio.status, 200, JSON.stringify(cambio.body));
+  assert.equal(login.status, 200, JSON.stringify(login.body));
+  assert.equal((await pedir('GET', '/api/portal/ordenes', null, login.body.data.token)).status, 401);
+  assert.equal((await pedir('GET', '/api/portal/ordenes', null, propio)).status, 401, 'el token de antes del cambio se reemplaza');
+  assert.ok(cambio.body.data && cambio.body.data.token);
+  assert.equal((await pedir('GET', '/api/portal/ordenes', null, cambio.body.data.token)).status, 200);
 });

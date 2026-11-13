@@ -384,8 +384,15 @@ export class PortalService {
     return this.http.put<{ data: any }>(`${this.url}/perfil/notificaciones`, data);
   }
 
-  updateMiPassword(data: { actual: string; nueva: string }): Observable<any> {
-    return this.http.put(`${this.url}/perfil/password`, data);
+  // Cambiar la contraseña invalida todos los tokens anteriores (también el de esta
+  // sesión): el backend devuelve uno nuevo y se guarda para seguir adentro.
+  updateMiPassword(data: { actual: string; nueva: string }): Observable<{ data?: { token?: string }; message: string }> {
+    return this.http.put<{ data?: { token?: string }; message: string }>(`${this.url}/perfil/password`, data).pipe(
+      tap(res => {
+        const cliente = this.clienteSubject.value;
+        if (res?.data?.token && cliente) this.guardarSesion(res.data.token, cliente);
+      })
+    );
   }
 
   // Sube/cambia/quita la foto de perfil (foto = data URL base64, o null para quitarla).

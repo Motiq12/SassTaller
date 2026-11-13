@@ -17,7 +17,7 @@
 const router = require('express').Router();
 const bcrypt = require('bcrypt');
 const { fail } = require('../utils/responder');
-const { cerrarLasDemas } = require('../utils/sesiones');
+const { cerrarLasDemas, cambiarContrasenaPropia } = require('../utils/sesiones');
 const { fotoValida } = require('../utils/validar');
 const { getConfig } = require('../utils/configuracion');
 const { politica, problemaDeContrasena } = require('../utils/contrasena');
@@ -54,10 +54,8 @@ router.put('/perfil/password', async (req, res) => {
     const ok = await bcrypt.compare(String(actual), u.password_hash);
     if (!ok) return res.status(400).json({ error: 'La contraseña actual no es correcta' });
     const hash = await bcrypt.hash(String(nueva), 10);
-    await req.db.query(
-      'UPDATE usuarios SET password_hash = ? WHERE id = ? AND tenant_id = @tenant',
-      [hash, req.usuario.id]
-    );
+    // QA34-02: hash, versión de credenciales y esta sesión, en una sola sentencia.
+    await cambiarContrasenaPropia(req.usuario, hash);
     await cerrarLasDemas(req.usuario);
     res.json({ message: 'Contraseña actualizada' });
   } catch (err) {
