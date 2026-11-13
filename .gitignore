@@ -30,3 +30,9 @@ pruebas-carga/lighthouse/
 
 # Capturas y mediciones de la skill de diseño (se regeneran)
 .taste-skill/
+
+# Suite end-to-end (Playwright): reportes, trazas y scripts sueltos de depuración
+e2e/playwright-report/
+e2e/test-results/
+e2e/blob-report/
+e2e/scripts-debug/

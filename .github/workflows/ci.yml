@@ -88,3 +88,59 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run build
+
+  e2e:
+    # Los 12 flujos críticos de punta a punta con Playwright, en Chromium headless.
+    # Playwright levanta el backend (3201, crea la base si falta y la migra al
+    # arrancar) y el build del frontend servido en 4310 con /api hacia el backend.
+    # Cada worker crea su propio taller por POST /api/onboarding.
+    name: E2E · 12 flujos críticos (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: motiq
+          POSTGRES_PASSWORD: motiq_ci
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U motiq"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      E2E_DATABASE_URL: postgres://motiq:motiq_ci@localhost:5432/motiq_t11_e2e
+      JWT_SECRET: secreto-solo-para-e2e-ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+            e2e/package-lock.json
+      - name: Instalar dependencias
+        run: |
+          npm ci --prefix backend
+          npm ci --prefix frontend
+          npm ci --prefix e2e
+      - name: Compilar el frontend (la suite sirve frontend/www)
+        run: npm run build
+        working-directory: frontend
+      - name: Instalar Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: e2e
+      - name: Correr la suite
+        run: npx playwright test
+        working-directory: e2e
+      - name: Guardar reporte y trazas si falla
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-e2e
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+          retention-days: 7
