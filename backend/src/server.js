@@ -34,6 +34,11 @@ if (!process.env.JWT_SECRET) {
 // registro): se avisa acá, al arrancar, y cada envío vuelve a avisar sin el contenido.
 require('./services/mailer').revisarConfiguracionCorreo();
 
+// QP3-07: sin TOTP_CLAVE (o con una mal formada) los secretos del 2FA quedan en claro.
+// No corta el arranque, para que el login no dependa de cuándo se cargue la variable:
+// avisa en el registro y sigue como antes.
+require('./utils/totp-cifrado').revisarClaveTotp();
+
 if (esProduccion) {
   if (!process.env.CORS_ORIGIN && !hasFrontend) {
     console.warn('⚠️  CORS_ORIGIN no definido en producción. Usando default restrictivo.');

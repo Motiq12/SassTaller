@@ -21,6 +21,9 @@ const URL_BASE = new URL(URL_ADMIN); URL_BASE.pathname = `/${BASE}`;
 const ENV_BASE = {
   ...process.env, DATABASE_URL: URL_BASE.href, MIGRACION_DATABASE_URL: '', DATABASE_SSL: '', PGSSLMODE: 'disable',
   JWT_SECRET: process.env.JWT_SECRET || 'solo-para-esta-prueba',
+  // QP3-07: clave de prueba generada en cada corrida (nunca una real), para que el login
+  // de la plataforma pase por el secreto cifrado.
+  TOTP_CLAVE: require('crypto').randomBytes(32).toString('base64'),
 };
 // Mismo idioma que el resto del backend: `?` y `const [filas] = ...`.
 async function abrir(url) {
@@ -34,7 +37,7 @@ async function abrir(url) {
     end: () => c.end(),
   };
 }
-Object.assign(process.env, { JWT_SECRET: ENV_BASE.JWT_SECRET });
+Object.assign(process.env, { JWT_SECRET: ENV_BASE.JWT_SECRET, TOTP_CLAVE: ENV_BASE.TOTP_CLAVE });
 const PORT = 3199;
 const url = `http://127.0.0.1:${PORT}/api`;
 const fallos = [];
@@ -603,7 +606,7 @@ async function pedir(met, ruta, { token, body, taller } = {}) {
     const totp = require('../src/utils/totp');
     const claveMotiq = 'ClaveDePlataforma123';
     const secretoMotiq = totp.generarSecreto();
-    const [[plataforma]] = await db.query("INSERT INTO plataforma_admins (nombre, email, password_hash, activo, totp_secret, totp_activado) VALUES ('Prueba', ?, ?, 1, ?, 1) RETURNING id", [correoMotiq, bcrypt.hashSync(claveMotiq, 4), secretoMotiq]);
+    const [[plataforma]] = await db.query("INSERT INTO plataforma_admins (nombre, email, password_hash, activo, totp_secret, totp_activado) VALUES ('Prueba', ?, ?, 1, ?, 1) RETURNING id", [correoMotiq, bcrypt.hashSync(claveMotiq, 4), require('../src/utils/totp-cifrado').cifrarSecreto(secretoMotiq)]);
     const aMano = jwt.sign({ id: plataforma.id, tipo: 'plataforma', nombre: 'Prueba', email: correoMotiq }, process.env.JWT_SECRET, { expiresIn: '1h' });
     ok((await pedir('GET', '/motiq/resumen', { token: aMano })).status === 401, 'Motiq: un token sin sesión persistida no entra');
     const pasoMotiq = await pedir('POST', '/motiq/login', { body: { email: correoMotiq, password: claveMotiq } });

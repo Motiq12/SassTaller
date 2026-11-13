@@ -24,6 +24,7 @@ const { ordenDeBorrado } = require('../utils/orden-borrado');
 const { TABLAS_CON_TENANT } = require('../db/tenant-db');
 const { anotar } = require('../utils/bitacora');
 const totp = require('../utils/totp');
+const { cifrarSecreto, descifrarSecreto, secretoParaVerificar, recifrado, ErrorTotpCifrado } = require('../utils/totp-cifrado');
 const { registrarEvento } = require('../utils/eventos-seguridad');
 const { DURACION_SEG, abrirSesion, cerrarSid, cambiarContrasena, cerrarTodas } = require('../utils/sesiones-plataforma');
 
@@ -149,9 +150,10 @@ router.post('/login/configurar', async (req, res) => {
       return res.status(400).json({ error: 'La verificación en dos pasos ya está configurada' });
     }
     const secreto = totp.generarSecreto();
+    // Se guarda cifrado (QP3-07); se devuelve en claro para configurar la app.
     const [r] = await pool.query(
       'UPDATE plataforma_admins SET totp_secret = ?, totp_ultimo_contador = NULL WHERE id = ? AND totp_activado = 0',
-      [secreto, admin.id]
+      [cifrarSecreto(secreto), admin.id]
     );
     if (!r.affectedRows) return res.status(400).json({ error: 'La verificación en dos pasos ya está configurada' });
     res.json({
@@ -180,17 +182,27 @@ router.post('/login/activar', async (req, res) => {
       return res.status(400).json({ error: 'La verificación en dos pasos ya está configurada' });
     }
     if (!admin.totp_secret) return res.status(400).json({ error: 'Primero generá la clave' });
-    const contador = totp.verificar(admin.totp_secret, req.body?.codigo);
+    let secreto;
+    try {
+      secreto = descifrarSecreto(admin.totp_secret);
+    } catch (err) {
+      if (!(err instanceof ErrorTotpCifrado)) throw err;
+      console.error(`❌ 2FA (plataforma ${admin.id}): ${err.message}`);
+      return res.status(503).json({ error: 'No se pudo leer la clave pendiente. Generá una nueva e intentá de nuevo.' });
+    }
+    const contador = totp.verificar(secreto, req.body?.codigo);
     if (!contador) return res.status(401).json({ error: 'Código incorrecto. Revisá que la hora del teléfono esté al día.' });
 
     const codigos = totp.generarCodigosRespaldo();
     const hashes = await Promise.all(codigos.map(c => bcrypt.hash(totp.normalizarRespaldo(c), 10)));
     // Condicionado a la misma clave y a que siga sin activar: si dos pestañas
     // configuran a la vez, solo una gana y la otra tiene que volver a empezar.
+    // Se compara contra el valor GUARDADO; una clave pendiente vieja en claro se
+    // re-cifra en la misma escritura.
     const [r] = await pool.query(
-      `UPDATE plataforma_admins SET totp_activado = 1, totp_backup = ?, totp_ultimo_contador = ?
+      `UPDATE plataforma_admins SET totp_activado = 1, totp_secret = ?, totp_backup = ?, totp_ultimo_contador = ?
         WHERE id = ? AND totp_activado = 0 AND totp_secret = ? AND credenciales_version = ?`,
-      [JSON.stringify(hashes), contador, admin.id, admin.totp_secret, datos.cv]
+      [recifrado(admin.totp_secret) || admin.totp_secret, JSON.stringify(hashes), contador, admin.id, admin.totp_secret, datos.cv]
     );
     if (!r.affectedRows) return res.status(409).json({ error: 'La configuración cambió mientras tanto. Volvé a entrar.' });
     anotar(admin, 'activo_2fa');
@@ -214,7 +226,9 @@ router.post('/login/verificar', async (req, res) => {
 
     const codigo = req.body?.codigo;
     let valido = false;
-    const contador = totp.verificar(admin.totp_secret, codigo, { ultimoContador: admin.totp_ultimo_contador });
+    // Si el secreto cifrado no se puede leer, solo entran los códigos de respaldo.
+    const secreto = secretoParaVerificar(admin.totp_secret, `plataforma ${admin.id}`);
+    const contador = totp.verificar(secreto, codigo, { ultimoContador: admin.totp_ultimo_contador });
     if (contador) {
       // Anti-replay en la misma sentencia: si dos pedidos traen el mismo código a la
       // vez, solo uno avanza el contador.
@@ -229,6 +243,14 @@ router.post('/login/verificar', async (req, res) => {
     if (!valido) {
       registrarEvento('dosfa_fallido', { email: admin.email, ip: req.ip, detalle: 'plataforma' });
       return res.status(401).json({ error: 'Código incorrecto' });
+    }
+    // Un secreto viejo en claro se re-cifra en este ingreso, si nadie lo cambió entretanto.
+    const nuevo = recifrado(admin.totp_secret);
+    if (nuevo) {
+      await pool.query(
+        'UPDATE plataforma_admins SET totp_secret = ? WHERE id = ? AND totp_secret = ?',
+        [nuevo, admin.id, admin.totp_secret]
+      ).catch(err => console.error('No se pudo re-cifrar el secreto TOTP:', err.message));
     }
     return entregarSesion(req, res, admin, datos.cv);
   } catch (err) {
