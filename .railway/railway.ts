@@ -3,14 +3,12 @@
 // Generado con `railway config migrate --service SassTaller --variables unmanaged`
 // a partir de railway.json, que Railway deja de leer el 2026-12-01.
 //
-// TODAVÍA NO ESTÁ ACTIVO: Railway sigue leyendo railway.json hasta que se haga el
-// "cutover" (pasos en la descripción del PR). Railway no lee .railway/ al desplegar.
+// Se aplica a mano con `railway config plan` y `railway config apply` (ver
+// docs/railway-iac.md). Railway no lee .railway/ al desplegar: un cambio acá no hace
+// nada hasta que alguien lo aplica.
 //
 // Variables: `managed: false` a propósito. Los secretos (DATABASE_URL, JWT_SECRET,
 // RESEND_API_KEY…) siguen viviendo en el panel de Railway y nunca en el repositorio.
-//
-// Lo que este formato no expresa: la política de reinicio de railway.json
-// (ON_FAILURE, 3 reintentos). Queda configurada en el panel del servicio.
 import { defineRailway, github, project, service } from "railway/iac";
 // This repository manages only its own resources in the environment. Other
 // repositories export their own partial name.
@@ -23,6 +21,8 @@ export default defineRailway(() => {
     start: "node backend/src/cluster.js",
     healthcheck: "/api/health",
     healthcheckTimeout: 30,
+    // Lo que tenía railway.json: si el proceso se cae, Railway lo levanta hasta 3 veces.
+    deploy: { restartPolicyType: "ON_FAILURE", restartPolicyMaxRetries: 3 },
     replicas: { "sfo": 1 },
     domains: ["motiq12.com", "www.motiq12.com"],
     networking: { privateNetworkEndpoint: "sasstaller" },
