@@ -22,6 +22,10 @@ test('03 · recepción registra a un cliente y queda en su taller', async ({ tal
 
   await page.locator('button.cta', { hasText: 'Guardar' }).click();
   await expect(page.locator('ion-toast')).toContainText(/cliente/i, { timeout: 15_000 });
+  // Al guardar, el formulario hace location.back(). Hay que esperar a que esa navegación
+  // termine: si el goto de abajo sale mientras tanto, el navegador cancela uno de los dos
+  // (net::ERR_ABORTED) y la página queda en blanco. Pasó en el CI del PR #48.
+  await page.waitForURL(url => !url.pathname.startsWith('/cliente-form'), { timeout: 15_000 });
 
   // En la base: el cliente pertenece a ESTE taller, con los datos tal cual.
   const c = await una(
