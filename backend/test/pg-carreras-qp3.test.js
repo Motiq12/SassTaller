@@ -216,7 +216,8 @@ for (const nombre of ['A', 'B']) {
     assert.equal(r1.status, 400, JSON.stringify(r1.body));
     const [[fila]] = await q('SELECT totp_activado, totp_secret FROM usuarios WHERE id = ?', [u.id]);
     assert.equal(Number(fila.totp_activado), 0);
-    assert.equal(fila.totp_secret, r2.body.data.secreto, 'queda pendiente la clave del último setup');
+    // Con TOTP_CLAVE definida el valor guardado va cifrado (QP3-07): se compara descifrado.
+    assert.equal(require('../src/utils/totp-cifrado').descifrarSecreto(fila.totp_secret), r2.body.data.secreto, 'queda pendiente la clave del último setup');
   });
 }
 

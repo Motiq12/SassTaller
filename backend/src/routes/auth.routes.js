@@ -16,6 +16,7 @@ const { nuevoCodigo, canjear, codigoDeSeisDigitos, VIGENCIA_MIN } = require('../
 const { enviarCodigoCorreoStaff, enviarCodigoReset } = require('../services/mailer');
 const { antibot } = require('../utils/antibot');
 const totp = require('../utils/totp');
+const { cifrarSecreto, descifrarSecreto, secretoParaVerificar, recifrado, ErrorTotpCifrado } = require('../utils/totp-cifrado');
 const { canjearCodigo } = require('../utils/codigos-un-uso');
 const { normalizarPermisos } = require('../utils/permisos-web');
 const { permisosDeUsuario } = require('../middleware/permisos');
@@ -345,7 +346,10 @@ router.post('/2fa/verificar', async (req, res) => {
     }
 
     const ERR = 'Código incorrecto';
-    const contador = totp.verificar(usuario.totp_secret, codigo, { ultimoContador: usuario.totp_ultimo_contador });
+    // El secreto se guarda cifrado (QP3-07). Si no se puede descifrar, el código de la
+    // app no coincide pero los de respaldo siguen sirviendo.
+    const secreto = secretoParaVerificar(usuario.totp_secret, `usuario ${usuario.id}`);
+    const contador = totp.verificar(secreto, codigo, { ultimoContador: usuario.totp_ultimo_contador });
 
     if (contador) {
       // Guarda el período consumido: ese mismo código ya no se puede reusar. El UPDATE
@@ -366,6 +370,16 @@ router.post('/2fa/verificar', async (req, res) => {
         registrarEvento('dosfa_fallido', { email: usuario.email, ip: req.ip, usuarioId: usuario.id });
         return res.status(401).json({ error: ERR });
       }
+    }
+
+    // Un secreto viejo en claro se re-cifra en este ingreso. Condicionado al valor leído:
+    // si mientras tanto cambió (baja, nuevo alta), no se pisa.
+    const nuevo = recifrado(usuario.totp_secret);
+    if (nuevo) {
+      await req.db.query(
+        'UPDATE usuarios SET totp_secret = ? WHERE id = ? AND tenant_id = @tenant AND totp_secret = ?',
+        [nuevo, usuario.id, usuario.totp_secret]
+      ).catch(err => console.error('No se pudo re-cifrar el secreto TOTP:', err.message));
     }
 
     // El SELECT de arriba no trae tenant_id: el taller sale del token parcial ya
@@ -439,9 +453,10 @@ router.post('/2fa/setup', auth, async (req, res) => {
     // QP3-01: solo reemplaza la clave PENDIENTE. Un setup que leyó "inactivo" y llega
     // después de que otra petición activó el 2FA no puede volver a apagarlo: la
     // condición va en el propio UPDATE (la lectura de arriba es solo para el mensaje).
+    // Se guarda cifrado (QP3-07); al usuario se le devuelve en claro para su app.
     const [alta] = await req.db.query(
       'UPDATE usuarios SET totp_secret = ?, totp_ultimo_contador = NULL WHERE id = ? AND tenant_id = @tenant AND totp_activado = 0',
-      [secreto, req.usuario.id]
+      [cifrarSecreto(secreto), req.usuario.id]
     );
     if (alta.affectedRows !== 1) return res.status(409).json({ error: 'La verificación en dos pasos ya está activa' });
     res.json({
@@ -474,16 +489,26 @@ router.post('/2fa/activar', auth, async (req, res) => {
     if (u?.totp_activado) return res.status(400).json({ error: 'La verificación en dos pasos ya está activa' });
     if (!u?.totp_secret) return res.status(400).json({ error: 'Primero generá la clave' });
 
-    const contador = totp.verificar(u.totp_secret, codigo);
+    let secreto;
+    try {
+      secreto = descifrarSecreto(u.totp_secret);
+    } catch (err) {
+      if (!(err instanceof ErrorTotpCifrado)) throw err;
+      console.error(`❌ 2FA (usuario ${req.usuario.id}): ${err.message}`);
+      return res.status(503).json({ error: 'No se pudo leer la clave pendiente. Generá una nueva e intentá de nuevo.' });
+    }
+    const contador = totp.verificar(secreto, codigo);
     if (!contador) return invalido(res, 'codigo', 'El código no coincide. Revisá la hora del teléfono e intentá de nuevo.');
 
     const codigos = totp.generarCodigosRespaldo();
     const hashes = await Promise.all(codigos.map(c => bcrypt.hash(totp.normalizarRespaldo(c), 10)));
     // Solo activa quien llega primero con la clave que se leyó: dos altas simultáneas
     // generaban dos juegos de códigos de respaldo y el primero mostrado no servía.
+    // La comparación es contra el valor GUARDADO (cifrado o no), no el descifrado. Una
+    // clave pendiente vieja en claro se re-cifra en la misma escritura.
     const [alta] = await req.db.query(
-      'UPDATE usuarios SET totp_activado = 1, totp_backup = ?, totp_ultimo_contador = ? WHERE id = ? AND tenant_id = @tenant AND totp_activado = 0 AND totp_secret = ?',
-      [JSON.stringify(hashes), contador, req.usuario.id, u.totp_secret]
+      'UPDATE usuarios SET totp_activado = 1, totp_secret = ?, totp_backup = ?, totp_ultimo_contador = ? WHERE id = ? AND tenant_id = @tenant AND totp_activado = 0 AND totp_secret = ?',
+      [recifrado(u.totp_secret) || u.totp_secret, JSON.stringify(hashes), contador, req.usuario.id, u.totp_secret]
     );
     if (alta.affectedRows !== 1) return res.status(400).json({ error: 'La verificación en dos pasos ya está activa' });
 
